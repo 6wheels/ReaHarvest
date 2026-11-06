@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import 'app.dart';
 import 'app_paths.dart';
 import 'demo_titles.dart';
+import 'state/libraries.dart';
 import 'state/providers.dart';
 
 const _demo = bool.fromEnvironment('REAHARVEST_DEMO');
@@ -30,17 +32,22 @@ Future<void> main() async {
   final settingsFile = SettingsFile(p.join(dir, 'settings.json'));
   final settings = await settingsFile.load();
 
+  final container = ProviderContainer(
+    overrides: [
+      settingsFileProvider.overrideWithValue(settingsFile),
+      initialSettingsProvider.overrideWithValue(settings),
+      localIndexProvider.overrideWithValue(
+        LocalIndex.open(p.join(dir, 'index.sqlite')),
+      ),
+      if (_demo) titleViewsProvider.overrideWithValue(demoTitles()),
+    ],
+  );
   runApp(
-    ProviderScope(
-      overrides: [
-        settingsFileProvider.overrideWithValue(settingsFile),
-        initialSettingsProvider.overrideWithValue(settings),
-        localIndexProvider.overrideWithValue(
-          LocalIndex.open(p.join(dir, 'index.sqlite')),
-        ),
-        if (_demo) titleViewsProvider.overrideWithValue(demoTitles()),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const ReaHarvestApp(),
     ),
   );
+  // Indexed titles are shown at once; the scan then refreshes them.
+  if (!_demo) unawaited(container.read(libraryServiceProvider).scanAll());
 }

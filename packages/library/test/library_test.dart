@@ -193,6 +193,13 @@ void main() {
         read.removeLibrary(const LibraryId('L1')).libraries.single.id,
         'L2',
       );
+
+      final kept = read.copyWith(theme: ThemePreference.light);
+      expect(kept.reaperExecutable, '/opt/reaper/reaper');
+      final reset = read.copyWith(reaperExecutable: null, templatesFolder: null);
+      expect(reset.reaperExecutable, isNull);
+      expect(reset.templatesFolder, isNull);
+      expect(reset.reaperResources, '/home/alice/.config/REAPER');
     });
 
     test('rejects an unsupported schema', () {

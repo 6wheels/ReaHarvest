@@ -265,6 +265,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scene'**
   String get levelScene;
+
+  /// No description provided for @welcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to ReaHarvest'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Let\'s set up your first library. It only takes a minute.'**
+  String get welcomeHint;
+
+  /// No description provided for @yourName.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get yourName;
+
+  /// No description provided for @yourNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown as the owner of your versions.'**
+  String get yourNameHint;
+
+  /// No description provided for @later.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get later;
+
+  /// No description provided for @continueAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get continueAction;
+
+  /// No description provided for @back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
+  /// No description provided for @finish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get finish;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @stepOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current} of {total}'**
+  String stepOf(int current, int total);
+
+  /// No description provided for @libraryStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your first library'**
+  String get libraryStepTitle;
+
+  /// No description provided for @libraryStepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the folder that holds, or will hold, your REAPER projects.'**
+  String get libraryStepHint;
+
+  /// No description provided for @libraryFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get libraryFolder;
+
+  /// No description provided for @choose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose…'**
+  String get choose;
+
+  /// No description provided for @noFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'No folder chosen'**
+  String get noFolder;
+
+  /// No description provided for @libraryName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get libraryName;
+
+  /// No description provided for @libraryMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode'**
+  String get libraryMode;
+
+  /// No description provided for @modeLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get modeLocal;
+
+  /// No description provided for @modeCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud'**
+  String get modeCloud;
+
+  /// No description provided for @modeCollab.
+  ///
+  /// In en, this message translates to:
+  /// **'Collaboration'**
+  String get modeCollab;
+
+  /// No description provided for @modesComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud and collaboration modes are coming soon.'**
+  String get modesComingSoon;
+
+  /// No description provided for @libraryLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Organization'**
+  String get libraryLayout;
+
+  /// No description provided for @recommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get recommended;
+
+  /// No description provided for @layoutClassic.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic'**
+  String get layoutClassic;
+
+  /// No description provided for @layoutProjectOriented.
+  ///
+  /// In en, this message translates to:
+  /// **'Project-oriented'**
+  String get layoutProjectOriented;
+
+  /// No description provided for @layoutFilm.
+  ///
+  /// In en, this message translates to:
+  /// **'Film-oriented'**
+  String get layoutFilm;
+
+  /// No description provided for @layoutFreeTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free tree'**
+  String get layoutFreeTree;
+
+  /// No description provided for @layoutFreeTreeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own folders, at any depth.'**
+  String get layoutFreeTreeHint;
+
+  /// No description provided for @existingLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder already holds a library: its organization is kept.'**
+  String get existingLibrary;
+
+  /// No description provided for @createLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Create library'**
+  String get createLibrary;
+
+  /// No description provided for @addLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a library'**
+  String get addLibrary;
+
+  /// No description provided for @errorUnsupportedMode.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder holds a cloud or collaboration library, which is not supported yet.'**
+  String get errorUnsupportedMode;
+
+  /// No description provided for @errorOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is, contains or is inside another library.'**
+  String get errorOverlap;
+
+  /// No description provided for @errorInvalidFile.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder holds an unreadable _library.json file.'**
+  String get errorInvalidFile;
+
+  /// No description provided for @reaperStepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'ReaHarvest opens your projects in REAPER and checks your plugins.'**
+  String get reaperStepHint;
+
+  /// No description provided for @reaperExecutable.
+  ///
+  /// In en, this message translates to:
+  /// **'Application'**
+  String get reaperExecutable;
+
+  /// No description provided for @reaperResources.
+  ///
+  /// In en, this message translates to:
+  /// **'Resource folder'**
+  String get reaperResources;
+
+  /// No description provided for @templatesFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Project templates'**
+  String get templatesFolder;
+
+  /// No description provided for @notFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found'**
+  String get notFound;
+
+  /// No description provided for @resetToDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get resetToDefault;
+
+  /// No description provided for @peaksWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Peak files (.reapeaks) are saved next to your projects. To keep your library clean, enable “Store all peak caches (.reapeaks) in alternate path” in REAPER (Preferences > General > Paths).'**
+  String get peaksWarning;
+
+  /// No description provided for @profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profile;
+
+  /// No description provided for @libraries.
+  ///
+  /// In en, this message translates to:
+  /// **'Libraries'**
+  String get libraries;
+
+  /// No description provided for @noLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'No library yet.'**
+  String get noLibrary;
+
+  /// No description provided for @removeLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeLibrary;
+
+  /// No description provided for @removeLibraryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove “{name}”?'**
+  String removeLibraryTitle(String name);
+
+  /// No description provided for @removeLibraryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The library is only removed from ReaHarvest: its folder and files are left untouched.'**
+  String get removeLibraryHint;
 }
 
 class _AppLocalizationsDelegate

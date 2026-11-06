@@ -6,6 +6,7 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import 'l10n/app_localizations.dart';
 import 'state/providers.dart';
 import 'theme/app_theme.dart';
+import 'ui/first_run_wizard.dart';
 import 'ui/library_page.dart';
 
 class ReaHarvestApp extends ConsumerWidget {
@@ -43,7 +44,12 @@ class ReaHarvestApp extends ConsumerWidget {
         ).copyWith(textScaler: TextScaler.linear(settings.textScale)),
         child: child!,
       ),
-      home: const LibraryPage(),
+      home: AnimatedSwitcher(
+        duration: Motion.slow,
+        child: ref.watch(wizardActiveProvider)
+            ? const FirstRunWizard()
+            : const LibraryPage(),
+      ),
     );
   }
 }

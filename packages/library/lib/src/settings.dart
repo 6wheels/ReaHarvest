@@ -106,25 +106,32 @@ final class AppSettings {
   /// UI language code (e.g. `en`), or [systemLanguage].
   final String language;
 
+  /// Copy with the given values. Paths are kept when omitted and reset to
+  /// the default when passed as null.
   AppSettings copyWith({
     LocalIdentity? identity,
     List<LibraryEntry>? libraries,
-    String? reaperExecutable,
-    String? reaperResources,
-    String? templatesFolder,
+    Object? reaperExecutable = _keep,
+    Object? reaperResources = _keep,
+    Object? templatesFolder = _keep,
     ThemePreference? theme,
     double? textScale,
     String? language,
   }) => AppSettings(
     identity: identity ?? this.identity,
     libraries: libraries ?? this.libraries,
-    reaperExecutable: reaperExecutable ?? this.reaperExecutable,
-    reaperResources: reaperResources ?? this.reaperResources,
-    templatesFolder: templatesFolder ?? this.templatesFolder,
+    reaperExecutable: _path(reaperExecutable, this.reaperExecutable),
+    reaperResources: _path(reaperResources, this.reaperResources),
+    templatesFolder: _path(templatesFolder, this.templatesFolder),
     theme: theme ?? this.theme,
     textScale: textScale ?? this.textScale,
     language: language ?? this.language,
   );
+
+  static const _keep = Object();
+
+  static String? _path(Object? value, String? current) =>
+      identical(value, _keep) ? current : value as String?;
 
   /// Adds [entry]. Throws [ArgumentError] if the id is already configured or
   /// if one of its folders is, contains or is inside a folder of another

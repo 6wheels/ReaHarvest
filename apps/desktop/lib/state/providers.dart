@@ -39,16 +39,29 @@ final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(
   SettingsNotifier.new,
 );
 
+/// Incremented after every index change, to refresh what reads the index.
+class IndexRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+final indexRevisionProvider = NotifierProvider<IndexRevision, int>(
+  IndexRevision.new,
+);
+
 /// What a title card shows. [bpm] and [status] are null until known.
 typedef TitleView = ({Title title, int? bpm, String? status});
 
 /// All indexed titles, served from the index (SPEC §8: startup view).
-final titleViewsProvider = Provider<List<TitleView>>(
-  (ref) => [
+final titleViewsProvider = Provider<List<TitleView>>((ref) {
+  ref.watch(indexRevisionProvider);
+  return [
     for (final t in ref.watch(localIndexProvider).titles())
       (title: t, bpm: null, status: t.status),
-  ],
-);
+  ];
+});
 
 class SearchQueryNotifier extends Notifier<String> {
   @override

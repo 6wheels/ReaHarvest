@@ -106,4 +106,159 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get levelScene => 'Scene';
+
+  @override
+  String get welcomeTitle => 'Welcome to ReaHarvest';
+
+  @override
+  String get welcomeHint =>
+      'Let\'s set up your first library. It only takes a minute.';
+
+  @override
+  String get yourName => 'Your name';
+
+  @override
+  String get yourNameHint => 'Shown as the owner of your versions.';
+
+  @override
+  String get later => 'Later';
+
+  @override
+  String get continueAction => 'Continue';
+
+  @override
+  String get back => 'Back';
+
+  @override
+  String get finish => 'Finish';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String stepOf(int current, int total) {
+    return 'Step $current of $total';
+  }
+
+  @override
+  String get libraryStepTitle => 'Your first library';
+
+  @override
+  String get libraryStepHint =>
+      'Choose the folder that holds, or will hold, your REAPER projects.';
+
+  @override
+  String get libraryFolder => 'Folder';
+
+  @override
+  String get choose => 'Choose…';
+
+  @override
+  String get noFolder => 'No folder chosen';
+
+  @override
+  String get libraryName => 'Name';
+
+  @override
+  String get libraryMode => 'Mode';
+
+  @override
+  String get modeLocal => 'Local';
+
+  @override
+  String get modeCloud => 'Cloud';
+
+  @override
+  String get modeCollab => 'Collaboration';
+
+  @override
+  String get modesComingSoon =>
+      'Cloud and collaboration modes are coming soon.';
+
+  @override
+  String get libraryLayout => 'Organization';
+
+  @override
+  String get recommended => 'Recommended';
+
+  @override
+  String get layoutClassic => 'Classic';
+
+  @override
+  String get layoutProjectOriented => 'Project-oriented';
+
+  @override
+  String get layoutFilm => 'Film-oriented';
+
+  @override
+  String get layoutFreeTree => 'Free tree';
+
+  @override
+  String get layoutFreeTreeHint => 'Your own folders, at any depth.';
+
+  @override
+  String get existingLibrary =>
+      'This folder already holds a library: its organization is kept.';
+
+  @override
+  String get createLibrary => 'Create library';
+
+  @override
+  String get addLibrary => 'Add a library';
+
+  @override
+  String get errorUnsupportedMode =>
+      'This folder holds a cloud or collaboration library, which is not supported yet.';
+
+  @override
+  String get errorOverlap =>
+      'This folder is, contains or is inside another library.';
+
+  @override
+  String get errorInvalidFile =>
+      'This folder holds an unreadable _library.json file.';
+
+  @override
+  String get reaperStepHint =>
+      'ReaHarvest opens your projects in REAPER and checks your plugins.';
+
+  @override
+  String get reaperExecutable => 'Application';
+
+  @override
+  String get reaperResources => 'Resource folder';
+
+  @override
+  String get templatesFolder => 'Project templates';
+
+  @override
+  String get notFound => 'Not found';
+
+  @override
+  String get resetToDefault => 'Reset to default';
+
+  @override
+  String get peaksWarning =>
+      'Peak files (.reapeaks) are saved next to your projects. To keep your library clean, enable “Store all peak caches (.reapeaks) in alternate path” in REAPER (Preferences > General > Paths).';
+
+  @override
+  String get profile => 'Profile';
+
+  @override
+  String get libraries => 'Libraries';
+
+  @override
+  String get noLibrary => 'No library yet.';
+
+  @override
+  String get removeLibrary => 'Remove';
+
+  @override
+  String removeLibraryTitle(String name) {
+    return 'Remove “$name”?';
+  }
+
+  @override
+  String get removeLibraryHint =>
+      'The library is only removed from ReaHarvest: its folder and files are left untouched.';
 }
