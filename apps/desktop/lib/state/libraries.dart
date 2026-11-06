@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +20,10 @@ enum LibraryProblem {
 
   /// The folder holds an unreadable `_library.json`.
   invalidFile,
+
+  /// The library already holds titles: its layout cannot change without a
+  /// migration (SPEC §3.1).
+  layoutLocked,
 }
 
 final class LibraryException implements Exception {
@@ -49,10 +54,15 @@ class LibraryService {
     }
   }
 
+  /// Whether the layout of [library], described in [folder], can no longer
+  /// change: frozen, or the folder already holds projects (SPEC §3.1).
+  Future<bool> isLayoutLocked(String folder, Library library) async =>
+      (library.layout?.frozen ?? false) || await _hasProjects(folder);
+
   /// Adds the local library at [folder] with [layout] (null: free tree):
   /// attaches the library already described there (keeping its id, and
-  /// replacing its layout if it differs), or creates it. Then scans it.
-  /// Throws [LibraryException].
+  /// replacing its layout if it differs and is not locked), or creates it.
+  /// Then scans it. Throws [LibraryException].
   Future<void> addLocal({
     required String folder,
     required String displayName,
@@ -62,11 +72,17 @@ class LibraryService {
     if (found != null && found.mode != LibraryMode.local) {
       throw const LibraryException(LibraryProblem.unsupportedMode);
     }
-    final library = Library(
-      id: found?.id ?? LibraryId.generate(),
-      mode: LibraryMode.local,
-      layout: layout,
-    );
+    final changed = found == null || !sameLayout(found.layout, layout);
+    if (found != null && changed && await isLayoutLocked(folder, found)) {
+      throw const LibraryException(LibraryProblem.layoutLocked);
+    }
+    final library = changed
+        ? Library(
+            id: found?.id ?? LibraryId.generate(),
+            mode: LibraryMode.local,
+            layout: layout,
+          )
+        : found;
     final entry = LibraryEntry(
       id: library.id,
       displayName: displayName.trim().isEmpty
@@ -81,9 +97,7 @@ class LibraryService {
     } on ArgumentError {
       throw const LibraryException(LibraryProblem.overlap);
     }
-    if (found == null || !sameLayout(found.layout, layout)) {
-      await writeLibrary(MountedFolderStorage(folder), library);
-    }
+    if (changed) await writeLibrary(MountedFolderStorage(folder), library);
     await ref.read(settingsProvider.notifier).change((_) => updated);
     await scan(entry);
   }
@@ -109,7 +123,8 @@ class LibraryService {
   Future<void> scan(LibraryEntry entry) async {
     try {
       final root = entry.libraryRoot;
-      final library = await readLibrary(MountedFolderStorage(root));
+      final storage = MountedFolderStorage(root);
+      var library = await readLibrary(storage);
       if (library == null) return;
       final index = ref.read(localIndexProvider);
       final result = await scanFolder(
@@ -117,6 +132,17 @@ class LibraryService {
         library,
         previous: index.scanResult(library.id),
       );
+      // The layout is frozen as soon as the library holds a title (§3.1).
+      final layout = library.layout;
+      if (layout != null && !layout.frozen && result.titles.isNotEmpty) {
+        library = Library(
+          id: library.id,
+          mode: library.mode,
+          layout: layout.freeze(),
+          collab: library.collab,
+        );
+        await writeLibrary(storage, library);
+      }
       index.update(library, result);
       ref.read(indexRevisionProvider.notifier).bump();
     } on Object catch (error) {
@@ -125,6 +151,22 @@ class LibraryService {
     }
   }
 }
+
+/// Whether [folder] holds a REAPER project (backups, history and trash left
+/// out), listed in an isolate.
+Future<bool> _hasProjects(String folder) => Isolate.run(() async {
+  for (final e in await MountedFolderStorage(
+    folder,
+  ).list('', recursive: true)) {
+    final segments = e.path.split('/');
+    if (!e.isDirectory &&
+        isProjectFile(segments.last) &&
+        !segments.any(isExcludedFolder)) {
+      return true;
+    }
+  }
+  return false;
+});
 
 /// Same layout levels and render mapping (the frozen flag is ignored).
 bool sameLayout(Layout? a, Layout? b) =>

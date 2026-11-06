@@ -31,6 +31,9 @@ class FakePickers extends Pickers {
 /// Library found in any chosen folder.
 Library? existingLibrary;
 
+/// Whether [existingLibrary] holds titles.
+var existingLocked = false;
+
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
   FakeLibraryService(super.ref);
@@ -40,6 +43,10 @@ class FakeLibraryService extends LibraryService {
 
   @override
   Future<Library?> existing(String folder) async => existingLibrary;
+
+  @override
+  Future<bool> isLayoutLocked(String folder, Library library) async =>
+      existingLocked;
 
   @override
   Future<void> addLocal({
@@ -88,6 +95,7 @@ void main() {
     addTearDown(tester.view.reset);
     settings = MemorySettings();
     existingLibrary = null;
+    existingLocked = false;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -286,6 +294,31 @@ void main() {
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
     expect(libraries.added.single.$3!.leaf.key, 'scene');
+  });
+
+  testWidgets('a library holding titles shows its layout only', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingLibrary = Library(
+      id: LibraryId.generate(),
+      mode: LibraryMode.local,
+      layout: Layout.projectOriented().freeze(),
+    );
+    existingLocked = true;
+    await tester.tap(find.text('Choose…'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('organization is fixed'), findsOneWidget);
+    expect(find.text('Project-oriented'), findsOneWidget);
+    expect(find.text('Classic'), findsNothing);
+    expect(find.text('Free tree'), findsNothing);
+
+    await tester.ensureVisible(find.text('Create library'));
+    await tester.tap(find.text('Create library'));
+    await tester.pumpAndSettle();
+    expect(libraries.added.single.$3!.levels, hasLength(2));
   });
 
   testWidgets('uses French when chosen', (tester) async {

@@ -198,7 +198,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get existingLibrary =>
-      'This folder already holds a library. Changing its organization keeps the files in place: folders that no longer match it go to “To sort”.';
+      'This folder already holds a library without titles: you can still change its organization.';
+
+  @override
+  String get layoutLocked =>
+      'This library already holds titles: its organization is fixed. Changing it requires a migration.';
 
   @override
   String get layoutCurrent => 'Current organization';

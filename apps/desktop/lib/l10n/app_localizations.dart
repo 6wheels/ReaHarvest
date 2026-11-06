@@ -437,8 +437,14 @@ abstract class AppLocalizations {
   /// No description provided for @existingLibrary.
   ///
   /// In en, this message translates to:
-  /// **'This folder already holds a library. Changing its organization keeps the files in place: folders that no longer match it go to “To sort”.'**
+  /// **'This folder already holds a library without titles: you can still change its organization.'**
   String get existingLibrary;
+
+  /// No description provided for @layoutLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'This library already holds titles: its organization is fixed. Changing it requires a migration.'**
+  String get layoutLocked;
 
   /// No description provided for @layoutCurrent.
   ///

@@ -34,6 +34,10 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
   final _name = TextEditingController();
   String? _folder;
   Library? _existing;
+
+  /// The existing library holds titles: its layout cannot change.
+  var _locked = false;
+
   /// Selected choice: a template, the free tree, or the current custom
   /// layout of an existing library.
   var _choice = LayoutTemplate.recommended.index;
@@ -49,12 +53,16 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
   Future<void> _chooseFolder() async {
     final folder = await ref.read(pickersProvider).folder(initial: _folder);
     if (folder == null) return;
+    final service = ref.read(libraryServiceProvider);
     Library? existing;
+    var locked = false;
     LibraryProblem? problem;
     try {
-      existing = await ref.read(libraryServiceProvider).existing(folder);
+      existing = await service.existing(folder);
       if (existing != null && existing.mode != LibraryMode.local) {
         problem = LibraryProblem.unsupportedMode;
+      } else if (existing != null) {
+        locked = await service.isLayoutLocked(folder, existing);
       }
     } on LibraryException catch (e) {
       problem = e.problem;
@@ -63,6 +71,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
     setState(() {
       _folder = folder;
       _existing = existing;
+      _locked = locked;
       _problem = problem;
       if (existing != null) _choice = _choiceOf(existing.layout);
       if (_name.text.trim().isEmpty) _name.text = p.basename(folder);
@@ -95,11 +104,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
     try {
       await ref
           .read(libraryServiceProvider)
-          .addLocal(
-            folder: _folder!,
-            displayName: _name.text,
-            layout: _layout,
-          );
+          .addLocal(folder: _folder!, displayName: _name.text, layout: _layout);
       widget.onAdded();
     } on LibraryException catch (e) {
       if (mounted) setState(() => _problem = e.problem);
@@ -176,29 +181,31 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: Space.s),
                   child: Text(
-                    l10n.existingLibrary,
+                    _locked ? l10n.layoutLocked : l10n.existingLibrary,
                     style: text.bodySmall?.copyWith(color: c.muted),
                   ),
                 ),
               for (final t in LayoutTemplate.values)
+                if (!_locked || _choice == t.index)
+                  _LayoutChoice(
+                    name: switch (t) {
+                      LayoutTemplate.classic => l10n.layoutClassic,
+                      LayoutTemplate.projectOriented =>
+                        l10n.layoutProjectOriented,
+                      LayoutTemplate.film => l10n.layoutFilm,
+                    },
+                    detail: _levels(l10n, t.create()),
+                    recommended: t == LayoutTemplate.recommended,
+                    selected: _choice == t.index,
+                    onTap: () => setState(() => _choice = t.index),
+                  ),
+              if (!_locked || _choice == _freeTreeChoice)
                 _LayoutChoice(
-                  name: switch (t) {
-                    LayoutTemplate.classic => l10n.layoutClassic,
-                    LayoutTemplate.projectOriented =>
-                      l10n.layoutProjectOriented,
-                    LayoutTemplate.film => l10n.layoutFilm,
-                  },
-                  detail: _levels(l10n, t.create()),
-                  recommended: t == LayoutTemplate.recommended,
-                  selected: _choice == t.index,
-                  onTap: () => setState(() => _choice = t.index),
+                  name: l10n.layoutFreeTree,
+                  detail: l10n.layoutFreeTreeHint,
+                  selected: _choice == _freeTreeChoice,
+                  onTap: () => setState(() => _choice = _freeTreeChoice),
                 ),
-              _LayoutChoice(
-                name: l10n.layoutFreeTree,
-                detail: l10n.layoutFreeTreeHint,
-                selected: _choice == _freeTreeChoice,
-                onTap: () => setState(() => _choice = _freeTreeChoice),
-              ),
               if (_custom case final custom?)
                 _LayoutChoice(
                   name: l10n.layoutCurrent,
@@ -217,6 +224,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
                 LibraryProblem.unsupportedMode => l10n.errorUnsupportedMode,
                 LibraryProblem.overlap => l10n.errorOverlap,
                 LibraryProblem.invalidFile => l10n.errorInvalidFile,
+                LibraryProblem.layoutLocked => l10n.layoutLocked,
               },
               style: text.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.error,

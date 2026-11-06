@@ -71,6 +71,9 @@ void main() {
       'title',
     ]);
     expect(index.titles().single.tags['title'], 'Song');
+    // Frozen by the scan, as soon as a title exists (SPEC §3.1).
+    expect(library.layout!.frozen, isTrue);
+    expect(index.libraries().single.layout!.frozen, isTrue);
     expect(container.read(indexRevisionProvider), greaterThan(revision));
   });
 
@@ -115,6 +118,59 @@ void main() {
     expect(read.id, id);
     expect(read.layout!.leaf.key, 'scene');
     expect(container.read(settingsProvider).libraries.single.id, id);
+  });
+
+  test('a library holding titles keeps its layout', () async {
+    final band = folder('Band');
+    final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
+      ..createSync(recursive: true);
+    File(
+      '../../test/fixtures/project-1.rpp',
+    ).copySync(p.join(song.path, 'v1.rpp'));
+    await service().addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    final id = container.read(settingsProvider).libraries.single.id;
+    await service().remove(id);
+    final found = (await service().existing(band))!;
+    expect(await service().isLayoutLocked(band, found), isTrue);
+
+    await expectLater(
+      service().addLocal(folder: band, displayName: '', layout: Layout.film()),
+      throwsA(
+        isA<LibraryException>().having(
+          (e) => e.problem,
+          'problem',
+          LibraryProblem.layoutLocked,
+        ),
+      ),
+    );
+    expect(container.read(settingsProvider).libraries, isEmpty);
+
+    await service().addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    expect(container.read(settingsProvider).libraries.single.id, id);
+  });
+
+  test('a free tree holding projects is locked too', () async {
+    final solo = folder('Solo');
+    final library = Library(
+      id: LibraryId.generate(),
+      mode: LibraryMode.local,
+      layout: null,
+    );
+    await writeLibrary(MountedFolderStorage(solo), library);
+    Directory(p.join(solo, 'Backups')).createSync();
+    File(p.join(solo, 'Backups', 'old.rpp')).writeAsStringSync('');
+    expect(await service().isLayoutLocked(solo, library), isFalse);
+
+    File(p.join(solo, 'Demo.RPP')).writeAsStringSync('');
+    expect(await service().isLayoutLocked(solo, library), isTrue);
   });
 
   test('rejects cloud libraries, overlaps and invalid files', () async {
