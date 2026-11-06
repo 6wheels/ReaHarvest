@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -47,9 +49,10 @@ class LibraryService {
     }
   }
 
-  /// Adds the local library at [folder]: attaches the library already
-  /// described there, or creates it with [layout] (null: free tree). Then
-  /// scans it. Throws [LibraryException].
+  /// Adds the local library at [folder] with [layout] (null: free tree):
+  /// attaches the library already described there (keeping its id, and
+  /// replacing its layout if it differs), or creates it. Then scans it.
+  /// Throws [LibraryException].
   Future<void> addLocal({
     required String folder,
     required String displayName,
@@ -59,13 +62,11 @@ class LibraryService {
     if (found != null && found.mode != LibraryMode.local) {
       throw const LibraryException(LibraryProblem.unsupportedMode);
     }
-    final library =
-        found ??
-        Library(
-          id: LibraryId.generate(),
-          mode: LibraryMode.local,
-          layout: layout,
-        );
+    final library = Library(
+      id: found?.id ?? LibraryId.generate(),
+      mode: LibraryMode.local,
+      layout: layout,
+    );
     final entry = LibraryEntry(
       id: library.id,
       displayName: displayName.trim().isEmpty
@@ -80,7 +81,7 @@ class LibraryService {
     } on ArgumentError {
       throw const LibraryException(LibraryProblem.overlap);
     }
-    if (found == null) {
+    if (found == null || !sameLayout(found.layout, layout)) {
       await writeLibrary(MountedFolderStorage(folder), library);
     }
     await ref.read(settingsProvider.notifier).change((_) => updated);
@@ -124,5 +125,9 @@ class LibraryService {
     }
   }
 }
+
+/// Same layout levels and render mapping (the frozen flag is ignored).
+bool sameLayout(Layout? a, Layout? b) =>
+    jsonEncode(a?.freeze().toJson()) == jsonEncode(b?.freeze().toJson());
 
 final libraryServiceProvider = Provider<LibraryService>(LibraryService.new);

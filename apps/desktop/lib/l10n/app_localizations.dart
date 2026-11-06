@@ -437,8 +437,14 @@ abstract class AppLocalizations {
   /// No description provided for @existingLibrary.
   ///
   /// In en, this message translates to:
-  /// **'This folder already holds a library: its organization is kept.'**
+  /// **'This folder already holds a library. Changing its organization keeps the files in place: folders that no longer match it go to “To sort”.'**
   String get existingLibrary;
+
+  /// No description provided for @layoutCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current organization'**
+  String get layoutCurrent;
 
   /// No description provided for @createLibrary.
   ///

@@ -199,7 +199,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get existingLibrary =>
-      'Ce dossier contient déjà une bibliothèque : son organisation est conservée.';
+      'Ce dossier contient déjà une bibliothèque. Changer son organisation laisse les fichiers en place : les dossiers qui ne correspondent plus vont dans « À ranger ».';
+
+  @override
+  String get layoutCurrent => 'Organisation actuelle';
 
   @override
   String get createLibrary => 'Créer la bibliothèque';

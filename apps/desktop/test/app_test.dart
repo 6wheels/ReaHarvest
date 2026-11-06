@@ -28,6 +28,9 @@ class FakePickers extends Pickers {
   Future<String?> reaperExecutable() async => '/apps/reaper';
 }
 
+/// Library found in any chosen folder.
+Library? existingLibrary;
+
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
   FakeLibraryService(super.ref);
@@ -36,7 +39,7 @@ class FakeLibraryService extends LibraryService {
   final removed = <LibraryId>[];
 
   @override
-  Future<Library?> existing(String folder) async => null;
+  Future<Library?> existing(String folder) async => existingLibrary;
 
   @override
   Future<void> addLocal({
@@ -84,6 +87,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     settings = MemorySettings();
+    existingLibrary = null;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -170,6 +174,7 @@ void main() {
     await tester.tap(find.text('Choose…'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Film-oriented'));
+    await tester.ensureVisible(find.text('Create library'));
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
     final (folder, name, layout) = libraries.added.single;
@@ -240,6 +245,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(libraries.added.single.$3, isNull);
     expect(find.text('/music/Band'), findsOneWidget);
+  });
+
+  testWidgets('an existing library keeps or changes its layout', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    final custom = Layout(const [LayoutLevel('client'), LayoutLevel('spot')]);
+    existingLibrary = Library(
+      id: LibraryId.generate(),
+      mode: LibraryMode.local,
+      layout: custom,
+    );
+    await tester.tap(find.text('Choose…'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('already holds a library'), findsOneWidget);
+    expect(find.text('client / spot'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Create library'));
+    await tester.tap(find.text('Create library'));
+    await tester.pumpAndSettle();
+    expect(libraries.added.single.$3, same(custom));
+  });
+
+  testWidgets('an existing template library is preselected', (tester) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingLibrary = Library(
+      id: LibraryId.generate(),
+      mode: LibraryMode.local,
+      layout: Layout.film().freeze(),
+    );
+    await tester.tap(find.text('Choose…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Current organization'), findsNothing);
+    await tester.ensureVisible(find.text('Create library'));
+    await tester.tap(find.text('Create library'));
+    await tester.pumpAndSettle();
+    expect(libraries.added.single.$3!.leaf.key, 'scene');
   });
 
   testWidgets('uses French when chosen', (tester) async {

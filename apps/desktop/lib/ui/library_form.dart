@@ -27,14 +27,16 @@ class LibraryForm extends ConsumerStatefulWidget {
   ConsumerState<LibraryForm> createState() => _LibraryFormState();
 }
 
-/// Layout choices: the provided templates, then the free tree (null).
-const _choices = <LayoutTemplate?>[...LayoutTemplate.values, null];
+/// Index of the free tree in the layout choices, after the templates.
+final _freeTreeChoice = LayoutTemplate.values.length;
 
 class _LibraryFormState extends ConsumerState<LibraryForm> {
   final _name = TextEditingController();
   String? _folder;
   Library? _existing;
-  LayoutTemplate? _template = LayoutTemplate.recommended;
+  /// Selected choice: a template, the free tree, or the current custom
+  /// layout of an existing library.
+  var _choice = LayoutTemplate.recommended.index;
   LibraryProblem? _problem;
   var _busy = false;
 
@@ -62,9 +64,31 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
       _folder = folder;
       _existing = existing;
       _problem = problem;
+      if (existing != null) _choice = _choiceOf(existing.layout);
       if (_name.text.trim().isEmpty) _name.text = p.basename(folder);
     });
   }
+
+  /// Choice matching [layout]: a template, the free tree, or the custom one.
+  static int _choiceOf(Layout? layout) {
+    if (layout == null) return _freeTreeChoice;
+    for (final t in LayoutTemplate.values) {
+      if (sameLayout(t.create(), layout)) return t.index;
+    }
+    return _freeTreeChoice + 1;
+  }
+
+  /// Existing custom layout, offered as an extra choice.
+  Layout? get _custom => switch (_existing?.layout) {
+    final l? when _choiceOf(l) > _freeTreeChoice => l,
+    _ => null,
+  };
+
+  Layout? get _layout => _choice < _freeTreeChoice
+      ? LayoutTemplate.values[_choice].create()
+      : _choice == _freeTreeChoice
+      ? null
+      : _custom;
 
   Future<void> _submit() async {
     setState(() => _busy = true);
@@ -74,7 +98,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
           .addLocal(
             folder: _folder!,
             displayName: _name.text,
-            layout: _template?.create(),
+            layout: _layout,
           );
       widget.onAdded();
     } on LibraryException catch (e) {
@@ -145,21 +169,45 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
         FormRow(
           label: l10n.libraryLayout,
           alignTop: true,
-          child: _existing != null
-              ? Text(
-                  l10n.existingLibrary,
-                  style: text.bodyMedium?.copyWith(color: c.muted),
-                )
-              : Column(
-                  children: [
-                    for (final t in _choices)
-                      _LayoutChoice(
-                        template: t,
-                        selected: _template == t,
-                        onTap: () => setState(() => _template = t),
-                      ),
-                  ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_existing != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Space.s),
+                  child: Text(
+                    l10n.existingLibrary,
+                    style: text.bodySmall?.copyWith(color: c.muted),
+                  ),
                 ),
+              for (final t in LayoutTemplate.values)
+                _LayoutChoice(
+                  name: switch (t) {
+                    LayoutTemplate.classic => l10n.layoutClassic,
+                    LayoutTemplate.projectOriented =>
+                      l10n.layoutProjectOriented,
+                    LayoutTemplate.film => l10n.layoutFilm,
+                  },
+                  detail: _levels(l10n, t.create()),
+                  recommended: t == LayoutTemplate.recommended,
+                  selected: _choice == t.index,
+                  onTap: () => setState(() => _choice = t.index),
+                ),
+              _LayoutChoice(
+                name: l10n.layoutFreeTree,
+                detail: l10n.layoutFreeTreeHint,
+                selected: _choice == _freeTreeChoice,
+                onTap: () => setState(() => _choice = _freeTreeChoice),
+              ),
+              if (_custom case final custom?)
+                _LayoutChoice(
+                  name: l10n.layoutCurrent,
+                  detail: _levels(l10n, custom),
+                  selected: _choice > _freeTreeChoice,
+                  onTap: () => setState(() => _choice = _freeTreeChoice + 1),
+                ),
+            ],
+          ),
         ),
         if (_problem case final problem?)
           Padding(
@@ -187,15 +235,21 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
   }
 }
 
+String _levels(AppLocalizations l10n, Layout layout) =>
+    layout.levels.map((level) => layoutLevelLabel(l10n, level)).join(' / ');
+
 class _LayoutChoice extends StatelessWidget {
   const _LayoutChoice({
-    required this.template,
+    required this.name,
+    required this.detail,
     required this.selected,
     required this.onTap,
+    this.recommended = false,
   });
 
-  /// Null for the free tree.
-  final LayoutTemplate? template;
+  final String name;
+  final String detail;
+  final bool recommended;
   final bool selected;
   final VoidCallback onTap;
 
@@ -204,20 +258,6 @@ class _LayoutChoice extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final t = template;
-    final name = switch (t) {
-      LayoutTemplate.classic => l10n.layoutClassic,
-      LayoutTemplate.projectOriented => l10n.layoutProjectOriented,
-      LayoutTemplate.film => l10n.layoutFilm,
-      null => l10n.layoutFreeTree,
-    };
-    final detail = t == null
-        ? l10n.layoutFreeTreeHint
-        : t
-              .create()
-              .levels
-              .map((level) => layoutLevelLabel(l10n, level))
-              .join(' / ');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.s),
@@ -246,7 +286,7 @@ class _LayoutChoice extends StatelessWidget {
                       Row(
                         children: [
                           Text(name, style: text.bodyLarge),
-                          if (t == LayoutTemplate.recommended) ...[
+                          if (recommended) ...[
                             const SizedBox(width: Space.s),
                             Text(
                               l10n.recommended,

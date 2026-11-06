@@ -87,12 +87,34 @@ void main() {
     await service().addLocal(
       folder: solo,
       displayName: 'Solo work',
-      layout: Layout.film(),
+      layout: null,
     );
 
     final entry = container.read(settingsProvider).libraries.single;
     expect((entry.id, entry.displayName), (library.id, 'Solo work'));
     expect((await readLibrary(MountedFolderStorage(solo)))!.isFreeTree, isTrue);
+  });
+
+  test('re-adding a removed library can change its layout', () async {
+    final band = folder('Band');
+    await service().addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    final id = container.read(settingsProvider).libraries.single.id;
+    await service().remove(id);
+
+    await service().addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.film(),
+    );
+
+    final read = (await readLibrary(MountedFolderStorage(band)))!;
+    expect(read.id, id);
+    expect(read.layout!.leaf.key, 'scene');
+    expect(container.read(settingsProvider).libraries.single.id, id);
   });
 
   test('rejects cloud libraries, overlaps and invalid files', () async {
