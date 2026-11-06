@@ -249,7 +249,7 @@ Parsing of the `.RPP`, without REAPER:
 - **plugins missing** on the machine, by comparison with the REAPER plugin caches, discovered by pattern (`reaper-vstplugins*.ini`, `reaper-clap-*.ini`, `reaper-auplugins*.ini`) rather than by exact name:
   - VST (validated on Windows, `reaper-vstplugins64.ini`): `[vstcache]` section, lines `file=timestamp,uid,Name (Vendor)`; in the key, every character of the file name other than a letter, digit, `.` or `_` is replaced by `_` (`"TDR Kotelnikov.vst3"` → `TDR_Kotelnikov.vst3`, `SS-11X.vst3` → `SS_11X.vst3`, `"Darkglass Ultra(x64).dll"` → `Darkglass_Ultra_x64_.dll`); also merged: other `reaper-vstplugins*.ini` files (32-bit). Shell plugins (e.g. Waves) have a `file=timestamp,0,<SHELL>` line plus one `file<id=…` line per sub-plugin; matching is done on the shell file only. Lines with only a timestamp (no plugin name) are treated as not installed;
   - JS (validated, `reaper-jsfx.ini`): lines `NAME relative/path "JS: Name"` (path quoted when it contains spaces); `REV` lines are ignored;
-  - formats without validated cache (CLAP, AU, DX, LV2) are reported with an unknown status, never as missing;
+  - formats without validated cache (CLAP, AU, LV2, DX) are reported with an unknown status, never as missing. CLAP (all OS), AU (macOS) and LV2 (all OS, mostly Linux) are to be covered (#40); DX is not covered (32-bit REAPER only, obsolete);
   - CLAP, AU, macOS and Linux names **[TO VALIDATE]**;
 - tempo, time signature, length, sample rate, REAPER version;
 - owner, label, modification date;
@@ -538,7 +538,7 @@ Plan from milestone A: local `memberId` and version `owner`, `libraryId`, `_libr
 2. Detection of an open project: neither `REAPER.ini` nor file lock; MVP through process detection, companion script later (§5.7).
 3. Reliability of file watching on the streaming Drive volume (§6.3).
 4. ~~`reaper.ini` preference keys~~ (validated: peaks only, backups without check, §5.1).
-5. Plugin caches: VST and JS validated on Windows; CLAP, AU, macOS and Linux remaining (§5.3).
+5. Plugin caches: VST and JS validated on Windows; CLAP, AU, LV2, macOS and Linux remaining (§5.3, #40). Linux can be validated under WSL2 + WSLg (available on the dev machine) with the Linux REAPER build and a Linux Dart SDK installed inside WSL: the `dart` reached through Windows interop runs as Windows.
 6. Opening in the existing instance on macOS (§5.7).
 7. Naming patterns of conflict copies per cloud provider (§3.0).
 8. ~~License and SignPath~~ (GPL-3.0, SignPath retained, §8).
