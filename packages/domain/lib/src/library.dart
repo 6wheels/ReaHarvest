@@ -6,20 +6,32 @@ enum LibraryMode { local, cloud, collab }
 /// Collab store implementation selected in `_library.json`.
 enum CollabStoreKind { journal, pocketbase }
 
-/// One layout level: a folder level bound to a tag key.
+/// One layout level: a folder level bound to a language-independent tag key
+/// (a token, written `<key>`, SPEC §3.1).
 final class LayoutLevel {
-  const LayoutLevel(this.key, this.label);
+  const LayoutLevel(this.key, {this.labels = const {}});
 
   /// Technical tag key, in English (e.g. `artist`).
   final String key;
 
-  /// Displayed label (e.g. `Artiste`).
-  final String label;
+  /// Translations of a custom key (language code -> label). Empty for the
+  /// keys of the provided templates, which the application translates.
+  final Map<String, String> labels;
 
-  Map<String, Object?> toJson() => {'key': key, 'label': label};
+  /// Label of a custom key in [languageCode], falling back to English, then
+  /// to the key itself.
+  String label(String languageCode) =>
+      labels[languageCode] ?? labels['en'] ?? key;
 
-  static LayoutLevel fromJson(Map<String, Object?> json) =>
-      LayoutLevel(json['key'] as String, json['label'] as String);
+  Map<String, Object?> toJson() => {
+    'key': key,
+    if (labels.isNotEmpty) 'labels': labels,
+  };
+
+  static LayoutLevel fromJson(Map<String, Object?> json) => LayoutLevel(
+    json['key'] as String,
+    labels: (json['labels'] as Map?)?.cast() ?? const {},
+  );
 }
 
 /// Ordered folder levels of a library; the last one is the leaf (title).
@@ -45,20 +57,20 @@ final class Layout {
   static const unassigned = '_Unassigned';
 
   static Layout classic() => Layout(const [
-    LayoutLevel('artist', 'Artiste'),
-    LayoutLevel('album', 'Album'),
-    LayoutLevel('title', 'Titre'),
+    LayoutLevel('artist'),
+    LayoutLevel('album'),
+    LayoutLevel('title'),
   ]);
 
   static Layout projectOriented() => Layout(const [
-    LayoutLevel('artist', 'Artiste'),
-    LayoutLevel('title', 'Titre'),
+    LayoutLevel('artist'),
+    LayoutLevel('title'),
   ]);
 
   static Layout film() => Layout(const [
-    LayoutLevel('project', 'Projet'),
-    LayoutLevel('chapter', 'Chapitre'),
-    LayoutLevel('scene', 'Scène ou titre'),
+    LayoutLevel('project'),
+    LayoutLevel('chapter'),
+    LayoutLevel('scene'),
   ]);
 
   final List<LayoutLevel> levels;

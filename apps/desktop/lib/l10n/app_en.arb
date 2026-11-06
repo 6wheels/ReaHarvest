@@ -30,5 +30,11 @@
   "statusWriting": "Writing",
   "statusRecording": "Recording",
   "statusMixing": "Mixing",
-  "statusDone": "Done"
+  "statusDone": "Done",
+  "levelArtist": "Artist",
+  "levelAlbum": "Album",
+  "levelTitle": "Title",
+  "levelProject": "Project",
+  "levelChapter": "Chapter",
+  "levelScene": "Scene"
 }

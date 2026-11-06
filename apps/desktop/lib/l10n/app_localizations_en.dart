@@ -88,4 +88,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusDone => 'Done';
+
+  @override
+  String get levelArtist => 'Artist';
+
+  @override
+  String get levelAlbum => 'Album';
+
+  @override
+  String get levelTitle => 'Title';
+
+  @override
+  String get levelProject => 'Project';
+
+  @override
+  String get levelChapter => 'Chapter';
+
+  @override
+  String get levelScene => 'Scene';
 }

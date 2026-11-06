@@ -21,5 +21,11 @@
   "statusWriting": "Écriture",
   "statusRecording": "Enregistrement",
   "statusMixing": "Mixage",
-  "statusDone": "Terminé"
+  "statusDone": "Terminé",
+  "levelArtist": "Artiste",
+  "levelAlbum": "Album",
+  "levelTitle": "Titre",
+  "levelProject": "Projet",
+  "levelChapter": "Chapitre",
+  "levelScene": "Scène ou titre"
 }

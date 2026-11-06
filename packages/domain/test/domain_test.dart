@@ -86,13 +86,22 @@ void main() {
     test('enforces 1 to 4 unique levels', () {
       expect(() => Layout(const []), throwsArgumentError);
       expect(
-        () => Layout([for (var i = 0; i < 5; i++) LayoutLevel('l$i', 'L$i')]),
+        () => Layout([for (var i = 0; i < 5; i++) LayoutLevel('l$i')]),
         throwsArgumentError,
       );
       expect(
-        () => Layout(const [LayoutLevel('a', 'A'), LayoutLevel('a', 'B')]),
+        () => Layout(const [LayoutLevel('a'), LayoutLevel('a')]),
         throwsArgumentError,
       );
+    });
+
+    test('labels custom keys with English then key fallback', () {
+      const level = LayoutLevel('take', labels: {'en': 'Take', 'fr': 'Prise'});
+      expect(level.label('fr'), 'Prise');
+      expect(level.label('de'), 'Take');
+      expect(const LayoutLevel('take').label('fr'), 'take');
+      expect(const LayoutLevel('take').toJson(), {'key': 'take'});
+      expect(LayoutLevel.fromJson(level.toJson()).labels, level.labels);
     });
 
     test('derives tags from a matching path', () {
@@ -126,11 +135,15 @@ void main() {
       expect(read.id, library.id);
       expect(read.mode, LibraryMode.collab);
       expect(read.layout!.frozen, isTrue);
-      expect(read.layout!.levels.map((l) => l.label), [
-        'Artiste',
-        'Album',
-        'Titre',
+      expect(read.layout!.levels.map((l) => l.key), [
+        'artist',
+        'album',
+        'title',
       ]);
+      expect(
+        (json['layout'] as Map)['levels'],
+        everyElement(isNot(contains('labels'))),
+      );
       expect(read.collab!.groupId, library.collab!.groupId);
       expect(read.collab!.backendUrl, 'https://example.org');
     });

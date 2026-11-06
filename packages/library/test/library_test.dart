@@ -81,7 +81,10 @@ void main() {
     test('round-trips a custom layout and a free tree', () async {
       final storage = MemoryStorage();
       final custom = Layout(
-        const [LayoutLevel('client', 'Client'), LayoutLevel('spot', 'Spot')],
+        const [
+          LayoutLevel('client'),
+          LayoutLevel('spot', labels: {'en': 'Spot', 'fr': 'Annonce'}),
+        ],
         renderMetadata: {'client': 'artist', 'spot': 'title'},
       );
       await writeLibrary(
@@ -93,7 +96,9 @@ void main() {
         ),
       );
       final read = (await readLibrary(storage))!;
-      expect(read.layout!.leaf.label, 'Spot');
+      expect(read.layout!.leaf.label('fr'), 'Annonce');
+      expect(read.layout!.leaf.label('de'), 'Spot');
+      expect(read.layout!.levels.first.label('fr'), 'client');
       expect(read.layout!.renderMetadata, {
         'client': 'artist',
         'spot': 'title',

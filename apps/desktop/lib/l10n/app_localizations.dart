@@ -229,6 +229,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get statusDone;
+
+  /// No description provided for @levelArtist.
+  ///
+  /// In en, this message translates to:
+  /// **'Artist'**
+  String get levelArtist;
+
+  /// No description provided for @levelAlbum.
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get levelAlbum;
+
+  /// No description provided for @levelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get levelTitle;
+
+  /// No description provided for @levelProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get levelProject;
+
+  /// No description provided for @levelChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter'**
+  String get levelChapter;
+
+  /// No description provided for @levelScene.
+  ///
+  /// In en, this message translates to:
+  /// **'Scene'**
+  String get levelScene;
 }
 
 class _AppLocalizationsDelegate
