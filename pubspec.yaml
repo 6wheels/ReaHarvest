@@ -1,0 +1,17 @@
+name: reaharvest_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+workspace:
+  - apps/desktop
+  - packages/domain
+  - packages/rpp
+  - packages/library
+  - packages/repository
+  - packages/index
+  - packages/reaper
+
+dev_dependencies:
+  lints: ^6.0.0

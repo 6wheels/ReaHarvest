@@ -1,0 +1,669 @@
+<REAPER_PROJECT 0.1 "7.11/win64" 1708079229
+  <NOTES 0 2
+  >
+  RIPPLE 0
+  GROUPOVERRIDE 0 0 0
+  AUTOXFADE 129
+  ENVATTACH 3
+  POOLEDENVATTACH 0
+  MIXERUIFLAGS 11 48
+  PEAKGAIN 1
+  FEEDBACK 0
+  PANLAW 1
+  PROJOFFS 0 0 0
+  MAXPROJLEN 0 0
+  GRID 3199 8 1 8 1 0 0 0
+  TIMEMODE 1 5 -1 30 0 0 -1
+  VIDEO_CONFIG 0 0 256
+  PANMODE 3
+  CURSOR 0
+  ZOOM 100 0 0
+  VZOOMEX 2 0
+  USE_REC_CFG 0
+  RECMODE 1
+  SMPTESYNC 0 30 100 40 1000 300 0 0 1 0 0
+  LOOP 0
+  LOOPGRAN 0 4
+  RECORD_PATH ".\audio-files" ""
+  <RECORD_CFG
+    ZXZhdxgAAQ==
+  >
+  <APPLYFX_CFG
+  >
+  RENDER_FILE ""
+  RENDER_PATTERN ""
+  RENDER_FMT 0 2 0
+  RENDER_1X 0
+  RENDER_RANGE 2 0 0 18 1000
+  RENDER_RESAMPLE 3 0 1
+  RENDER_ADDTOPROJ 0
+  RENDER_STEMS 0
+  RENDER_DITHER 0
+  TIMELOCKMODE 1
+  TEMPOENVLOCKMODE 1
+  ITEMMIX 1
+  DEFPITCHMODE 589824 0
+  TAKELANE 1
+  SAMPLERATE 44100 0 0
+  <RENDER_CFG
+    ZXZhdxgAAQ==
+  >
+  LOCK 1
+  <METRONOME 6 2
+    VOL 0.25 0.125
+    FREQ 800 1600 1
+    BEATLEN 4
+    SAMPLES "" ""
+    PATTERN 2863311530 2863311529
+    MULT 1
+  >
+  GLOBAL_AUTO -1
+  TEMPO 120 4 4
+  PLAYRATE 1 0 0.25 4
+  SELECTION 0 0
+  SELECTION2 0 0
+  MASTERAUTOMODE 0
+  MASTERTRACKHEIGHT 0 0
+  MASTERPEAKCOL 16576
+  MASTERMUTESOLO 0
+  MASTERTRACKVIEW 0 0.6667 0.5 0.5 0 -1 0 0 0 0 0 0 0 0
+  MASTERHWOUT 0 0 1 0 0 0 0 -1
+  MASTER_NCH 2 2
+  MASTER_VOLUME 1 0 -1 -1 1
+  MASTER_PANMODE 3
+  MASTER_FX 1
+  MASTER_SEL 0
+  <MASTERPLAYSPEEDENV
+    EGUID {BC4DDAE3-CDA3-4907-B875-F039D213F29C}
+    ACT 0 -1
+    VIS 0 1 1
+    LANEHEIGHT 0 0
+    ARM 0
+    DEFSHAPE 0 -1 -1
+  >
+  <TEMPOENVEX
+    EGUID {A9D5FE73-E42E-43E7-A388-33CED430C5B3}
+    ACT 0 -1
+    VIS 1 0 1
+    LANEHEIGHT 0 0
+    ARM 0
+    DEFSHAPE 1 -1 -1
+  >
+  <PROJBAY
+  >
+  <TRACK {23C2C809-4459-4DA1-A8C3-8749CE24C685}
+    NAME "Track 1"
+    PEAKCOL 21403218
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {23C2C809-4459-4DA1-A8C3-8749CE24C685}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 378 118 516 311
+      FXID {9C237671-4069-4FA8-B32D-AF2B340D791D}
+      WAK 0 2
+    >
+  >
+  <TRACK {5F975515-8AFE-44B9-AF8D-636602B0A1A7}
+    NAME "Track 2"
+    PEAKCOL 30112323
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 1 1
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {5F975515-8AFE-44B9-AF8D-636602B0A1A7}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {C2122A2D-3CC6-44FB-974C-37C2A9C4D441}
+      WAK 0 2
+    >
+  >
+  <TRACK {75E3A49F-FB11-4F0F-9D5D-E355810B3220}
+    NAME "Track 3"
+    PEAKCOL 30112323
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {75E3A49F-FB11-4F0F-9D5D-E355810B3220}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {A5A61168-6811-47E0-99D7-585A1B772485}
+      WAK 0 2
+    >
+  >
+  <TRACK {8FE659C5-E28F-4FD0-89F1-AFCADFAD223D}
+    NAME "Track 4"
+    PEAKCOL 30112323
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 2 -1
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {8FE659C5-E28F-4FD0-89F1-AFCADFAD223D}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {DE579C91-DE52-4C0B-ADB3-BABE4474CB57}
+      WAK 0 2
+    >
+  >
+  <TRACK {CB5E9695-ECBB-4B90-AA3E-087EF0271197}
+    NAME "Track 5"
+    PEAKCOL 20019410
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 1 1
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {CB5E9695-ECBB-4B90-AA3E-087EF0271197}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {C695061B-4384-4D04-B99B-6D06D52A25BD}
+      WAK 0 2
+    >
+  >
+  <TRACK {6CB3D8F8-4C88-4193-9024-02CAF5C54B82}
+    NAME "Track 6"
+    PEAKCOL 20019410
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {6CB3D8F8-4C88-4193-9024-02CAF5C54B82}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {19A9CCB6-8750-4EAA-8BB3-2AA8313785BA}
+      WAK 0 2
+    >
+  >
+  <TRACK {865BB0F3-4275-46B0-815E-54E5D427B992}
+    NAME "Track 7"
+    PEAKCOL 20019410
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 2 -1
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {865BB0F3-4275-46B0-815E-54E5D427B992}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {33C3BAA7-901B-4ACB-90CC-3473F3E87A9C}
+      WAK 0 2
+    >
+  >
+  <TRACK {0729B5B8-6A7D-4F9B-A3FA-1645BC6F0AA5}
+    NAME "Track 8"
+    PEAKCOL 21909988
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {0729B5B8-6A7D-4F9B-A3FA-1645BC6F0AA5}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {5D84ED4E-7E8A-48B9-A288-7059CF7B284C}
+      WAK 0 2
+    >
+  >
+  <TRACK {36FB4B19-59C1-40B8-88B6-85CA2A792007}
+    NAME "Track 9"
+    PEAKCOL 21672638
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 1 1
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {36FB4B19-59C1-40B8-88B6-85CA2A792007}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {763EE848-8D18-48B1-8394-C8990CB34DBF}
+      WAK 0 2
+    >
+  >
+  <TRACK {FBF7E87A-BED6-4321-A730-793713919B76}
+    NAME "Track 10"
+    PEAKCOL 21672638
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {FBF7E87A-BED6-4321-A730-793713919B76}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {72074052-94D9-4844-AB41-8BC872692740}
+      WAK 0 2
+    >
+  >
+  <TRACK {6695CFED-E34D-4272-870B-78B427B3802C}
+    NAME "Track 11"
+    PEAKCOL 21672638
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {6695CFED-E34D-4272-870B-78B427B3802C}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {8D2ABA90-D004-48BE-8F45-BF8FE8EDDACA}
+      WAK 0 2
+    >
+  >
+  <TRACK {A77247AA-421B-4EF4-A337-AFC94865912B}
+    NAME "Track 12"
+    PEAKCOL 21672638
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {A77247AA-421B-4EF4-A337-AFC94865912B}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {D4A34A0C-D363-4747-8E90-901C067C5CD2}
+      WAK 0 2
+    >
+  >
+  <TRACK {820EDD16-5F0E-46BD-92E7-D2593C34D91A}
+    NAME "Track 13"
+    PEAKCOL 21672638
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 2 -1
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {820EDD16-5F0E-46BD-92E7-D2593C34D91A}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {E1442282-4C4C-41E4-A2D6-AEF803043C36}
+      WAK 0 2
+    >
+  >
+  <TRACK {834145F0-16EA-41EB-AD6F-E0C0A88AD7FD}
+    NAME "Track 14"
+    PEAKCOL 31683967
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {834145F0-16EA-41EB-AD6F-E0C0A88AD7FD}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {E36335F3-09CA-4F05-8DB8-1A0BA3D4E2DF}
+      WAK 0 2
+    >
+  >
+  <TRACK {7AA501D8-A3DF-4D3E-8901-95195088779A}
+    NAME "Track 15"
+    PEAKCOL 29910695
+    BEAT -1
+    AUTOMODE 0
+    VOLPAN 1 0 -1 -1 1
+    MUTESOLO 0 0 0
+    IPHASE 0
+    PLAYOFFS 0 1
+    ISBUS 0 0
+    BUSCOMP 0 0 0 0 0
+    SHOWINMIX 1 0.6667 0.5 1 0.5 0 0 0
+    FIXEDLANES 9 0 0
+    SEL 0
+    REC 0 0 1 0 0 0 0 0
+    VU 2
+    TRACKHEIGHT 0 0 0 0 0 0 0
+    INQ 0 0 0 0.5 100 0 0 100
+    NCHAN 2
+    FX 1
+    TRACKID {7AA501D8-A3DF-4D3E-8901-95195088779A}
+    PERF 0
+    MIDIOUT -1
+    MAINSEND 1 0
+    <FXCHAIN
+      SHOW 0
+      LASTSEL 0
+      DOCKED 0
+      BYPASS 0 0 0
+      <JS "ReaTeam JSFX/Utility/zenomod_VU Meter (ZenoMOD).jsfx" ""
+        5 0 -12 -4 50 0.0053 0 1 0 0 0 0 0 - - - - - - -20 -20 0 0 -20 -20 -316.5 -316.5 - - - - - - - - - - - - 3 2 3 0 1 0 0 12 - - 0 - - - - - - - - - - - - - 1
+      >
+      FLOATPOS 0 0 0 0
+      FXID {FC9D4D4D-6E44-47B5-8BE7-BD9488FED168}
+      WAK 0 2
+    >
+  >
+  <EXTENSIONS
+    <SWSAUTOCOLOR
+      {00000000-0000-0000-0000-000000000000} 0 "" "" ""
+      {23C2C809-4459-4DA1-A8C3-8749CE24C685} 21403218 "" "" ""
+      {5F975515-8AFE-44B9-AF8D-636602B0A1A7} 30112323 "" "" ""
+      {75E3A49F-FB11-4F0F-9D5D-E355810B3220} 30112323 "" "" ""
+      {8FE659C5-E28F-4FD0-89F1-AFCADFAD223D} 30112323 "" "" ""
+      {CB5E9695-ECBB-4B90-AA3E-087EF0271197} 20019410 "" "" ""
+      {6CB3D8F8-4C88-4193-9024-02CAF5C54B82} 20019410 "" "" ""
+      {865BB0F3-4275-46B0-815E-54E5D427B992} 20019410 "" "" ""
+      {0729B5B8-6A7D-4F9B-A3FA-1645BC6F0AA5} 21909988 "" "" ""
+      {36FB4B19-59C1-40B8-88B6-85CA2A792007} 21672638 "" "" ""
+      {FBF7E87A-BED6-4321-A730-793713919B76} 21672638 "" "" ""
+      {6695CFED-E34D-4272-870B-78B427B3802C} 21672638 "" "" ""
+      {A77247AA-421B-4EF4-A337-AFC94865912B} 21672638 "" "" ""
+      {820EDD16-5F0E-46BD-92E7-D2593C34D91A} 21672638 "" "" ""
+      {834145F0-16EA-41EB-AD6F-E0C0A88AD7FD} 31683967 "" "" ""
+      {7AA501D8-A3DF-4D3E-8901-95195088779A} 29910695 "" "" ""
+    >
+  >
+>

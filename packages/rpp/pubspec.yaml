@@ -1,0 +1,9 @@
+name: reaharvest_rpp
+description: "Pure Dart REAPER .rpp parser and targeted patch writer."
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+dev_dependencies:
+  test: ^1.31.1
