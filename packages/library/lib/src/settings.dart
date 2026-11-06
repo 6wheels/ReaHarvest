@@ -68,6 +68,9 @@ final class LibraryEntry {
   );
 }
 
+/// Light, dark or system theme (SPEC §7.1).
+enum ThemePreference { system, light, dark }
+
 /// Application settings (SPEC §5.1). Null paths mean "use the default".
 final class AppSettings {
   AppSettings({
@@ -76,7 +79,13 @@ final class AppSettings {
     this.reaperExecutable,
     this.reaperResources,
     this.templatesFolder,
+    this.theme = ThemePreference.system,
+    this.textScale = 1.0,
+    this.language = systemLanguage,
   }) : libraries = List.unmodifiable(libraries);
+
+  /// [language] value meaning "follow the system language".
+  static const systemLanguage = 'system';
 
   static const schemaVersion = 1;
 
@@ -89,18 +98,32 @@ final class AppSettings {
   /// resource folder).
   final String? templatesFolder;
 
+  final ThemePreference theme;
+
+  /// Font size factor (1.0 = default).
+  final double textScale;
+
+  /// UI language code (e.g. `en`), or [systemLanguage].
+  final String language;
+
   AppSettings copyWith({
     LocalIdentity? identity,
     List<LibraryEntry>? libraries,
     String? reaperExecutable,
     String? reaperResources,
     String? templatesFolder,
+    ThemePreference? theme,
+    double? textScale,
+    String? language,
   }) => AppSettings(
     identity: identity ?? this.identity,
     libraries: libraries ?? this.libraries,
     reaperExecutable: reaperExecutable ?? this.reaperExecutable,
     reaperResources: reaperResources ?? this.reaperResources,
     templatesFolder: templatesFolder ?? this.templatesFolder,
+    theme: theme ?? this.theme,
+    textScale: textScale ?? this.textScale,
+    language: language ?? this.language,
   );
 
   /// Adds [entry]. Throws [ArgumentError] if the id is already configured or
@@ -134,6 +157,9 @@ final class AppSettings {
     'reaperExecutable': ?reaperExecutable,
     'reaperResources': ?reaperResources,
     'templatesFolder': ?templatesFolder,
+    'theme': theme.name,
+    'textScale': textScale,
+    'language': language,
   };
 
   static AppSettings fromJson(Map<String, Object?> json) {
@@ -150,6 +176,10 @@ final class AppSettings {
       reaperExecutable: json['reaperExecutable'] as String?,
       reaperResources: json['reaperResources'] as String?,
       templatesFolder: json['templatesFolder'] as String?,
+      theme: ThemePreference.values.asNameMap()[json['theme']] ??
+          ThemePreference.system,
+      textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
+      language: json['language'] as String? ?? systemLanguage,
     );
   }
 }

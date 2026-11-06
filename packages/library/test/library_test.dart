@@ -147,6 +147,9 @@ void main() {
             reaperExecutable: '/opt/reaper/reaper',
             reaperResources: '/home/alice/.config/REAPER',
             templatesFolder: '/templates',
+            theme: ThemePreference.dark,
+            textScale: 1.2,
+            language: 'fr',
           )
           .addLibrary(
             const LibraryEntry(
@@ -171,6 +174,10 @@ void main() {
       expect(read.reaperExecutable, '/opt/reaper/reaper');
       expect(read.reaperResources, '/home/alice/.config/REAPER');
       expect(read.templatesFolder, '/templates');
+      expect(
+        (read.theme, read.textScale, read.language),
+        (ThemePreference.dark, 1.2, 'fr'),
+      );
       expect(read.libraries.map((l) => l.id), ['L1', 'L2']);
       expect(read.libraries[0].libraryRoot, '/drive/band');
       expect(read.libraries[0].templatesFolder, '/work/band-templates');
