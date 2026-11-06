@@ -63,7 +63,7 @@ The user configures **one or more libraries**. Each has its own mode, layout and
 
 | Mode | Folders | Features | Use case |
 |---|---|---|---|
-| **`local`** | Workspace only | Organization (layout), navigation, versions (with owner = local member), detail view, creation, opening in REAPER. No synchronization, no collaboration | Personal projects on a single machine |
+| **`local`** | Workspace only | Organization (layout), navigation, versions (with owner = local member), statuses, detail view, creation, opening in REAPER. No synchronization, no collaboration | Personal projects on a single machine |
 | **`cloud`** (local + cloud) | Workspace + cloud repository | `local` + Checkout / Publish / Release, conflict detection (useful between several machines of the same user), backup. Single user: no ownership check and no forcing | Personal projects backed up and accessible from several machines |
 | **`collab`** (collaboration) | Workspace + shared cloud repository | `cloud` + members, version ownership and forcing, collab store (statuses, tasks, notes, lyrics, shared assets, activity, notifications) | Group projects |
 
@@ -71,8 +71,8 @@ Rules:
 - Work always happens **in the local workspace**; the repository is never a place to work in.
 - **Mode change** possible at any time, through a wizard:
   - `local` → `cloud`: choice of the repository, initial publish;
-  - `cloud` → `collab`: group creation, member invitation, adoption of versions (owner assignment);
-  - downgrades: `collab` → `cloud` (export of the collab store as a snapshot kept in the repository), `cloud` → `local` (the repository is left intact, simply detached).
+  - `cloud` → `collab`: group creation, member invitation, adoption of versions (owner assignment), import of the statuses from the `.node.json` files into the collab store (§5.9);
+  - downgrades: `collab` → `cloud` (export of the collab store as a snapshot kept in the repository, statuses written back into the `.node.json` files), `cloud` → `local` (the repository is left intact, simply detached).
 - A given folder can belong to only one library (checked at configuration).
 
 **Cloud providers.** The MVP relies on a **folder mounted or synchronized by the provider's client**: the application only sees a file system path. The following are therefore covered, with no specific code: Google Drive for desktop, Dropbox, OneDrive, iCloud Drive, Nextcloud, Syncthing, network share (NAS/SMB), rclone mount (Linux). Common constraints to handle:
@@ -86,15 +86,15 @@ Providers accessible through an API only (without a mounted folder) are **outsid
 The folder structure is defined by a **layout**: an ordered sequence of levels. Each level is a **placeholder targeting a tag**. The tag value is the folder name; it feeds search, filters and navigation in the interface.
 
 Provided templates:
-| Template | Levels (tag keys) | Displayed labels (UI) |
+| Template | Levels (tag keys) | Displayed labels (UI, en / fr) |
 |---|---|---|
-| **Classic (recommended)** | `artist / album / title` | Artiste / Album / Titre |
-| Project-oriented (no album) | `artist / title` | Artiste / Titre |
-| Film-oriented | `project / chapter / scene` | Projet / Chapitre / Scène ou titre |
+| **Classic (recommended)** | `<artist> / <album> / <title>` | Artist / Album / Title — Artiste / Album / Titre |
+| Project-oriented (no album) | `<artist> / <title>` | Artist / Title — Artiste / Titre |
+| Film-oriented | `<project> / <chapter> / <scene>` | Project / Chapter / Scene — Projet / Chapitre / Scène ou titre |
 
 Layout rules:
 - The last level is always the **leaf node** (title): it holds `Media/` and the versions.
-- A layout has 1 to 4 levels. Custom templates define, for each level, a tag key (technical identifier, in English) and a displayed label.
+- A layout has 1 to 4 levels. Each level is a **token** (placeholder, written `<key>`, e.g. `<album>`): a language-independent tag key (technical identifier, in English), so that a configuration can be reproduced as is. Labels are never stored as plain text: the displayed label is the translation of the key (key → value per language). Keys of the provided templates are translated by the application; custom keys carry their own translations in `_library.json` (`labels`, by language code), with fallback to English, then to the key itself.
 - All levels are mandatory. Each intermediate level has a reserved value (`_Unassigned`, UI: « Non classé ») for items that are not attached.
 - In `local` mode only, a layout can be replaced by the **free tree** (§3.3).
 - The layout is defined **per library**, in `_library.json`. It is **frozen as soon as the first title is created**: changing it afterwards is a migration (outside the MVP).
@@ -112,7 +112,7 @@ Example with the classic template:
     <album>/
       .node.json                  # { nodeId, level: "album" }
       <title>/                    # leaf node
-        .node.json                # { nodeId, level: "title" }
+        .node.json                # { nodeId, level: "title", status, versionStatuses } (cf. §5.9)
         Media/                    # shared, append-only pool
         Renders/                  # default render folder; publication optional (cf. §5.3)
         Assets/                   # attached files: scores, tabs, images, docs (cf. §5.9)
@@ -222,11 +222,13 @@ Versions form a **flat list** (no tree, no parent version).
 ### 5.2 Navigation
 Principle: **no imposed tree navigation**. Titles are reached first through search and filters, to minimize the number of clicks.
 
+Main window: the application opens directly on the library. Clean but functional layout, **no side navigation**: search bar at the top, filter chips below it, then the titles (cards by default). Settings are reached through a **gear icon at the top right** and open as a **popup over a blurred backdrop** (glass pane over the rest of the application), with an opening and closing animation.
+
 - **Main search bar**, always visible and focused on startup:
   - instant, typo-tolerant search, served by the local index;
   - covers tag values, version names, labels, owners and, in `collab` mode, notes and lyrics.
 - **Display modes**, chosen by the user and remembered:
-  - **cards** (default view): title, tags, status, sync state, version owners, last modification date;
+  - **cards** (default view): **square** cards, like a record sleeve. Generated "aurora borealis" visual, with colors derived from the `titleId` (stable for a given title, different between titles). Content: title, number of versions, tempo (BPM), last modification date, status as a badge, tags; later also sync state and version owners;
   - **list**: dense table, sortable by column;
   - **tree**: grouping by layout levels (e.g. Artist → Album → Title), offered as one view among others.
 - **Combinable filters** (chips or side panel):
@@ -234,7 +236,7 @@ Principle: **no imposed tree navigation**. Titles are reached first through sear
   - library and mode (`local`, `cloud`, `collab`);
   - source: **repository (cloud)**, **local**, or both (`cloud` and `collab` modes);
   - sync state: not checked out, up to date, locally modified, remotely updated, in conflict;
-  - collab status (`collab` mode);
+  - status (all modes, cf. §5.9);
   - version owner;
   - missing plugins.
 - Filters and search are combined and kept between sessions; **saved views** (e.g. "My titles in progress", UI: « Mes titres en cours ») are possible.
@@ -337,7 +339,9 @@ Included in the MVP (milestone C). Wizard taking over the current folder tree (`
 - dry-run mode with a report before execution.
 
 ### 5.9 Collaboration (`collab` mode, through the collab store, cf. §6)
-- **Status** per title and per version: `idea`, `writing`, `recording`, `mixing`, `done` (configurable list).
+- **Status** per title and per version: `idea`, `writing`, `recording`, `mixing`, `done` (configurable list). Available in **all modes** (key feature):
+  - `local` and `cloud` modes: stored in the title's `.node.json` (`status`, and `versionStatuses`: map `versionId` → status), synchronized with the title in `cloud` mode. Never stored in the `.RPP` (REAPER would overwrite it on the next save of an open project, §5.7);
+  - `collab` mode: the collab store is authoritative (history, activity, LWW). Mode change: import from the `.node.json` files on `cloud` → `collab`, written back on `collab` → `cloud` (§3.0).
 - **Tasks** per title: text, assignee, optional due date, state.
 - **Notes** per title or per version.
 - **Lyrics** per title, with modification history.
@@ -412,9 +416,10 @@ CollabStore
   "mode": "local" | "cloud" | "collab",
   "layout": {
     "levels": [
-      { "key": "artist", "label": "Artiste" },
-      { "key": "album",  "label": "Album" },
-      { "key": "title",  "label": "Titre" }
+      { "key": "artist" },
+      { "key": "album" },
+      { "key": "title" }
+      // custom key: { "key": "take", "labels": { "en": "Take", "fr": "Prise" } }
     ],
     "renderMetadata": { "artist": "artist", "album": "album", "title": "title" },
     "frozen": true
@@ -440,8 +445,11 @@ Switch procedure (single action in the settings):
 ### 7.1 Stack
 - **Flutter (desktop) + Dart**, native AOT compilation. Targets: Windows and macOS first, Linux secondary; Android and iOS considered later (§7.4).
 - A single language for everything: interface, business logic, input/output.
-- Interface: Material 3 with a custom theme (the application's own design system).
-- State management: **Riverpod** **[TO VALIDATE at project start]**.
+- Interface: **Material as a minimal foundation only** (text fields, menus, tooltips, focus, accessibility), under the application's own design system: own tokens (colors, spacing, radii, motion durations and curves) through `ThemeExtension`, own key components (title card, search bar, filter chips, settings popup) and own animations. No dependency on Material 3 Expressive (status in Flutter uncertain; Material moved to the `material_ui` package in Flutter 3.47).
+  - Visual direction: refined and modern, aimed at artists, beautiful without being flashy; polished animations kept light (built-in Flutter animations only, no Lottie/Rive, no heavy shaders).
+  - Light and dark themes (both mandatory); theme setting: light, dark or follow the system. Adjustable font size.
+  - Embedded font: **Inter** (variable, SIL OFL). Alternatives shortlisted by the user if Inter does not fit: Martel, Fira Sans, Poppins; more characterful: Poiret One, DM Mono.
+- State management: **Riverpod 3** (`flutter_riverpod`), **without code generation**. Decided (2026-11-06) over plain `ChangeNotifier`/`InheritedWidget` (async loading/error states, dependencies between states and disposal would have to be hand-written) and over `provider` (superseded) or Bloc (verbose). Only `Provider`, `FutureProvider`, `StreamProvider`, `Notifier` and `AsyncNotifier` are used. Ports are exposed as providers and overridden with the concrete adapters in `main()` (`ProviderScope(overrides: …)`), and with fakes in tests.
 - Indicative packages:
   - `sqlite3` / `drift`: local index;
   - `watcher`: file watching;
@@ -511,7 +519,8 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
   - **Automatic update** (`auto_updater`, WinSparkle / Sparkle, signed appcast feed): check at startup then periodically → "update available" notification (UI: « mise à jour disponible ») → one click → download, installation → restart if needed.
 - **License**: GPL-3.0 (`LICENSE`).
 - **Application identifier**: `io.github.6wheels.reaharvest` (Windows, macOS); `io.github._6wheels.reaharvest` on Linux (freedesktop rule: a segment cannot start with a digit; format compatible with Flathub verification).
-- **Internationalization**: interface in French, prepared for i18n (later publication).
+- **Internationalization**: interface in **English and French** (ARB files, `gen-l10n`); system language on startup, English if it is not supported; language can be changed in the settings.
+- **Footprint**: stay light, in the spirit of REAPER (16 MB installer for a full DAW). Measured (2026-11-06, Flutter 3.47.9, empty app, Windows x64 release): 24.7 MB on disk (Flutter engine 20.3 MB, compiled Dart 3.3 MB, ICU data 0.8 MB), 10.3 MB zipped. With the app shell (#9: Riverpod, localizations, Inter subset to Latin ~114 KB, SQLite 1.7 MB): 28.9 MB on disk, 12.2 MB zipped.
 
 ---
 

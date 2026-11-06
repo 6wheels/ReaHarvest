@@ -23,7 +23,7 @@ Test fixtures: real `.rpp` files in `test/fixtures/`.
 
 ## Rules
 
-- Code, identifiers, comments and technical file names in English. UI text in French, i18n-ready.
+- Code, identifiers, comments and technical file names in English. UI text in English (default) and French, through ARB localization files.
 - KISS. No speculative abstractions beyond the ports defined in the spec (`RepositoryStorage`, `CollabStore`).
 - `packages/domain` and `packages/rpp` are pure Dart: no Flutter, no `dart:io`.
 - Packages depend on interfaces from `domain`, never on concrete adapters. Adapters are wired only in the app entry point.
