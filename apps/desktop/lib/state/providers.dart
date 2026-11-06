@@ -46,7 +46,7 @@ typedef TitleView = ({Title title, int? bpm, String? status});
 final titleViewsProvider = Provider<List<TitleView>>(
   (ref) => [
     for (final t in ref.watch(localIndexProvider).titles())
-      (title: t, bpm: null, status: null),
+      (title: t, bpm: null, status: t.status),
   ],
 );
 

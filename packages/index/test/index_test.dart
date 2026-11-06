@@ -279,6 +279,38 @@ void main() {
       expect(storage.reads, isEmpty);
       expect(again.titles.single.versions.single.fileName, 'v1.rpp');
     });
+
+    test('stores statuses and keeps them across a restart', () async {
+      final root = Directory.systemTemp.createTempSync('reaharvest_scan_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      Directory(p.join(root.path, 'Band', 'Album', 'Song'))
+          .createSync(recursive: true);
+      File('$fixtures/project-1.rpp')
+          .copySync(p.join(root.path, 'Band', 'Album', 'Song', 'v1.rpp'));
+      final lib = library();
+      final storage = MountedFolderStorage(root.path);
+      await scan(storage, lib);
+      final versionId = VersionId.generate();
+      await setTitleStatus(storage, 'Band/Album/Song', 'recording');
+      await setVersionStatus(storage, 'Band/Album/Song', versionId, 'done');
+      index.update(lib, await scan(storage, lib));
+
+      final stored = index.titles().single;
+      expect(stored.status, 'recording');
+      expect(stored.versionStatuses, {versionId: 'done'});
+
+      // After a restart, unchanged node files are not read again: statuses
+      // must come from the stored scan.
+      final again = await scan(
+        storage,
+        lib,
+        previous: index.scanResult(lib.id),
+      );
+      expect(again.titles.single.status, 'recording');
+      expect(again.nodes['Band/Album/Song']!.versionStatuses, {
+        versionId: 'done',
+      });
+    });
   });
 
   group('TitleSearch', () {

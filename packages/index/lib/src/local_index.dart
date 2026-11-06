@@ -11,7 +11,7 @@ typedef FileHasher = Future<String> Function(String path);
 /// A file tracked by the index.
 typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 
-const _schemaVersion = 1;
+const _schemaVersion = 2;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -30,6 +30,8 @@ CREATE TABLE titles (
   path TEXT NOT NULL,
   id TEXT NOT NULL,
   tags TEXT NOT NULL,
+  status TEXT,
+  version_statuses TEXT NOT NULL,
   PRIMARY KEY (library_id, path)
 );
 CREATE TABLE versions (
@@ -113,9 +115,18 @@ final class LocalIndex {
         ],
       );
       _insertAll(
-        'INSERT INTO titles (library_id, path, id, tags) VALUES (?, ?, ?, ?)',
+        'INSERT INTO titles (library_id, path, id, tags, status, '
+        'version_statuses) VALUES (?, ?, ?, ?, ?, ?)',
         [
-          for (final t in scan.titles) [id, t.path, t.id, jsonEncode(t.tags)],
+          for (final t in scan.titles)
+            [
+              id,
+              t.path,
+              t.id,
+              jsonEncode(t.tags),
+              t.status,
+              jsonEncode(t.versionStatuses),
+            ],
         ],
       );
       _insertAll(
@@ -210,6 +221,12 @@ final class LocalIndex {
           path: r['path'] as String,
           tags: (jsonDecode(r['tags'] as String) as Map).cast(),
           versions: versions[(r['library_id'], r['path'])] ?? const [],
+          status: r['status'] as String?,
+          versionStatuses: {
+            for (final e
+                in (jsonDecode(r['version_statuses'] as String) as Map).entries)
+              VersionId(e.key as String): e.value as String,
+          },
         ),
     ];
   }
@@ -227,8 +244,10 @@ final class LocalIndex {
       ))
         r['path'] as String,
     ];
+    final restored = titles(library: id);
+    final byPath = {for (final t in restored) t.path: t};
     return ScanResult(
-      titles: titles(library: id),
+      titles: restored,
       nodes: {
         for (final r in _db.select('SELECT * FROM nodes WHERE library_id = ?', [
           id,
@@ -236,6 +255,8 @@ final class LocalIndex {
           r['path'] as String: NodeFile(
             NodeId(r['node_id'] as String),
             r['level'] as String,
+            status: byPath[r['path']]?.status,
+            versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
           ),
       },
       toSort: issues('toSort'),

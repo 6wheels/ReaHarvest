@@ -8,7 +8,19 @@ final class Title {
     required this.path,
     required this.tags,
     this.versions = const [],
+    this.status,
+    this.versionStatuses = const {},
   });
+
+  /// Default status list, from idea to done (SPEC §5.9). The list is
+  /// configurable: any non-empty key is accepted.
+  static const defaultStatuses = [
+    'idea',
+    'writing',
+    'recording',
+    'mixing',
+    'done',
+  ];
 
   final NodeId id;
   final LibraryId libraryId;
@@ -20,6 +32,19 @@ final class Title {
   final Map<String, String> tags;
 
   final List<Version> versions;
+
+  /// Title status key (e.g. `mixing`); null when not set.
+  final String? status;
+
+  /// Status of each version, by version id. May hold ids of versions that
+  /// no longer exist.
+  final Map<VersionId, String> versionStatuses;
+
+  /// Status of [version]; null when not set or not adopted.
+  String? statusOf(Version version) => switch (version.metadata) {
+    final m? => versionStatuses[m.id],
+    null => null,
+  };
 }
 
 /// Version metadata stored in the `.RPP` EXTSTATE section (SPEC §4.2).

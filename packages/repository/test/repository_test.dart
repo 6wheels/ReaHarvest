@@ -243,6 +243,73 @@ void main() {
     });
   });
 
+  group('statuses', () {
+    test('are written to the title node file and read by the scan', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1.rpp', adopted);
+      final first = await scan(storage, lib);
+      final versionId = first.titles.single.versions.single.metadata!.id;
+
+      await setTitleStatus(storage, 'band/album/song', 'mixing');
+      await setVersionStatus(storage, 'band/album/song', versionId, 'done');
+      final saved = jsonDecode(
+        File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
+            .readAsStringSync(),
+      );
+      expect(saved['status'], 'mixing');
+      expect(saved['versionStatuses'], {versionId: 'done'});
+      expect(saved['nodeId'], first.titles.single.id);
+
+      final second = await scan(storage, lib, previous: first);
+      final title = second.titles.single;
+      expect(title.status, 'mixing');
+      expect(title.statusOf(title.versions.single), 'done');
+      expect(second.nodes['band/album/song']!.status, 'mixing');
+
+      await setTitleStatus(storage, 'band/album/song', null);
+      await setVersionStatus(storage, 'band/album/song', versionId, '');
+      final cleared = (await scan(storage, lib, previous: second)).titles;
+      expect(cleared.single.status, isNull);
+      expect(cleared.single.versionStatuses, isEmpty);
+      expect(
+        File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
+            .readAsStringSync(),
+        isNot(contains('tatus')),
+      );
+    });
+
+    test('are kept for versions that no longer exist', () async {
+      put('song/v1.rpp', unknown);
+      await scan(storage, library(null));
+      final gone = VersionId.generate();
+      await setVersionStatus(storage, 'song', gone, 'idea');
+      await setTitleStatus(storage, 'song', 'writing');
+
+      final title = (await scan(storage, library(null))).titles.single;
+      expect(title.status, 'writing');
+      expect(title.versionStatuses, {gone: 'idea'});
+      expect(title.statusOf(title.versions.single), isNull);
+    });
+
+    test('require an existing node file', () {
+      expect(
+        setTitleStatus(storage, 'missing', 'idea'),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('reject an invalid shape', () {
+      expect(
+        () => NodeFile.fromJson({
+          'nodeId': newUlid(),
+          'level': 'title',
+          'versionStatuses': {'v': 1},
+        }),
+        throwsFormatException,
+      );
+    });
+  });
+
   group('free tree scan', () {
     test('makes a title of every folder holding a project', () async {
       put('band/2024/demo/demo.rpp', unknown);

@@ -7,6 +7,7 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'conventions.dart';
 import 'mounted_folder_storage.dart';
+import 'node_file.dart';
 
 /// Size and modification time of a file, used to skip unchanged files.
 typedef FileStamp = ({int size, DateTime modified});
@@ -131,7 +132,7 @@ final class _Scanner {
           'folder${i + 1}': segments[i],
         if (segments.isNotEmpty) 'title': segments.last,
       };
-      await _addTitle(dir, node.id, tags);
+      await _addTitle(dir, node, tags);
     }
   }
 
@@ -165,13 +166,13 @@ final class _Scanner {
         skipped.add(dir);
         continue;
       }
-      if (d == depth) await _addTitle(dir, node.id, layout.tagsOf(segments)!);
+      if (d == depth) await _addTitle(dir, node, layout.tagsOf(segments)!);
     }
   }
 
   Future<void> _addTitle(
     String dir,
-    NodeId id,
+    NodeFile node,
     Map<String, String> tags,
   ) async {
     final versions = <Version>[];
@@ -196,11 +197,13 @@ final class _Scanner {
     versions.sort((a, b) => a.fileName.compareTo(b.fileName));
     titles.add(
       Title(
-        id: id,
+        id: node.id,
         libraryId: library.id,
         path: dir,
         tags: tags,
         versions: versions,
+        status: node.status,
+        versionStatuses: node.versionStatuses,
       ),
     );
   }
@@ -238,8 +241,7 @@ final class _Scanner {
       }
     } else {
       node = NodeFile(NodeId.generate(), level);
-      final json = jsonEncode(node.toJson());
-      await storage.write(path, Stream.value(utf8.encode('$json\n')));
+      await writeNodeFile(storage, dir, node);
       final written = await storage.stat(path);
       if (written != null) stamps[path] = _stamp(written);
     }
