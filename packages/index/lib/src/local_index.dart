@@ -5,7 +5,7 @@ import 'package:reaharvest_repository/reaharvest_repository.dart';
 import 'package:sqlite3/sqlite3.dart' hide Version;
 
 /// Computes the content hash of the file at [path] (relative to the library
-/// root). The algorithm is chosen by the caller (SPEC §7.1).
+/// root), e.g. [xxh3Hasher] (SPEC §7.1).
 typedef FileHasher = Future<String> Function(String path);
 
 /// A file tracked by the index.
