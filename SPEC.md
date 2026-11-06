@@ -214,7 +214,7 @@ Versions form a **flat list** (no tree, no parent version).
 - Adding a library: creation of a new one (choice of mode and layout) or attachment to an existing repository (reading its `_library.json`, case of a member joining a group).
 - First-run wizard: creation of the first library, REAPER detection.
 - Local member identity (`memberId`, display name), created on first run and used in all modes (version owner).
-- Path of the REAPER executable and of the REAPER resource folder (defaults per OS).
+- Path of the REAPER executable and of the REAPER resource folder (defaults per OS). Executable detection: first the location reported by the OS (Windows: default value of `HKLM\SOFTWARE\REAPER` = install folder, validated; macOS: Spotlight `mdfind "kMDItemCFBundleIdentifier == 'com.cockos.reaper'"`; Linux: `which reaper`), then the usual install locations (Windows: `%ProgramFiles%\REAPER (x64)`, `%ProgramFiles%\REAPER`; macOS: `/Applications/REAPER.app`, `/Applications/REAPER64.app`, `~/Applications/REAPER.app`; Linux: `~/opt/REAPER/reaper`, `/opt/REAPER/reaper`). Resource folder: `%APPDATA%\REAPER`, `~/Library/Application Support/REAPER`, `~/.config/REAPER`. macOS and Linux values **[TO VALIDATE]**.
 - Project templates folder (default: `ProjectTemplates` in the REAPER resource folder).
 - Check of a recommended REAPER preference, with a non-blocking warning: peaks centralized outside the project (avoids thousands of `.reapeaks` in the workspace). Validated keys: `altpeaks` bit `0x1` = "Store all peak caches (.reapeaks) in alternate path" (General > Paths), `altpeakspath` = path.
 - No check of REAPER backup options: all backups (`.rpp-bak`, timestamped, `Backups/`) are excluded from synchronization (§3.2), whatever option is chosen.
@@ -247,8 +247,9 @@ Parsing of the `.RPP`, without REAPER:
 - top-level tracks (depth 0), with name (`NAME`) and color (`PEAKCOL`, bit `0x1000000` = custom color). Depth computed through `ISBUS <type> <delta>` (validated on the corpus): `ISBUS 0 0` normal track, `ISBUS 1 1` folder start, `ISBUS 2 -n` last track of a folder, closes `n` levels;
 - plugins used per track, deduplicated. Observed forms: `<VST "VST3: Name (Vendor)" file.vst3 0 "" uid{guid} ""`, `<VST "VSTi: …" file.dll …`, `<VST "VST: …" file.dll …`, `<JS relative/path ""`. CLAP and AU absent from the corpus **[TO VALIDATE]**;
 - **plugins missing** on the machine, by comparison with the REAPER plugin caches, discovered by pattern (`reaper-vstplugins*.ini`, `reaper-clap-*.ini`, `reaper-auplugins*.ini`) rather than by exact name:
-  - VST (validated on Windows, `reaper-vstplugins64.ini`): `[vstcache]` section, lines `file=timestamp,uid,Name (Vendor)`; in the key, spaces in the file name are replaced by `_` (`"TDR Kotelnikov.vst3"` → `TDR_Kotelnikov.vst3`);
-  - JS (validated, `reaper-jsfx.ini`): lines `NAME relative/path "JS: Name"`;
+  - VST (validated on Windows, `reaper-vstplugins64.ini`): `[vstcache]` section, lines `file=timestamp,uid,Name (Vendor)`; in the key, every character of the file name other than a letter, digit, `.` or `_` is replaced by `_` (`"TDR Kotelnikov.vst3"` → `TDR_Kotelnikov.vst3`, `SS-11X.vst3` → `SS_11X.vst3`, `"Darkglass Ultra(x64).dll"` → `Darkglass_Ultra_x64_.dll`); also merged: other `reaper-vstplugins*.ini` files (32-bit). Shell plugins (e.g. Waves) have a `file=timestamp,0,<SHELL>` line plus one `file<id=…` line per sub-plugin; matching is done on the shell file only. Lines with only a timestamp (no plugin name) are treated as not installed;
+  - JS (validated, `reaper-jsfx.ini`): lines `NAME relative/path "JS: Name"` (path quoted when it contains spaces); `REV` lines are ignored;
+  - formats without validated cache (CLAP, AU, DX, LV2) are reported with an unknown status, never as missing;
   - CLAP, AU, macOS and Linux names **[TO VALIDATE]**;
 - tempo, time signature, length, sample rate, REAPER version;
 - owner, label, modification date;
@@ -318,10 +319,10 @@ Parsing of the `.RPP`, without REAPER:
 - Immediate opening in REAPER.
 
 ### 5.7 Opening in REAPER
-- Opening in the existing instance (`-nonewinst` on Windows, validated: `reaper.exe -nonewinst <file>.rpp` opens the project in a new tab of the already open instance, without launching a second one; if REAPER is closed, it starts it) **[TO VALIDATE: macOS equivalent]**.
+- Opening in the existing instance (`-nonewinst` on Windows, validated: `reaper.exe -nonewinst <file>.rpp` opens the project in a new tab of the already open instance, without launching a second one; if REAPER is closed, it starts it) **[TO VALIDATE: macOS equivalent]**. Implemented without validation: macOS `open -a <REAPER.app> <file>.rpp`, Linux `reaper -nonewinst <file>.rpp`.
 - Any modification of a `.RPP` by the application (adoption, path rewrite, track import) requires the project to be closed in REAPER: warning and confirmation in the MVP.
   - `REAPER.ini` (`projecttabs`, `projecttab1..n`) is not reliable: it is only rewritten occasionally and keeps stale entries (observed: `projecttabs=1` with `projecttab2..9` still present).
-  - MVP: if a REAPER process is running, warning and confirmation. Later: REAPER companion script publishing the list of open projects.
+  - MVP: if a REAPER process is running, warning and confirmation. Detection: Windows `tasklist /FI "IMAGENAME eq reaper.exe"`, macOS and Linux `pgrep -ix reaper` **[TO VALIDATE on macOS and Linux]**. Later: REAPER companion script publishing the list of open projects.
   - Validated: REAPER **does not lock** the open `.rpp` (exclusive write open and rename succeeded while the project was open). No lock-based detection is possible, and REAPER will overwrite the modification on the next save of the project: the warning must say so clearly.
 
 ### 5.8 Adoption of existing projects (migration)
