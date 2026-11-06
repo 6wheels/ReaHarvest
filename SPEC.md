@@ -309,6 +309,10 @@ Parsing du `.RPP`, sans REAPER :
   - `RENDER_FILE <chemin>`, `RENDER_PATTERN <motif>` (jokers REAPER : `$project`, `$title`, `$author`…) ;
   - `<RENDER_METADATA` puis une ligne `TAG <SCHÉMA:CHAMP> <valeur>` par champ (ex. `TAG ID3:TIT2 $title`, `TAG ID3:TPE1 $author`, `TAG VORBIS:ARTIST $author`), puis `>`.
 
+  - case « Metadata » du dialogue de rendu (écriture effective des métadonnées) : bit `512` de `RENDER_STEMS` ; le writer l'active dès qu'il écrit des tags.
+
+  Validé (REAPER 7.84, Windows) : un projet patché par le writer (titre, auteur, notes, `RECORD_PATH`, `RENDER_FILE`, `RENDER_PATTERN`, `<RENDER_METADATA`, `FILE "Media\…"`, `EXTSTATE`) s'ouvre sans erreur, les médias relatifs sont résolus, toutes les valeurs sont lues, puis conservées à l'identique lors d'une sauvegarde par REAPER (qui réordonne seulement `TITLE` avant `AUTHOR` et met `RECORD_PATH` entre `"`).
+
   Les valeurs ne sont entre guillemets que si nécessaire. Quotation validée : brut sans espace (`TITLE coffeetime`), `"…"` avec espaces (`TITLE "Dancing on a line"`), `'…'` si la valeur contient `"` (`TITLE 'My "quoted" title'`), puis `` `…` `` si elle contient aussi `'`. Le writer reproduit ces règles ; le reader accepte les trois délimiteurs.
 - Ouverture immédiate dans REAPER.
 

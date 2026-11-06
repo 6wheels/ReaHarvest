@@ -42,7 +42,12 @@ List<String> tokenize(String line) {
 /// `"`, `'`, `` ` `` depending on which delimiters the value contains.
 String quote(String value) {
   if (value.isEmpty) return '""';
-  final needsQuotes = value.contains(RegExp(r'[\s"' "'`]"));
+  final needsQuotes = value.contains(
+    RegExp(
+      r'[\s"'
+      "'`]",
+    ),
+  );
   if (!needsQuotes) return value;
   if (!value.contains('"')) return '"$value"';
   if (!value.contains("'")) return "'$value'";

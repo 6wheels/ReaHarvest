@@ -62,8 +62,7 @@ class RppTrack {
 class RppProject {
   RppProject(this.document);
 
-  factory RppProject.parse(String text) =>
-      RppProject(RppDocument.parse(text));
+  factory RppProject.parse(String text) => RppProject(RppDocument.parse(text));
 
   final RppDocument document;
 
@@ -75,8 +74,7 @@ class RppProject {
   }
 
   /// REAPER version that last saved the project, e.g. `7.84/win64`.
-  String? get reaperVersion =>
-      _root.params.length > 1 ? _root.params[1] : null;
+  String? get reaperVersion => _root.params.length > 1 ? _root.params[1] : null;
 
   String? get title => _param('TITLE');
   String? get author => _param('AUTHOR');
@@ -99,6 +97,13 @@ class RppProject {
   String? get renderFile => _param('RENDER_FILE');
   String? get renderPattern => _param('RENDER_PATTERN');
 
+  /// Render metadata tags (`SCHEMA:FIELD` → value) from `<RENDER_METADATA`.
+  Map<String, String> get renderMetadata => {
+    for (final l in _root.chunk('RENDER_METADATA')?.lines ?? <RppLine>[])
+      if (l.name == 'TAG' && l.params.isNotEmpty)
+        l.params[0]: l.params.length > 1 ? l.params[1] : '',
+  };
+
   String? get notes {
     final c = _root.chunk('NOTES');
     if (c == null) return null;
@@ -112,10 +117,12 @@ class RppProject {
     var end = 0.0;
     for (final track in _root.chunksNamed('TRACK')) {
       for (final item in track.chunksNamed('ITEM')) {
-        final pos =
-            double.tryParse(item.line('POSITION')?.params.firstOrNull ?? '');
-        final len =
-            double.tryParse(item.line('LENGTH')?.params.firstOrNull ?? '');
+        final pos = double.tryParse(
+          item.line('POSITION')?.params.firstOrNull ?? '',
+        );
+        final len = double.tryParse(
+          item.line('LENGTH')?.params.firstOrNull ?? '',
+        );
         if (pos != null && len != null && pos + len > end) end = pos + len;
       }
     }
@@ -127,20 +134,24 @@ class RppProject {
     var depth = 0;
     for (final track in _root.chunksNamed('TRACK')) {
       final name = track.line('NAME')?.params.firstOrNull ?? '';
-      final peak = int.tryParse(track.line('PEAKCOL')?.params.firstOrNull ?? '');
-      final color =
-          (peak != null && peak & 0x1000000 != 0) ? peak & 0xFFFFFF : null;
+      final peak = int.tryParse(
+        track.line('PEAKCOL')?.params.firstOrNull ?? '',
+      );
+      final color = (peak != null && peak & 0x1000000 != 0)
+          ? peak & 0xFFFFFF
+          : null;
       final plugins = <RppPlugin>{};
       _collectPlugins(track, plugins);
-      result.add(RppTrack(
-        name: name,
-        depth: depth < 0 ? 0 : depth,
-        color: color,
-        plugins: plugins.toList(),
-      ));
-      final delta = int.tryParse(
-            track.line('ISBUS')?.params.elementAtOrNull(1) ?? '',
-          ) ??
+      result.add(
+        RppTrack(
+          name: name,
+          depth: depth < 0 ? 0 : depth,
+          color: color,
+          plugins: plugins.toList(),
+        ),
+      );
+      final delta =
+          int.tryParse(track.line('ISBUS')?.params.elementAtOrNull(1) ?? '') ??
           0;
       depth += delta;
     }
@@ -158,9 +169,9 @@ class RppProject {
 
   /// Every plugin used in the project (master and tracks), deduplicated.
   Set<RppPlugin> get allPlugins => {
-        ...masterPlugins,
-        for (final t in tracks) ...t.plugins,
-      };
+    ...masterPlugins,
+    for (final t in tracks) ...t.plugins,
+  };
 
   /// Media file references (`FILE` lines of `SOURCE` chunks), deduplicated,
   /// as written in the project (relative or absolute).
