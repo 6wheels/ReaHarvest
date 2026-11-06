@@ -449,7 +449,8 @@ Switch procedure (single action in the settings):
   - `ulid`: identifiers;
   - `window_manager`, `file_selector`, `local_notifier`: desktop integration;
   - `auto_updater` (Sparkle / WinSparkle): automatic update.
-- **Hash**: algorithm not imposed. Requirements: robust (fingerprint ≥ 128 bits, negligible collisions outside an adversarial context; no security use), extremely fast (throughput close to the disk's), streamed computation on large files. Choice by benchmark at project start (candidates: XXH3-128, BLAKE3, through `dart:ffi` if needed) **[TO VALIDATE]**. The hash is computed only if size or mtime changed.
+- **Hash**: requirements: negligible collision probability outside an adversarial context (no security use), throughput at least the disk's, streamed computation on large files. A 64-bit fingerprint is enough: hashes are only ever compared together with name and size, between a few files (same path, media pool), never across the whole corpus (~3·10⁻⁶ collision probability even for 10 million files compared pairwise). Chosen: **XXH3-64**, pure Dart (`xxh3` package, streaming API), stored as 16 lowercase hex digits. The hash is computed only if size or mtime changed.
+  Benchmark (Windows x64, AOT executable, 1 GB file in the OS cache read by 1 MB blocks, read alone ~7.5 GB/s): pure Dart `xxh3` XXH3-64 ~1.9 GB/s; `hashlib` XXH3-128 ~90 MB/s, BLAKE2b/MD5 ~170 MB/s, `crypto` SHA-256 ~160 MB/s; no pure Dart BLAKE3. Native through `dart:ffi`: XXH3-128 ~6.1 GB/s (SSE2) / ~7.0 GB/s (AVX2), BLAKE3 single-threaded ~3.0 GB/s. Pure Dart XXH3-64 is faster than real disk reads (HDD, SATA SSD, most NVMe, streaming cloud folders) and needs no native toolchain; the native path stays available behind the same hasher function if ever needed.
 - **Concurrency**: all long tasks (scan, bulk parsing, hash, copies) run in **isolates**, never on the UI isolate. The hash is computed in the background, in batches (one title and its versions).
 
 ### 7.2 Package layout
@@ -541,7 +542,7 @@ Plan from milestone A: local `memberId` and version `owner`, `libraryId`, `_libr
 7. Naming patterns of conflict copies per cloud provider (§3.0).
 8. ~~License and SignPath~~ (GPL-3.0, SignPath retained, §8).
 9. ~~`RENDER_FILE` form, command-line render with REAPER open~~ (validated, §5.3).
-10. Choice of the hash algorithm by benchmark (§7.1).
+10. ~~Choice of the hash algorithm by benchmark~~ (validated: XXH3-64, pure Dart, §7.1).
 11. Relative paths with `\` read by REAPER macOS (§4.3).
 
 ## 11. Out of scope
