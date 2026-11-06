@@ -7,3 +7,10 @@ environment:
   sdk: ^3.13.0
 dev_dependencies:
   test: ^1.31.1
+dependencies:
+  path: ^1.9.1
+  reaharvest_domain:
+    path: ../domain
+  reaharvest_repository:
+    path: ../repository
+  sqlite3: ^3.9.0

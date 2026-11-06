@@ -35,7 +35,8 @@ final class ScanResult {
   /// node file is corrupted is not scanned further.
   final List<String> corrupted;
 
-  /// Stamps of the files read (`.RPP` and node files), for the next scan.
+  /// Stamps of all scanned files (excluded files and folders left out), by
+  /// path; used to skip unchanged files on the next scan.
   final Map<String, FileStamp> stamps;
 
   /// Versions without metadata ("To adopt", SPEC §4.2).
@@ -96,6 +97,7 @@ final class _Scanner {
         if (!isExcludedFolder(segments.last)) dirs.add(e.path);
       } else if (!isExcludedFile(segments.last)) {
         files.putIfAbsent(_parent(e.path), () => []).add(e);
+        stamps[e.path] = _stamp(e);
       }
     }
     final ordered = dirs.toList()
@@ -204,9 +206,7 @@ final class _Scanner {
   }
 
   Future<VersionMetadata?> _metadata(StorageEntry e) async {
-    final stamp = _stamp(e);
-    stamps[e.path] = stamp;
-    if (previous.stamps[e.path] == stamp &&
+    if (previous.stamps[e.path] == stamps[e.path] &&
         previousMetadata.containsKey(e.path)) {
       return previousMetadata[e.path];
     }
@@ -225,9 +225,7 @@ final class _Scanner {
     final entry = files[dir]?.where((e) => e.path == path).firstOrNull;
     NodeFile? node;
     if (entry != null) {
-      final stamp = _stamp(entry);
-      stamps[path] = stamp;
-      node = previous.stamps[path] == stamp ? previous.nodes[dir] : null;
+      node = previous.stamps[path] == stamps[path] ? previous.nodes[dir] : null;
       if (node == null) {
         try {
           final text = await utf8.decodeStream(storage.read(path));
