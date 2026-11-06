@@ -63,7 +63,7 @@ flutter test             # in apps/desktop
 flutter run -d windows   # in apps/desktop
 ```
 
-The full specification (in French) is in [SPEC.md](SPEC.md).
+The full specification is in [SPEC.md](SPEC.md).
 
 ## License
 

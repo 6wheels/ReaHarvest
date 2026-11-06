@@ -1,107 +1,108 @@
-# ReaHarvest — Spécification
+# ReaHarvest — Specification
 
-> Gestionnaire collaboratif de projets REAPER.
-> Nom technique : `reaharvest` (dépôt, paquets Dart préfixés `reaharvest_`, identifiant d'application `reaharvest`).
+> Collaborative REAPER project manager.
+> Technical name: `reaharvest` (repository, Dart packages prefixed `reaharvest_`, application identifier `reaharvest`).
 
-> Document de référence pour l'implémentation (sessions Claude Code).
-> Les identifiants de code, noms de fichiers techniques et commentaires sont en anglais.
-> Les points marqués **[À VALIDER]** doivent être vérifiés avant d'implémenter la fonctionnalité concernée.
-
----
-
-## 1. Contexte et objectifs
-
-Groupe de 3 musiciens (un seul profil technique) travaillant sur des projets REAPER partagés via un dossier Google Drive monté (mode streaming).
-
-Problèmes à résoudre :
-1. Divergence des projets et réintégration manuelle des parties.
-2. Duplication massive (médias copiés par personne et par version, jusqu'à ×5).
-3. Manque de discipline (arborescence non respectée, duplications par peur de supprimer, perte de la « bonne » version).
-
-Objectifs :
-- Imposer une organisation sans effort pour les non-techniciens.
-- Ne jamais dupliquer les médias.
-- Travailler sur une copie locale (performance, hors ligne), le Drive servant de dépôt partagé.
-- Partager statuts, tâches, notes et paroles entre membres.
-- Gérer aussi des projets purement personnels (locaux, ou locaux avec sauvegarde cloud) dans la même application, via des bibliothèques de modes différents (§3.0).
-- Application rapide, moderne, intuitive.
-
-Plateformes : **Windows et macOS prioritaires**, Linux secondaire (doit compiler et fonctionner, sans effort d'optimisation dédié).
-Publication publique envisagée à terme : aucune dépendance en dur à Google Drive, à un fournisseur cloud ni à un backend précis.
+> Reference document for implementation (Claude Code sessions).
+> Code identifiers, technical file names and comments are in English.
+> Items marked **[TO VALIDATE]** must be verified before implementing the related feature.
+> The user interface is in French (i18n-ready): French UI labels are given as (UI: « … »).
 
 ---
 
-## 2. Glossaire
+## 1. Context and goals
 
-| Terme | Définition |
+A group of 3 musicians (only one with a technical profile) working on REAPER projects shared through a mounted Google Drive folder (streaming mode).
+
+Problems to solve:
+1. Diverging projects and manual reintegration of parts.
+2. Massive duplication (media copied per person and per version, up to ×5).
+3. Lack of discipline (folder structure not followed, duplication out of fear of deleting, loss of the "right" version).
+
+Goals:
+- Enforce an organization that requires no effort from non-technical users.
+- Never duplicate media.
+- Work on a local copy (performance, offline), the Drive acting as the shared repository.
+- Share statuses, tasks, notes and lyrics between members.
+- Also manage purely personal projects (local, or local with cloud backup) in the same application, through libraries with different modes (§3.0).
+- Fast, modern, intuitive application.
+
+Platforms: **Windows and macOS first**, Linux secondary (must build and work, without dedicated optimization effort).
+Public release considered in the long run: no hard dependency on Google Drive, on a cloud provider or on a specific backend.
+
+---
+
+## 2. Glossary
+
+| Term | Definition |
 |---|---|
-| Bibliothèque (library) | Ensemble de projets géré par l'application, avec un mode (local, local + cloud, collaboration), un layout et ses dossiers. Possède un `libraryId`. |
-| Mode | Niveau de partage et de fonctionnalités d'une bibliothèque (§3.0). |
-| Dépôt (repository) | Dossier racine cloud d'une bibliothèque en mode local + cloud ou collaboration (ex. Drive monté). Source de vérité des fichiers projets. |
-| Espace de travail (workspace) | Dossier local d'une bibliothèque, où les titres sont créés, récupérés et modifiés. |
-| Groupe | Ensemble de membres partageant une bibliothèque en mode collaboration. Possède un `groupId`. À ne pas confondre avec le niveau « Artiste » d'une arborescence. |
-| Modèle d'arborescence (layout) | Suite ordonnée de niveaux qui fige la structure des dossiers d'un dépôt (ex. `artist/album/title`). Cf. §3. |
-| Niveau / tag | Élément d'un layout. Chaque niveau correspond à un dossier et à un tag (clé + valeur) utilisé pour la recherche et la navigation. |
-| Nœud | Dossier correspondant à un niveau du layout. Possède un `nodeId` stable. |
-| Titre (nœud feuille) | Dernier niveau du layout, quel que soit son nom affiché (titre, scène…). Dossier contenant le pool média, les assets et les versions. Son `nodeId` sert de `titleId`. |
-| Version | Un fichier `.RPP` dans le dossier d'un titre. Possède un `versionId` stable, un propriétaire, un libellé. |
-| Pool média | Dossier `Media/` du titre, partagé par toutes ses versions, en ajout seul. |
-| Récupérer (checkout) | Copie dépôt → espace de travail. |
-| Publier (publish) | Copie espace de travail → dépôt. |
-| Libérer (release) | Suppression de la copie locale d'un titre. |
-| Asset | Fichier annexe d'un titre, hors projet REAPER (partition, tablature, image, PDF, texte…). |
-| Store collaboratif | Stockage des données partagées (statuts, tâches, notes, paroles, métadonnées d'assets). Deux implémentations : journal et PocketBase. |
+| Library | Set of projects managed by the application, with a mode (local, local + cloud, collaboration), a layout and its folders. Has a `libraryId`. |
+| Mode | Sharing and feature level of a library (§3.0). |
+| Repository | Cloud root folder of a library in local + cloud or collaboration mode (e.g. mounted Drive). Source of truth for project files. |
+| Workspace | Local folder of a library, where titles are created, checked out and modified. |
+| Group | Set of members sharing a library in collaboration mode. Has a `groupId`. Not to be confused with the "Artist" level of a layout. |
+| Layout | Ordered sequence of levels that fixes the folder structure of a repository (e.g. `artist/album/title`). See §3. |
+| Level / tag | Element of a layout. Each level maps to a folder and to a tag (key + value) used for search and navigation. |
+| Node | Folder matching a layout level. Has a stable `nodeId`. |
+| Title (leaf node) | Last level of the layout, whatever its displayed name (title, scene…). Folder holding the media pool, the assets and the versions. Its `nodeId` serves as `titleId`. |
+| Version | A `.RPP` file in a title folder. Has a stable `versionId`, an owner, a label. |
+| Media pool | `Media/` folder of the title, shared by all its versions, append-only. |
+| Checkout (UI: « Récupérer ») | Copy repository → workspace. |
+| Publish (UI: « Publier ») | Copy workspace → repository. |
+| Release (UI: « Libérer ») | Deletion of the local copy of a title. |
+| Asset | Auxiliary file of a title, outside the REAPER project (score, tab, image, PDF, text…). |
+| Collab store | Storage of shared data (statuses, tasks, notes, lyrics, asset metadata). Two implementations: journal and PocketBase. |
 
 ---
 
-## 3. Bibliothèques, modes et organisation
+## 3. Libraries, modes and organization
 
-### 3.0 Bibliothèques et modes
+### 3.0 Libraries and modes
 
-L'utilisateur configure **une ou plusieurs bibliothèques**. Chacune possède son propre mode, son layout et ses dossiers. Toutes sont présentées dans une **vue unifiée**, filtrable par bibliothèque et par mode (§5.2).
+The user configures **one or more libraries**. Each has its own mode, layout and folders. All are presented in a **unified view**, filterable by library and by mode (§5.2).
 
-| Mode | Dossiers | Fonctionnalités | Cas d'usage |
+| Mode | Folders | Features | Use case |
 |---|---|---|---|
-| **`local`** | Espace de travail uniquement | Organisation (layout), navigation, versions (avec propriétaire = membre local), vue détail, création, ouverture REAPER. Aucune synchronisation, aucune collaboration | Projets personnels sur une seule machine |
-| **`cloud`** (local + cloud) | Espace de travail + dépôt cloud | `local` + Récupérer / Publier / Libérer, détection de conflits (utile entre plusieurs machines d'un même utilisateur), sauvegarde. Utilisateur unique : pas de contrôle de propriété ni de forçage | Projets personnels sauvegardés et accessibles depuis plusieurs machines |
-| **`collab`** (collaboration) | Espace de travail + dépôt cloud partagé | `cloud` + membres, propriété des versions et forçage, store collaboratif (statuts, tâches, notes, paroles, assets partagés, activité, notifications) | Projets de groupe |
+| **`local`** | Workspace only | Organization (layout), navigation, versions (with owner = local member), detail view, creation, opening in REAPER. No synchronization, no collaboration | Personal projects on a single machine |
+| **`cloud`** (local + cloud) | Workspace + cloud repository | `local` + Checkout / Publish / Release, conflict detection (useful between several machines of the same user), backup. Single user: no ownership check and no forcing | Personal projects backed up and accessible from several machines |
+| **`collab`** (collaboration) | Workspace + shared cloud repository | `cloud` + members, version ownership and forcing, collab store (statuses, tasks, notes, lyrics, shared assets, activity, notifications) | Group projects |
 
-Règles :
-- Le travail se fait **toujours dans l'espace de travail local** ; le dépôt n'est jamais un lieu de travail.
-- **Changement de mode** possible à tout moment, par assistant :
-  - `local` → `cloud` : choix du dépôt, publication initiale ;
-  - `cloud` → `collab` : création du groupe, invitation des membres, adoption des versions (attribution du propriétaire) ;
-  - rétrogradations : `collab` → `cloud` (export du store collaboratif en snapshot conservé dans le dépôt), `cloud` → `local` (le dépôt est laissé intact, simplement détaché).
-- Un même dossier ne peut appartenir qu'à une seule bibliothèque (contrôle à la configuration).
+Rules:
+- Work always happens **in the local workspace**; the repository is never a place to work in.
+- **Mode change** possible at any time, through a wizard:
+  - `local` → `cloud`: choice of the repository, initial publish;
+  - `cloud` → `collab`: group creation, member invitation, adoption of versions (owner assignment);
+  - downgrades: `collab` → `cloud` (export of the collab store as a snapshot kept in the repository), `cloud` → `local` (the repository is left intact, simply detached).
+- A given folder can belong to only one library (checked at configuration).
 
-**Fournisseurs cloud.** Le MVP s'appuie sur un **dossier monté ou synchronisé par le client du fournisseur** : l'application ne voit qu'un chemin du système de fichiers. Sont donc couverts, sans code spécifique : Google Drive pour ordinateur, Dropbox, OneDrive, iCloud Drive, Nextcloud, Syncthing, partage réseau (NAS/SMB), montage rclone (Linux). Contraintes communes à prendre en charge :
-- fichiers « à la demande » (non présents localement) : ne jamais les lire ni les hacher inutilement, s'appuyer sur taille et mtime ;
-- copies de conflit propres au fournisseur (ex. `fichier (1).RPP`, `conflicted copy`) : détectées et signalées comme anomalies, jamais adoptées silencieusement **[À VALIDER : motifs de nommage par fournisseur]**.
+**Cloud providers.** The MVP relies on a **folder mounted or synchronized by the provider's client**: the application only sees a file system path. The following are therefore covered, with no specific code: Google Drive for desktop, Dropbox, OneDrive, iCloud Drive, Nextcloud, Syncthing, network share (NAS/SMB), rclone mount (Linux). Common constraints to handle:
+- on-demand files (not present locally): never read or hash them needlessly, rely on size and mtime;
+- provider-specific conflict copies (e.g. `file (1).RPP`, `conflicted copy`): detected and reported as anomalies, never silently adopted **[TO VALIDATE: naming patterns per provider]**.
 
-Les fournisseurs accessibles par API (sans dossier monté) sont **hors MVP**. L'accès au dépôt passe par un port `RepositoryStorage` dont l'implémentation MVP est `MountedFolderStorage`, pour permettre d'autres adaptateurs ultérieurement.
+Providers accessible through an API only (without a mounted folder) are **outside the MVP**. Repository access goes through a `RepositoryStorage` port whose MVP implementation is `MountedFolderStorage`, to allow other adapters later.
 
-### 3.1 Modèles d'arborescence (layouts)
+### 3.1 Layouts
 
-La structure des dossiers est définie par un **layout** : une suite ordonnée de niveaux. Chaque niveau est un **placeholder ciblant un tag**. La valeur du tag est le nom du dossier ; elle alimente la recherche, les filtres et la navigation dans l'interface.
+The folder structure is defined by a **layout**: an ordered sequence of levels. Each level is a **placeholder targeting a tag**. The tag value is the folder name; it feeds search, filters and navigation in the interface.
 
-Modèles fournis :
-| Modèle | Niveaux (clés de tag) | Libellés affichés |
+Provided templates:
+| Template | Levels (tag keys) | Displayed labels (UI) |
 |---|---|---|
-| **Classique (recommandé)** | `artist / album / title` | Artiste / Album / Titre |
-| Orienté projet (sans album) | `artist / title` | Artiste / Titre |
-| Orienté film | `project / chapter / scene` | Projet / Chapitre / Scène ou titre |
+| **Classic (recommended)** | `artist / album / title` | Artiste / Album / Titre |
+| Project-oriented (no album) | `artist / title` | Artiste / Titre |
+| Film-oriented | `project / chapter / scene` | Projet / Chapitre / Scène ou titre |
 
-Règles des layouts :
-- Le dernier niveau est toujours le **nœud feuille** (titre) : c'est lui qui contient `Media/` et les versions.
-- Un layout comporte de 1 à 4 niveaux. Les modèles personnalisés définissent pour chaque niveau une clé de tag (identifiant technique, en anglais) et un libellé affiché.
-- Tous les niveaux sont obligatoires. Chaque niveau intermédiaire dispose d'une valeur réservée (`_Unassigned`, affichée « Non classé » dans l'interface) pour les éléments non rattachés.
-- En mode `local` uniquement, un layout peut être remplacé par l'**arborescence libre** (§3.3).
-- Le layout est défini **par bibliothèque**, dans `_library.json`. Il est **figé dès la création du premier titre** : en changer ensuite relève d'une migration (hors MVP).
-- Chaque layout déclare un **mapping tags → métadonnées de rendu** (ex. classique : `artist` → artiste, `album` → album, `title` → titre). Le mapping est modifiable par l'utilisateur.
+Layout rules:
+- The last level is always the **leaf node** (title): it holds `Media/` and the versions.
+- A layout has 1 to 4 levels. Custom templates define, for each level, a tag key (technical identifier, in English) and a displayed label.
+- All levels are mandatory. Each intermediate level has a reserved value (`_Unassigned`, UI: « Non classé ») for items that are not attached.
+- In `local` mode only, a layout can be replaced by the **free tree** (§3.3).
+- The layout is defined **per library**, in `_library.json`. It is **frozen as soon as the first title is created**: changing it afterwards is a migration (outside the MVP).
+- Each layout declares a **tags → render metadata mapping** (e.g. classic: `artist` → artist, `album` → album, `title` → title). The mapping can be modified by the user.
 
-### 3.2 Structure physique
+### 3.2 Physical structure
 
-Exemple avec le modèle classique :
+Example with the classic template:
 ```
 <libraryRoot>/                   # repository root (modes cloud/collab) or workspace root (mode local)
   _library.json                   # libraryId, mode, layout, collab settings (cf. §6.5)
@@ -120,245 +121,245 @@ Exemple avec le modèle classique :
         _trash/                   # deleted versions and assets
 ```
 
-Règles :
-- Le **chemin** définit les valeurs des tags. Les fichiers `.node.json` ne portent que des **identifiants stables** et le niveau, pour que déplacer ou renommer un dossier ne casse pas les données collaboratives.
-- Tout dossier ou `.RPP` dont la position ne correspond pas au layout apparaît dans la section « À ranger » (§5.2).
-- Le nom d'un `.RPP` est libre : l'identité d'une version ne dépend pas de son nom (cf. §4.2).
-- Les comparaisons d'extension sont **insensibles à la casse** (`.rpp` et `.RPP` coexistent dans les projets réels).
-- Fichiers exclus de toute synchronisation et de l'indexation (relevé sur un dépôt réel) :
-  - REAPER : `*.reapeaks`, `*.rpp-bak` (y compris horodatés : `<nom>-AAAA-MM-JJ_HHMM.rpp-bak`), sous-dossier `Backups/` du titre (backups horodatés), `*.rpp-undo`, `*.rpp-prox`, `*.reapindex`. Les backups REAPER restent un filet de sécurité **local** : l'historique partagé est assuré par `_versions/` (§5.4) et par l'historique du fournisseur cloud ;
-  - système : `.DS_Store`, `._*` (AppleDouble macOS), `desktop.ini`, `Thumbs.db` ;
-  - fournisseur cloud : raccourcis Google Drive (`*.gdoc`, `*.gsheet`…).
+Rules:
+- The **path** defines the tag values. `.node.json` files only carry **stable identifiers** and the level, so that moving or renaming a folder does not break collaborative data.
+- Any folder or `.RPP` whose position does not match the layout appears in the "To sort" section (UI: « À ranger », §5.2).
+- The name of a `.RPP` is free: the identity of a version does not depend on its name (cf. §4.2).
+- Extension comparisons are **case-insensitive** (`.rpp` and `.RPP` coexist in real projects).
+- Files excluded from any synchronization and from indexing (surveyed on a real repository):
+  - REAPER: `*.reapeaks`, `*.rpp-bak` (including timestamped ones: `<name>-YYYY-MM-DD_HHMM.rpp-bak`), the title's `Backups/` subfolder (timestamped backups), `*.rpp-undo`, `*.rpp-prox`, `*.reapindex`. REAPER backups remain a **local** safety net: shared history is provided by `_versions/` (§5.4) and by the cloud provider's history;
+  - system: `.DS_Store`, `._*` (macOS AppleDouble), `desktop.ini`, `Thumbs.db`;
+  - cloud provider: Google Drive shortcuts (`*.gdoc`, `*.gsheet`…).
 
-### 3.3 Arborescence libre (mode `local` uniquement)
+### 3.3 Free tree (`local` mode only)
 
-Option pour les utilisateurs qui ne veulent pas réorganiser leurs dossiers : l'application **laisse l'arborescence intacte**. L'interface recommande néanmoins un layout figé, et l'assistant de migration (§5.8) permet d'y passer plus tard.
+Option for users who do not want to reorganize their folders: the application **leaves the folder tree intact**. The interface nevertheless recommends a frozen layout, and the migration wizard (§5.8) allows switching to one later.
 
-Principe : la bibliothèque surveille **un ou plusieurs dossiers racines** et se comporte comme une grande bibliothèque indexée. Tout dossier contenant au moins un `.rpp` est un titre ; ses `.rpp` sont ses versions.
+Principle: the library watches **one or more root folders** and behaves like a large indexed library. Any folder containing at least one `.rpp` is a title; its `.rpp` files are its versions.
 
-Règles :
-1. **Tags** : dérivés des noms des dossiers parents, relatifs à la racine ; utilisables en recherche, sans filtre par niveau.
-2. **Identité des titres** : un `.node.json` est écrit dans chaque dossier titre (identité stable, facilite la migration ultérieure vers un layout). C'est la seule écriture de l'application dans l'arborescence en dehors des actions explicites.
-3. **Métadonnées de version** (`EXTSTATE`) : écrites uniquement à l'adoption explicite d'une version ; `.rpp` en lecture seule sinon.
-4. **Pool média** : aucune contrainte `Media/`, pas de normalisation des chemins, pas de section « À ranger ». Seuls les médias absents sont signalés.
-5. **Création, suppression, historique** : nouveaux titres créés dans un dossier choisi par l'utilisateur ; `_trash/` et `_versions/` placés dans le dossier du `.rpp` concerné, créés à la première utilisation.
-6. **Dossiers imbriqués** contenant chacun des `.rpp` (cas réel : `titre/membre/v2/…`) : chaque dossier est un titre distinct.
-7. **Configuration** : les racines surveillées et la configuration de la bibliothèque sont stockées dans la configuration de l'application, pas dans les dossiers. Une racine située sous une racine déjà déclarée (dans n'importe quelle bibliothèque) est refusée, pour éviter les doublons.
-8. **Changement de mode** : passage à `cloud` ou `collab` impossible sans migration préalable vers un layout.
+Rules:
+1. **Tags**: derived from the names of the parent folders, relative to the root; usable in search, without per-level filters.
+2. **Title identity**: a `.node.json` is written in each title folder (stable identity, eases a later migration to a layout). This is the application's only write in the tree outside explicit actions.
+3. **Version metadata** (`EXTSTATE`): written only on explicit adoption of a version; `.rpp` read-only otherwise.
+4. **Media pool**: no `Media/` constraint, no path normalization, no "To sort" section. Only missing media are reported.
+5. **Creation, deletion, history**: new titles created in a folder chosen by the user; `_trash/` and `_versions/` placed in the folder of the `.rpp` concerned, created on first use.
+6. **Nested folders** each containing `.rpp` files (real case: `title/member/v2/…`): each folder is a distinct title.
+7. **Configuration**: watched roots and the library configuration are stored in the application configuration, not in the folders. A root located under an already declared root (in any library) is refused, to avoid duplicates.
+8. **Mode change**: switching to `cloud` or `collab` is impossible without a prior migration to a layout.
 
-L'espace de travail local reproduit la même arborescence pour les titres récupérés. En modes `cloud` et `collab`, `_library.json` du dépôt fait référence ; l'espace de travail en conserve une copie pour fonctionner hors ligne.
+The local workspace mirrors the same tree for checked-out titles. In `cloud` and `collab` modes, the repository's `_library.json` is authoritative; the workspace keeps a copy of it to work offline.
 
 ---
 
-## 4. Modèle de données côté fichiers
+## 4. File-side data model
 
-Ces données ne dépendent **pas** du store collaboratif : l'application doit fonctionner (navigation, versions, synchronisation) même sans store disponible.
+This data does **not** depend on the collab store: the application must work (navigation, versions, synchronization) even without an available store.
 
-### 4.1 Nœuds et titre
-- `nodeId` : ULID généré à la création ou à l'adoption de chaque nœud, stocké dans son `.node.json`.
-- Le `nodeId` du nœud feuille sert de `titleId`.
-- Les tags d'un titre (ex. `artist=X`, `album=Y`, `title=Z`) sont dérivés de son chemin et indexés.
+### 4.1 Nodes and title
+- `nodeId`: ULID generated on creation or adoption of each node, stored in its `.node.json`.
+- The `nodeId` of the leaf node serves as `titleId`.
+- The tags of a title (e.g. `artist=X`, `album=Y`, `title=Z`) are derived from its path and indexed.
 
 ### 4.2 Version
-Métadonnées stockées **dans le `.RPP`**, via une section `EXTSTATE` dédiée nommée `ReaHarvest` (conservée par REAPER à chaque sauvegarde) :
+Metadata stored **in the `.RPP`**, through a dedicated `EXTSTATE` section named `ReaHarvest` (kept by REAPER on every save):
 - `versionId` (ULID)
-- `owner` (memberId) — obligatoire dans **tous les modes**, dès le jalon A (en mode `local` et `cloud` : le membre local), afin d'éviter toute évolution ultérieure du modèle
-- `label` (texte libre, ex. « refrain B »)
+- `owner` (memberId) — mandatory in **all modes**, from milestone A (in `local` and `cloud` modes: the local member), to avoid any later change of the model
+- `label` (free text, e.g. "chorus B")
 
-La date est la date de modification du fichier.
+The date is the file modification date.
 
-Format observé (REAPER 7.84, `test/fixtures/reference-metadata.rpp`) : chunk `<EXTSTATE` en fin de chunk racine `<REAPER_PROJECT`, après `<EXTENSIONS`, un sous-chunk par section, une ligne `CLÉ valeur` par clé, section et clé en majuscules :
+Observed format (REAPER 7.84, `test/fixtures/reference-metadata.rpp`): `<EXTSTATE` chunk at the end of the root `<REAPER_PROJECT` chunk, after `<EXTENSIONS`, one subchunk per section, one `KEY value` line per key, section and key in uppercase:
 ```
   <EXTSTATE
     <REAHARVEST
       VERSIONID 01JC...
       OWNER 01JC...
-      LABEL "refrain B"
+      LABEL "chorus B"
     >
   >
 ```
-Règles validées par test (`SetProjExtState` puis sauvegarde, REAPER 7.84) :
-- REAPER met section et clés **en majuscules** et les **trie alphabétiquement** ;
-- une valeur vide n'est pas écrite (clé absente = clé supprimée) ;
-- valeur simple : brute (`VERSIONID 01JC…`) ; avec espaces : entre `"` (`LABEL "refrain B"`) ; Unicode écrit tel quel en UTF-8 ;
-- valeur contenant `"` : entre `'` (`DQUOTE 'say "hi"'`), même règle de délimiteurs que les lignes projet (§5.6) ;
-- valeur contenant les trois délimiteurs (`"`, `'`, `` ` ``) ou un retour à la ligne : sous-chunk base64 `<BIN CLÉ` / ligne(s) base64 / `>`.
+Rules validated by test (`SetProjExtState` then save, REAPER 7.84):
+- REAPER puts section and keys **in uppercase** and **sorts them alphabetically**;
+- an empty value is not written (absent key = deleted key);
+- simple value: raw (`VERSIONID 01JC…`); with spaces: between `"` (`LABEL "chorus B"`); Unicode written as is in UTF-8;
+- value containing `"`: between `'` (`DQUOTE 'say "hi"'`), same delimiter rule as project lines (§5.6);
+- value containing all three delimiters (`"`, `'`, `` ` ``) or a line break: base64 subchunk `<BIN KEY` / base64 line(s) / `>`.
 
-Le reader gère toutes ces formes. Le writer émet : brut si aucun espace ni délimiteur, `"…"` si la valeur ne contient ni `"` ni retour à la ligne, `<BIN` sinon (forme acceptée par REAPER, plus simple que de reproduire la cascade de délimiteurs). Clés toujours écrites en majuscules, comme REAPER.
+The reader handles all these forms. The writer emits: raw if no space or delimiter, `"…"` if the value contains neither `"` nor a line break, `<BIN` otherwise (form accepted by REAPER, simpler than reproducing the delimiter cascade). Keys always written in uppercase, like REAPER.
 
-Validé par test (fichier écrit à la main, ouvert par REAPER, valeurs relues via `GetProjExtState`) : REAPER lit correctement les valeurs brutes, `"…"`, `<BIN` base64 et l'Unicode ; la lecture des clés est insensible à la casse (une clé écrite `owner` est lue via `OWNER`). Si `<EXTSTATE` est absent, le writer l'insère en fin de chunk racine ; si la section est absente, il l'ajoute au chunk `<EXTSTATE` existant.
+Validated by test (hand-written file, opened by REAPER, values read back through `GetProjExtState`): REAPER correctly reads raw values, `"…"`, `<BIN` base64 and Unicode; key lookup is case-insensitive (a key written `owner` is read through `OWNER`). If `<EXTSTATE` is absent, the writer inserts it at the end of the root chunk; if the section is absent, it adds it to the existing `<EXTSTATE` chunk.
 
-Détection automatique lors du scan :
-| Cas | Détection | Comportement |
+Automatic detection during the scan:
+| Case | Detection | Behavior |
 |---|---|---|
-| Renommage | Même `versionId`, nouveau nom | Suivi transparent |
-| Duplication manuelle (*Save As*) | Deux fichiers avec le même `versionId` | Proposer d'en faire une nouvelle version (nouvel ID, propriétaire = utilisateur courant) |
-| Fichier inconnu | `.RPP` sans `versionId` | Section « À adopter » : choix du propriétaire et du libellé, écriture des métadonnées |
+| Rename | Same `versionId`, new name | Transparent tracking |
+| Manual duplication (*Save As*) | Two files with the same `versionId` | Offer to make it a new version (new ID, owner = current user) |
+| Unknown file | `.RPP` without `versionId` | "To adopt" section (UI: « À adopter »): choice of owner and label, metadata written |
 
-Les versions forment une **liste plate** (pas d'arbre, pas de version parente).
+Versions form a **flat list** (no tree, no parent version).
 
-### 4.3 Médias
-- Tout média référencé par une version doit résider dans `Media/` du titre, en **chemin relatif**.
-- Références observées : `<SOURCE WAVE` / `<SOURCE MIDI` … `FILE ".\audio-files\x.wav"` ou `FILE "audio-files\x.wav"`, séparateur `\` sous Windows. Les projets existants utilisent `RECORD_PATH "audio-files"` : la migration (§5.8) réécrit ces chemins vers `Media/` **[À VALIDER : lecture par REAPER macOS d'un chemin relatif avec `\`]**.
-- Le pool est en **ajout seul** : un fichier publié n'est jamais modifié ni supprimé, sauf purge explicite (cf. §5.4).
-- Collision de nom à la publication (même nom, contenu différent selon le hash) : renommage avec suffixe et réécriture des références dans le `.RPP`.
-- Le MIDI intégré au `.RPP` (cas du batteur) ne génère pas de média.
+### 4.3 Media
+- Any media referenced by a version must reside in the title's `Media/`, as a **relative path**.
+- Observed references: `<SOURCE WAVE` / `<SOURCE MIDI` … `FILE ".\audio-files\x.wav"` or `FILE "audio-files\x.wav"`, `\` separator on Windows. Existing projects use `RECORD_PATH "audio-files"`: the migration (§5.8) rewrites these paths to `Media/` **[TO VALIDATE: reading by REAPER macOS of a relative path with `\`]**.
+- The pool is **append-only**: a published file is never modified or deleted, except on explicit purge (cf. §5.4).
+- Name collision on publish (same name, different content according to the hash): rename with a suffix and rewrite of the references in the `.RPP`.
+- MIDI embedded in the `.RPP` (the drummer's case) does not generate media.
 
 ---
 
-## 5. Fonctionnalités
+## 5. Features
 
 ### 5.1 Configuration
-- **Bibliothèques** (0..n), chacune avec : nom affiché, mode (§3.0), racine de l'espace de travail, racine du dépôt (modes `cloud` et `collab`), layout, dossier de templates optionnel propre à la bibliothèque.
-- Ajout d'une bibliothèque : création d'une nouvelle (choix du mode et du layout) ou rattachement à un dépôt existant (lecture de son `_library.json`, cas d'un membre qui rejoint un groupe).
-- Assistant de premier lancement : création de la première bibliothèque, détection de REAPER.
-- Identité locale du membre (`memberId`, nom affiché), créée au premier lancement et utilisée dans tous les modes (propriétaire des versions).
-- Chemin de l'exécutable REAPER et du dossier de ressources REAPER (valeurs par défaut par OS).
-- Dossier des templates de projet (par défaut : `ProjectTemplates` du dossier de ressources REAPER).
-- Vérification d'une préférence REAPER recommandée, avec avertissement non bloquant : peaks centralisés hors projet (évite des milliers de `.reapeaks` dans l'espace de travail). Clés validées : `altpeaks` bit `0x1` = « Store all peak caches (.reapeaks) in alternate path » (General > Paths), `altpeakspath` = chemin.
-- Aucune vérification des options de backup REAPER : tous les backups (`.rpp-bak`, horodatés, `Backups/`) sont exclus de la synchronisation (§3.2), quelle que soit l'option choisie.
+- **Libraries** (0..n), each with: display name, mode (§3.0), workspace root, repository root (`cloud` and `collab` modes), layout, optional templates folder specific to the library.
+- Adding a library: creation of a new one (choice of mode and layout) or attachment to an existing repository (reading its `_library.json`, case of a member joining a group).
+- First-run wizard: creation of the first library, REAPER detection.
+- Local member identity (`memberId`, display name), created on first run and used in all modes (version owner).
+- Path of the REAPER executable and of the REAPER resource folder (defaults per OS).
+- Project templates folder (default: `ProjectTemplates` in the REAPER resource folder).
+- Check of a recommended REAPER preference, with a non-blocking warning: peaks centralized outside the project (avoids thousands of `.reapeaks` in the workspace). Validated keys: `altpeaks` bit `0x1` = "Store all peak caches (.reapeaks) in alternate path" (General > Paths), `altpeakspath` = path.
+- No check of REAPER backup options: all backups (`.rpp-bak`, timestamped, `Backups/`) are excluded from synchronization (§3.2), whatever option is chosen.
 
 ### 5.2 Navigation
-Principe : **aucune navigation arborescente imposée**. L'accès aux titres passe d'abord par la recherche et les filtres, pour minimiser le nombre de clics.
+Principle: **no imposed tree navigation**. Titles are reached first through search and filters, to minimize the number of clicks.
 
-- **Barre de recherche principale**, toujours visible et focalisée au démarrage :
-  - recherche instantanée, tolérante aux fautes, servie par l'index local ;
-  - porte sur les valeurs de tags, les noms de versions, les libellés, les propriétaires et, en mode `collab`, les notes et paroles.
-- **Modes d'affichage**, au choix de l'utilisateur et mémorisés :
-  - **cartes** (vue par défaut) : titre, tags, statut, état de synchronisation, propriétaires des versions, date de dernière modification ;
-  - **liste** : tableau dense, triable par colonne ;
-  - **arborescence** : regroupement selon les niveaux du layout (ex. Artiste → Album → Titre), proposé comme vue parmi d'autres.
-- **Filtres combinables** (puces ou panneau latéral) :
-  - tags, un filtre par niveau du layout (ex. `artist`, `album`). Les bibliothèques ayant des layouts différents exposent leurs propres filtres ; une clé de tag commune (ex. `artist`) est filtrée sur l'ensemble ;
-  - bibliothèque et mode (`local`, `cloud`, `collab`) ;
-  - source : **dépôt (cloud)**, **local**, ou les deux (modes `cloud` et `collab`) ;
-  - état de synchronisation : non récupéré, à jour, modifié localement, mis à jour à distance, en conflit ;
-  - statut collaboratif (mode `collab`) ;
-  - propriétaire de version ;
-  - plugins manquants.
-- Filtres et recherche sont combinés et conservés entre les sessions ; des **vues enregistrées** (ex. « Mes titres en cours ») sont possibles.
-- Accès aux versions d'un titre depuis n'importe quel mode d'affichage, sans changer de vue (panneau de détail).
-- Section « À ranger » : `.RPP` ou dossiers hors convention, avec déplacement guidé.
-- Section « À adopter » (cf. §4.2).
+- **Main search bar**, always visible and focused on startup:
+  - instant, typo-tolerant search, served by the local index;
+  - covers tag values, version names, labels, owners and, in `collab` mode, notes and lyrics.
+- **Display modes**, chosen by the user and remembered:
+  - **cards** (default view): title, tags, status, sync state, version owners, last modification date;
+  - **list**: dense table, sortable by column;
+  - **tree**: grouping by layout levels (e.g. Artist → Album → Title), offered as one view among others.
+- **Combinable filters** (chips or side panel):
+  - tags, one filter per layout level (e.g. `artist`, `album`). Libraries with different layouts expose their own filters; a common tag key (e.g. `artist`) is filtered across all of them;
+  - library and mode (`local`, `cloud`, `collab`);
+  - source: **repository (cloud)**, **local**, or both (`cloud` and `collab` modes);
+  - sync state: not checked out, up to date, locally modified, remotely updated, in conflict;
+  - collab status (`collab` mode);
+  - version owner;
+  - missing plugins.
+- Filters and search are combined and kept between sessions; **saved views** (e.g. "My titles in progress", UI: « Mes titres en cours ») are possible.
+- Access to a title's versions from any display mode, without changing view (detail panel).
+- "To sort" section (UI: « À ranger »): `.RPP` or folders outside the convention, with guided move.
+- "To adopt" section (UI: « À adopter », cf. §4.2).
 
-### 5.3 Vue détail d'une version
-Parsing du `.RPP`, sans REAPER :
-- pistes de premier niveau (profondeur 0), avec nom (`NAME`) et couleur (`PEAKCOL`, bit `0x1000000` = couleur personnalisée). Profondeur calculée via `ISBUS <type> <delta>` (validé sur le corpus) : `ISBUS 0 0` piste normale, `ISBUS 1 1` début de dossier, `ISBUS 2 -n` dernière piste d'un dossier, ferme `n` niveaux ;
-- plugins utilisés par piste, dédupliqués. Formes observées : `<VST "VST3: Nom (Éditeur)" fichier.vst3 0 "" uid{guid} ""`, `<VST "VSTi: …" fichier.dll …`, `<VST "VST: …" fichier.dll …`, `<JS chemin/relatif ""`. CLAP et AU absents du corpus **[À VALIDER]** ;
-- **plugins absents** sur la machine, par comparaison avec les caches plugins REAPER, découverts par motif (`reaper-vstplugins*.ini`, `reaper-clap-*.ini`, `reaper-auplugins*.ini`) plutôt que par nom exact :
-  - VST (validé Windows, `reaper-vstplugins64.ini`) : section `[vstcache]`, lignes `fichier=horodatage,uid,Nom (Éditeur)` ; dans la clé, les espaces du nom de fichier sont remplacés par `_` (`"TDR Kotelnikov.vst3"` → `TDR_Kotelnikov.vst3`) ;
-  - JS (validé, `reaper-jsfx.ini`) : lignes `NAME chemin/relatif "JS: Nom"` ;
-  - CLAP, AU, noms macOS et Linux **[À VALIDER]** ;
-- tempo, signature, durée, fréquence d'échantillonnage, version de REAPER ;
-- propriétaire, libellé, date de modification ;
-- médias référencés, avec présence locale et taille.
+### 5.3 Version detail view
+Parsing of the `.RPP`, without REAPER:
+- top-level tracks (depth 0), with name (`NAME`) and color (`PEAKCOL`, bit `0x1000000` = custom color). Depth computed through `ISBUS <type> <delta>` (validated on the corpus): `ISBUS 0 0` normal track, `ISBUS 1 1` folder start, `ISBUS 2 -n` last track of a folder, closes `n` levels;
+- plugins used per track, deduplicated. Observed forms: `<VST "VST3: Name (Vendor)" file.vst3 0 "" uid{guid} ""`, `<VST "VSTi: …" file.dll …`, `<VST "VST: …" file.dll …`, `<JS relative/path ""`. CLAP and AU absent from the corpus **[TO VALIDATE]**;
+- **plugins missing** on the machine, by comparison with the REAPER plugin caches, discovered by pattern (`reaper-vstplugins*.ini`, `reaper-clap-*.ini`, `reaper-auplugins*.ini`) rather than by exact name:
+  - VST (validated on Windows, `reaper-vstplugins64.ini`): `[vstcache]` section, lines `file=timestamp,uid,Name (Vendor)`; in the key, spaces in the file name are replaced by `_` (`"TDR Kotelnikov.vst3"` → `TDR_Kotelnikov.vst3`);
+  - JS (validated, `reaper-jsfx.ini`): lines `NAME relative/path "JS: Name"`;
+  - CLAP, AU, macOS and Linux names **[TO VALIDATE]**;
+- tempo, time signature, length, sample rate, REAPER version;
+- owner, label, modification date;
+- referenced media, with local presence and size.
 
-**Écoute d'un échantillon et rendus** *(hors MVP — phase 3)*
-- Un aperçu fidèle **sans rendu est impossible** : le son final dépend des plugins, des automations et du routage, que seul REAPER sait calculer. Un simple mixage des fichiers médias bruts serait trompeur ; il n'est pas retenu.
-- **Rendus existants** : l'application lit le dossier de rendu défini dans le projet (ligne `RENDER_FILE`, résolue en relatif par rapport au dossier du titre), liste les fichiers audio présents (date, durée, format) et les lit dans un lecteur intégré (lecture, position, boucle).
-- **Rendu à la demande** (optionnel) : lancement d'un rendu en arrière-plan via la ligne de commande REAPER (`-renderproject`), avec les paramètres de rendu du projet. Contraintes : REAPER installé, plugins présents sur la machine, durée proportionnelle au morceau.
-  Validé (Windows, REAPER 7.84, REAPER déjà ouvert) : `reaper.exe -renderproject <fichier>.rpp` lance une instance séparée qui rend puis se ferme (code de sortie 0), sans perturber l'instance ouverte ; `RENDER_FILE` relatif est résolu depuis le dossier du projet. L'instance de rendu réécrit `REAPER.ini` en se fermant, avec un contenu identique. Risque résiduel : une préférence modifiée dans l'instance principale pendant un rendu pourrait être écrasée par cette réécriture (piste : option `-cfgfile` avec une copie de `REAPER.ini`, à évaluer en phase 3).
-  Formes de `RENDER_FILE` observées : `""` (dossier du projet), dossier relatif (`.\render`), chemin de fichier relatif (`".\render\Drums 3.mp3"`) ou absolu (`"C:\Users\…\x.mp3"`, souvent d'une autre machine). Combiné avec `RENDER_PATTERN` (ex. `$project-ending`) quand il désigne un dossier.
-- Convention par défaut pour les nouveaux projets (dès le MVP) : dossier de rendu `Renders/` dans le dossier du titre (cf. §5.6).
-- **Publication des rendus**, deux cibles indépendantes, activables au niveau du dépôt et surchargeables par titre :
-  - **dépôt** : `Renders/` publié avec le titre, pour que les membres puissent écouter sans REAPER ni plugins. Option désactivable pour économiser l'espace Drive ;
-  - **dossiers d'export** (0..n) : copie des rendus vers un dossier externe configuré (ex. dossier Drive synchronisé vers un serveur de streaming type Navidrome). Chaque cible définit un motif de chemin et de nom basé sur les tags du layout (ex. `{artist}/{album}/{title}.{ext}`), des formats acceptés et une politique de remplacement (écraser, versionner).
-  - Les métadonnées embarquées dans les fichiers proviennent du mapping tags → métadonnées de rendu (§3.1) ; l'application ne réécrit pas les tags audio **[À VALIDER : suffisance des métadonnées écrites par REAPER pour l'indexation Navidrome]**.
+**Listening to a sample and renders** *(outside the MVP — phase 3)*
+- A faithful preview **without rendering is impossible**: the final sound depends on plugins, automation and routing, which only REAPER can compute. A simple mix of the raw media files would be misleading; it is not retained.
+- **Existing renders**: the application reads the render folder defined in the project (`RENDER_FILE` line, resolved relative to the title folder), lists the audio files present (date, length, format) and plays them in a built-in player (play, position, loop).
+- **On-demand render** (optional): background render launched through the REAPER command line (`-renderproject`), with the project's render settings. Constraints: REAPER installed, plugins present on the machine, duration proportional to the song.
+  Validated (Windows, REAPER 7.84, REAPER already open): `reaper.exe -renderproject <file>.rpp` launches a separate instance that renders then exits (exit code 0), without disturbing the open instance; a relative `RENDER_FILE` is resolved from the project folder. The render instance rewrites `REAPER.ini` when it exits, with identical content. Residual risk: a preference modified in the main instance during a render could be overwritten by this rewrite (lead: `-cfgfile` option with a copy of `REAPER.ini`, to be evaluated in phase 3).
+  Observed `RENDER_FILE` forms: `""` (project folder), relative folder (`.\render`), relative file path (`".\render\Drums 3.mp3"`) or absolute (`"C:\Users\…\x.mp3"`, often from another machine). Combined with `RENDER_PATTERN` (e.g. `$project-ending`) when it denotes a folder.
+- Default convention for new projects (from the MVP): render folder `Renders/` in the title folder (cf. §5.6).
+- **Render publication**, two independent targets, enabled at repository level and overridable per title:
+  - **repository**: `Renders/` published with the title, so that members can listen without REAPER or plugins. Option can be disabled to save Drive space;
+  - **export folders** (0..n): copy of renders to a configured external folder (e.g. Drive folder synchronized to a streaming server such as Navidrome). Each target defines a path and name pattern based on the layout tags (e.g. `{artist}/{album}/{title}.{ext}`), accepted formats and a replacement policy (overwrite, version).
+  - Metadata embedded in the files comes from the tags → render metadata mapping (§3.1); the application does not rewrite audio tags **[TO VALIDATE: whether the metadata written by REAPER is sufficient for Navidrome indexing]**.
 
-### 5.4 Gestion des versions
-- **Créer** : vierge, depuis un template ou par duplication d'une version existante. Nouvel ID ; le propriétaire est l'utilisateur courant.
-- **Renommer** le fichier et/ou modifier le libellé.
-- **Supprimer** : déplacement vers `_trash/`.
-- **Purger** : suppression définitive depuis `_trash/`, avec confirmation. Ensuite, liste des médias du pool référencés par aucune version, puis purge sur confirmation. La purge des médias non référencés ne porte que sur `Media/` : `Assets/` n'est jamais concerné.
-- **Historique** : consultation et restauration des instantanés `_versions/`.
+### 5.4 Version management
+- **Create**: blank, from a template or by duplicating an existing version. New ID; the owner is the current user.
+- **Rename** the file and/or modify the label.
+- **Delete**: move to `_trash/`.
+- **Purge**: permanent deletion from `_trash/`, with confirmation. Then, list of pool media referenced by no version, then purge on confirmation. Purging unreferenced media only applies to `Media/`: `Assets/` is never concerned.
+- **History**: browsing and restoring `_versions/` snapshots.
 
-### 5.5 Synchronisation
-**Récupérer**
-- Par défaut : dossier du titre complet (toutes les versions et les médias référencés).
-- Option : exclure des versions. Les médias référencés uniquement par les versions exclues ne sont alors pas copiés.
-- Mémorisation locale du hash (cf. §7.1) de chaque fichier récupéré, qui sert de base de comparaison.
+### 5.5 Synchronization
+**Checkout**
+- By default: full title folder (all versions and referenced media).
+- Option: exclude versions. Media referenced only by the excluded versions are then not copied.
+- Local storage of the hash (cf. §7.1) of each checked-out file, used as the comparison base.
 
-**Publier**
-1. Normalisation des médias : tout média hors `Media/` (chemin absolu, autre machine) y est copié, puis la référence est réécrite en relatif.
-2. Copie des médias absents du pool distant (comparaison par nom + taille + hash).
-3. Pour chaque `.RPP` modifié :
-   - **conflit** si le hash distant diffère du hash de base : refus, affichage du conflit, choix utilisateur (garder le distant, publier comme nouvelle version, ou forcer) ;
-   - **version d'un autre membre** : refus par défaut, avec proposition d'enregistrer comme nouvelle version à son nom ;
-   - **forçage** : contourne uniquement le contrôle de propriété ou le conflit après confirmation explicite. La version distante écrasée est d'abord copiée dans `_versions/`, et un événement de notification est émis vers le propriétaire.
-4. Mise à jour des hash de base et émission d'un événement d'activité (« X a publié Y »).
+**Publish**
+1. Media normalization: any media outside `Media/` (absolute path, other machine) is copied into it, then the reference is rewritten as relative.
+2. Copy of media missing from the remote pool (comparison by name + size + hash).
+3. For each modified `.RPP`:
+   - **conflict** if the remote hash differs from the base hash: refusal, conflict display, user choice (keep remote, publish as new version, or force);
+   - **version of another member**: refused by default, with an offer to save it as a new version under one's own name;
+   - **forcing**: only bypasses the ownership check or the conflict after explicit confirmation. The overwritten remote version is first copied into `_versions/`, and a notification event is sent to the owner.
+4. Update of the base hashes and emission of an activity event ("X published Y", UI: « X a publié Y »).
 
-**Libérer**
-- Refus si des modifications locales ne sont pas publiées, sauf confirmation explicite.
+**Release**
+- Refused if local modifications are not published, unless explicitly confirmed.
 
-**Versions des autres membres en local** : lisibles, ouvrables, importables (phase ultérieure), mais non publiables sans forçage.
+**Other members' versions locally**: readable, openable, importable (later phase), but not publishable without forcing.
 
-### 5.6 Création de projet
-- Saisie d'une valeur pour chaque niveau du layout (avec autocomplétion sur les valeurs existantes ; création des dossiers si nécessaire), choix du template et du libellé de version.
-- Copie du template, puis renseignement de :
-  - titre et auteur du projet ;
-  - métadonnées de rendu, selon le mapping tags → métadonnées du layout (§3.1) ;
-  - motif de nom de rendu ;
-  - chemin d'enregistrement relatif `Media` ;
-  - dossier de rendu relatif `Renders` ;
-  - métadonnées de version (§4.2).
+### 5.6 Project creation
+- Input of a value for each layout level (with autocompletion on existing values; folders created if needed), choice of the template and of the version label.
+- Copy of the template, then filling in of:
+  - project title and author;
+  - render metadata, according to the layout's tags → metadata mapping (§3.1);
+  - render file name pattern;
+  - relative record path `Media`;
+  - relative render folder `Renders`;
+  - version metadata (§4.2).
 
-  Lignes validées sur le corpus (chunk racine) :
-  - `TITLE <valeur>`, `AUTHOR <valeur>` ;
-  - `<NOTES 0 2` puis une ligne `|texte` par ligne de note, puis `>` ;
-  - `RECORD_PATH "<principal>" "<secondaire>"` ;
-  - `RENDER_FILE <chemin>`, `RENDER_PATTERN <motif>` (jokers REAPER : `$project`, `$title`, `$author`…) ;
-  - `<RENDER_METADATA` puis une ligne `TAG <SCHÉMA:CHAMP> <valeur>` par champ (ex. `TAG ID3:TIT2 $title`, `TAG ID3:TPE1 $author`, `TAG VORBIS:ARTIST $author`), puis `>`.
+  Lines validated on the corpus (root chunk):
+  - `TITLE <value>`, `AUTHOR <value>`;
+  - `<NOTES 0 2` then one `|text` line per note line, then `>`;
+  - `RECORD_PATH "<primary>" "<secondary>"`;
+  - `RENDER_FILE <path>`, `RENDER_PATTERN <pattern>` (REAPER wildcards: `$project`, `$title`, `$author`…);
+  - `<RENDER_METADATA` then one `TAG <SCHEMA:FIELD> <value>` line per field (e.g. `TAG ID3:TIT2 $title`, `TAG ID3:TPE1 $author`, `TAG VORBIS:ARTIST $author`), then `>`.
 
-  - case « Metadata » du dialogue de rendu (écriture effective des métadonnées) : bit `512` de `RENDER_STEMS` ; le writer l'active dès qu'il écrit des tags.
+  - "Metadata" checkbox of the render dialog (actual writing of the metadata): bit `512` of `RENDER_STEMS`; the writer enables it as soon as it writes tags.
 
-  Validé (REAPER 7.84, Windows) : un projet patché par le writer (titre, auteur, notes, `RECORD_PATH`, `RENDER_FILE`, `RENDER_PATTERN`, `<RENDER_METADATA`, `FILE "Media\…"`, `EXTSTATE`) s'ouvre sans erreur, les médias relatifs sont résolus, toutes les valeurs sont lues, puis conservées à l'identique lors d'une sauvegarde par REAPER (qui réordonne seulement `TITLE` avant `AUTHOR` et met `RECORD_PATH` entre `"`).
+  Validated (REAPER 7.84, Windows): a project patched by the writer (title, author, notes, `RECORD_PATH`, `RENDER_FILE`, `RENDER_PATTERN`, `<RENDER_METADATA`, `FILE "Media\…"`, `EXTSTATE`) opens without error, relative media are resolved, all values are read, then kept identical when REAPER saves (it only reorders `TITLE` before `AUTHOR` and puts `RECORD_PATH` between `"`).
 
-  Les valeurs ne sont entre guillemets que si nécessaire. Quotation validée : brut sans espace (`TITLE coffeetime`), `"…"` avec espaces (`TITLE "Dancing on a line"`), `'…'` si la valeur contient `"` (`TITLE 'My "quoted" title'`), puis `` `…` `` si elle contient aussi `'`. Le writer reproduit ces règles ; le reader accepte les trois délimiteurs.
-- Ouverture immédiate dans REAPER.
+  Values are quoted only when needed. Validated quoting: raw without space (`TITLE coffeetime`), `"…"` with spaces (`TITLE "Dancing on a line"`), `'…'` if the value contains `"` (`TITLE 'My "quoted" title'`), then `` `…` `` if it also contains `'`. The writer reproduces these rules; the reader accepts all three delimiters.
+- Immediate opening in REAPER.
 
-### 5.7 Ouverture dans REAPER
-- Ouverture dans l'instance existante (`-nonewinst` sous Windows, validé : `reaper.exe -nonewinst <fichier>.rpp` ouvre le projet dans un nouvel onglet de l'instance déjà ouverte, sans en lancer une seconde ; si REAPER est fermé, il le démarre) **[À VALIDER : équivalent macOS]**.
-- Toute modification d'un `.RPP` par l'application (adoption, réécriture de chemins, import de pistes) exige que le projet soit fermé dans REAPER : avertissement et confirmation dans le MVP.
-  - `REAPER.ini` (`projecttabs`, `projecttab1..n`) n'est pas fiable : il n'est réécrit que ponctuellement et garde des entrées périmées (constaté : `projecttabs=1` avec `projecttab2..9` encore présents).
-  - MVP : si un processus REAPER tourne, avertissement et confirmation. Plus tard : script compagnon REAPER publiant la liste des projets ouverts.
-  - Validé : REAPER **ne verrouille pas** le `.rpp` ouvert (ouverture exclusive en écriture et renommage réussis pendant que le projet est ouvert). Aucune détection par verrou n'est possible, et REAPER écrasera la modification à la prochaine sauvegarde du projet : l'avertissement doit le dire clairement.
+### 5.7 Opening in REAPER
+- Opening in the existing instance (`-nonewinst` on Windows, validated: `reaper.exe -nonewinst <file>.rpp` opens the project in a new tab of the already open instance, without launching a second one; if REAPER is closed, it starts it) **[TO VALIDATE: macOS equivalent]**.
+- Any modification of a `.RPP` by the application (adoption, path rewrite, track import) requires the project to be closed in REAPER: warning and confirmation in the MVP.
+  - `REAPER.ini` (`projecttabs`, `projecttab1..n`) is not reliable: it is only rewritten occasionally and keeps stale entries (observed: `projecttabs=1` with `projecttab2..9` still present).
+  - MVP: if a REAPER process is running, warning and confirmation. Later: REAPER companion script publishing the list of open projects.
+  - Validated: REAPER **does not lock** the open `.rpp` (exclusive write open and rename succeeded while the project was open). No lock-based detection is possible, and REAPER will overwrite the modification on the next save of the project: the warning must say so clearly.
 
-### 5.8 Adoption de l'existant (migration)
-Inclus dans le MVP (jalon C). Assistant de reprise de l'arborescence actuelle (`proaudio/reaper/projects/<groupe>/<titre>[/<membre>]`) :
-- choix du layout cible, correspondance des niveaux existants avec ses niveaux (valeur `_Unassigned` proposée pour un niveau absent, par exemple l'album), puis déplacement des titres dans la nouvelle structure ;
-- lecture de chaque `.rpp` pour connaître sa configuration de chemins : `RECORD_PATH` (ex. `audio-files`), références `FILE` des sources (relatives, absolues, hors du dossier du titre), `RENDER_FILE` (cf. formes au §5.3). Pour chaque cas, le rapport indique si l'application sait le corriger :
-  - correction possible : proposition de déplacer les fichiers dans le bon dossier (`Media/`, `Renders/`) et de mettre à jour le `.rpp` en conséquence (patch ciblé, cf. §7.3) ;
-  - correction impossible (ex. média introuvable, chemin absolu d'une autre machine sans fichier correspondant) : signalé dans le rapport, `.rpp` laissé intact ;
-- fusion des médias des sous-dossiers par membre dans le pool unique, avec gestion des collisions par hash ;
-- adoption de chaque `.RPP` (propriétaire déduit du sous-dossier quand il existe, sinon demandé) ;
-- dédoublonnage des médias identiques (même hash) ;
-- mode simulation avec rapport avant exécution.
+### 5.8 Adoption of existing projects (migration)
+Included in the MVP (milestone C). Wizard taking over the current folder tree (`proaudio/reaper/projects/<group>/<title>[/<member>]`):
+- choice of the target layout, mapping of existing levels to its levels (`_Unassigned` value offered for a missing level, for example the album), then move of the titles into the new structure;
+- reading of each `.rpp` to know its path configuration: `RECORD_PATH` (e.g. `audio-files`), `FILE` references of sources (relative, absolute, outside the title folder), `RENDER_FILE` (cf. forms in §5.3). For each case, the report states whether the application can fix it:
+  - fix possible: offer to move the files into the right folder (`Media/`, `Renders/`) and to update the `.rpp` accordingly (targeted patch, cf. §7.3);
+  - fix impossible (e.g. media not found, absolute path from another machine with no matching file): reported, `.rpp` left intact;
+- merge of the per-member subfolders' media into the single pool, with collision handling by hash;
+- adoption of each `.RPP` (owner deduced from the subfolder when it exists, asked otherwise);
+- deduplication of identical media (same hash);
+- dry-run mode with a report before execution.
 
-### 5.9 Collaboration (mode `collab`, via le store collaboratif, cf. §6)
-- **Statut** par titre et par version : `idea`, `writing`, `recording`, `mixing`, `done` (liste configurable).
-- **Tâches** par titre : texte, assigné, échéance optionnelle, état.
-- **Notes** par titre ou par version.
-- **Paroles** par titre, avec historique des modifications.
-- **Assets partagés** par titre (partitions, tablatures, images, PDF, autres fichiers) :
-  - les fichiers sont stockés dans `Assets/` du titre et synchronisés avec le titre (§5.5). Ils ne sont **pas versionnés** (pas d'historique `_versions/`) ; un asset supprimé est déplacé dans `_trash/` du titre ;
-  - les métadonnées (description, auteur, version associée éventuelle) sont dans le store collaboratif (entité `asset`) ;
-  - aperçu intégré pour les images et PDF, ouverture avec l'application système sinon ;
-  - en mode `local` et `cloud`, `Assets/` est disponible sans métadonnées collaboratives.
-- **Fil d'activité** : publications, forçages, changements de statut, nouvelles tâches.
-- **Notifications** : dans l'application et notifications système OS.
+### 5.9 Collaboration (`collab` mode, through the collab store, cf. §6)
+- **Status** per title and per version: `idea`, `writing`, `recording`, `mixing`, `done` (configurable list).
+- **Tasks** per title: text, assignee, optional due date, state.
+- **Notes** per title or per version.
+- **Lyrics** per title, with modification history.
+- **Shared assets** per title (scores, tabs, images, PDF, other files):
+  - files are stored in the title's `Assets/` and synchronized with the title (§5.5). They are **not versioned** (no `_versions/` history); a deleted asset is moved to the title's `_trash/`;
+  - metadata (description, author, optional associated version) is in the collab store (`asset` entity);
+  - built-in preview for images and PDF, opening with the system application otherwise;
+  - in `local` and `cloud` modes, `Assets/` is available without collaborative metadata.
+- **Activity feed**: publications, forced publishes, status changes, new tasks.
+- **Notifications**: in the application and OS system notifications.
 
 ---
 
-## 6. Store collaboratif
+## 6. Collab store
 
-### 6.1 Principes
-- Un **modèle canonique unique**, indépendant de l'implémentation.
-- Deux adaptateurs interchangeables derrière un même port : `JournalStore` (sans serveur, MVP) et `PocketBaseStore` (phase 2).
-- **Bascule en un clic** entre les deux, sans perte de données.
-- Le reste de l'application ne connaît que le port.
+### 6.1 Principles
+- A **single canonical model**, independent of the implementation.
+- Two interchangeable adapters behind the same port: `JournalStore` (serverless, MVP) and `PocketBaseStore` (phase 2).
+- **One-click switch** between the two, without data loss.
+- The rest of the application only knows the port.
 
-### 6.2 Modèle canonique
-Toutes les entités partagent ces champs :
+### 6.2 Canonical model
+All entities share these fields:
 ```
 uid        ULID, generated client-side (canonical identity, never backend-generated)
 groupId    ULID
@@ -368,11 +369,11 @@ author     memberId
 hlc        Hybrid Logical Clock timestamp of the last write
 deleted    boolean (tombstone)
 ```
-Champs spécifiques par entité : à définir dans le code (types partagés générés une seule fois).
-Résolution des conflits : **last-writer-wins par champ**, ordonné par `hlc`, puis par `author` en cas d'égalité.
-`activity` est en ajout seul (jamais modifié).
+Entity-specific fields: to be defined in code (shared types generated once).
+Conflict resolution: **last-writer-wins per field**, ordered by `hlc`, then by `author` on ties.
+`activity` is append-only (never modified).
 
-Port (pseudo-signature) :
+Port (pseudo-signature):
 ```
 CollabStore
   upsert(entity, uid, fields)
@@ -383,26 +384,26 @@ CollabStore
   importSnapshot(CanonicalSnapshot)      # idempotent upsert by uid, LWW applied
 ```
 
-### 6.3 Adaptateur journal (`JournalStore`)
+### 6.3 Journal adapter (`JournalStore`)
 ```
 <repositoryRoot>/_collab/<memberId>/<yyyy-mm>.jsonl     # append-only, one writer per directory
 <repositoryRoot>/_collab/_snapshots/<timestamp>.json    # optional baselines
 ```
-- Chaque membre n'écrit **que** dans son propre dossier : aucun conflit de synchronisation Drive possible.
-- Une ligne = une opération : `{ v, opId, groupId, author, hlc, entity, uid, op: "upsert"|"delete", fields }`.
-- Lecture : fusion de tous les journaux, puis projection locale dans SQLite (rejeu incrémental par offset de fichier).
-- Détection des changements distants : surveillance de fichiers, avec **repli sur une scrutation périodique des mtimes** (les événements de fichiers sur un lecteur virtuel Drive ne sont pas fiables) **[À VALIDER]**.
-- Limite connue : latence de propagation dépendante du client Drive.
+- Each member writes **only** in their own folder: no Drive synchronization conflict possible.
+- One line = one operation: `{ v, opId, groupId, author, hlc, entity, uid, op: "upsert"|"delete", fields }`.
+- Reading: merge of all journals, then local projection into SQLite (incremental replay by file offset).
+- Detection of remote changes: file watching, with **fallback to periodic polling of mtimes** (file events on a virtual Drive volume are not reliable) **[TO VALIDATE]**.
+- Known limitation: propagation latency depending on the Drive client.
 
-### 6.4 Adaptateur PocketBase (`PocketBaseStore`, phase 2)
-- Une collection par entité. Le champ `uid` porte un index unique et sert d'identité canonique ; l'`id` interne PocketBase n'est jamais exposé hors de l'adaptateur.
-- Écritures : upsert par `uid`, avec application du LWW par champ côté adaptateur.
-- Abonnements : temps réel PocketBase.
-- Règles d'accès filtrées par `groupId` (multi-tenant possible).
-- Authentification : un compte par membre, rattaché à son `memberId`.
+### 6.4 PocketBase adapter (`PocketBaseStore`, phase 2)
+- One collection per entity. The `uid` field has a unique index and serves as canonical identity; the internal PocketBase `id` is never exposed outside the adapter.
+- Writes: upsert by `uid`, with per-field LWW applied on the adapter side.
+- Subscriptions: PocketBase realtime.
+- Access rules filtered by `groupId` (multi-tenant possible).
+- Authentication: one account per member, linked to their `memberId`.
 
-### 6.5 Configuration de bibliothèque et bascule du store
-`_library.json` (à la racine de la bibliothèque ; en modes `cloud` et `collab`, dans le dépôt, donc partagé par tous les membres) :
+### 6.5 Library configuration and store switch
+`_library.json` (at the library root; in `cloud` and `collab` modes, in the repository, hence shared by all members):
 ```json
 {
   "libraryId": "...",
@@ -424,35 +425,35 @@ CollabStore
   }
 }
 ```
-Procédure de bascule (action unique dans les paramètres) :
-1. `exportSnapshot()` depuis l'adaptateur courant.
-2. `importSnapshot()` dans l'adaptateur cible, puis vérification par comptage par entité.
-3. Écriture de `_library.json` avec le nouveau store.
-4. Les applications des autres membres détectent le changement de `_library.json` et basculent automatiquement.
-5. Bascule PocketBase → journal : le snapshot est écrit dans `_collab/_snapshots/` comme base de départ.
+Switch procedure (single action in the settings):
+1. `exportSnapshot()` from the current adapter.
+2. `importSnapshot()` into the target adapter, then verification by count per entity.
+3. Writing of `_library.json` with the new store.
+4. The other members' applications detect the change of `_library.json` and switch automatically.
+5. PocketBase → journal switch: the snapshot is written into `_collab/_snapshots/` as the starting baseline.
 
 ---
 
-## 7. Architecture technique
+## 7. Technical architecture
 
 ### 7.1 Stack
-- **Flutter (desktop) + Dart**, compilation AOT native. Cibles : Windows et macOS prioritaires, Linux secondaire ; Android et iOS envisagés ultérieurement (§7.4).
-- Un seul langage pour l'ensemble : interface, logique métier, entrées/sorties.
-- Interface : Material 3 avec thème personnalisé (design system propre à l'application).
-- Gestion d'état : **Riverpod** **[À VALIDER au démarrage du projet]**.
-- Paquets indicatifs :
-  - `sqlite3` / `drift` : index local ;
-  - `watcher` : surveillance de fichiers ;
-  - `path` ;
-  - `pocketbase` : SDK Dart officiel (phase 2) ;
-  - `ulid` : identifiants ;
-  - `window_manager`, `file_selector`, `local_notifier` : intégration desktop ;
-  - `auto_updater` (Sparkle / WinSparkle) : mise à jour automatique.
-- **Hash** : algorithme non imposé. Exigences : robuste (empreinte ≥ 128 bits, collisions négligeables hors contexte adverse ; aucun usage de sécurité), extrêmement performant (débit proche de celui du disque), calcul en flux sur les gros fichiers. Choix par benchmark au démarrage du projet (candidats : XXH3-128, BLAKE3, via `dart:ffi` si nécessaire) **[À VALIDER]**. Le hash n'est calculé que si taille ou mtime ont changé.
-- **Concurrence** : toutes les tâches longues (scan, parsing de masse, hash, copies) s'exécutent dans des **isolates**, jamais sur l'isolate de l'interface. Le hash est calculé en tâche de fond, par lot (un titre et ses versions).
+- **Flutter (desktop) + Dart**, native AOT compilation. Targets: Windows and macOS first, Linux secondary; Android and iOS considered later (§7.4).
+- A single language for everything: interface, business logic, input/output.
+- Interface: Material 3 with a custom theme (the application's own design system).
+- State management: **Riverpod** **[TO VALIDATE at project start]**.
+- Indicative packages:
+  - `sqlite3` / `drift`: local index;
+  - `watcher`: file watching;
+  - `path`;
+  - `pocketbase`: official Dart SDK (phase 2);
+  - `ulid`: identifiers;
+  - `window_manager`, `file_selector`, `local_notifier`: desktop integration;
+  - `auto_updater` (Sparkle / WinSparkle): automatic update.
+- **Hash**: algorithm not imposed. Requirements: robust (fingerprint ≥ 128 bits, negligible collisions outside an adversarial context; no security use), extremely fast (throughput close to the disk's), streamed computation on large files. Choice by benchmark at project start (candidates: XXH3-128, BLAKE3, through `dart:ffi` if needed) **[TO VALIDATE]**. The hash is computed only if size or mtime changed.
+- **Concurrency**: all long tasks (scan, bulk parsing, hash, copies) run in **isolates**, never on the UI isolate. The hash is computed in the background, in batches (one title and its versions).
 
-### 7.2 Découpage
-Monorepo de paquets Dart (workspace) :
+### 7.2 Package layout
+Monorepo of Dart packages (workspace):
 ```
 packages/
   domain/          # pure Dart: entities, rules, sync states, canonical collab model, ports (abstract classes)
@@ -470,85 +471,85 @@ apps/
   desktop/         # Flutter desktop app: UI, state management, wiring of adapters
   mobile/          # (later) Flutter mobile app
 ```
-Les paquets sont créés au jalon qui les utilise (jalon A : `domain`, `rpp`, `library`, `repository`, `index`, `reaper` ; jalon B : `sync` ; jalon C : `collab`). Nom de paquet : `reaharvest_<dossier>`.
+Packages are created at the milestone that uses them (milestone A: `domain`, `rpp`, `library`, `repository`, `index`, `reaper`; milestone B: `sync`; milestone C: `collab`). Package name: `reaharvest_<folder>`.
 
-Règles de découplage :
-- `domain` et `rpp` sont du **Dart pur** (aucune dépendance Flutter ni `dart:io`), donc testables isolément et réutilisables sur mobile.
-- Les autres paquets dépendent de `domain` via des **interfaces** (classes abstraites), jamais d'implémentations concrètes.
-- Aucun type propre à PocketBase ou au journal ne sort de son adaptateur.
-- La couche UI ne connaît ni le mode collaboratif ni le système de fichiers : elle consomme des services exposés par la couche d'état.
-- Injection des implémentations au point d'entrée de l'application uniquement.
+Decoupling rules:
+- `domain` and `rpp` are **pure Dart** (no Flutter or `dart:io` dependency), hence testable in isolation and reusable on mobile.
+- Other packages depend on `domain` through **interfaces** (abstract classes), never on concrete implementations.
+- No PocketBase- or journal-specific type leaves its adapter.
+- The UI layer knows neither the collaborative mode nor the file system: it consumes services exposed by the state layer.
+- Implementations are injected at the application entry point only.
 
-### 7.3 Écriture des fichiers RPP
-- Le writer modifie le **texte d'origine par patchs ciblés**, et ne réémet jamais le fichier complet depuis un modèle, afin de garantir la fidélité.
-- Écriture atomique : fichier temporaire, puis renommage.
-- Tests de non-régression sur un corpus de `.RPP` réels (écrire puis relire sans perte, ouverture dans REAPER).
+### 7.3 Writing RPP files
+- The writer modifies the **original text through targeted patches**, and never re-emits the complete file from a model, to guarantee fidelity.
+- Atomic write: temporary file, then rename.
+- Non-regression tests on a corpus of real `.RPP` files (write then read back without loss, opening in REAPER).
 
-### 7.4 Applications mobiles (ultérieur)
-Objectif : notifications, notes, tâches, paroles, statuts ; pas de gestion de projets REAPER.
-- Réutilisation directe de `domain` et du port `CollabStore`.
-- **Contrainte** : le mode journal suppose un dossier Drive monté, indisponible sur mobile. Les applications mobiles nécessiteront le **mode PocketBase** (ou un adaptateur journal via l'API Google Drive, à évaluer le moment venu).
-- Notifications push mobiles : service tiers requis (FCM / APNs), hors périmètre actuel.
+### 7.4 Mobile applications (later)
+Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project management.
+- Direct reuse of `domain` and of the `CollabStore` port.
+- **Constraint**: journal mode assumes a mounted Drive folder, unavailable on mobile. Mobile applications will require **PocketBase mode** (or a journal adapter through the Google Drive API, to be evaluated when the time comes).
+- Mobile push notifications: third-party service required (FCM / APNs), outside the current scope.
 
 ---
 
-## 8. Exigences non fonctionnelles
+## 8. Non-functional requirements
 
-- **Performance** :
-  - démarrage jusqu'à la vue principale exploitable en moins d'une seconde, servie depuis l'index ;
-  - aucune opération bloquante dans l'interface ;
-  - tâches longues en arrière-plan avec progression et annulation ;
-  - scan incrémental (mtime + taille, hash uniquement si nécessaire) ;
-  - cible indicative : 1 000 `.RPP` et 100 Go de médias sans dégradation perceptible.
-- **Fiabilité** : aucune perte de données possible sans confirmation explicite ; toutes les opérations destructrices passent par la corbeille ou l'historique.
-- **Ergonomie** : utilisable par des non-techniciens ; vocabulaire musical plutôt que technique ; actions principales accessibles en un clic.
-- **Distribution** : outillage entièrement gratuit et open source ; build et publication par la CI (GitHub Actions), artefacts publiés en GitHub Releases.
-  - **Windows** : installeur (Inno Setup ou MSIX) signé gratuitement via **SignPath Foundation** (programme open source : dépôt public, licence OSI, signature depuis la CI), afin d'éviter l'avertissement SmartScreen (retenu ; candidature à déposer une fois le dépôt public et la licence choisie).
-  - **macOS** : DMG **non notarisé** (pas d'adhésion payante Apple). L'avertissement Gatekeeper au premier lancement est accepté ; la procédure d'autorisation est documentée. Pas de machine de test disponible : macOS est construit par la CI, testé sur une base « best effort ».
-  - **Mise à jour automatique** (`auto_updater`, WinSparkle / Sparkle, flux d'appcast signé) : vérification au démarrage puis périodique → notification « mise à jour disponible » → un clic → téléchargement, installation → redémarrage si nécessaire.
-- **Licence** : GPL-3.0 (`LICENSE`).
-- **Identifiant d'application** : `io.github.6wheels.reaharvest` (Windows, macOS) ; `io.github._6wheels.reaharvest` sous Linux (règle freedesktop : un segment ne peut commencer par un chiffre ; format compatible avec la vérification Flathub).
-- **Internationalisation** : interface en français, préparée pour l'i18n (publication ultérieure).
+- **Performance**:
+  - startup to a usable main view in less than one second, served from the index;
+  - no blocking operation in the interface;
+  - long tasks in the background with progress and cancellation;
+  - incremental scan (mtime + size, hash only when needed);
+  - indicative target: 1,000 `.RPP` and 100 GB of media without perceptible degradation.
+- **Reliability**: no data loss possible without explicit confirmation; all destructive operations go through the trash or the history.
+- **Usability**: usable by non-technical people; musical rather than technical vocabulary; main actions reachable in one click.
+- **Distribution**: entirely free and open source tooling; build and publication by CI (GitHub Actions), artifacts published as GitHub Releases.
+  - **Windows**: installer (Inno Setup or MSIX) signed for free through **SignPath Foundation** (open source program: public repository, OSI license, signing from CI), to avoid the SmartScreen warning (retained; application to be submitted once the repository is public and the license chosen).
+  - **macOS**: **non-notarized** DMG (no paid Apple membership). The Gatekeeper warning on first launch is accepted; the authorization procedure is documented. No test machine available: macOS is built by CI, tested on a "best effort" basis.
+  - **Automatic update** (`auto_updater`, WinSparkle / Sparkle, signed appcast feed): check at startup then periodically → "update available" notification (UI: « mise à jour disponible ») → one click → download, installation → restart if needed.
+- **License**: GPL-3.0 (`LICENSE`).
+- **Application identifier**: `io.github.6wheels.reaharvest` (Windows, macOS); `io.github._6wheels.reaharvest` on Linux (freedesktop rule: a segment cannot start with a digit; format compatible with Flathub verification).
+- **Internationalization**: interface in French, prepared for i18n (later publication).
 
 ---
 
 ## 9. Phases
 
-| Phase | Contenu |
+| Phase | Content |
 |---|---|
-| **1 — MVP** | Bibliothèques et modes (`local`, `cloud`, `collab`), changement de mode, configuration, layouts (modèles fournis + personnalisé), conventions de dépôt, scan et index, navigation, vue détail, gestion des versions, Récupérer / Publier / Libérer (conflits, forçage), création depuis template, ouverture REAPER, assistant d'adoption. Mode `collab` complet : membres, propriété et forçage, port `CollabStore` + `JournalStore`, statuts, tâches, notes, paroles, assets partagés, activité, notifications |
-| **2 — Backend** | `PocketBaseStore`, bascule en un clic, authentification ; prérequis des applications mobiles |
-| **3 — Outils** | Rendus : lecteur intégré, rendu à la demande, publication des rendus (dépôt et dossiers d'export) ; import de pistes entre versions ; scripts Lua compagnons (par exemple rendu audio des pistes dont les plugins manquent) |
+| **1 — MVP** | Libraries and modes (`local`, `cloud`, `collab`), mode change, configuration, layouts (provided templates + custom), repository conventions, scan and index, navigation, detail view, version management, Checkout / Publish / Release (conflicts, forcing), creation from template, opening in REAPER, adoption wizard. Full `collab` mode: members, ownership and forcing, `CollabStore` port + `JournalStore`, statuses, tasks, notes, lyrics, shared assets, activity, notifications |
+| **2 — Backend** | `PocketBaseStore`, one-click switch, authentication; prerequisite for mobile applications |
+| **3 — Tools** | Renders: built-in player, on-demand render, render publication (repository and export folders); track import between versions; companion Lua scripts (for example audio render of tracks whose plugins are missing) |
 
-Jalons internes du MVP, livrés et testés dans cet ordre, chacun utilisable seul :
-1. **Jalon A — mode `local`** : configuration et bibliothèques, layouts et arborescence libre, scan et index, navigation, vue détail, gestion des versions, création depuis template, ouverture REAPER.
-2. **Jalon B — mode `cloud`** : port `RepositoryStorage` + `MountedFolderStorage`, Récupérer / Publier / Libérer, détection de conflits, changement de mode `local` ↔ `cloud`.
-3. **Jalon C — mode `collab`** : membres, propriété et forçage, `CollabStore` + `JournalStore`, statuts, tâches, notes, paroles, assets partagés, activité, notifications, assistant d'adoption de l'existant.
+Internal MVP milestones, delivered and tested in this order, each usable on its own:
+1. **Milestone A — `local` mode**: configuration and libraries, layouts and free tree, scan and index, navigation, detail view, version management, creation from template, opening in REAPER.
+2. **Milestone B — `cloud` mode**: `RepositoryStorage` port + `MountedFolderStorage`, Checkout / Publish / Release, conflict detection, mode change `local` ↔ `cloud`.
+3. **Milestone C — `collab` mode**: members, ownership and forcing, `CollabStore` + `JournalStore`, statuses, tasks, notes, lyrics, shared assets, activity, notifications, adoption wizard for existing projects.
 
-Prévoir dès le jalon A : `memberId` local et `owner` des versions, `libraryId`, `_library.json` (y compris le bloc `collab`), `groupId`, `uid` ULID, HLC, URL de backend configurable, ports `RepositoryStorage` et `CollabStore`.
+Plan from milestone A: local `memberId` and version `owner`, `libraryId`, `_library.json` (including the `collab` block), `groupId`, ULID `uid`, HLC, configurable backend URL, `RepositoryStorage` and `CollabStore` ports.
 
 ---
 
-## 10. Points ouverts et risques
+## 10. Open points and risks
 
-1. ~~Format des lignes de métadonnées projet et rendu, `EXTSTATE`~~ (validé, §4.2, §5.6).
-2. Détection d'un projet ouvert : ni `REAPER.ini` ni verrou de fichier ; MVP par détection du processus, script compagnon ensuite (§5.7).
-3. Fiabilité de la surveillance de fichiers sur le lecteur Drive en streaming (§6.3).
-4. ~~Clés `reaper.ini` des préférences~~ (validé : peaks uniquement, backups sans vérification, §5.1).
-5. Caches plugins : VST et JS validés sous Windows ; CLAP, AU, macOS et Linux restants (§5.3).
-6. Ouverture dans l'instance existante sous macOS (§5.7).
-7. Motifs de nommage des copies de conflit par fournisseur cloud (§3.0).
-8. ~~Licence et SignPath~~ (GPL-3.0, SignPath retenu, §8).
-9. ~~Forme de `RENDER_FILE`, rendu en ligne de commande avec REAPER ouvert~~ (validé, §5.3).
-10. Choix de l'algorithme de hash par benchmark (§7.1).
-11. Chemins relatifs avec `\` lus par REAPER macOS (§4.3).
+1. ~~Format of project and render metadata lines, `EXTSTATE`~~ (validated, §4.2, §5.6).
+2. Detection of an open project: neither `REAPER.ini` nor file lock; MVP through process detection, companion script later (§5.7).
+3. Reliability of file watching on the streaming Drive volume (§6.3).
+4. ~~`reaper.ini` preference keys~~ (validated: peaks only, backups without check, §5.1).
+5. Plugin caches: VST and JS validated on Windows; CLAP, AU, macOS and Linux remaining (§5.3).
+6. Opening in the existing instance on macOS (§5.7).
+7. Naming patterns of conflict copies per cloud provider (§3.0).
+8. ~~License and SignPath~~ (GPL-3.0, SignPath retained, §8).
+9. ~~`RENDER_FILE` form, command-line render with REAPER open~~ (validated, §5.3).
+10. Choice of the hash algorithm by benchmark (§7.1).
+11. Relative paths with `\` read by REAPER macOS (§4.3).
 
-## 11. Hors périmètre
+## 11. Out of scope
 
-- Synchronisation bidirectionnelle automatique en continu (les synchronisations restent explicites).
-- Arbre de versions et fusion automatique de projets.
-- Changement de layout d'un dépôt existant (migration de structure).
-- Travail direct dans le dossier Drive.
-- Mode peer-to-peer.
-- Fournisseurs cloud accessibles uniquement par API (sans dossier monté).
-- Notarisation macOS.
+- Continuous automatic bidirectional synchronization (synchronizations remain explicit).
+- Version tree and automatic project merging.
+- Change of layout of an existing repository (structure migration).
+- Working directly in the Drive folder.
+- Peer-to-peer mode.
+- Cloud providers accessible only through an API (without a mounted folder).
+- macOS notarization.

@@ -4,8 +4,8 @@ Collaborative REAPER project manager (Flutter desktop + Dart).
 
 ## Specification
 
-`SPEC.md` (French) is the single source of truth. Read the relevant sections before implementing any feature.
-- Items marked **[À VALIDER]** must be verified (on real files / real REAPER behavior) before implementing the related feature. Record the outcome in `SPEC.md`.
+`SPEC.md` is the single source of truth. Read the relevant sections before implementing any feature.
+- Items marked **[TO VALIDATE]** must be verified (on real files / real REAPER behavior) before implementing the related feature. Record the outcome in `SPEC.md`.
 - Open points are listed in §10; out-of-scope items in §11.
 - Deliver in milestone order (§9): A (`local`) → B (`cloud`) → C (`collab`).
 

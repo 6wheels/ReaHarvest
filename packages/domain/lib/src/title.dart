@@ -79,7 +79,7 @@ final class Version {
 
   final int size;
 
-  /// Null when the file has no metadata yet ("À adopter").
+  /// Null when the file has no metadata yet ("To adopt" section).
   final VersionMetadata? metadata;
 
   bool get isAdopted => metadata != null;
