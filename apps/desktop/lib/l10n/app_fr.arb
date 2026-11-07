@@ -127,5 +127,7 @@
   "restore": "Restaurer",
   "restoreTitle": "Restaurer ce point de sauvegarde ?",
   "restoreHint": "La version est remplacée par son état du {date}. Son état actuel est d'abord enregistré comme point de sauvegarde.",
-  "backupRestored": "Point de sauvegarde restauré"
+  "backupRestored": "Point de sauvegarde restauré",
+  "openInReaper": "Ouvrir dans REAPER",
+  "reaperNotFound": "REAPER est introuvable. Indiquez son emplacement dans les paramètres."
 }

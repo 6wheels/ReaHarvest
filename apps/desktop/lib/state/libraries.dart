@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
+import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import 'providers.dart';
+import 'reaper.dart';
 
 /// Why a folder cannot become a library.
 enum LibraryProblem {
@@ -204,6 +206,19 @@ class LibraryService {
     );
     ref.invalidate(historyProvider(title.id));
     await scan(entry);
+  }
+
+  /// Opens [backup] of [title] in REAPER, after normalizing its paths
+  /// (REAPER lengthens them on every save of a backup, SPEC §5.4). Returns
+  /// false if REAPER is not found.
+  Future<bool> openBackup(Title title, Backup backup) async {
+    final executable = await ref.read(reaperExecutableProvider.future);
+    if (executable == null) return false;
+    final root = _entry(title.libraryId).libraryRoot;
+    final path = backup.path;
+    await Isolate.run(() => cleanBackupPaths(MountedFolderStorage(root), path));
+    await openInReaper(executable, p.joinAll([root, ...path.split('/')]));
+    return true;
   }
 
   LibraryEntry _entry(LibraryId id) =>

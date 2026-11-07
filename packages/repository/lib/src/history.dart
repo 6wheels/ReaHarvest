@@ -28,25 +28,28 @@ final class Backup {
 
 /// Backs up the version [fileName] of the title [titleDir] (UI: « Créer un
 /// point de sauvegarde », SPEC §5.4): copies it into `.history/` as
-/// `<name> <yyyy-MM-dd HHmmss>.<ext>`; the version is unchanged. Returns the
-/// path of the backup.
+/// `<name> <yyyy-MM-dd HHmmss>.<ext>`, its relative paths rebased so that the
+/// backup opens in REAPER ([rebaseProjectPaths]); the version is unchanged.
+/// Returns the path of the backup.
 Future<String> backupVersion(
   RepositoryStorage storage,
   String titleDir,
   String fileName, {
   DateTime? now,
 }) async {
-  final source = _join(titleDir, fileName);
   final name = p.posix.basenameWithoutExtension(fileName);
   final ext = p.posix.extension(fileName);
+  final history = _join(titleDir, historyFolderName);
   final target = await freePath(
     storage,
-    _join(
-      titleDir,
-      '$historyFolderName/$name ${_stamp(now ?? DateTime.now())}$ext',
-    ),
+    _join(history, '$name ${_stamp(now ?? DateTime.now())}$ext'),
   );
-  await storage.write(target, storage.read(source));
+  final text = await _readText(storage, _join(titleDir, fileName));
+  await _writeText(
+    storage,
+    target,
+    rebaseProjectPaths(text, _parent(_join(titleDir, fileName)), history),
+  );
   return target;
 }
 
@@ -87,7 +90,8 @@ Future<Map<VersionId, List<Backup>>> readHistory(
 
 /// Restores the backup [backup] into the version [fileName] of the title
 /// [titleDir] (SPEC §5.4): the current content is backed up first, then
-/// replaced. Returns the path of that new backup.
+/// replaced, its relative paths rebased to the title folder. Returns the path
+/// of that new backup.
 Future<String> restoreBackup(
   RepositoryStorage storage,
   String titleDir,
@@ -96,8 +100,88 @@ Future<String> restoreBackup(
   DateTime? now,
 }) async {
   final saved = await backupVersion(storage, titleDir, fileName, now: now);
-  await storage.write(_join(titleDir, fileName), storage.read(backup));
+  final version = _join(titleDir, fileName);
+  final text = await _readText(storage, backup);
+  await _writeText(
+    storage,
+    version,
+    rebaseProjectPaths(text, _parent(backup), _parent(version)),
+  );
   return saved;
+}
+
+/// Normalizes the relative paths of the backup [backup] before it is opened
+/// in REAPER, which lengthens them on every save of a backup (SPEC §5.4).
+/// The file is written only if a path changed.
+Future<void> cleanBackupPaths(RepositoryStorage storage, String backup) async {
+  final text = await _readText(storage, backup);
+  final dir = _parent(backup);
+  final cleaned = rebaseProjectPaths(text, dir, dir);
+  if (cleaned != text) await _writeText(storage, backup, cleaned);
+}
+
+/// Rewrites the relative paths of a project written for the folder [from]
+/// (library path) so that they denote the same files from the folder [to],
+/// normalized (SPEC §5.4): media references, record paths (`RECORD_PATH`,
+/// empty = project folder) and render target (`RENDER_FILE`). Absolute
+/// paths are kept. Targeted patches: the text is unchanged when no path
+/// changes.
+String rebaseProjectPaths(String text, String from, String to) {
+  String? rebase(String ref) {
+    final slashed = ref.replaceAll(r'\', '/');
+    if (slashed.startsWith('/') || RegExp(r'^[A-Za-z]:').hasMatch(slashed)) {
+      return null;
+    }
+    // Resolved under a deep virtual root, so that paths leading outside the
+    // library keep their meaning.
+    final target = p.posix.join(_virtualRoot, from, slashed);
+    final relative = p.posix.relative(
+      target,
+      from: p.posix.join(_virtualRoot, to),
+    );
+    if (relative == '.') return '';
+    final separator = separatorOf(ref);
+    return separator == '/' ? relative : relative.replaceAll('/', separator);
+  }
+
+  var out = rewriteMediaPaths(text, (ref) => rebase(ref) ?? ref);
+  final root = RppProject.parse(out).document.root;
+  final record = root.line('RECORD_PATH')?.params;
+  if (record != null && record.isNotEmpty) {
+    final primary = rebase(record[0]) ?? record[0];
+    final secondary = record.length > 1 && record[1].isNotEmpty
+        ? rebase(record[1]) ?? record[1]
+        : record.elementAtOrNull(1);
+    if (primary != record[0] || secondary != record.elementAtOrNull(1)) {
+      out = setRootAttribute(out, 'RECORD_PATH', [
+        primary,
+        ?secondary,
+        ...record.skip(2),
+      ]);
+    }
+  }
+  final render = root.line('RENDER_FILE')?.params;
+  if (render != null && render.isNotEmpty) {
+    final file = rebase(render[0]) ?? render[0];
+    if (file != render[0]) {
+      out = setRootAttribute(out, 'RENDER_FILE', [file, ...render.skip(1)]);
+    }
+  }
+  return out;
+}
+
+/// Root under which library paths are resolved by [rebaseProjectPaths].
+final _virtualRoot = '/${List.filled(64, 'r').join('/')}';
+
+Future<String> _readText(RepositoryStorage storage, String path) =>
+    storage.read(path).transform(utf8.decoder).join();
+
+Future<void> _writeText(RepositoryStorage storage, String path, String text) =>
+    storage.write(path, Stream.value(utf8.encode(text)));
+
+String _parent(String path) {
+  final i = path.lastIndexOf('/');
+  return i < 0 ? '' : path.substring(0, i);
 }
 
 String _stamp(DateTime d) {

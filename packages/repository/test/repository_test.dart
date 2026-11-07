@@ -497,7 +497,8 @@ void main() {
 
       expect(path, '$title/.history/Song - chorus 2026-11-07 153012.RPP');
       expect(again, '$title/.history/Song - chorus 2026-11-07 153012 (2).RPP');
-      expect(read(path), adopted);
+      expect(read(path), rebaseProjectPaths(adopted, title, '$title/.history'));
+      expect(read(path), isNot(adopted));
       expect(read('$title/Song - chorus.RPP'), adopted);
       final result = await scan(storage, library(Layout.classic()));
       expect(result.titles.single.versions, hasLength(1));
@@ -541,9 +542,87 @@ void main() {
         now: when.add(const Duration(hours: 1)),
       );
 
-      expect(read('$title/v1.rpp'), adopted);
-      expect(read(saved), '$adopted\n');
-      expect(read(backup), adopted);
+      final history = '$title/.history';
+      expect(read(backup), rebaseProjectPaths(adopted, title, history));
+      expect(
+        read('$title/v1.rpp'),
+        rebaseProjectPaths(read(backup), history, title),
+      );
+      expect(read(saved), rebaseProjectPaths('$adopted\n', title, history));
+    });
+
+    const project = r'''<REAPER_PROJECT 0.1 "7.84/win64" 0
+  RECORD_PATH "Media" ""
+  RENDER_FILE ".\Renders"
+  <TRACK
+    <ITEM
+      <SOURCE WAVE
+        FILE "Media\kick.wav"
+      >
+    >
+    <ITEM
+      <SOURCE WAVE
+        FILE "C:\Samples\snare.wav"
+      >
+    >
+    <ITEM
+      <SOURCE MIDI
+        FILE "../../../../other.mid" QN
+      >
+    >
+  >
+>
+''';
+
+    RppProject parse(String text) => RppProject.parse(text);
+
+    test('rebases relative paths into and out of the history', () {
+      final backup = rebaseProjectPaths(project, title, '$title/.history');
+      expect(parse(backup).mediaFiles, {
+        r'..\Media\kick.wav',
+        r'C:\Samples\snare.wav',
+        '../../../../../other.mid',
+      });
+      expect(parse(backup).recordPath, r'..\Media');
+      expect(parse(backup).renderFile, r'..\Renders');
+      expect(backup, contains('FILE "../../../../../other.mid" QN'));
+
+      final restored = rebaseProjectPaths(backup, '$title/.history', title);
+      expect(parse(restored).mediaFiles, {
+        r'Media\kick.wav',
+        r'C:\Samples\snare.wav',
+        '../../../../other.mid',
+      });
+      expect(parse(restored).recordPath, 'Media');
+      expect(parse(restored).renderFile, 'Renders');
+    });
+
+    test('rebases an empty record path to the project folder', () {
+      final text = project.replaceFirst(
+        'RECORD_PATH "Media" ""',
+        'RECORD_PATH "" ""',
+      );
+      final backup = rebaseProjectPaths(text, title, '$title/.history');
+      expect(parse(backup).recordPath, '..');
+      expect(
+        parse(rebaseProjectPaths(backup, '$title/.history', title)).recordPath,
+        '',
+      );
+    });
+
+    test('normalizes paths lengthened by REAPER, keeps clean files', () async {
+      final history = '$title/.history';
+      final file = '$history/v1 2026-11-07 153012.rpp';
+      final clean = rebaseProjectPaths(project, title, history);
+      expect(rebaseProjectPaths(clean, history, history), clean);
+      put(
+        file,
+        clean.replaceFirst(r'..\Media\kick.wav', r'..\Media\..\Media\kick.wav'),
+      );
+
+      await cleanBackupPaths(storage, file);
+
+      expect(read(file), clean);
     });
   });
 

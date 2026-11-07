@@ -96,7 +96,7 @@ Future<MoveReport> moveProjectToTitle(
       }
     }
     newRefs[ref] =
-        '$mediaFolderName${_separatorOf(ref)}${p.posix.basename(target)}';
+        '$mediaFolderName${separatorOf(ref)}${p.posix.basename(target)}';
   }
 
   var patched = rewriteMediaPaths(text, (ref) => newRefs[ref] ?? ref);
@@ -124,7 +124,7 @@ Future<MoveReport> moveProjectToTitle(
 
 /// Path separator of [ref]; the platform one if it has none (REAPER writes
 /// `\` on Windows).
-String _separatorOf(String ref) {
+String separatorOf(String ref) {
   if (ref.contains(r'\')) return r'\';
   if (ref.contains('/')) return '/';
   return Platform.isWindows ? r'\' : '/';

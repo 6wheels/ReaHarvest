@@ -1,7 +1,7 @@
 /// Repository and workspace scanning, layout conventions, adoption, RepositoryStorage adapters.
 library;
 
-export 'src/adoption.dart' hide freePath;
+export 'src/adoption.dart' hide freePath, separatorOf;
 export 'src/conventions.dart';
 export 'src/history.dart';
 export 'src/mounted_folder_storage.dart';

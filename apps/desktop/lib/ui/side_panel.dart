@@ -289,6 +289,23 @@ class _VersionHistoryState extends ConsumerState<_VersionHistory> {
     }
   }
 
+  Future<void> _open(Backup backup) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final opened = await ref
+          .read(libraryServiceProvider)
+          .openBackup(widget.title, backup);
+      if (!opened) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.reaperNotFound)));
+      }
+    } on Object catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.actionFailed('$error'))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -331,6 +348,11 @@ class _VersionHistoryState extends ConsumerState<_VersionHistory> {
                     format.format(b.created),
                     style: text.bodySmall?.copyWith(color: c.muted),
                   ),
+                ),
+                IconButton(
+                  tooltip: l10n.openInReaper,
+                  onPressed: () => _open(b),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
                 ),
                 TextButton(
                   onPressed: () => _restore(b, format.format(b.created)),
