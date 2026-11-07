@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
@@ -218,8 +219,126 @@ class _VersionTile extends ConsumerWidget {
               label: Text(l10n.separateDuplicate),
             ),
           ],
+          if (!freeTree && m != null) _VersionHistory(title, version, m.id),
         ],
       ),
+    );
+  }
+}
+
+/// Backup points of a version: creation, list and restore (SPEC §5.4).
+class _VersionHistory extends ConsumerStatefulWidget {
+  const _VersionHistory(this.title, this.version, this.id);
+
+  final Title title;
+  final Version version;
+  final VersionId id;
+
+  @override
+  ConsumerState<_VersionHistory> createState() => _VersionHistoryState();
+}
+
+class _VersionHistoryState extends ConsumerState<_VersionHistory> {
+  var _expanded = false;
+
+  Future<void> _backup() async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(libraryServiceProvider)
+          .backup(widget.title, widget.version);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.backupCreated)));
+    } on Object catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.actionFailed('$error'))),
+      );
+    }
+  }
+
+  Future<void> _restore(Backup backup, String date) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.restoreTitle),
+        content: Text(l10n.restoreHint(date)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.restore),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final done = await runProjectChange(
+      context,
+      ref,
+      () => ref
+          .read(libraryServiceProvider)
+          .restore(widget.title, widget.version, backup),
+    );
+    if (done) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.backupRestored)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final c = context.colors;
+    final text = Theme.of(context).textTheme;
+    final backups =
+        ref.watch(historyProvider(widget.title.id)).value?[widget.id] ??
+        const <Backup>[];
+    final format = DateFormat.yMMMd(l10n.localeName).add_Hm();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: Space.xs),
+        Wrap(
+          spacing: Space.xs,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+              onPressed: _backup,
+              label: Text(l10n.createBackup),
+            ),
+            if (backups.isNotEmpty)
+              TextButton.icon(
+                icon: Icon(
+                  _expanded ? Icons.expand_less_rounded : Icons.history_rounded,
+                  size: 18,
+                ),
+                onPressed: () => setState(() => _expanded = !_expanded),
+                label: Text(l10n.backupCount(backups.length)),
+              ),
+          ],
+        ),
+        if (_expanded)
+          for (final b in backups)
+            Row(
+              children: [
+                const SizedBox(width: Space.s),
+                Expanded(
+                  child: Text(
+                    format.format(b.created),
+                    style: text.bodySmall?.copyWith(color: c.muted),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _restore(b, format.format(b.created)),
+                  child: Text(l10n.restore),
+                ),
+              ],
+            ),
+      ],
     );
   }
 }

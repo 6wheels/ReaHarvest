@@ -156,5 +156,18 @@
   "filterValue": "{label}: {value}",
   "@filterValue": {
     "placeholders": { "label": { "type": "String" }, "value": { "type": "String" } }
-  }
+  },
+  "createBackup": "Create a backup point",
+  "backupCreated": "Backup point created",
+  "backupCount": "{count, plural, =1{1 backup point} other{{count} backup points}}",
+  "@backupCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "restore": "Restore",
+  "restoreTitle": "Restore this backup point?",
+  "restoreHint": "The version is replaced by its state of {date}. Its current state is saved as a backup point first.",
+  "@restoreHint": {
+    "placeholders": { "date": { "type": "String" } }
+  },
+  "backupRestored": "Backup point restored"
 }

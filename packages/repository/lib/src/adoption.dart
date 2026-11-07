@@ -6,9 +6,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'conventions.dart';
-
-/// Media pool folder of a title (SPEC §4.3).
-const mediaFolderName = 'Media';
+import 'scaffold.dart';
 
 /// Writes [metadata] into the EXTSTATE section of the project at [path]
 /// ("To adopt", Save As duplicates, SPEC §4.2): targeted patch, atomic
@@ -109,7 +107,7 @@ Future<MoveReport> moveProjectToTitle(
     recordPath?.params.elementAtOrNull(1) ?? '',
   ]);
 
-  final destination = await _freeName(
+  final destination = await freePath(
     storage,
     _join(titleDir, p.posix.basename(project)),
   );
@@ -165,7 +163,7 @@ Future<(String, bool)> _poolTarget(
 }
 
 /// [path], or the first free `name (n).ext` variant.
-Future<String> _freeName(RepositoryStorage storage, String path) async {
+Future<String> freePath(RepositoryStorage storage, String path) async {
   final dir = _parent(path);
   final stem = p.posix.basenameWithoutExtension(path);
   final ext = p.posix.extension(path);

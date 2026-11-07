@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/app.dart';
 import 'package:reaharvest/demo_titles.dart';
 import 'package:reaharvest/state/libraries.dart';
+import 'package:reaharvest/ui/side_panel.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
@@ -129,6 +130,7 @@ void main() {
             demoLibrary.id: demoLibrary,
           }),
           toSortProvider.overrideWithValue(const []),
+          historyProvider.overrideWith((ref, id) async => const {}),
           pluginCacheProvider.overrideWith((ref) async => null),
           reaperRunningProvider.overrideWithValue(() async => reaperRunning),
           libraryServiceProvider.overrideWith(
@@ -398,6 +400,17 @@ void main() {
     await tester.tap(find.text('Midnight Ferry'));
     await tester.pumpAndSettle();
     expect(find.text('Midnight Ferry v1'), findsOneWidget);
+    expect(find.text('Create a backup point'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('Midnight Ferry v5'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(SidePanel),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.text('Midnight Ferry v5'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Close'));

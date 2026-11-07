@@ -120,5 +120,12 @@
   "columnModified": "Modifié",
   "actionFailed": "L'opération a échoué : {error}",
   "noFilterResults": "Aucun titre ne correspond à ces filtres",
-  "filterValue": "{label} : {value}"
+  "filterValue": "{label} : {value}",
+  "createBackup": "Créer un point de sauvegarde",
+  "backupCreated": "Point de sauvegarde créé",
+  "backupCount": "{count, plural, =1{1 point de sauvegarde} other{{count} points de sauvegarde}}",
+  "restore": "Restaurer",
+  "restoreTitle": "Restaurer ce point de sauvegarde ?",
+  "restoreHint": "La version est remplacée par son état du {date}. Son état actuel est d'abord enregistré comme point de sauvegarde.",
+  "backupRestored": "Point de sauvegarde restauré"
 }

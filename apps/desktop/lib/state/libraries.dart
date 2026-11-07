@@ -174,6 +174,38 @@ class LibraryService {
     return report;
   }
 
+  /// Backs up [version] of [title] into its `.history/` (UI: « Créer un
+  /// point de sauvegarde », SPEC §5.4); the version is unchanged.
+  Future<void> backup(Title title, Version version) async {
+    final root = _entry(title.libraryId).libraryRoot;
+    await Isolate.run(
+      () => backupVersion(
+        MountedFolderStorage(root),
+        title.path,
+        version.fileName,
+      ),
+    );
+    ref.invalidate(historyProvider(title.id));
+  }
+
+  /// Restores [backup] into [version] of [title], after backing up its
+  /// current state (SPEC §5.4). Then rescans.
+  Future<void> restore(Title title, Version version, Backup backup) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final path = backup.path;
+    await Isolate.run(
+      () => restoreBackup(
+        MountedFolderStorage(root),
+        title.path,
+        version.fileName,
+        path,
+      ),
+    );
+    ref.invalidate(historyProvider(title.id));
+    await scan(entry);
+  }
+
   LibraryEntry _entry(LibraryId id) =>
       ref.read(settingsProvider).libraries.firstWhere((l) => l.id == id);
 
@@ -228,3 +260,24 @@ bool sameLayout(Layout? a, Layout? b) =>
     jsonEncode(a?.toJson()) == jsonEncode(b?.toJson());
 
 final libraryServiceProvider = Provider<LibraryService>(LibraryService.new);
+
+/// Backups of the versions of a title, by version, newest first (SPEC
+/// §5.4); empty for free tree titles, which have no history.
+final historyProvider = FutureProvider.autoDispose
+    .family<Map<VersionId, List<Backup>>, NodeId>((ref, id) async {
+      final title = ref
+          .watch(titlesProvider)
+          .where((t) => t.id == id)
+          .firstOrNull;
+      if (title == null ||
+          ref.watch(indexedLibrariesProvider)[title.libraryId]?.isFreeTree !=
+              false) {
+        return const {};
+      }
+      final root = ref
+          .watch(settingsProvider.select((s) => s.libraries))
+          .firstWhere((l) => l.id == title.libraryId)
+          .libraryRoot;
+      final dir = title.path;
+      return Isolate.run(() => readHistory(MountedFolderStorage(root), dir));
+    });

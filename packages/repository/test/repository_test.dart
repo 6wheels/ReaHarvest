@@ -436,6 +436,117 @@ void main() {
     });
   });
 
+  group('scaffolding', () {
+    bool dir(String path) =>
+        Directory(p.joinAll([root.path, ...path.split('/')])).existsSync();
+
+    test('scan scaffolds new layout titles only', () async {
+      put('band/album/song/v1.rpp', adopted);
+      put(
+        'band/album/old/.node.json',
+        '{"nodeId":"${newUlid()}","level":"title"}',
+      );
+
+      await scan(storage, library(Layout.classic()));
+
+      for (final name in titleFolders) {
+        expect(dir('band/album/song/$name'), isTrue, reason: name);
+        expect(dir('band/album/old/$name'), isFalse, reason: name);
+        expect(dir('band/album/$name'), isFalse, reason: name);
+      }
+      expect(exists('band/album/song/.node.json'), isTrue);
+    });
+
+    test('free tree titles are not scaffolded', () async {
+      put('songs/demo/v1.rpp', unknown);
+      await scan(storage, library(null));
+      expect(exists('songs/demo/.node.json'), isTrue);
+      expect(dir('songs/demo/Media'), isFalse);
+    });
+
+    test('scaffoldTitle creates the folders and node file', () async {
+      final node = await scaffoldTitle(storage, 'band/album/song', 'title');
+      expect(titleFolders.every((n) => dir('band/album/song/$n')), isTrue);
+      final saved = await readNodeFile(storage, 'band/album/song');
+      expect((saved!.id, saved.level), (node.id, 'title'));
+    });
+  });
+
+  group('history', () {
+    const title = 'band/album/song';
+    final when = DateTime(2026, 11, 7, 15, 30, 12);
+
+    String read(String path) =>
+        File(p.joinAll([root.path, ...path.split('/')])).readAsStringSync();
+
+    test('backs up a version under its name and date', () async {
+      put('$title/Song - chorus.RPP', adopted);
+
+      final path = await backupVersion(
+        storage,
+        title,
+        'Song - chorus.RPP',
+        now: when,
+      );
+      final again = await backupVersion(
+        storage,
+        title,
+        'Song - chorus.RPP',
+        now: when,
+      );
+
+      expect(path, '$title/.history/Song - chorus 2026-11-07 153012.RPP');
+      expect(again, '$title/.history/Song - chorus 2026-11-07 153012 (2).RPP');
+      expect(read(path), adopted);
+      expect(read('$title/Song - chorus.RPP'), adopted);
+      final result = await scan(storage, library(Layout.classic()));
+      expect(result.titles.single.versions, hasLength(1));
+    });
+
+    test('lists backups by version, newest first', () async {
+      final id = VersionMetadata.fromExtState(
+        RppProject.parse(adopted).extState(VersionMetadata.section),
+      )!.id;
+      put('$title/v1.rpp', adopted);
+      put('$title/.history/unknown 2026-01-01 000000.rpp', unknown);
+      put('$title/.history/notes.txt', 'x');
+      await backupVersion(storage, title, 'v1.rpp', now: when);
+      await backupVersion(
+        storage,
+        title,
+        'v1.rpp',
+        now: when.add(const Duration(days: 1)),
+      );
+
+      final history = await readHistory(storage, title);
+
+      expect(history.keys, [id]);
+      expect(history[id]!.map((b) => b.created), [
+        when.add(const Duration(days: 1)),
+        when,
+      ]);
+      expect(await readHistory(storage, 'band/album/other'), isEmpty);
+    });
+
+    test('restores a backup after backing up the current state', () async {
+      put('$title/v1.rpp', adopted);
+      final backup = await backupVersion(storage, title, 'v1.rpp', now: when);
+      put('$title/v1.rpp', '$adopted\n');
+
+      final saved = await restoreBackup(
+        storage,
+        title,
+        'v1.rpp',
+        backup,
+        now: when.add(const Duration(hours: 1)),
+      );
+
+      expect(read('$title/v1.rpp'), adopted);
+      expect(read(saved), '$adopted\n');
+      expect(read(backup), adopted);
+    });
+  });
+
   group('adoption', () {
     test('writes version metadata into the project', () async {
       put('band/album/song/v1.rpp', unknown);

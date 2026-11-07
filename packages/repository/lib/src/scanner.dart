@@ -8,6 +8,7 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'conventions.dart';
 import 'mounted_folder_storage.dart';
 import 'node_file.dart';
+import 'scaffold.dart';
 
 /// Size and modification time of a file, used to skip unchanged files.
 typedef FileStamp = ({int size, DateTime modified});
@@ -67,8 +68,9 @@ Future<ScanResult> scanFolder(
 ///
 /// Files whose stamp did not change since [previous] are not read again;
 /// free tree projects are never read (no metadata, SPEC §3.3). Missing
-/// `.node.json` files are written for layout nodes and free tree titles;
-/// this is the only write.
+/// `.node.json` files are written for layout nodes and free tree titles, and
+/// layout titles without one are scaffolded ([scaffoldTitle]); these are the
+/// only writes.
 Future<ScanResult> scan(
   RepositoryStorage storage,
   Library library, {
@@ -187,7 +189,7 @@ final class _Scanner {
         if (d == 0) continue;
       }
       final level = layout.levels[d - 1].key;
-      final node = await _node(dir, level);
+      final node = await _node(dir, level, scaffold: d == depth);
       if (node == null) {
         skipped.add(dir);
         continue;
@@ -266,9 +268,14 @@ final class _Scanner {
     );
   }
 
-  /// Node file of [dir], written with [level] if missing; null (and the file
-  /// reported as corrupted) if unreadable.
-  Future<NodeFile?> _node(String dir, String level) async {
+  /// Node file of [dir], written with [level] if missing (with the title
+  /// folders if [scaffold]); null (and the file reported as corrupted) if
+  /// unreadable.
+  Future<NodeFile?> _node(
+    String dir,
+    String level, {
+    bool scaffold = false,
+  }) async {
     final path = _join(dir, nodeFileName);
     final entry = files[dir]?.where((e) => e.path == path).firstOrNull;
     NodeFile? node;
@@ -285,8 +292,12 @@ final class _Scanner {
         }
       }
     } else {
-      node = NodeFile(NodeId.generate(), level);
-      await writeNodeFile(storage, dir, node);
+      if (scaffold) {
+        node = await scaffoldTitle(storage, dir, level);
+      } else {
+        node = NodeFile(NodeId.generate(), level);
+        await writeNodeFile(storage, dir, node);
+      }
       final written = await storage.stat(path);
       if (written != null) stamps[path] = _stamp(written);
     }
