@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Title;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/app.dart';
 import 'package:reaharvest/demo_titles.dart';
 import 'package:reaharvest/state/libraries.dart';
+import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
@@ -40,6 +41,16 @@ class FakeLibraryService extends LibraryService {
 
   final added = <(String, String, Layout?)>[];
   final removed = <LibraryId>[];
+  final adopted = <(String, String)>[];
+  final separated = <String>[];
+
+  @override
+  Future<void> adopt(Title title, Version version, String label) async =>
+      adopted.add((version.fileName, label));
+
+  @override
+  Future<void> separateDuplicate(Title title, Version version) async =>
+      separated.add(version.fileName);
 
   @override
   Future<Library?> existing(String folder) async => existingLibrary;
@@ -85,7 +96,9 @@ void main() {
 
   Future<void> pumpApp(
     WidgetTester tester, {
-    List<TitleView> titles = const [],
+    List<Title> titles = const [],
+    bool reaperRunning = false,
+    NavigationSettings navigation = const NavigationSettings(),
     String language = 'en',
     List<LibraryEntry> configured = const [band],
     PeaksPreference? peaks = const PeaksPreference(
@@ -107,10 +120,17 @@ void main() {
               identity: const LocalIdentity(MemberId('M'), 'Alice'),
               language: language,
               libraries: configured,
+              navigation: navigation,
             ),
           ),
           settingsProvider.overrideWith(() => settings),
-          titleViewsProvider.overrideWithValue(titles),
+          titlesProvider.overrideWithValue(titles),
+          indexedLibrariesProvider.overrideWithValue({
+            demoLibrary.id: demoLibrary,
+          }),
+          toSortProvider.overrideWithValue(const []),
+          pluginCacheProvider.overrideWith((ref) async => null),
+          reaperRunningProvider.overrideWithValue(() async => reaperRunning),
           libraryServiceProvider.overrideWith(
             (ref) => libraries = FakeLibraryService(ref),
           ),
@@ -320,6 +340,140 @@ void main() {
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
     expect(libraries.added.single.$3!.levels, hasLength(2));
+  });
+
+  testWidgets('filters by tag and saves the filter', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    expect(find.byType(TitleCard), findsNWidgets(12));
+
+    await tester.tap(find.text('Artist'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Other Artist'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(1200, 790));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CheckboxMenuButton), findsNothing);
+    expect(find.byType(TitleCard), findsNWidgets(6));
+    expect(find.text('Artist: Other Artist'), findsOneWidget);
+    expect(settings.saved.last.navigation.filter.tags, {
+      'artist': {'Other Artist'},
+    });
+
+    await tester.tap(find.text('Clear filters'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleCard), findsNWidgets(12));
+  });
+
+  testWidgets('restores the search query', (tester) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      navigation: const NavigationSettings(query: 'tide'),
+    );
+    expect(find.byType(TitleCard), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'tide'), findsOneWidget);
+  });
+
+  testWidgets('switches to list and tree views', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await tester.tap(find.byTooltip('List'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleCard), findsNothing);
+    expect(find.text('Northern Lights'), findsOneWidget);
+    expect(settings.saved.last.navigation.displayMode, DisplayMode.list);
+
+    await tester.tap(find.byTooltip('Tree'));
+    await tester.pumpAndSettle();
+    expect(find.text('Other Artist'), findsOneWidget);
+    expect(find.text('Paper Boats'), findsOneWidget);
+    await tester.tap(find.text('Other Artist'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paper Boats'), findsNothing);
+    expect(find.text('Northern Lights'), findsOneWidget);
+  });
+
+  testWidgets('opens the title detail with its versions', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await tester.tap(find.text('Midnight Ferry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Midnight Ferry v1'), findsOneWidget);
+    expect(find.text('Midnight Ferry v5'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Midnight Ferry v1'), findsNothing);
+  });
+
+  testWidgets('saves and applies a view', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await tester.enterText(find.byType(TextField), 'tide');
+    await tester.tap(find.text('Views'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save current view…'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Tide');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(settings.saved.last.navigation.savedViews.single.query, 'tide');
+
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleCard), findsNWidgets(12));
+    await tester.tap(find.text('Views'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tide'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleCard), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'tide'), findsOneWidget);
+  });
+
+  testWidgets('adopts a version after the REAPER warning', (tester) async {
+    await pumpApp(tester, titles: demoTitles(), reaperRunning: true);
+    await tester.tap(find.text('To adopt · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('Glass Garden v1'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Label'), 'intro');
+    await tester.tap(find.text('Adopt'));
+    await tester.pumpAndSettle();
+    expect(find.text('REAPER is open'), findsOneWidget);
+    await tester.tap(find.text('Continue anyway'));
+    await tester.pumpAndSettle();
+    expect(libraries.adopted, [('Glass Garden v1.rpp', 'intro')]);
+  });
+
+  testWidgets('offers to make a duplicate a new version', (tester) async {
+    final metadata = VersionMetadata(
+      id: VersionId.generate(),
+      owner: const MemberId('M'),
+      label: 'take',
+    );
+    Version version(String name) => Version(
+      fileName: name,
+      modified: DateTime(2026, 11, 1),
+      size: 1,
+      metadata: metadata,
+    );
+    await pumpApp(
+      tester,
+      titles: [
+        Title(
+          id: NodeId.generate(),
+          libraryId: demoLibrary.id,
+          path: 'Band/Album/Song',
+          tags: const {'artist': 'Band', 'album': 'Album', 'title': 'Song'},
+          versions: [version('Song.rpp'), version('Song copy.rpp')],
+        ),
+      ],
+    );
+    await tester.tap(find.text('Song'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Same identity as'), findsNWidgets(2));
+
+    await tester.tap(find.text('Make it a new version').last);
+    await tester.pumpAndSettle();
+    expect(libraries.separated, hasLength(1));
   });
 
   testWidgets('uses French when chosen', (tester) async {

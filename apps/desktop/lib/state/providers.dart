@@ -51,39 +51,14 @@ final indexRevisionProvider = NotifierProvider<IndexRevision, int>(
   IndexRevision.new,
 );
 
-/// What a title card shows. [bpm] and [status] are null until known.
-typedef TitleView = ({Title title, int? bpm, String? status});
-
 /// All indexed titles, served from the index (SPEC §8: startup view).
-final titleViewsProvider = Provider<List<TitleView>>((ref) {
+final titlesProvider = Provider<List<Title>>((ref) {
   ref.watch(indexRevisionProvider);
-  return [
-    for (final t in ref.watch(localIndexProvider).titles())
-      (title: t, bpm: null, status: t.status),
-  ];
+  return ref.watch(localIndexProvider).titles();
 });
 
-class SearchQueryNotifier extends Notifier<String> {
-  @override
-  String build() => '';
-
-  void set(String query) => state = query;
-}
-
-final searchQueryProvider = NotifierProvider<SearchQueryNotifier, String>(
-  SearchQueryNotifier.new,
-);
-
-final _titleSearchProvider = Provider<TitleSearch>(
-  (ref) => TitleSearch([for (final v in ref.watch(titleViewsProvider)) v.title]),
-);
-
-/// Titles matching the search query, best first.
-final visibleTitlesProvider = Provider<List<TitleView>>((ref) {
-  final views = {for (final v in ref.watch(titleViewsProvider)) v.title.id: v};
-  return [
-    for (final t
-        in ref.watch(_titleSearchProvider).search(ref.watch(searchQueryProvider)))
-      views[t.id]!,
-  ];
+/// Indexed libraries (mode and layout), by id.
+final indexedLibrariesProvider = Provider<Map<LibraryId, Library>>((ref) {
+  ref.watch(indexRevisionProvider);
+  return {for (final l in ref.watch(localIndexProvider).libraries()) l.id: l};
 });

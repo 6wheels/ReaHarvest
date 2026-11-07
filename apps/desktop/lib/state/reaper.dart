@@ -6,7 +6,7 @@ import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 
 import 'providers.dart';
 
-/// REAPER executable found on this machine (SPEC §5.1), null if none.
+/// REAPER executable found on this machine (SPEC Â§5.1), null if none.
 final detectedReaperProvider = FutureProvider<String?>(
   (ref) => detectReaperExecutable(),
 );
@@ -52,3 +52,8 @@ final peaksPreferenceProvider = FutureProvider<PeaksPreference?>((ref) async {
     return null;
   }
 });
+
+/// Whether REAPER is running (SPEC §5.7), checked before changing a project.
+final reaperRunningProvider = Provider<Future<bool> Function()>(
+  (ref) => isReaperRunning,
+);

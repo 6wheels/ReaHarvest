@@ -68,6 +68,15 @@ void main() {
     fileName: fileName,
     modified: t0,
     size: 10,
+    tempo: label == null ? null : 98.5,
+    plugins: [
+      if (label != null)
+        const PluginRef(
+          kind: 'VST3',
+          name: 'Comp (Vendor)',
+          identifier: 'comp.vst3',
+        ),
+    ],
     metadata: label == null
         ? null
         : VersionMetadata(
@@ -119,9 +128,14 @@ void main() {
       expect(a.metadata!.owner, owner);
       expect(a.metadata!.label, 'chorus B');
       expect(a.modified, t0);
+      expect(a.tempo, 98.5);
+      expect(a.plugins, song.versions.first.plugins);
       expect(t.versions.last.isAdopted, isFalse);
+      expect(t.versions.last.tempo, isNull);
+      expect(t.versions.last.plugins, isEmpty);
       expect(restored.nodes['Band']!.id, nodeId);
       expect(restored.toSort, ['loose.rpp']);
+      expect(index.toSort(), [(library: lib.id, path: 'loose.rpp')]);
       expect(restored.corrupted, ['Band/bad.rpp']);
       expect(restored.stamps, {
         'Band/First Album/Song/a.RPP': (size: 10, modified: t0),

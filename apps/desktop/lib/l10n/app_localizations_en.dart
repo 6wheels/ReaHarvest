@@ -268,4 +268,173 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get removeLibraryHint =>
       'The library is only removed from ReaHarvest: its folder and files are left untouched.';
+
+  @override
+  String get filterLibrary => 'Library';
+
+  @override
+  String get filterMode => 'Mode';
+
+  @override
+  String get filterStatus => 'Status';
+
+  @override
+  String get filterOwner => 'Owner';
+
+  @override
+  String get filterMissingPlugins => 'Missing plugins';
+
+  @override
+  String get clearFilters => 'Clear filters';
+
+  @override
+  String get unassigned => 'Unassigned';
+
+  @override
+  String get views => 'Views';
+
+  @override
+  String get saveView => 'Save current view…';
+
+  @override
+  String get viewName => 'View name';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get deleteView => 'Delete view';
+
+  @override
+  String get noSavedView => 'No saved view yet.';
+
+  @override
+  String get displayCards => 'Cards';
+
+  @override
+  String get displayList => 'List';
+
+  @override
+  String get displayTree => 'Tree';
+
+  @override
+  String get toSort => 'To sort';
+
+  @override
+  String get toAdopt => 'To adopt';
+
+  @override
+  String get toSortHint =>
+      'These projects and folders are outside the organization of their library.';
+
+  @override
+  String get toSortFolderHint =>
+      'Folder: move it by hand to its place in the organization.';
+
+  @override
+  String get sortAction => 'Move…';
+
+  @override
+  String sortTitle(String name) {
+    return 'Move “$name”';
+  }
+
+  @override
+  String get sortHint =>
+      'The project moves into this title, with its media, and its media paths are updated.';
+
+  @override
+  String get sortConfirm => 'Move';
+
+  @override
+  String get invalidFolderName => 'Invalid folder name';
+
+  @override
+  String get sortDone => 'Project moved.';
+
+  @override
+  String sortMissingMedia(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count media files were not found.',
+      one: '1 media file was not found.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sortExternalMedia(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count media files are outside the library: fix them in REAPER.',
+      one: '1 media file is outside the library: fix it in REAPER.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get toAdoptHint =>
+      'ReaHarvest does not know these versions yet. Adopting one writes its identity into the project.';
+
+  @override
+  String get versionLabel => 'Label';
+
+  @override
+  String get adopt => 'Adopt';
+
+  @override
+  String get reaperOpenTitle => 'REAPER is open';
+
+  @override
+  String get reaperOpenHint =>
+      'Close this project in REAPER first: REAPER does not see the change and would overwrite it on its next save.';
+
+  @override
+  String get continueAnyway => 'Continue anyway';
+
+  @override
+  String get versions => 'Versions';
+
+  @override
+  String get notAdopted => 'Not adopted';
+
+  @override
+  String duplicateOf(String name) {
+    return 'Same identity as “$name”, probably a copy (Save As).';
+  }
+
+  @override
+  String get separateDuplicate => 'Make it a new version';
+
+  @override
+  String missingPluginCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count missing plugins',
+      one: '1 missing plugin',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get columnName => 'Name';
+
+  @override
+  String get columnModified => 'Modified';
+
+  @override
+  String actionFailed(String error) {
+    return 'The operation failed: $error';
+  }
+
+  @override
+  String get noFilterResults => 'No title matches these filters';
+
+  @override
+  String filterValue(String label, String value) {
+    return '$label: $value';
+  }
 }

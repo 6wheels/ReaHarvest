@@ -14,13 +14,17 @@ class ReaHarvestApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
+    // Only what the app shell needs: navigation changes are saved in the
+    // settings too, and must not rebuild the whole application.
+    final (theme, language, textScale) = ref.watch(
+      settingsProvider.select((s) => (s.theme, s.language, s.textScale)),
+    );
     return MaterialApp(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
-      themeMode: switch (settings.theme) {
+      themeMode: switch (theme) {
         ThemePreference.system => ThemeMode.system,
         ThemePreference.light => ThemeMode.light,
         ThemePreference.dark => ThemeMode.dark,
@@ -28,9 +32,7 @@ class ReaHarvestApp extends ConsumerWidget {
       themeAnimationDuration: Motion.medium,
       // System language when null; English when it is not supported (first
       // supported locale).
-      locale: settings.language == AppSettings.systemLanguage
-          ? null
-          : Locale(settings.language),
+      locale: language == AppSettings.systemLanguage ? null : Locale(language),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -39,9 +41,8 @@ class ReaHarvestApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(settings.textScale)),
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,
       ),
       home: AnimatedSwitcher(

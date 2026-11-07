@@ -51,3 +51,13 @@ bool isExcludedFile(String name) {
 /// Whether the folder [name] is excluded from version scanning.
 bool isExcludedFolder(String name) =>
     _excludedFolders.contains(name.toLowerCase());
+
+/// Whether [name] can be a layout folder name on every OS: not empty, no
+/// path separator or reserved character, no trailing dot or space, and no
+/// leading dot (reserved for application files, SPEC §3.2).
+bool isValidFolderName(String name) =>
+    name.isNotEmpty &&
+    !name.startsWith('.') &&
+    !name.endsWith('.') &&
+    !name.endsWith(' ') &&
+    !RegExp(r'[<>:"/\\|?*\x00-\x1F]').hasMatch(name);

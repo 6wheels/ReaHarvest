@@ -91,5 +91,70 @@
   "@removeLibraryTitle": {
     "placeholders": { "name": { "type": "String" } }
   },
-  "removeLibraryHint": "The library is only removed from ReaHarvest: its folder and files are left untouched."
+  "removeLibraryHint": "The library is only removed from ReaHarvest: its folder and files are left untouched.",
+  "filterLibrary": "Library",
+  "filterMode": "Mode",
+  "filterStatus": "Status",
+  "filterOwner": "Owner",
+  "filterMissingPlugins": "Missing plugins",
+  "clearFilters": "Clear filters",
+  "unassigned": "Unassigned",
+  "views": "Views",
+  "saveView": "Save current view…",
+  "viewName": "View name",
+  "save": "Save",
+  "deleteView": "Delete view",
+  "noSavedView": "No saved view yet.",
+  "displayCards": "Cards",
+  "displayList": "List",
+  "displayTree": "Tree",
+  "toSort": "To sort",
+  "toAdopt": "To adopt",
+  "toSortHint": "These projects and folders are outside the organization of their library.",
+  "toSortFolderHint": "Folder: move it by hand to its place in the organization.",
+  "sortAction": "Move…",
+  "sortTitle": "Move “{name}”",
+  "@sortTitle": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "sortHint": "The project moves into this title, with its media, and its media paths are updated.",
+  "sortConfirm": "Move",
+  "invalidFolderName": "Invalid folder name",
+  "sortDone": "Project moved.",
+  "sortMissingMedia": "{count, plural, =1{1 media file was not found.} other{{count} media files were not found.}}",
+  "@sortMissingMedia": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "sortExternalMedia": "{count, plural, =1{1 media file is outside the library: fix it in REAPER.} other{{count} media files are outside the library: fix them in REAPER.}}",
+  "@sortExternalMedia": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "toAdoptHint": "ReaHarvest does not know these versions yet. Adopting one writes its identity into the project.",
+  "versionLabel": "Label",
+  "adopt": "Adopt",
+  "reaperOpenTitle": "REAPER is open",
+  "reaperOpenHint": "Close this project in REAPER first: REAPER does not see the change and would overwrite it on its next save.",
+  "continueAnyway": "Continue anyway",
+  "versions": "Versions",
+  "notAdopted": "Not adopted",
+  "duplicateOf": "Same identity as “{name}”, probably a copy (Save As).",
+  "@duplicateOf": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "separateDuplicate": "Make it a new version",
+  "missingPluginCount": "{count, plural, =1{1 missing plugin} other{{count} missing plugins}}",
+  "@missingPluginCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "columnName": "Name",
+  "columnModified": "Modified",
+  "actionFailed": "The operation failed: {error}",
+  "@actionFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "noFilterResults": "No title matches these filters",
+  "filterValue": "{label}: {value}",
+  "@filterValue": {
+    "placeholders": { "label": { "type": "String" }, "value": { "type": "String" } }
+  }
 }

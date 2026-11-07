@@ -559,6 +559,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The library is only removed from ReaHarvest: its folder and files are left untouched.'**
   String get removeLibraryHint;
+
+  /// No description provided for @filterLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get filterLibrary;
+
+  /// No description provided for @filterMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode'**
+  String get filterMode;
+
+  /// No description provided for @filterStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get filterStatus;
+
+  /// No description provided for @filterOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get filterOwner;
+
+  /// No description provided for @filterMissingPlugins.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing plugins'**
+  String get filterMissingPlugins;
+
+  /// No description provided for @clearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get clearFilters;
+
+  /// No description provided for @unassigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Unassigned'**
+  String get unassigned;
+
+  /// No description provided for @views.
+  ///
+  /// In en, this message translates to:
+  /// **'Views'**
+  String get views;
+
+  /// No description provided for @saveView.
+  ///
+  /// In en, this message translates to:
+  /// **'Save current view…'**
+  String get saveView;
+
+  /// No description provided for @viewName.
+  ///
+  /// In en, this message translates to:
+  /// **'View name'**
+  String get viewName;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @deleteView.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete view'**
+  String get deleteView;
+
+  /// No description provided for @noSavedView.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved view yet.'**
+  String get noSavedView;
+
+  /// No description provided for @displayCards.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards'**
+  String get displayCards;
+
+  /// No description provided for @displayList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get displayList;
+
+  /// No description provided for @displayTree.
+  ///
+  /// In en, this message translates to:
+  /// **'Tree'**
+  String get displayTree;
+
+  /// No description provided for @toSort.
+  ///
+  /// In en, this message translates to:
+  /// **'To sort'**
+  String get toSort;
+
+  /// No description provided for @toAdopt.
+  ///
+  /// In en, this message translates to:
+  /// **'To adopt'**
+  String get toAdopt;
+
+  /// No description provided for @toSortHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These projects and folders are outside the organization of their library.'**
+  String get toSortHint;
+
+  /// No description provided for @toSortFolderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder: move it by hand to its place in the organization.'**
+  String get toSortFolderHint;
+
+  /// No description provided for @sortAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Move…'**
+  String get sortAction;
+
+  /// No description provided for @sortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move “{name}”'**
+  String sortTitle(String name);
+
+  /// No description provided for @sortHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The project moves into this title, with its media, and its media paths are updated.'**
+  String get sortHint;
+
+  /// No description provided for @sortConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get sortConfirm;
+
+  /// No description provided for @invalidFolderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid folder name'**
+  String get invalidFolderName;
+
+  /// No description provided for @sortDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Project moved.'**
+  String get sortDone;
+
+  /// No description provided for @sortMissingMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 media file was not found.} other{{count} media files were not found.}}'**
+  String sortMissingMedia(int count);
+
+  /// No description provided for @sortExternalMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 media file is outside the library: fix it in REAPER.} other{{count} media files are outside the library: fix them in REAPER.}}'**
+  String sortExternalMedia(int count);
+
+  /// No description provided for @toAdoptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'ReaHarvest does not know these versions yet. Adopting one writes its identity into the project.'**
+  String get toAdoptHint;
+
+  /// No description provided for @versionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Label'**
+  String get versionLabel;
+
+  /// No description provided for @adopt.
+  ///
+  /// In en, this message translates to:
+  /// **'Adopt'**
+  String get adopt;
+
+  /// No description provided for @reaperOpenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'REAPER is open'**
+  String get reaperOpenTitle;
+
+  /// No description provided for @reaperOpenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Close this project in REAPER first: REAPER does not see the change and would overwrite it on its next save.'**
+  String get reaperOpenHint;
+
+  /// No description provided for @continueAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue anyway'**
+  String get continueAnyway;
+
+  /// No description provided for @versions.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions'**
+  String get versions;
+
+  /// No description provided for @notAdopted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not adopted'**
+  String get notAdopted;
+
+  /// No description provided for @duplicateOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Same identity as “{name}”, probably a copy (Save As).'**
+  String duplicateOf(String name);
+
+  /// No description provided for @separateDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Make it a new version'**
+  String get separateDuplicate;
+
+  /// No description provided for @missingPluginCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 missing plugin} other{{count} missing plugins}}'**
+  String missingPluginCount(int count);
+
+  /// No description provided for @columnName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get columnName;
+
+  /// No description provided for @columnModified.
+  ///
+  /// In en, this message translates to:
+  /// **'Modified'**
+  String get columnModified;
+
+  /// No description provided for @actionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The operation failed: {error}'**
+  String actionFailed(String error);
+
+  /// No description provided for @noFilterResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No title matches these filters'**
+  String get noFilterResults;
+
+  /// No description provided for @filterValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value}'**
+  String filterValue(String label, String value);
 }
 
 class _AppLocalizationsDelegate

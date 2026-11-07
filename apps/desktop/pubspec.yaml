@@ -26,6 +26,8 @@ dependencies:
     path: ../../packages/reaper
   reaharvest_repository:
     path: ../../packages/repository
+  reaharvest_rpp:
+    path: ../../packages/rpp
 
 dev_dependencies:
   flutter_test:

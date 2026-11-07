@@ -410,4 +410,144 @@ void main() {
       expect(title.statusOf(title.versions.last), isNull);
     });
   });
+
+  group('project data', () {
+    test('scan reads tempo and plugins of layout versions', () async {
+      put('band/album/song/v1.rpp', unknown);
+      final result = await scan(storage, library(Layout.classic()));
+      final v = result.titles.single.versions.single;
+      expect(v.tempo, 120);
+      expect(
+        v.plugins.map((p) => p.identifier),
+        containsAll(['TDR Kotelnikov.vst3', 'reaeq.dll']),
+      );
+    });
+
+    test('duplicates share a version id across titles', () async {
+      put('band/album/song/v1.rpp', adopted);
+      put('band/album/song/copy.rpp', adopted);
+      put('band/album/other/v1.rpp', unknown);
+      final result = await scan(storage, library(Layout.classic()));
+      final duplicates = duplicateVersions(result.titles);
+      expect(duplicates.values.single.map((d) => d.$2.fileName), [
+        'copy.rpp',
+        'v1.rpp',
+      ]);
+    });
+  });
+
+  group('adoption', () {
+    test('writes version metadata into the project', () async {
+      put('band/album/song/v1.rpp', unknown);
+      final metadata = VersionMetadata(
+        id: VersionId.generate(),
+        owner: MemberId.generate(),
+        label: 'chorus B',
+      );
+      await writeVersionMetadata(storage, 'band/album/song/v1.rpp', metadata);
+      final result = await scan(storage, library(Layout.classic()));
+      final read = result.titles.single.versions.single.metadata!;
+      expect(
+        (read.id, read.owner, read.label),
+        (metadata.id, metadata.owner, 'chorus B'),
+      );
+      expect(result.toAdopt, isEmpty);
+    });
+
+    test('accepts portable folder names only', () {
+      expect(isValidFolderName('Album 2'), isTrue);
+      expect(isValidFolderName(Layout.unassigned), isTrue);
+      for (final name in ['', '.hidden', 'a/b', r'a\b', 'a:b', 'end.', 'x ']) {
+        expect(isValidFolderName(name), isFalse, reason: name);
+      }
+    });
+  });
+
+  group('guided move', () {
+    String project(List<String> media) => [
+      '<REAPER_PROJECT 0.1 "7.84/win64" 0',
+      '  RECORD_PATH "audio-files" ""',
+      '  <TRACK',
+      for (final m in media) ...[
+        '    <ITEM',
+        '      <SOURCE WAVE',
+        '        FILE "$m"',
+        '      >',
+        '    >',
+      ],
+      '  >',
+      '>',
+      '',
+    ].join('\n');
+
+    RppProject read(String path) => RppProject.parse(
+      File(p.joinAll([root.path, ...path.split('/')])).readAsStringSync(),
+    );
+
+    test('moves the project and its media into the title pool', () async {
+      put(
+        'band/loose.rpp',
+        project([r'audio-files\kick.wav', r'C:\elsewhere\x.wav', 'gone.wav']),
+      );
+      put('band/audio-files/kick.wav', 'kick');
+
+      final report = await moveProjectToTitle(
+        storage,
+        'band/loose.rpp',
+        'band/_Unassigned/loose',
+      );
+
+      expect(report.project, 'band/_Unassigned/loose/loose.rpp');
+      expect(report.moved, ['band/_Unassigned/loose/Media/kick.wav']);
+      expect(report.missing, ['gone.wav']);
+      expect(report.external, [r'C:\elsewhere\x.wav']);
+      expect(exists('band/loose.rpp'), isFalse);
+      expect(exists('band/audio-files/kick.wav'), isFalse);
+      final moved = read(report.project);
+      expect(moved.mediaFiles, [
+        r'Media\kick.wav',
+        r'C:\elsewhere\x.wav',
+        'gone.wav',
+      ]);
+      expect(moved.recordPath, 'Media');
+
+      final result = await scan(storage, library(Layout.classic()));
+      expect(result.toSort, isEmpty);
+      expect(result.titles.single.path, 'band/_Unassigned/loose');
+    });
+
+    test(
+      'copies shared media, reuses identical ones, renames others',
+      () async {
+        put(
+          'band/a.rpp',
+          project(['audio/kick.wav', 'audio/snare.wav', 'audio/hat.wav']),
+        );
+        put('band/b.rpp', project(['audio/kick.wav']));
+        put('band/audio/kick.wav', 'kick');
+        put('band/audio/snare.wav', 'snare');
+        put('band/audio/hat.wav', 'hat');
+        put('band/album/song/Media/snare.wav', 'snare');
+        put('band/album/song/Media/hat.wav', 'other hat');
+        put('band/album/song/a.rpp', unknown);
+
+        final report = await moveProjectToTitle(
+          storage,
+          'band/a.rpp',
+          'band/album/song',
+        );
+
+        expect(report.project, 'band/album/song/a (2).rpp');
+        expect(report.copied, ['band/album/song/Media/kick.wav']);
+        expect(report.moved, ['band/album/song/Media/hat (2).wav']);
+        expect(exists('band/audio/kick.wav'), isTrue);
+        expect(exists('band/audio/snare.wav'), isTrue);
+        expect(read(report.project).mediaFiles, [
+          'Media/kick.wav',
+          'Media/snare.wav',
+          'Media/hat (2).wav',
+        ]);
+      },
+    );
+  });
 }

@@ -77,15 +77,15 @@ Future<ScanResult> scan(
 
 final class _Scanner {
   _Scanner(this.storage, this.library, this.previous)
-    : previousMetadata = {
+    : previousVersions = {
         for (final t in previous.titles)
-          for (final v in t.versions) _join(t.path, v.fileName): v.metadata,
+          for (final v in t.versions) _join(t.path, v.fileName): v,
       };
 
   final RepositoryStorage storage;
   final Library library;
   final ScanResult previous;
-  final Map<String, VersionMetadata?> previousMetadata;
+  final Map<String, Version> previousVersions;
 
   final dirs = <String>{''};
   final files = <String, List<StorageEntry>>{};
@@ -142,7 +142,7 @@ final class _Scanner {
     for (final MapEntry(key: dir, value: entries) in files.entries) {
       if (_titleOf(dir, versions) case final title?) {
         versions[title]!.addAll([
-          for (final e in entries.where(_isProject)) _version(title, e, null),
+          for (final e in entries.where(_isProject)) _version(title, e),
         ]);
       }
     }
@@ -201,7 +201,7 @@ final class _Scanner {
         final versions = <Version>[];
         for (final e in _projects(dir)) {
           try {
-            versions.add(_version(dir, e, await _metadata(e)));
+            versions.add(await _readVersion(dir, e));
           } on Object catch (error) {
             if (!_isCorruption(error)) rethrow;
             corrupted.add(e.path);
@@ -212,15 +212,11 @@ final class _Scanner {
     }
   }
 
-  static Version _version(
-    String dir,
-    StorageEntry e,
-    VersionMetadata? metadata,
-  ) => Version(
+  /// Version without project data (free tree projects are never read).
+  static Version _version(String dir, StorageEntry e) => Version(
     fileName: e.path.substring(dir.isEmpty ? 0 : dir.length + 1),
     modified: e.modified,
     size: e.size,
-    metadata: metadata,
   );
 
   void _addTitle(
@@ -243,17 +239,31 @@ final class _Scanner {
     );
   }
 
-  Future<VersionMetadata?> _metadata(StorageEntry e) async {
-    if (previous.stamps[e.path] == stamps[e.path] &&
-        previousMetadata.containsKey(e.path)) {
-      return previousMetadata[e.path];
+  /// Version of the project [e] in the title [dir], with its metadata,
+  /// tempo and plugins; reused from the previous scan if unchanged.
+  Future<Version> _readVersion(String dir, StorageEntry e) async {
+    if (previous.stamps[e.path] == stamps[e.path]) {
+      if (previousVersions[e.path] case final v?) return v;
     }
     final text = await storage
         .read(e.path)
         .transform(const Utf8Decoder(allowMalformed: true))
         .join();
-    final values = RppProject.parse(text).extState(VersionMetadata.section);
-    return VersionMetadata.fromExtState(values);
+    final project = RppProject.parse(text);
+    final base = _version(dir, e);
+    return Version(
+      fileName: base.fileName,
+      modified: base.modified,
+      size: base.size,
+      metadata: VersionMetadata.fromExtState(
+        project.extState(VersionMetadata.section),
+      ),
+      tempo: project.tempo,
+      plugins: [
+        for (final p in project.allPlugins)
+          PluginRef(kind: p.kind, name: p.name, identifier: p.identifier),
+      ],
+    );
   }
 
   /// Node file of [dir], written with [level] if missing; null (and the file

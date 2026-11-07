@@ -68,6 +68,168 @@ final class LibraryEntry {
   );
 }
 
+/// How the titles are displayed (SPEC §5.2).
+enum DisplayMode { cards, list, tree }
+
+/// Combinable title filters (SPEC §5.2). An empty set does not filter.
+final class TitleFilter {
+  const TitleFilter({
+    this.tags = const {},
+    this.libraries = const {},
+    this.modes = const {},
+    this.statuses = const {},
+    this.owners = const {},
+    this.missingPlugins = false,
+  });
+
+  /// Accepted values, by tag key (e.g. `artist`).
+  final Map<String, Set<String>> tags;
+  final Set<LibraryId> libraries;
+  final Set<LibraryMode> modes;
+
+  /// Accepted title status keys.
+  final Set<String> statuses;
+
+  /// Accepted version owners: a title matches if one of its versions does.
+  final Set<MemberId> owners;
+
+  /// Only titles with a version using a plugin missing on this machine.
+  final bool missingPlugins;
+
+  bool get isEmpty =>
+      tags.values.every((v) => v.isEmpty) &&
+      libraries.isEmpty &&
+      modes.isEmpty &&
+      statuses.isEmpty &&
+      owners.isEmpty &&
+      !missingPlugins;
+
+  /// Copy accepting [values] for the tag [key] (empty: no tag filter).
+  TitleFilter withTag(String key, Set<String> values) => copyWith(
+    tags: {
+      for (final e in tags.entries)
+        if (e.key != key) e.key: e.value,
+      if (values.isNotEmpty) key: values,
+    },
+  );
+
+  TitleFilter copyWith({
+    Map<String, Set<String>>? tags,
+    Set<LibraryId>? libraries,
+    Set<LibraryMode>? modes,
+    Set<String>? statuses,
+    Set<MemberId>? owners,
+    bool? missingPlugins,
+  }) => TitleFilter(
+    tags: tags ?? this.tags,
+    libraries: libraries ?? this.libraries,
+    modes: modes ?? this.modes,
+    statuses: statuses ?? this.statuses,
+    owners: owners ?? this.owners,
+    missingPlugins: missingPlugins ?? this.missingPlugins,
+  );
+
+  Map<String, Object?> toJson() => {
+    if (tags.isNotEmpty)
+      'tags': {for (final e in tags.entries) e.key: e.value.toList()},
+    if (libraries.isNotEmpty) 'libraries': libraries.toList(),
+    if (modes.isNotEmpty) 'modes': [for (final m in modes) m.name],
+    if (statuses.isNotEmpty) 'statuses': statuses.toList(),
+    if (owners.isNotEmpty) 'owners': owners.toList(),
+    if (missingPlugins) 'missingPlugins': true,
+  };
+
+  static TitleFilter fromJson(Map<String, Object?> json) {
+    Set<String> strings(Object? list) => {...?(list as List?)?.cast<String>()};
+    final modes = LibraryMode.values.asNameMap();
+    return TitleFilter(
+      tags: {
+        for (final e in ((json['tags'] as Map?) ?? const {}).entries)
+          e.key as String: strings(e.value),
+      },
+      libraries: {for (final id in strings(json['libraries'])) LibraryId(id)},
+      modes: {for (final m in strings(json['modes'])) ?modes[m]},
+      statuses: strings(json['statuses']),
+      owners: {for (final id in strings(json['owners'])) MemberId(id)},
+      missingPlugins: json['missingPlugins'] == true,
+    );
+  }
+}
+
+/// A named search and filter combination (SPEC §5.2).
+final class SavedView {
+  const SavedView({
+    required this.name,
+    this.query = '',
+    this.filter = const TitleFilter(),
+  });
+
+  final String name;
+  final String query;
+  final TitleFilter filter;
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'query': query,
+    'filter': filter.toJson(),
+  };
+
+  static SavedView fromJson(Map<String, Object?> json) => SavedView(
+    name: json['name'] as String,
+    query: json['query'] as String? ?? '',
+    filter: TitleFilter.fromJson((json['filter'] as Map? ?? const {}).cast()),
+  );
+}
+
+/// Navigation state kept between sessions (SPEC §5.2).
+final class NavigationSettings {
+  const NavigationSettings({
+    this.displayMode = DisplayMode.cards,
+    this.query = '',
+    this.filter = const TitleFilter(),
+    this.savedViews = const [],
+  });
+
+  final DisplayMode displayMode;
+  final String query;
+  final TitleFilter filter;
+  final List<SavedView> savedViews;
+
+  NavigationSettings copyWith({
+    DisplayMode? displayMode,
+    String? query,
+    TitleFilter? filter,
+    List<SavedView>? savedViews,
+  }) => NavigationSettings(
+    displayMode: displayMode ?? this.displayMode,
+    query: query ?? this.query,
+    filter: filter ?? this.filter,
+    savedViews: savedViews ?? this.savedViews,
+  );
+
+  Map<String, Object?> toJson() => {
+    'displayMode': displayMode.name,
+    'query': query,
+    'filter': filter.toJson(),
+    'savedViews': [for (final v in savedViews) v.toJson()],
+  };
+
+  static NavigationSettings fromJson(Map<String, Object?> json) =>
+      NavigationSettings(
+        displayMode:
+            DisplayMode.values.asNameMap()[json['displayMode']] ??
+            DisplayMode.cards,
+        query: json['query'] as String? ?? '',
+        filter: TitleFilter.fromJson(
+          (json['filter'] as Map? ?? const {}).cast(),
+        ),
+        savedViews: [
+          for (final v in json['savedViews'] as List? ?? const [])
+            SavedView.fromJson((v as Map).cast()),
+        ],
+      );
+}
+
 /// Light, dark or system theme (SPEC §7.1).
 enum ThemePreference { system, light, dark }
 
@@ -82,6 +244,7 @@ final class AppSettings {
     this.theme = ThemePreference.system,
     this.textScale = 1.0,
     this.language = systemLanguage,
+    this.navigation = const NavigationSettings(),
   }) : libraries = List.unmodifiable(libraries);
 
   /// [language] value meaning "follow the system language".
@@ -106,6 +269,8 @@ final class AppSettings {
   /// UI language code (e.g. `en`), or [systemLanguage].
   final String language;
 
+  final NavigationSettings navigation;
+
   /// Copy with the given values. Paths are kept when omitted and reset to
   /// the default when passed as null.
   AppSettings copyWith({
@@ -117,6 +282,7 @@ final class AppSettings {
     ThemePreference? theme,
     double? textScale,
     String? language,
+    NavigationSettings? navigation,
   }) => AppSettings(
     identity: identity ?? this.identity,
     libraries: libraries ?? this.libraries,
@@ -126,6 +292,7 @@ final class AppSettings {
     theme: theme ?? this.theme,
     textScale: textScale ?? this.textScale,
     language: language ?? this.language,
+    navigation: navigation ?? this.navigation,
   );
 
   static const _keep = Object();
@@ -167,6 +334,7 @@ final class AppSettings {
     'theme': theme.name,
     'textScale': textScale,
     'language': language,
+    'navigation': navigation.toJson(),
   };
 
   static AppSettings fromJson(Map<String, Object?> json) {
@@ -188,6 +356,9 @@ final class AppSettings {
           ThemePreference.system,
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
       language: json['language'] as String? ?? systemLanguage,
+      navigation: NavigationSettings.fromJson(
+        (json['navigation'] as Map? ?? const {}).cast(),
+      ),
     );
   }
 }

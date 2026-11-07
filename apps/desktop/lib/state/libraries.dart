@@ -110,6 +110,73 @@ class LibraryService {
     ref.read(indexRevisionProvider.notifier).bump();
   }
 
+  /// Adopts [version] of [title] ("To adopt", SPEC §4.2): writes a new
+  /// version id, the local member as owner and [label] into the project,
+  /// then rescans.
+  Future<void> adopt(Title title, Version version, String label) =>
+      _writeMetadata(
+        title,
+        version,
+        VersionMetadata(
+          id: VersionId.generate(),
+          owner: ref.read(settingsProvider).identity.memberId,
+          label: label.trim(),
+        ),
+      );
+
+  /// Makes the manual duplicate [version] of [title] a new version (SPEC
+  /// §4.2): new id, owned by the local member, label kept. Then rescans.
+  Future<void> separateDuplicate(Title title, Version version) =>
+      _writeMetadata(
+        title,
+        version,
+        VersionMetadata(
+          id: VersionId.generate(),
+          owner: ref.read(settingsProvider).identity.memberId,
+          label: version.metadata?.label ?? '',
+        ),
+      );
+
+  Future<void> _writeMetadata(
+    Title title,
+    Version version,
+    VersionMetadata metadata,
+  ) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final path = title.path.isEmpty
+        ? version.fileName
+        : '${title.path}/${version.fileName}';
+    await Isolate.run(
+      () => writeVersionMetadata(MountedFolderStorage(root), path, metadata),
+    );
+    await scan(entry);
+  }
+
+  /// Moves the misplaced project [path] of [library] into the title at
+  /// [folders] (one folder name per layout level), with its media ("To
+  /// sort", SPEC §5.2). Then rescans.
+  Future<MoveReport> moveToTitle(
+    LibraryId library,
+    String path,
+    List<String> folders,
+  ) async {
+    final entry = _entry(library);
+    final root = entry.libraryRoot;
+    final report = await Isolate.run(
+      () => moveProjectToTitle(
+        MountedFolderStorage(root),
+        path,
+        folders.join('/'),
+      ),
+    );
+    await scan(entry);
+    return report;
+  }
+
+  LibraryEntry _entry(LibraryId id) =>
+      ref.read(settingsProvider).libraries.firstWhere((l) => l.id == id);
+
   /// Scans every configured library, one after the other.
   Future<void> scanAll() async {
     for (final entry in ref.read(settingsProvider).libraries) {

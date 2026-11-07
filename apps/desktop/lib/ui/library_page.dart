@@ -1,22 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
+import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'filter_bar.dart';
 import 'settings_dialog.dart';
+import 'side_panel.dart';
 import 'title_card.dart';
+import 'title_views.dart';
 
 /// Main window: the library (SPEC §5.2). Search bar at the top, filters
-/// below (#11), then the title cards.
+/// below, then the titles as cards, list or tree, and the side panel.
 class LibraryPage extends ConsumerWidget {
   const LibraryPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final titles = ref.watch(visibleTitlesProvider);
-    final query = ref.watch(searchQueryProvider);
-    final hasTitles = ref.watch(titleViewsProvider).isNotEmpty;
+    final navigation = ref.watch(navigationProvider);
+    final hasTitles = ref.watch(titlesProvider).isNotEmpty;
+    final panel = ref.watch(panelProvider);
     final l10n = AppLocalizations.of(context);
 
     final Widget content;
@@ -31,84 +38,171 @@ class LibraryPage extends ConsumerWidget {
       content = _Message(
         key: const ValueKey('noResults'),
         icon: Icons.search_off_rounded,
-        title: l10n.noResults(query.trim()),
+        title: navigation.query.trim().isEmpty
+            ? l10n.noFilterResults
+            : l10n.noResults(navigation.query.trim()),
       );
     } else {
-      content = GridView.builder(
-        key: const ValueKey('grid'),
-        padding: const EdgeInsets.fromLTRB(
-          Space.xl,
-          Space.s,
-          Space.xl,
-          Space.xl,
+      content = switch (navigation.displayMode) {
+        DisplayMode.cards => GridView.builder(
+          key: const ValueKey('grid'),
+          padding: const EdgeInsets.fromLTRB(
+            Space.xl,
+            Space.s,
+            Space.xl,
+            Space.xl,
+          ),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 240,
+            mainAxisSpacing: Space.l,
+            crossAxisSpacing: Space.l,
+          ),
+          itemCount: titles.length,
+          itemBuilder: (_, i) => _Appear(
+            key: ValueKey(titles[i].id),
+            index: i,
+            child: TitleCard(
+              titles[i],
+              selected: panel == TitlePanel(titles[i].id),
+              onTap: () => ref
+                  .read(panelProvider.notifier)
+                  .toggle(TitlePanel(titles[i].id)),
+            ),
+          ),
         ),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 240,
-          mainAxisSpacing: Space.l,
-          crossAxisSpacing: Space.l,
-        ),
-        itemCount: titles.length,
-        itemBuilder: (_, i) => _Appear(
-          key: ValueKey(titles[i].title.id),
-          index: i,
-          child: TitleCard(titles[i]),
-        ),
-      );
+        DisplayMode.list => TitleList(titles, key: const ValueKey('list')),
+        DisplayMode.tree => TitleTree(titles, key: const ValueKey('tree')),
+      };
     }
 
     return Scaffold(
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Space.xl,
-              Space.l,
-              Space.l,
-              Space.l,
-            ),
-            child: Row(
-              children: [
-                // Balances the gear so that the search bar stays centered.
-                const SizedBox(width: 40),
-                Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 560),
-                      child: _SearchBar(
-                        onChanged: ref.read(searchQueryProvider.notifier).set,
-                      ),
+      body: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              ref.read(panelProvider.notifier).close(),
+        },
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      Space.xl,
+                      Space.l,
+                      Space.l,
+                      Space.m,
+                    ),
+                    child: Row(
+                      children: [
+                        // Balances the gear so that the search bar stays
+                        // centered.
+                        const SizedBox(width: 40),
+                        Expanded(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 560),
+                              child: const _SearchBar(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: Space.s),
+                        const _SettingsButton(),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(width: Space.s),
-                const _SettingsButton(),
-              ],
+                  if (hasTitles) const FilterBar(),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: Motion.medium,
+                      child: content,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: AnimatedSwitcher(duration: Motion.medium, child: content),
-          ),
-        ],
+            _PanelHost(panel),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SearchBar extends StatelessWidget {
-  const _SearchBar({required this.onChanged});
+/// Slides the side panel in and out, keeping its content while closing.
+class _PanelHost extends StatefulWidget {
+  const _PanelHost(this.content);
 
-  final ValueChanged<String> onChanged;
+  final PanelContent? content;
+
+  @override
+  State<_PanelHost> createState() => _PanelHostState();
+}
+
+class _PanelHostState extends State<_PanelHost> {
+  PanelContent? _shown;
 
   @override
   Widget build(BuildContext context) {
+    _shown = widget.content ?? _shown;
+    final open = widget.content != null;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: open ? sidePanelWidth : 0),
+      duration: Motion.medium,
+      curve: Motion.curve,
+      onEnd: () {
+        if (!open) setState(() => _shown = null);
+      },
+      builder: (context, width, _) => SizedBox(
+        width: width,
+        child: _shown == null
+            ? null
+            : ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.centerLeft,
+                  minWidth: sidePanelWidth,
+                  maxWidth: sidePanelWidth,
+                  child: SidePanel(_shown!),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Search bar, focused on startup; shows the restored or applied query.
+class _SearchBar extends ConsumerStatefulWidget {
+  const _SearchBar();
+
+  @override
+  ConsumerState<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends ConsumerState<_SearchBar> {
+  late final _controller = TextEditingController(
+    text: ref.read(navigationProvider).query,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(navigationProvider.select((n) => n.query), (_, query) {
+      if (query != _controller.text) _controller.text = query;
+    });
     final c = context.colors;
     OutlineInputBorder border(Color color) => OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(color: color),
     );
     return TextField(
+      controller: _controller,
       autofocus: true,
-      onChanged: onChanged,
+      onChanged: ref.read(navigationProvider.notifier).setQuery,
       style: Theme.of(context).textTheme.bodyLarge,
       cursorColor: c.accent,
       decoration: InputDecoration(

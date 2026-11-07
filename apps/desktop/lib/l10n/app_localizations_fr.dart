@@ -269,4 +269,174 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get removeLibraryHint =>
       'La bibliothèque est seulement retirée de ReaHarvest : son dossier et ses fichiers restent intacts.';
+
+  @override
+  String get filterLibrary => 'Bibliothèque';
+
+  @override
+  String get filterMode => 'Mode';
+
+  @override
+  String get filterStatus => 'Statut';
+
+  @override
+  String get filterOwner => 'Propriétaire';
+
+  @override
+  String get filterMissingPlugins => 'Plugins manquants';
+
+  @override
+  String get clearFilters => 'Effacer les filtres';
+
+  @override
+  String get unassigned => 'Non classé';
+
+  @override
+  String get views => 'Vues';
+
+  @override
+  String get saveView => 'Enregistrer la vue actuelle…';
+
+  @override
+  String get viewName => 'Nom de la vue';
+
+  @override
+  String get save => 'Enregistrer';
+
+  @override
+  String get deleteView => 'Supprimer la vue';
+
+  @override
+  String get noSavedView => 'Aucune vue enregistrée.';
+
+  @override
+  String get displayCards => 'Cartes';
+
+  @override
+  String get displayList => 'Liste';
+
+  @override
+  String get displayTree => 'Arborescence';
+
+  @override
+  String get toSort => 'À ranger';
+
+  @override
+  String get toAdopt => 'À adopter';
+
+  @override
+  String get toSortHint =>
+      'Ces projets et dossiers sont hors de l\'organisation de leur bibliothèque.';
+
+  @override
+  String get toSortFolderHint =>
+      'Dossier : déplacez-le à la main à sa place dans l\'organisation.';
+
+  @override
+  String get sortAction => 'Ranger…';
+
+  @override
+  String sortTitle(String name) {
+    return 'Ranger « $name »';
+  }
+
+  @override
+  String get sortHint =>
+      'Le projet est déplacé dans ce titre avec ses médias, et les chemins de ses médias sont mis à jour.';
+
+  @override
+  String get sortConfirm => 'Ranger';
+
+  @override
+  String get invalidFolderName => 'Nom de dossier invalide';
+
+  @override
+  String get sortDone => 'Projet rangé.';
+
+  @override
+  String sortMissingMedia(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fichiers médias sont introuvables.',
+      one: '1 fichier média est introuvable.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sortExternalMedia(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count fichiers médias sont hors de la bibliothèque : corrigez-les dans REAPER.',
+      one: '1 fichier média est hors de la bibliothèque : corrigez-le dans REAPER.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get toAdoptHint =>
+      'ReaHarvest ne connaît pas encore ces versions. Adopter une version inscrit son identité dans le projet.';
+
+  @override
+  String get versionLabel => 'Libellé';
+
+  @override
+  String get adopt => 'Adopter';
+
+  @override
+  String get reaperOpenTitle => 'REAPER est ouvert';
+
+  @override
+  String get reaperOpenHint =>
+      'Fermez d\'abord ce projet dans REAPER : REAPER ne voit pas la modification et l\'écraserait au prochain enregistrement.';
+
+  @override
+  String get continueAnyway => 'Continuer quand même';
+
+  @override
+  String get versions => 'Versions';
+
+  @override
+  String get notAdopted => 'Non adoptée';
+
+  @override
+  String duplicateOf(String name) {
+    return 'Même identité que « $name », sans doute une copie (Enregistrer sous).';
+  }
+
+  @override
+  String get separateDuplicate => 'En faire une nouvelle version';
+
+  @override
+  String missingPluginCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count plugins manquants',
+      one: '1 plugin manquant',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get columnName => 'Nom';
+
+  @override
+  String get columnModified => 'Modifié';
+
+  @override
+  String actionFailed(String error) {
+    return 'L\'opération a échoué : $error';
+  }
+
+  @override
+  String get noFilterResults => 'Aucun titre ne correspond à ces filtres';
+
+  @override
+  String filterValue(String label, String value) {
+    return '$label : $value';
+  }
 }

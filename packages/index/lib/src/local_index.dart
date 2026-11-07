@@ -11,7 +11,7 @@ typedef FileHasher = Future<String> Function(String path);
 /// A file tracked by the index.
 typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 
-const _schemaVersion = 2;
+const _schemaVersion = 3;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -43,6 +43,8 @@ CREATE TABLE versions (
   version_id TEXT,
   owner TEXT,
   label TEXT,
+  tempo REAL,
+  plugins TEXT NOT NULL,
   PRIMARY KEY (library_id, title_path, file_name)
 );
 CREATE TABLE files (
@@ -131,7 +133,8 @@ final class LocalIndex {
       );
       _insertAll(
         'INSERT INTO versions (library_id, title_path, file_name, size, '
-        'modified, version_id, owner, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'modified, version_id, owner, label, tempo, plugins) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           for (final t in scan.titles)
             for (final v in t.versions)
@@ -144,6 +147,8 @@ final class LocalIndex {
                 v.metadata?.id,
                 v.metadata?.owner,
                 v.metadata?.label,
+                v.tempo,
+                jsonEncode([for (final p in v.plugins) p.toJson()]),
               ],
         ],
       );
@@ -269,6 +274,19 @@ final class LocalIndex {
     );
   }
 
+  /// `.RPP` files and folders outside the layout ("To sort", SPEC §5.2) of
+  /// all libraries, sorted by library then path.
+  List<({LibraryId library, String path})> toSort() => [
+    for (final r in _db.select(
+      "SELECT library_id, path FROM issues WHERE kind = 'toSort' "
+      'ORDER BY library_id, path',
+    ))
+      (
+        library: LibraryId(r['library_id'] as String),
+        path: r['path'] as String,
+      ),
+  ];
+
   /// Stored hash of [path], or null if not computed yet.
   String? hashOf(LibraryId id, String path) {
     final rows = _db.select(
@@ -334,6 +352,11 @@ final class LocalIndex {
               owner: MemberId(r['owner'] as String),
               label: r['label'] as String? ?? '',
             ),
+      tempo: (r['tempo'] as num?)?.toDouble(),
+      plugins: [
+        for (final p in jsonDecode(r['plugins'] as String) as List)
+          PluginRef.fromJson((p as Map).cast()),
+      ],
     );
   }
 

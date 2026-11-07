@@ -13,6 +13,7 @@ import 'app.dart';
 import 'app_paths.dart';
 import 'demo_titles.dart';
 import 'state/libraries.dart';
+import 'state/navigation.dart';
 import 'state/providers.dart';
 
 const _demo = bool.fromEnvironment('REAHARVEST_DEMO');
@@ -39,7 +40,13 @@ Future<void> main() async {
       localIndexProvider.overrideWithValue(
         LocalIndex.open(p.join(dir, 'index.sqlite')),
       ),
-      if (_demo) titleViewsProvider.overrideWithValue(demoTitles()),
+      if (_demo) ...[
+        titlesProvider.overrideWithValue(demoTitles()),
+        indexedLibrariesProvider.overrideWithValue({
+          demoLibrary.id: demoLibrary,
+        }),
+        toSortProvider.overrideWithValue(const []),
+      ],
     ],
   );
   runApp(

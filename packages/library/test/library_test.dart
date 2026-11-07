@@ -154,6 +154,26 @@ void main() {
             theme: ThemePreference.dark,
             textScale: 1.2,
             language: 'fr',
+            navigation: const NavigationSettings(
+              displayMode: DisplayMode.tree,
+              query: 'tide',
+              filter: TitleFilter(
+                tags: {
+                  'artist': {'Band'},
+                },
+                libraries: {LibraryId('L1')},
+                modes: {LibraryMode.local},
+                statuses: {'mixing', 'done'},
+                owners: {MemberId('M')},
+                missingPlugins: true,
+              ),
+              savedViews: [
+                SavedView(
+                  name: 'Mixing',
+                  filter: TitleFilter(statuses: {'mixing'}),
+                ),
+              ],
+            ),
           )
           .addLibrary(
             const LibraryEntry(
@@ -182,6 +202,14 @@ void main() {
         (read.theme, read.textScale, read.language),
         (ThemePreference.dark, 1.2, 'fr'),
       );
+      final nav = read.navigation;
+      expect((nav.displayMode, nav.query), (DisplayMode.tree, 'tide'));
+      expect(nav.filter.toJson(), settings.navigation.filter.toJson());
+      expect(nav.filter.isEmpty, isFalse);
+      expect(nav.savedViews.single.name, 'Mixing');
+      expect(nav.savedViews.single.filter.statuses, {'mixing'});
+      expect(nav.filter.withTag('artist', const {}).tags, isEmpty);
+      expect(const TitleFilter().isEmpty, isTrue);
       expect(read.libraries.map((l) => l.id), ['L1', 'L2']);
       expect(read.libraries[0].libraryRoot, '/drive/band');
       expect(read.libraries[0].templatesFolder, '/work/band-templates');
