@@ -8,3 +8,4 @@ export 'src/mounted_folder_storage.dart';
 export 'src/node_file.dart';
 export 'src/scaffold.dart';
 export 'src/scanner.dart';
+export 'src/versions.dart';

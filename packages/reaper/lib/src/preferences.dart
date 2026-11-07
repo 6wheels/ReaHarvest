@@ -34,6 +34,30 @@ Future<PeaksPreference?> loadPeaksPreference(String resourcePath) async {
   return parsePeaksPreference(await file.readAsString());
 }
 
+/// Default template for new projects (`newprojtmpl`, Preferences > Project),
+/// as an absolute path: written relative to the resource folder
+/// [resourcePath] when the template is inside it. Null when unset.
+String? parseDefaultProjectTemplate(String reaperIni, String resourcePath) {
+  final value = _readSection(reaperIni, 'REAPER')['newprojtmpl']?.trim();
+  if (value == null || value.isEmpty) return null;
+  final path = p.joinAll(value.split(RegExp(r'[\\/]')));
+  return p.isAbsolute(path) || value.startsWith(RegExp(r'[\\/]'))
+      ? value
+      : p.join(resourcePath, path);
+}
+
+/// Reads [parseDefaultProjectTemplate] from `REAPER.ini` in [resourcePath];
+/// null when unset, or when the file or the template does not exist.
+Future<String?> loadDefaultProjectTemplate(String resourcePath) async {
+  final ini = File(p.join(resourcePath, 'REAPER.ini'));
+  if (!await ini.exists()) return null;
+  final path = parseDefaultProjectTemplate(
+    await ini.readAsString(),
+    resourcePath,
+  );
+  return path != null && await File(path).exists() ? path : null;
+}
+
 Map<String, String> _readSection(String ini, String section) {
   final values = <String, String>{};
   final header = '[${section.toLowerCase()}]';

@@ -37,6 +37,9 @@ final class CountingStorage implements RepositoryStorage {
 
   @override
   Future<void> createDirectory(String path) => inner.createDirectory(path);
+
+  @override
+  Future<void> delete(String path) => inner.delete(path);
 }
 
 void main() {

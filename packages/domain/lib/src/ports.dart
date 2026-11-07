@@ -37,6 +37,9 @@ abstract interface class RepositoryStorage {
   Future<void> move(String from, String to);
 
   Future<void> createDirectory(String path);
+
+  /// Permanently deletes the file [path] (explicit purge only, SPEC §5.4).
+  Future<void> delete(String path);
 }
 
 /// Entity types of the canonical collab model (SPEC §6.2).

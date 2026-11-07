@@ -211,6 +211,40 @@ void main() {
 
     test('missing REAPER.ini gives null', () async {
       expect(await loadPeaksPreference('/no/such/folder'), isNull);
+      expect(await loadDefaultProjectTemplate('/no/such/folder'), isNull);
+    });
+
+    test('resolves the default project template', () async {
+      final res = p.join('res', 'REAPER');
+      expect(
+        parseDefaultProjectTemplate(
+          '[REAPER]\nnewprojtmpl=ProjectTemplates\\default.rpp\n',
+          res,
+        ),
+        p.join(res, 'ProjectTemplates', 'default.rpp'),
+      );
+      expect(
+        parseDefaultProjectTemplate('[REAPER]\nnewprojtmpl=\n', res),
+        isNull,
+      );
+      final absolute = Platform.isWindows ? r'D:\t\a.rpp' : '/t/a.rpp';
+      expect(
+        parseDefaultProjectTemplate('[REAPER]\nnewprojtmpl=$absolute\n', res),
+        absolute,
+      );
+
+      final dir = Directory.systemTemp.createTempSync('reaharvest_tmpl_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      File(p.join(dir.path, 'REAPER.ini'))
+          .writeAsStringSync('[REAPER]\nnewprojtmpl=ProjectTemplates\\a.rpp\n');
+      expect(await loadDefaultProjectTemplate(dir.path), isNull);
+      File(p.join(dir.path, 'ProjectTemplates', 'a.rpp'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('<REAPER_PROJECT\n>\n');
+      expect(
+        await loadDefaultProjectTemplate(dir.path),
+        p.join(dir.path, 'ProjectTemplates', 'a.rpp'),
+      );
     });
   });
 

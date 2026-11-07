@@ -39,6 +39,9 @@ final class CountingStorage implements RepositoryStorage {
 
   @override
   Future<void> createDirectory(String path) => inner.createDirectory(path);
+
+  @override
+  Future<void> delete(String path) => inner.delete(path);
 }
 
 void main() {
@@ -623,6 +626,199 @@ void main() {
       await cleanBackupPaths(storage, file);
 
       expect(read(file), clean);
+    });
+  });
+
+  group('versions', () {
+    const title = 'band/album/song';
+    final owner = MemberId.generate();
+
+    String read(String path) =>
+        File(p.joinAll([root.path, ...path.split('/')])).readAsStringSync();
+
+    VersionMetadata? metadataOf(String path) => VersionMetadata.fromExtState(
+      RppProject.parse(read(path)).extState(VersionMetadata.section),
+    );
+
+    VersionMetadata meta([String label = '']) =>
+        VersionMetadata(id: VersionId.generate(), owner: owner, label: label);
+
+    String withoutMetadata(String text) => setExtState(
+      text,
+      VersionMetadata.section,
+      {for (final k in meta().toExtState().keys) k: null},
+    );
+
+    /// [adopted] with every media reference replaced by [ref].
+    String withMedia(String ref, {String record = 'Media'}) => setRootAttribute(
+      rewriteMediaPaths(adopted, (_) => ref),
+      'RECORD_PATH',
+      [record, ''],
+    );
+
+    test('creates a blank version, scanned as adopted', () async {
+      final m = meta('intro');
+      final path = await createVersion(storage, title, 'Song - intro.RPP', m);
+
+      expect(path, '$title/Song - intro.RPP');
+      final root = RppProject.parse(read(path)).document.root;
+      expect(root.line('RECORD_PATH')!.params, ['Media', '']);
+      expect(root.line('RENDER_FILE')!.params, ['Renders']);
+      expect(metadataOf(path)!.id, m.id);
+      final result = await scan(storage, library(Layout.classic()));
+      expect(result.titles.single.versions.single.metadata!.label, 'intro');
+    });
+
+    test('creates a version from a template, keeping its content', () async {
+      final path = await createVersion(
+        storage,
+        title,
+        'Song.rpp',
+        meta(),
+        template: unknown,
+      );
+
+      final project = RppProject.parse(read(path));
+      expect(project.tracks.length, RppProject.parse(unknown).tracks.length);
+      expect(project.document.root.line('RECORD_PATH')!.params.first, 'Media');
+    });
+
+    test('refuses invalid or existing names', () async {
+      put('$title/Song.RPP', adopted);
+      expect(
+        () => createVersion(storage, title, 'Song.RPP', meta()),
+        throwsStateError,
+      );
+      for (final name in ['Song.txt', 'a/b.rpp', '.rpp', ' .rpp']) {
+        expect(
+          () => createVersion(storage, title, name, meta()),
+          throwsArgumentError,
+          reason: name,
+        );
+      }
+    });
+
+    test('duplicates a version under a new identity', () async {
+      put('$title/Song.RPP', adopted);
+      final m = meta('copy');
+
+      final path = await duplicateVersion(
+        storage,
+        title,
+        'Song.RPP',
+        'Song - copy.RPP',
+        m,
+      );
+
+      expect(metadataOf(path)!.id, m.id);
+      expect(withoutMetadata(read(path)), withoutMetadata(adopted));
+    });
+
+    test('renames a version and edits its label', () async {
+      put('$title/Song.RPP', adopted);
+      final id = metadataOf('$title/Song.RPP')!.id;
+
+      final path = await renameVersion(
+        storage,
+        title,
+        'Song.RPP',
+        'Song B.RPP',
+      );
+      await setVersionLabel(storage, title, 'Song B.RPP', 'bridge');
+
+      expect(path, '$title/Song B.RPP');
+      expect(exists('$title/Song.RPP'), isFalse);
+      expect(metadataOf(path)!.id, id);
+      expect(metadataOf(path)!.label, 'bridge');
+      put('$title/Other.RPP', unknown);
+      expect(
+        () => renameVersion(storage, title, 'Other.RPP', 'Song B.RPP'),
+        throwsStateError,
+      );
+      expect(
+        () => setVersionLabel(storage, title, 'Other.RPP', 'x'),
+        throwsStateError,
+      );
+    });
+
+    test('deletes versions to the trash next to them', () async {
+      put('$title/Song.RPP', adopted);
+      put('$title/.trash/Song.RPP', adopted);
+      put('free/member/v2/take.rpp', unknown);
+
+      final trashed = await deleteVersion(storage, title, 'Song.RPP');
+      final nested = await deleteVersion(storage, 'free', 'member/v2/take.rpp');
+
+      expect(trashed, '$title/.trash/Song (2).RPP');
+      expect(nested, 'free/member/v2/.trash/take.rpp');
+      expect(exists('$title/Song.RPP'), isFalse);
+      expect((await readTrash(storage, 'free')).map((e) => e.path), [nested]);
+    });
+
+    test('purges trash files only', () async {
+      put('$title/.trash/Song.RPP', adopted);
+      put('$title/Song.RPP', adopted);
+
+      await expectLater(
+        purgeTrash(storage, title, ['$title/Song.RPP']),
+        throwsArgumentError,
+      );
+      await purgeTrash(storage, title, [
+        for (final e in await readTrash(storage, title)) e.path,
+      ]);
+
+      expect(exists('$title/.trash/Song.RPP'), isFalse);
+      expect(exists('$title/Song.RPP'), isTrue);
+    });
+
+    test('lists media referenced by no version nor backup', () async {
+      expect(RppProject.parse(adopted).mediaFiles, isNotEmpty);
+      put('$title/Song.RPP', withMedia(r'Media\kick.wav'));
+      put('$title/Other.RPP', withMedia('snare.wav'));
+      put(
+        '$title/.history/Song 2026-01-01 000000.RPP',
+        withMedia(r'..\Media\bass.wav', record: r'..\Media'),
+      );
+      put('$title/.trash/Old.RPP', withMedia(r'Media\old.wav'));
+      put('$title/Far.RPP', withMedia(r'D:\elsewhere\Media\far.wav'));
+      for (final name in [
+        'kick.wav',
+        'snare.wav',
+        'bass.wav',
+        'old.wav',
+        'far.wav',
+        'orphan.wav',
+        'orphan.wav.reapeaks',
+      ]) {
+        put('$title/Media/$name', 'x');
+      }
+
+      final orphans = await unreferencedMedia(storage, title);
+
+      expect(
+        orphans.map((e) => e.path),
+        unorderedEquals(['$title/Media/old.wav', '$title/Media/orphan.wav']),
+      );
+      await expectLater(
+        purgeMedia(storage, title, ['$title/Song.RPP']),
+        throwsArgumentError,
+      );
+      await purgeMedia(storage, title, [for (final e in orphans) e.path]);
+      expect(exists('$title/Media/orphan.wav'), isFalse);
+      expect(exists('$title/Media/kick.wav'), isTrue);
+      expect(await unreferencedMedia(storage, 'band/album/none'), isEmpty);
+    });
+
+    test('lists no media when a project cannot be read', () async {
+      put('$title/Media/a.wav', 'x');
+      File(p.joinAll([root.path, ...'$title/Bad.RPP'.split('/')]))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync([0xff, 0xfe, 0x00]);
+
+      await expectLater(
+        unreferencedMedia(storage, title),
+        throwsFormatException,
+      );
     });
   });
 

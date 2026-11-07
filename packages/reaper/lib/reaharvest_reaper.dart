@@ -5,7 +5,12 @@ export 'src/launcher.dart'
     show isReaperRunning, openInReaper, openProjectCommand;
 export 'src/plugin_cache.dart' show PluginCache, PluginStatus;
 export 'src/preferences.dart'
-    show PeaksPreference, loadPeaksPreference, parsePeaksPreference;
+    show
+        PeaksPreference,
+        loadDefaultProjectTemplate,
+        loadPeaksPreference,
+        parseDefaultProjectTemplate,
+        parsePeaksPreference;
 export 'src/reaper_paths.dart'
     show
         defaultExecutableCandidates,

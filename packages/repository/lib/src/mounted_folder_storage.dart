@@ -101,4 +101,7 @@ final class MountedFolderStorage implements RepositoryStorage {
     await Directory(_abs(path)).create(recursive: true);
     _hideDotSegments(path);
   }
+
+  @override
+  Future<void> delete(String path) => File(_abs(path)).delete();
 }

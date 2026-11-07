@@ -39,6 +39,9 @@ final class MemoryStorage implements RepositoryStorage {
 
   @override
   Future<void> createDirectory(String path) => throw UnimplementedError();
+
+  @override
+  Future<void> delete(String path) async => files.remove(path);
 }
 
 void main() {
