@@ -25,6 +25,9 @@ class TitleCard extends StatefulWidget {
 class _TitleCardState extends State<TitleCard> {
   var _hovered = false;
 
+  /// Aurora drift: moves forward on each hover, never back.
+  var _phase = 0.0;
+
   @override
   Widget build(BuildContext context) {
     final t = widget.title;
@@ -45,7 +48,10 @@ class _TitleCardState extends State<TitleCard> {
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
+      onEnter: (_) => setState(() {
+        _hovered = true;
+        _phase += 1;
+      }),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
@@ -86,7 +92,7 @@ class _TitleCardState extends State<TitleCard> {
                 children: [
                   RepaintBoundary(
                     child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: _hovered ? 1 : 0),
+                      tween: Tween(end: _phase),
                       duration: Motion.slow * 2,
                       curve: Curves.easeInOut,
                       builder: (_, phase, _) => CustomPaint(

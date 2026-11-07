@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:reaharvest_domain/reaharvest_domain.dart' as domain show Title;
 import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
@@ -44,32 +47,7 @@ class LibraryPage extends ConsumerWidget {
       );
     } else {
       content = switch (navigation.displayMode) {
-        DisplayMode.cards => GridView.builder(
-          key: const ValueKey('grid'),
-          padding: const EdgeInsets.fromLTRB(
-            Space.xl,
-            Space.s,
-            Space.xl,
-            Space.xl,
-          ),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 240,
-            mainAxisSpacing: Space.l,
-            crossAxisSpacing: Space.l,
-          ),
-          itemCount: titles.length,
-          itemBuilder: (_, i) => _Appear(
-            key: ValueKey(titles[i].id),
-            index: i,
-            child: TitleCard(
-              titles[i],
-              selected: panel == TitlePanel(titles[i].id),
-              onTap: () => ref
-                  .read(panelProvider.notifier)
-                  .toggle(TitlePanel(titles[i].id)),
-            ),
-          ),
-        ),
+        DisplayMode.cards => _TitleGrid(titles, key: const ValueKey('grid')),
         DisplayMode.list => TitleList(titles, key: const ValueKey('list')),
         DisplayMode.tree => TitleTree(titles, key: const ValueKey('tree')),
       };
@@ -81,47 +59,60 @@ class LibraryPage extends ConsumerWidget {
           const SingleActivator(LogicalKeyboardKey.escape): () =>
               ref.read(panelProvider.notifier).close(),
         },
-        child: Row(
+        // The content takes its final width at once and the panel slides
+        // over it: no relayout of the titles during the animation.
+        child: Stack(
           children: [
-            Expanded(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      Space.xl,
-                      Space.l,
-                      Space.l,
-                      Space.m,
-                    ),
-                    child: Row(
-                      children: [
-                        // Balances the gear so that the search bar stays
-                        // centered.
-                        const SizedBox(width: 40),
-                        Expanded(
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 560),
-                              child: const _SearchBar(),
+            Positioned.fill(
+              right: panel == null ? 0 : sidePanelWidth,
+              child: RepaintBoundary(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        Space.xl,
+                        Space.l,
+                        Space.l,
+                        Space.m,
+                      ),
+                      child: Row(
+                        children: [
+                          // Balances the gear so that the search bar stays
+                          // centered.
+                          const SizedBox(width: 40),
+                          Expanded(
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 560,
+                                ),
+                                child: const _SearchBar(),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: Space.s),
-                        const _SettingsButton(),
-                      ],
+                          const SizedBox(width: Space.s),
+                          const _SettingsButton(),
+                        ],
+                      ),
                     ),
-                  ),
-                  if (hasTitles) const FilterBar(),
-                  Expanded(
-                    child: AnimatedSwitcher(
-                      duration: Motion.medium,
-                      child: content,
+                    if (hasTitles) const FilterBar(),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: Motion.medium,
+                        child: content,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            _PanelHost(panel),
+            Positioned(
+              top: 0,
+              bottom: 0,
+              right: 0,
+              width: sidePanelWidth,
+              child: _PanelHost(panel),
+            ),
           ],
         ),
       ),
@@ -146,25 +137,18 @@ class _PanelHostState extends State<_PanelHost> {
   Widget build(BuildContext context) {
     _shown = widget.content ?? _shown;
     final open = widget.content != null;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(end: open ? sidePanelWidth : 0),
-      duration: Motion.medium,
-      curve: Motion.curve,
-      onEnd: () {
-        if (!open) setState(() => _shown = null);
-      },
-      builder: (context, width, _) => SizedBox(
-        width: width,
+    return IgnorePointer(
+      ignoring: !open,
+      child: AnimatedSlide(
+        offset: Offset(open ? 0 : 1, 0),
+        duration: Motion.medium,
+        curve: Motion.curve,
+        onEnd: () {
+          if (!open) setState(() => _shown = null);
+        },
         child: _shown == null
-            ? null
-            : ClipRect(
-                child: OverflowBox(
-                  alignment: Alignment.centerLeft,
-                  minWidth: sidePanelWidth,
-                  maxWidth: sidePanelWidth,
-                  child: SidePanel(_shown!),
-                ),
-              ),
+            ? const SizedBox()
+            : RepaintBoundary(child: SidePanel(_shown!)),
       ),
     );
   }
@@ -287,12 +271,133 @@ class _Message extends StatelessWidget {
   }
 }
 
-/// Fade and rise on first display, staggered for the first cards.
-class _Appear extends StatefulWidget {
-  const _Appear({super.key, required this.index, required this.child});
+/// Size of a title card.
+const _cardSize = 264.0;
 
+/// Titles as cards. When the results change, the cards leaving fade out
+/// first, then the grid reflows and the new or moved cards fade in.
+class _TitleGrid extends ConsumerStatefulWidget {
+  const _TitleGrid(this.titles, {super.key});
+
+  final List<domain.Title> titles;
+
+  @override
+  ConsumerState<_TitleGrid> createState() => _TitleGridState();
+}
+
+class _TitleGridState extends ConsumerState<_TitleGrid> {
+  late var _shown = widget.titles;
+  var _leaving = const <Object>{};
+  Timer? _timer;
+
+  @override
+  void didUpdateWidget(_TitleGrid old) {
+    super.didUpdateWidget(old);
+    if (identical(widget.titles, old.titles)) return;
+    _timer?.cancel();
+    final kept = {for (final t in widget.titles) t.id};
+    final leaving = {
+      for (final t in _shown)
+        if (!kept.contains(t.id)) t.id,
+    };
+    if (leaving.isEmpty) {
+      _shown = widget.titles;
+      _leaving = const {};
+      return;
+    }
+    _leaving = leaving;
+    _timer = Timer(Motion.fast, () {
+      if (mounted) {
+        setState(() {
+          _shown = widget.titles;
+          _leaving = const {};
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final panel = ref.watch(panelProvider);
+    final titles = _shown;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fixed card size: resizing only changes the column count, the
+        // remaining width stays on the right.
+        final available = constraints.maxWidth - 2 * Space.xl;
+        final columns = ((available + Space.l) / (_cardSize + Space.l))
+            .floor()
+            .clamp(1, 1 << 10);
+        final used = columns * _cardSize + (columns - 1) * Space.l;
+        return GridView.builder(
+          padding: EdgeInsets.fromLTRB(
+            Space.xl,
+            Space.s,
+            (constraints.maxWidth - Space.xl - used).clamp(
+              Space.xl,
+              double.infinity,
+            ),
+            Space.xl,
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: Space.l,
+            crossAxisSpacing: Space.l,
+          ),
+          itemCount: titles.length,
+          itemBuilder: (_, i) => _Appear(
+            key: ValueKey(titles[i].id),
+            id: titles[i].id,
+            index: i,
+            results: titles,
+            child: AnimatedOpacity(
+              opacity: _leaving.contains(titles[i].id) ? 0 : 1,
+              duration: Motion.fast,
+              child: TitleCard(
+                titles[i],
+                selected: panel == TitlePanel(titles[i].id),
+                onTap: () => ref
+                    .read(panelProvider.notifier)
+                    .toggle(TitlePanel(titles[i].id)),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Card entrance: staggered fade and rise on the first display of the
+/// library, short fade when the results change (search, filters). Cards
+/// rebuilt with the same results (scroll, resize) show up at once.
+class _Appear extends StatefulWidget {
+  const _Appear({
+    super.key,
+    required this.id,
+    required this.index,
+    required this.results,
+    required this.child,
+  });
+
+  final Object id;
   final int index;
+
+  /// Displayed titles this card belongs to.
+  final List<Object> results;
+
   final Widget child;
+
+  /// Last [results] seen, and the titles already shown for them.
+  static List<Object>? _results;
+  static var _initial = true;
+  static final _seen = <Object>{};
 
   @override
   State<_Appear> createState() => _AppearState();
@@ -304,10 +409,26 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
     duration: const Duration(milliseconds: 420),
   );
   late final _t = CurvedAnimation(parent: _controller, curve: Motion.curve);
+  var _rise = true;
 
   @override
   void initState() {
     super.initState();
+    if (!identical(widget.results, _Appear._results)) {
+      _Appear._initial = _Appear._results == null;
+      _Appear._results = widget.results;
+      _Appear._seen.clear();
+    }
+    if (!_Appear._seen.add(widget.id)) {
+      _controller.value = 1;
+      return;
+    }
+    if (!_Appear._initial) {
+      _rise = false;
+      _controller.duration = Motion.medium;
+      _controller.forward();
+      return;
+    }
     final delay = widget.index < 24 ? widget.index * 30 : 0;
     Future.delayed(Duration(milliseconds: delay), () {
       if (mounted) _controller.forward();
@@ -323,12 +444,14 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) => FadeTransition(
     opacity: _t,
-    child: SlideTransition(
-      position: Tween(
-        begin: const Offset(0, 0.04),
-        end: Offset.zero,
-      ).animate(_t),
-      child: widget.child,
-    ),
+    child: _rise
+        ? SlideTransition(
+            position: Tween(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(_t),
+            child: widget.child,
+          )
+        : widget.child,
   );
 }

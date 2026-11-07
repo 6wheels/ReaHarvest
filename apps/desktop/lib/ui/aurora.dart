@@ -13,15 +13,11 @@ final class AuroraPalette {
     final hue = (hash % 360).toDouble();
     HSLColor at(double offset, double s, double l) =>
         HSLColor.fromAHSL(1, (hue + offset) % 360, s, l);
-    return AuroraPalette._(
-      at(200, 0.45, 0.09).toColor(),
-      [
-        at(0, 0.72, 0.58).toColor(),
-        at(38, 0.68, 0.55).toColor(),
-        at(78, 0.62, 0.62).toColor(),
-      ],
-      hash,
-    );
+    return AuroraPalette._(at(200, 0.45, 0.09).toColor(), [
+      at(0, 0.72, 0.58).toColor(),
+      at(38, 0.68, 0.55).toColor(),
+      at(78, 0.62, 0.62).toColor(),
+    ], hash);
   }
 
   /// Night sky behind the lights.
@@ -42,15 +38,16 @@ final class AuroraPalette {
   }
 
   @override
-  bool operator ==(Object other) => other is AuroraPalette && other.seed == seed;
+  bool operator ==(Object other) =>
+      other is AuroraPalette && other.seed == seed;
 
   @override
   int get hashCode => seed;
 }
 
-/// Paints soft light curtains over a night sky. [phase] (0..1) drifts the
-/// curtains slightly, for hover animations. Gradients only (no blur), so it
-/// stays cheap to repaint.
+/// Paints soft light curtains over a night sky. [phase] drifts the curtains
+/// slightly, for hover animations; it can grow without bound (each step of 1
+/// is a half cycle). Gradients only (no blur), so it stays cheap to repaint.
 final class AuroraPainter extends CustomPainter {
   const AuroraPainter(this.palette, {this.phase = 0});
 
@@ -60,6 +57,8 @@ final class AuroraPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
+    // Plain source-over painting only: blend modes break when an ancestor
+    // fades the card.
     canvas.drawRect(rect, Paint()..color = palette.sky);
     final seed = palette.seed;
     for (final (i, color) in palette.lights.indexed) {
@@ -67,7 +66,7 @@ final class AuroraPainter extends CustomPainter {
       final bits = (seed >> (i * 7)) & 0x7f;
       final x = 0.15 + (bits & 0x0f) / 15 * 0.7;
       final y = 0.25 + ((bits >> 4) & 0x07) / 7 * 0.35;
-      final drift = math.sin((phase + i / 3) * math.pi) * 0.06 * phase;
+      final drift = math.sin((phase + i / 3) * math.pi) * 0.06;
       final center = Offset(
         size.width * (x + drift),
         size.height * (y - drift / 2),
@@ -86,13 +85,7 @@ final class AuroraPainter extends CustomPainter {
         ],
         stops: const [0, 0.45, 1],
       ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius));
-      canvas.drawCircle(
-        Offset.zero,
-        radius,
-        Paint()
-          ..shader = shader
-          ..blendMode = BlendMode.screen,
-      );
+      canvas.drawCircle(Offset.zero, radius, Paint()..shader = shader);
       canvas.restore();
     }
     // Bottom shade for text legibility.
