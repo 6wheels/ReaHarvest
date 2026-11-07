@@ -143,7 +143,9 @@ final filterOptionsProvider = Provider<FilterOptions>((ref) {
   final libraries = ref.watch(indexedLibrariesProvider);
   final levels = <String, LayoutLevel>{};
   for (final l in libraries.values) {
+    // Free tree libraries have no layout, hence no level filters.
     final layoutLevels = l.layout?.levels ?? const <LayoutLevel>[];
+    if (layoutLevels.isEmpty) continue;
     for (final level in layoutLevels.take(layoutLevels.length - 1)) {
       levels.putIfAbsent(level.key, () => level);
     }

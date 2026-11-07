@@ -28,7 +28,8 @@ String titleName(Title t) => t.tags.values.lastOrNull ?? t.path.split('/').last;
 
 /// Tag values of a title above its leaf (e.g. artist and album).
 List<String> parentTags(Title t) => [
-  ...t.tags.values.take(t.tags.length - 1).where((v) => v.isNotEmpty),
+  if (t.tags.isNotEmpty)
+    ...t.tags.values.take(t.tags.length - 1).where((v) => v.isNotEmpty),
 ];
 
 /// Short date: "Oct 28" this year, "Oct 2025" before.

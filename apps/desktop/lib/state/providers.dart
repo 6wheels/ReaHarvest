@@ -51,10 +51,30 @@ final indexRevisionProvider = NotifierProvider<IndexRevision, int>(
   IndexRevision.new,
 );
 
-/// All indexed titles, served from the index (SPEC §8: startup view).
+/// All indexed titles, served from the index (SPEC §8: startup view). A free
+/// tree whose root holds a project is a single title without tags (SPEC
+/// §3.3): it is named after its library.
 final titlesProvider = Provider<List<Title>>((ref) {
   ref.watch(indexRevisionProvider);
-  return ref.watch(localIndexProvider).titles();
+  final names = {
+    for (final l in ref.watch(settingsProvider.select((s) => s.libraries)))
+      l.id: l.displayName,
+  };
+  return [
+    for (final t in ref.watch(localIndexProvider).titles())
+      if (t.tags.isEmpty && names[t.libraryId] != null)
+        Title(
+          id: t.id,
+          libraryId: t.libraryId,
+          path: t.path,
+          tags: {'title': names[t.libraryId]!},
+          versions: t.versions,
+          status: t.status,
+          versionStatuses: t.versionStatuses,
+        )
+      else
+        t,
+  ];
 });
 
 /// Indexed libraries (mode and layout), by id.

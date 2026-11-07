@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest/state/libraries.dart';
+import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/providers.dart';
+import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -73,6 +75,29 @@ void main() {
     // Frozen as soon as a title exists (SPEC §3.1).
     expect(await service().isLayoutLocked(band), isTrue);
     expect(container.read(indexRevisionProvider), greaterThan(revision));
+  });
+
+  test('a free tree feeds the filters and labels', () async {
+    final songs = folder('Songs');
+    final demo = Directory(p.join(songs, 'Demo'))..createSync();
+    File('../../test/fixtures/project-1.rpp')
+      ..copySync(p.join(songs, 'root.rpp'))
+      ..copySync(p.join(demo.path, 'v1.rpp'));
+
+    await service().addLocal(
+      folder: songs,
+      displayName: 'My songs',
+      layout: null,
+    );
+
+    final options = container.read(filterOptionsProvider);
+    expect(options.tags, isEmpty);
+    final title = container.read(titlesProvider).single;
+    // The root holds a project: one title, named after the library.
+    expect(title.tags, {'title': 'My songs'});
+    expect(titleName(title), 'My songs');
+    expect(parentTags(title), isEmpty);
+    expect(parentTags(index.titles().single), isEmpty);
   });
 
   test('attaches the library already described in the folder', () async {
