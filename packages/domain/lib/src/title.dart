@@ -111,6 +111,9 @@ final class Version {
     required this.size,
     this.metadata,
     this.tempo,
+    this.length,
+    this.trackCount,
+    this.itemCount,
     this.plugins = const [],
   });
 
@@ -130,6 +133,16 @@ final class Version {
   /// Project tempo (BPM); null when unknown (e.g. free tree projects,
   /// which are never read, SPEC §3.3).
   final double? tempo;
+
+  /// Project length (end of the last item), in seconds; null when unknown
+  /// (like [tempo]).
+  final double? length;
+
+  /// Number of tracks; null when unknown (like [tempo]).
+  final int? trackCount;
+
+  /// Number of media items; null when unknown (like [tempo]).
+  final int? itemCount;
 
   /// Plugins used by the project, deduplicated; empty when unknown.
   final List<PluginRef> plugins;

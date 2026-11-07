@@ -236,8 +236,8 @@ Main window: the application opens directly on the library. Clean but functional
   - instant, typo-tolerant search, served by the local index;
   - covers tag values, version names, labels, owners and, in `collab` mode, notes and lyrics.
 - **Display modes**, chosen by the user and remembered:
-  - **cards** (default view): **square** cards, like a record sleeve. Generated "aurora borealis" visual, with colors derived from the `titleId` (stable for a given title, different between titles). Content: title, number of versions, tempo (BPM), last modification date, status as a badge, tags; sync state of the title in `cloud` and `collab` modes (not published, not checked out, up to date, locally modified, remotely updated, in conflict, cf. §5.5); later also version owners;
-  - **list**: dense table, sortable by column;
+  - **cards** (default view): **square** cards, like a record sleeve. Generated "aurora borealis" visual, with colors derived from the `titleId` (stable for a given title, different between titles). Content: title, number of versions, tempo (BPM), last modification date, status as a progress trail (below), tags; sync state of the title in `cloud` and `collab` modes (not published, not checked out, up to date, locally modified, remotely updated, in conflict, cf. §5.5); later also version owners. Quick actions shown on hover or selection: "Open in REAPER" (latest version of the current member, else the latest version; in `collab` mode, opening another member's version asks for a confirmation), "open detail", and a "…" menu (new version, backup point, change status, show in the file explorer);
+  - **list**: dense table, sortable by column, status as a progress trail; the card quick actions are shown at the end of a row on hover;
   - **tree**: grouping by layout levels (e.g. Artist → Album → Title), offered as one view among others.
 - **Combinable filters** (chips or side panel):
   - tags, one filter per layout level (e.g. `artist`, `album`). Libraries with different layouts expose their own filters; a common tag key (e.g. `artist`) is filtered across all of them;
@@ -248,9 +248,12 @@ Main window: the application opens directly on the library. Clean but functional
   - version owner;
   - missing plugins.
 - Filters and search are combined and kept between sessions; **saved views** (e.g. "My titles in progress", UI: « Mes titres en cours ») are possible.
-- Access to a title's versions from any display mode, without changing view (detail panel).
-- "To sort" section (UI: « À ranger »): `.RPP` or folders outside the convention, with guided move.
-- "To adopt" section (UI: « À adopter », cf. §4.2).
+- Access to a title's versions from any display mode, without changing view:
+  - **overview** (UI: « Aperçu »), dock at the bottom of the library opened by a click on a card or row (no double click): crucial data only (identity: name, parent tags, library, status, BPM, last modification; alerts: missing plugins, duplicated or not adopted versions, leading to the detail; the 3 most recent versions, each with "Open in REAPER"). It can be **pinned**: opaque, the titles end above it, it stays open and follows the selection; unpinned, it floats over the titles with an acrylic background (blur and slight transparency, a single blur clipped to the dock) and closes on a click outside. The pinned state is kept between sessions;
+  - **title detail**: full page over the library, opened by Enter in the search bar (title of the overview) or the "open detail" icon (same icon on the card and in the overview). Back to the library, with search, filters and scroll kept, through the back button, Escape or the mouse back button. Header: large title name with the first parent tag (e.g. artist) on the same line in a smaller font, the other tags (e.g. album) and the library below; on the right, length, BPM, number of tracks and number of items of the selected version (indexed at scan, like the tempo); below, the status progress trail across the width. Master-detail layout: versions on the left, selected version on the right (details, adoption, actions, missing plugins, duplicates, history; then §5.3 data). Title assets and trash come as title-level tabs.
+- **Status progress trail**: one segment per status, passed ones green, the current one orange, the next ones grey; "done" reached shows the whole trail green. Only the current status shows its label; hovering the trail reveals the other labels, with an animation. A status outside the list is shown as a plain label. Display only (status changes come with the title actions).
+- "To sort" section (UI: « À ranger »): `.RPP` or folders outside the convention, with guided move. Opened from its counter in the filter bar, as a page over the library (same back navigation as the title detail).
+- "To adopt" (UI: « À adopter », cf. §4.2): a filter (titles having a version to adopt), with its counter in the filter bar; adoption is done in the title detail, on the selected version.
 
 ### 5.3 Version detail view
 Parsing of the `.RPP`, without REAPER:

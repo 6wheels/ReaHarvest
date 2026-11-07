@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart' as domain show Title;
+import 'package:reaharvest_domain/reaharvest_domain.dart' show NodeId;
 import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
@@ -12,12 +13,14 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'filter_bar.dart';
 import 'settings_dialog.dart';
-import 'side_panel.dart';
+import 'overview.dart';
+import 'title_detail.dart';
 import 'title_card.dart';
 import 'title_views.dart';
 
 /// Main window: the library (SPEC §5.2). Search bar at the top, filters
-/// below, then the titles as cards, list or tree, and the side panel.
+/// below, then the titles as cards, list or tree, and the overview docked
+/// at the bottom.
 class LibraryPage extends ConsumerWidget {
   const LibraryPage({super.key});
 
@@ -26,7 +29,8 @@ class LibraryPage extends ConsumerWidget {
     final titles = ref.watch(visibleTitlesProvider);
     final navigation = ref.watch(navigationProvider);
     final hasTitles = ref.watch(titlesProvider).isNotEmpty;
-    final panel = ref.watch(panelProvider);
+    final overview = ref.watch(overviewProvider);
+    final pinned = navigation.overviewPinned;
     final l10n = AppLocalizations.of(context);
 
     final Widget content;
@@ -57,61 +61,72 @@ class LibraryPage extends ConsumerWidget {
       body: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.escape): () =>
-              ref.read(panelProvider.notifier).close(),
+              ref.read(overviewProvider.notifier).close(),
         },
-        // The content takes its final width at once and the panel slides
-        // over it: no relayout of the titles during the animation.
+        // The content takes its final size at once and the overview slides
+        // over it: no relayout of the titles during the animation. Pinned,
+        // the titles end above the overview; otherwise it floats over them
+        // and a click outside of it closes it (cards and controls win their
+        // own clicks).
         child: Stack(
           children: [
             Positioned.fill(
-              right: panel == null ? 0 : sidePanelWidth,
-              child: RepaintBoundary(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        Space.xl,
-                        Space.l,
-                        Space.l,
-                        Space.m,
-                      ),
-                      child: Row(
-                        children: [
-                          // Balances the gear so that the search bar stays
-                          // centered.
-                          const SizedBox(width: 40),
-                          Expanded(
-                            child: Center(
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 560,
+              bottom: overview == null || !pinned
+                  ? 0
+                  : overviewHeight + Space.l,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: pinned || overview == null
+                    ? null
+                    : ref.read(overviewProvider.notifier).close,
+                child: RepaintBoundary(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          Space.xl,
+                          Space.l,
+                          Space.l,
+                          Space.m,
+                        ),
+                        child: Row(
+                          children: [
+                            // Balances the gear so that the search bar stays
+                            // centered.
+                            const SizedBox(width: 40),
+                            Expanded(
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 560,
+                                  ),
+                                  child: const _SearchBar(),
                                 ),
-                                child: const _SearchBar(),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: Space.s),
-                          const _SettingsButton(),
-                        ],
+                            const SizedBox(width: Space.s),
+                            const _SettingsButton(),
+                          ],
+                        ),
                       ),
-                    ),
-                    if (hasTitles) const FilterBar(),
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: Motion.medium,
-                        child: content,
+                      if (hasTitles) const FilterBar(),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: Motion.medium,
+                          child: content,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
             Positioned(
-              top: 0,
-              bottom: 0,
-              right: 0,
-              width: sidePanelWidth,
-              child: _PanelHost(panel),
+              left: Space.xl,
+              right: Space.xl,
+              bottom: Space.l,
+              height: overviewHeight,
+              child: _OverviewHost(overview),
             ),
           ],
         ),
@@ -120,35 +135,40 @@ class LibraryPage extends ConsumerWidget {
   }
 }
 
-/// Slides the side panel in and out, keeping its content while closing.
-class _PanelHost extends StatefulWidget {
-  const _PanelHost(this.content);
+/// Slides the overview up and down, keeping its content while closing.
+class _OverviewHost extends StatefulWidget {
+  const _OverviewHost(this.title);
 
-  final PanelContent? content;
+  final NodeId? title;
 
   @override
-  State<_PanelHost> createState() => _PanelHostState();
+  State<_OverviewHost> createState() => _OverviewHostState();
 }
 
-class _PanelHostState extends State<_PanelHost> {
-  PanelContent? _shown;
+class _OverviewHostState extends State<_OverviewHost> {
+  NodeId? _shown;
 
   @override
   Widget build(BuildContext context) {
-    _shown = widget.content ?? _shown;
-    final open = widget.content != null;
+    _shown = widget.title ?? _shown;
+    final open = widget.title != null;
     return IgnorePointer(
       ignoring: !open,
       child: AnimatedSlide(
-        offset: Offset(open ? 0 : 1, 0),
+        offset: Offset(0, open ? 0 : 1.2),
         duration: Motion.medium,
         curve: Motion.curve,
         onEnd: () {
           if (!open) setState(() => _shown = null);
         },
-        child: _shown == null
-            ? const SizedBox()
-            : RepaintBoundary(child: SidePanel(_shown!)),
+        child: AnimatedOpacity(
+          opacity: open ? 1 : 0,
+          duration: Motion.medium,
+          curve: Motion.curve,
+          child: _shown == null
+              ? const SizedBox()
+              : RepaintBoundary(child: Overview(_shown!)),
+        ),
       ),
     );
   }
@@ -187,6 +207,12 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
       controller: _controller,
       autofocus: true,
       onChanged: ref.read(navigationProvider.notifier).setQuery,
+      // Enter opens the detail of the title in the overview.
+      onSubmitted: (_) {
+        if (ref.read(overviewProvider) case final title?) {
+          openTitleDetail(context, title);
+        }
+      },
       style: Theme.of(context).textTheme.bodyLarge,
       cursorColor: c.accent,
       decoration: InputDecoration(
@@ -324,7 +350,7 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
 
   @override
   Widget build(BuildContext context) {
-    final panel = ref.watch(panelProvider);
+    final overview = ref.watch(overviewProvider);
     final titles = _shown;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -361,10 +387,9 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
               duration: Motion.fast,
               child: TitleCard(
                 titles[i],
-                selected: panel == TitlePanel(titles[i].id),
-                onTap: () => ref
-                    .read(panelProvider.notifier)
-                    .toggle(TitlePanel(titles[i].id)),
+                selected: overview == titles[i].id,
+                onTap: () =>
+                    ref.read(overviewProvider.notifier).toggle(titles[i].id),
               ),
             ),
           ),

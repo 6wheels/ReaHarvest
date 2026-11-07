@@ -129,6 +129,11 @@ class RppProject {
     return end;
   }
 
+  /// Number of media items, on all tracks.
+  int get itemCount => _root
+      .chunksNamed('TRACK')
+      .fold(0, (n, track) => n + track.chunksNamed('ITEM').length);
+
   List<RppTrack> get tracks {
     final result = <RppTrack>[];
     var depth = 0;

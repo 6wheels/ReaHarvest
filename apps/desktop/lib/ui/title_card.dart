@@ -6,6 +6,8 @@ import '../state/navigation.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
+import 'status_trail.dart';
+import 'title_actions.dart';
 
 /// Square title card, like a record sleeve (SPEC §5.2).
 class TitleCard extends StatefulWidget {
@@ -13,7 +15,7 @@ class TitleCard extends StatefulWidget {
 
   final domain.Title title;
 
-  /// Whether the title is shown in the detail panel.
+  /// Whether the title is shown in the overview.
   final bool selected;
 
   final VoidCallback? onTap;
@@ -105,8 +107,14 @@ class _TitleCardState extends State<TitleCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (t.status case final status?)
-                          _StatusBadge(statusLabel(l10n, status)),
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: TitleActions(
+                            t,
+                            visible: _hovered || widget.selected,
+                            onDark: true,
+                          ),
+                        ),
                         const Spacer(),
                         Text(
                           name,
@@ -140,6 +148,8 @@ class _TitleCardState extends State<TitleCard> {
                             Text(date, style: metaStyle),
                           ],
                         ),
+                        const SizedBox(height: Space.s),
+                        StatusTrail(t.status, onDark: true),
                       ],
                     ),
                   ),
@@ -151,29 +161,4 @@ class _TitleCardState extends State<TitleCard> {
       ),
     );
   }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: Space.s, vertical: 3),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.16),
-      borderRadius: BorderRadius.circular(99),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-    ),
-    child: Text(
-      label.toUpperCase(),
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.8,
-      ),
-    ),
-  );
 }

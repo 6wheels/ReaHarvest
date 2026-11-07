@@ -80,6 +80,7 @@ final class TitleFilter {
     this.statuses = const {},
     this.owners = const {},
     this.missingPlugins = false,
+    this.toAdopt = false,
   });
 
   /// Accepted values, by tag key (e.g. `artist`).
@@ -96,13 +97,17 @@ final class TitleFilter {
   /// Only titles with a version using a plugin missing on this machine.
   final bool missingPlugins;
 
+  /// Only titles with a version to adopt (no metadata, SPEC §4.2).
+  final bool toAdopt;
+
   bool get isEmpty =>
       tags.values.every((v) => v.isEmpty) &&
       libraries.isEmpty &&
       modes.isEmpty &&
       statuses.isEmpty &&
       owners.isEmpty &&
-      !missingPlugins;
+      !missingPlugins &&
+      !toAdopt;
 
   /// Copy accepting [values] for the tag [key] (empty: no tag filter).
   TitleFilter withTag(String key, Set<String> values) => copyWith(
@@ -120,6 +125,7 @@ final class TitleFilter {
     Set<String>? statuses,
     Set<MemberId>? owners,
     bool? missingPlugins,
+    bool? toAdopt,
   }) => TitleFilter(
     tags: tags ?? this.tags,
     libraries: libraries ?? this.libraries,
@@ -127,6 +133,7 @@ final class TitleFilter {
     statuses: statuses ?? this.statuses,
     owners: owners ?? this.owners,
     missingPlugins: missingPlugins ?? this.missingPlugins,
+    toAdopt: toAdopt ?? this.toAdopt,
   );
 
   Map<String, Object?> toJson() => {
@@ -137,6 +144,7 @@ final class TitleFilter {
     if (statuses.isNotEmpty) 'statuses': statuses.toList(),
     if (owners.isNotEmpty) 'owners': owners.toList(),
     if (missingPlugins) 'missingPlugins': true,
+    if (toAdopt) 'toAdopt': true,
   };
 
   static TitleFilter fromJson(Map<String, Object?> json) {
@@ -152,6 +160,7 @@ final class TitleFilter {
       statuses: strings(json['statuses']),
       owners: {for (final id in strings(json['owners'])) MemberId(id)},
       missingPlugins: json['missingPlugins'] == true,
+      toAdopt: json['toAdopt'] == true,
     );
   }
 }
@@ -188,6 +197,7 @@ final class NavigationSettings {
     this.query = '',
     this.filter = const TitleFilter(),
     this.savedViews = const [],
+    this.overviewPinned = false,
   });
 
   final DisplayMode displayMode;
@@ -195,16 +205,22 @@ final class NavigationSettings {
   final TitleFilter filter;
   final List<SavedView> savedViews;
 
+  /// Whether the side panel is docked beside the titles rather than
+  /// floating over them.
+  final bool overviewPinned;
+
   NavigationSettings copyWith({
     DisplayMode? displayMode,
     String? query,
     TitleFilter? filter,
     List<SavedView>? savedViews,
+    bool? overviewPinned,
   }) => NavigationSettings(
     displayMode: displayMode ?? this.displayMode,
     query: query ?? this.query,
     filter: filter ?? this.filter,
     savedViews: savedViews ?? this.savedViews,
+    overviewPinned: overviewPinned ?? this.overviewPinned,
   );
 
   Map<String, Object?> toJson() => {
@@ -212,6 +228,7 @@ final class NavigationSettings {
     'query': query,
     'filter': filter.toJson(),
     'savedViews': [for (final v in savedViews) v.toJson()],
+    'overviewPinned': overviewPinned,
   };
 
   static NavigationSettings fromJson(Map<String, Object?> json) =>
@@ -227,6 +244,7 @@ final class NavigationSettings {
           for (final v in json['savedViews'] as List? ?? const [])
             SavedView.fromJson((v as Map).cast()),
         ],
+        overviewPinned: json['overviewPinned'] as bool? ?? false,
       );
 }
 

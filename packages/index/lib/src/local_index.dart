@@ -11,7 +11,7 @@ typedef FileHasher = Future<String> Function(String path);
 /// A file tracked by the index.
 typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 
-const _schemaVersion = 3;
+const _schemaVersion = 4;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -44,6 +44,9 @@ CREATE TABLE versions (
   owner TEXT,
   label TEXT,
   tempo REAL,
+  length REAL,
+  track_count INTEGER,
+  item_count INTEGER,
   plugins TEXT NOT NULL,
   PRIMARY KEY (library_id, title_path, file_name)
 );
@@ -133,8 +136,9 @@ final class LocalIndex {
       );
       _insertAll(
         'INSERT INTO versions (library_id, title_path, file_name, size, '
-        'modified, version_id, owner, label, tempo, plugins) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'modified, version_id, owner, label, tempo, length, track_count, '
+        'item_count, plugins) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           for (final t in scan.titles)
             for (final v in t.versions)
@@ -148,6 +152,9 @@ final class LocalIndex {
                 v.metadata?.owner,
                 v.metadata?.label,
                 v.tempo,
+                v.length,
+                v.trackCount,
+                v.itemCount,
                 jsonEncode([for (final p in v.plugins) p.toJson()]),
               ],
         ],
@@ -353,6 +360,9 @@ final class LocalIndex {
               label: r['label'] as String? ?? '',
             ),
       tempo: (r['tempo'] as num?)?.toDouble(),
+      length: (r['length'] as num?)?.toDouble(),
+      trackCount: r['track_count'] as int?,
+      itemCount: r['item_count'] as int?,
       plugins: [
         for (final p in jsonDecode(r['plugins'] as String) as List)
           PluginRef.fromJson((p as Map).cast()),

@@ -415,11 +415,13 @@ void main() {
   });
 
   group('project data', () {
-    test('scan reads tempo and plugins of layout versions', () async {
+    test('scan reads tempo, counts and plugins of layout versions', () async {
       put('band/album/song/v1.rpp', unknown);
       final result = await scan(storage, library(Layout.classic()));
       final v = result.titles.single.versions.single;
       expect(v.tempo, 120);
+      expect((v.trackCount, v.itemCount), (32, 223));
+      expect(v.length, greaterThan(0));
       expect(
         v.plugins.map((p) => p.identifier),
         containsAll(['TDR Kotelnikov.vst3', 'reaeq.dll']),

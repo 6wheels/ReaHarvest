@@ -221,6 +221,23 @@ class LibraryService {
     return true;
   }
 
+  /// Opens [version] of [title] in REAPER. Returns false if REAPER is not
+  /// found.
+  Future<bool> openVersion(Title title, Version version) async {
+    final executable = await ref.read(reaperExecutableProvider.future);
+    if (executable == null) return false;
+    final root = _entry(title.libraryId).libraryRoot;
+    await openInReaper(
+      executable,
+      p.joinAll([
+        root,
+        ...title.path.split('/'),
+        ...version.fileName.split('/'),
+      ]),
+    );
+    return true;
+  }
+
   LibraryEntry _entry(LibraryId id) =>
       ref.read(settingsProvider).libraries.firstWhere((l) => l.id == id);
 

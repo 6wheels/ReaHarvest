@@ -72,6 +72,9 @@ void main() {
     modified: t0,
     size: 10,
     tempo: label == null ? null : 98.5,
+    length: label == null ? null : 184.5,
+    trackCount: label == null ? null : 12,
+    itemCount: label == null ? null : 40,
     plugins: [
       if (label != null)
         const PluginRef(
@@ -132,9 +135,11 @@ void main() {
       expect(a.metadata!.label, 'chorus B');
       expect(a.modified, t0);
       expect(a.tempo, 98.5);
+      expect((a.length, a.trackCount, a.itemCount), (184.5, 12, 40));
       expect(a.plugins, song.versions.first.plugins);
       expect(t.versions.last.isAdopted, isFalse);
       expect(t.versions.last.tempo, isNull);
+      expect(t.versions.last.trackCount, isNull);
       expect(t.versions.last.plugins, isEmpty);
       expect(restored.nodes['Band']!.id, nodeId);
       expect(restored.toSort, ['loose.rpp']);

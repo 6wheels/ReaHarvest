@@ -51,6 +51,10 @@ class NavigationNotifier extends Notifier<NavigationSettings> {
     ),
   );
 
+  /// Docks the overview below the titles, or lets it float over them.
+  void setOverviewPinned(bool pinned) =>
+      _set(state.copyWith(overviewPinned: pinned));
+
   void applyView(SavedView view) =>
       _set(state.copyWith(query: view.query, filter: view.filter));
 
@@ -136,6 +140,7 @@ typedef FilterOptions = ({
   List<String> statuses,
   List<MemberId> owners,
   bool missingPlugins,
+  bool toAdopt,
 });
 
 final filterOptionsProvider = Provider<FilterOptions>((ref) {
@@ -178,6 +183,7 @@ final filterOptionsProvider = Provider<FilterOptions>((ref) {
         for (final v in t.versions) ?v.metadata?.owner,
     }.toList()..sort()),
     missingPlugins: ref.watch(titlesMissingPluginsProvider).isNotEmpty,
+    toAdopt: ref.watch(toAdoptProvider).isNotEmpty,
   );
 });
 
@@ -190,6 +196,7 @@ bool matchesFilter(
   Title t, {
   required Library? library,
   required bool missingPlugins,
+  required bool toAdopt,
 }) =>
     filter.tags.entries.every(
       (e) => e.value.isEmpty || e.value.contains(t.tags[e.key]),
@@ -199,7 +206,8 @@ bool matchesFilter(
     (filter.statuses.isEmpty || filter.statuses.contains(t.status)) &&
     (filter.owners.isEmpty ||
         t.versions.any((v) => filter.owners.contains(v.metadata?.owner))) &&
-    (!filter.missingPlugins || missingPlugins);
+    (!filter.missingPlugins || missingPlugins) &&
+    (!filter.toAdopt || toAdopt);
 
 final _titleSearchProvider = Provider<TitleSearch>((ref) {
   final identity = ref.watch(settingsProvider.select((s) => s.identity));
@@ -214,6 +222,7 @@ final visibleTitlesProvider = Provider<List<Title>>((ref) {
   final navigation = ref.watch(navigationProvider);
   final libraries = ref.watch(indexedLibrariesProvider);
   final missing = ref.watch(titlesMissingPluginsProvider);
+  final toAdopt = {for (final (t, _) in ref.watch(toAdoptProvider)) t.id};
   return [
     for (final t in ref.watch(_titleSearchProvider).search(navigation.query))
       if (matchesFilter(
@@ -221,6 +230,7 @@ final visibleTitlesProvider = Provider<List<Title>>((ref) {
         t,
         library: libraries[t.libraryId],
         missingPlugins: missing.contains(t.id),
+        toAdopt: toAdopt.contains(t.id),
       ))
         t,
   ];
@@ -250,57 +260,19 @@ final duplicatesProvider = Provider<Map<VersionId, List<(Title, Version)>>>(
   (ref) => duplicateVersions(ref.watch(titlesProvider)),
 );
 
-/// Content of the side panel (SPEC §5.2).
-sealed class PanelContent {
-  const PanelContent();
-}
-
-/// Detail of a title, with its versions.
-final class TitlePanel extends PanelContent {
-  const TitlePanel(this.title);
-
-  final NodeId title;
-
+/// Title shown in the overview (SPEC §5.2); null when closed.
+class OverviewNotifier extends Notifier<NodeId?> {
   @override
-  bool operator ==(Object other) => other is TitlePanel && other.title == title;
+  NodeId? build() => null;
 
-  @override
-  int get hashCode => title.hashCode;
-}
+  /// Shows the overview of [title], or closes it if it already shows it.
+  void toggle(NodeId title) => state = state == title ? null : title;
 
-final class ToSortPanel extends PanelContent {
-  const ToSortPanel();
-
-  @override
-  bool operator ==(Object other) => other is ToSortPanel;
-
-  @override
-  int get hashCode => 1;
-}
-
-final class ToAdoptPanel extends PanelContent {
-  const ToAdoptPanel();
-
-  @override
-  bool operator ==(Object other) => other is ToAdoptPanel;
-
-  @override
-  int get hashCode => 2;
-}
-
-class PanelNotifier extends Notifier<PanelContent?> {
-  @override
-  PanelContent? build() => null;
-
-  /// Shows [content], or closes the panel if it already shows it.
-  void toggle(PanelContent content) =>
-      state = state == content ? null : content;
-
-  void show(PanelContent content) => state = content;
+  void show(NodeId title) => state = title;
 
   void close() => state = null;
 }
 
-final panelProvider = NotifierProvider<PanelNotifier, PanelContent?>(
-  PanelNotifier.new,
+final overviewProvider = NotifierProvider<OverviewNotifier, NodeId?>(
+  OverviewNotifier.new,
 );

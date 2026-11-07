@@ -171,5 +171,37 @@
   },
   "backupRestored": "Backup point restored",
   "openInReaper": "Open in REAPER",
-  "reaperNotFound": "REAPER was not found. Set its location in the settings."
+  "reaperNotFound": "REAPER was not found. Set its location in the settings.",
+  "pin": "Pin below the titles",
+  "unpin": "Unpin",
+  "openDetail": "Open detail",
+  "back": "Back",
+  "recentVersions": "Recent versions",
+  "allVersions": "All {count} versions",
+  "@allVersions": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "duplicateCount": "{count, plural, =1{1 duplicated version} other{{count} duplicated versions}}",
+  "@duplicateCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "notAdoptedCount": "{count, plural, =1{1 version not adopted} other{{count} versions not adopted}}",
+  "@notAdoptedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "history": "History",
+  "noBackups": "No backup point yet.",
+  "statLength": "Length",
+  "statTracks": "Tracks",
+  "statItems": "Items",
+  "moreActions": "More actions",
+  "newVersion": "New version",
+  "changeStatus": "Change status",
+  "showInExplorer": "Show in file explorer",
+  "notYourVersionTitle": "Not your version",
+  "notYourVersionHint": "“{name}” belongs to {owner}. Changes you save may conflict with theirs.",
+  "@notYourVersionHint": {
+    "placeholders": { "name": { "type": "String" }, "owner": { "type": "String" } }
+  },
+  "openAnyway": "Open anyway"
 }

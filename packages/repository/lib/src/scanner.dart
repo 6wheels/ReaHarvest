@@ -242,7 +242,8 @@ final class _Scanner {
   }
 
   /// Version of the project [e] in the title [dir], with its metadata,
-  /// tempo and plugins; reused from the previous scan if unchanged.
+  /// tempo, length, counts and plugins; reused from the previous scan if
+  /// unchanged.
   Future<Version> _readVersion(String dir, StorageEntry e) async {
     if (previous.stamps[e.path] == stamps[e.path]) {
       if (previousVersions[e.path] case final v?) return v;
@@ -261,6 +262,9 @@ final class _Scanner {
         project.extState(VersionMetadata.section),
       ),
       tempo: project.tempo,
+      length: project.length,
+      trackCount: project.tracks.length,
+      itemCount: project.itemCount,
       plugins: [
         for (final p in project.allPlugins)
           PluginRef(kind: p.kind, name: p.name, identifier: p.identifier),

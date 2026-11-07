@@ -159,6 +159,7 @@ void main() {
             language: 'fr',
             navigation: const NavigationSettings(
               displayMode: DisplayMode.tree,
+              overviewPinned: true,
               query: 'tide',
               filter: TitleFilter(
                 tags: {
@@ -169,6 +170,7 @@ void main() {
                 statuses: {'mixing', 'done'},
                 owners: {MemberId('M')},
                 missingPlugins: true,
+                toAdopt: true,
               ),
               savedViews: [
                 SavedView(
@@ -207,6 +209,7 @@ void main() {
       );
       final nav = read.navigation;
       expect((nav.displayMode, nav.query), (DisplayMode.tree, 'tide'));
+      expect(nav.overviewPinned, isTrue);
       expect(nav.filter.toJson(), settings.navigation.filter.toJson());
       expect(nav.filter.isEmpty, isFalse);
       expect(nav.savedViews.single.name, 'Mixing');

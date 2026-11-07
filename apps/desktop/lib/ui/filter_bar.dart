@@ -8,6 +8,7 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
+import 'to_sort_page.dart';
 
 /// Filter chips, saved views, "To sort" / "To adopt" and display mode, below
 /// the search bar (SPEC §5.2). Chips offering a single value are hidden.
@@ -24,7 +25,6 @@ class FilterBar extends ConsumerWidget {
     final identity = ref.watch(settingsProvider.select((s) => s.identity));
     final toSort = ref.watch(toSortProvider).length;
     final toAdopt = ref.watch(toAdoptProvider).length;
-    final panel = ref.watch(panelProvider);
     void set(TitleFilter f) => notifier.setFilter(f);
 
     final chips = <Widget>[
@@ -104,9 +104,7 @@ class FilterBar extends ConsumerWidget {
             Pill(
               label: '${l10n.toSort} · $toSort',
               icon: Icons.move_down_rounded,
-              active: panel is ToSortPanel,
-              onPressed: () =>
-                  ref.read(panelProvider.notifier).toggle(const ToSortPanel()),
+              onPressed: () => openToSort(context),
             ),
             const SizedBox(width: Space.s),
           ],
@@ -114,9 +112,8 @@ class FilterBar extends ConsumerWidget {
             Pill(
               label: '${l10n.toAdopt} · $toAdopt',
               icon: Icons.add_task_rounded,
-              active: panel is ToAdoptPanel,
-              onPressed: () =>
-                  ref.read(panelProvider.notifier).toggle(const ToAdoptPanel()),
+              active: filter.toAdopt,
+              onPressed: () => set(filter.copyWith(toAdopt: !filter.toAdopt)),
             ),
             const SizedBox(width: Space.s),
           ],

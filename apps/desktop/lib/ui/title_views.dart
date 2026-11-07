@@ -8,6 +8,8 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
+import 'status_trail.dart';
+import 'title_actions.dart';
 
 enum _Column { name, tags, versions, tempo, status, modified }
 
@@ -37,7 +39,7 @@ class _TitleListState extends ConsumerState<TitleList> {
         return _ascending ? r : -r;
       });
     }
-    final selected = ref.watch(panelProvider);
+    final selected = ref.watch(overviewProvider);
     final labels = {
       _Column.name: l10n.columnName,
       _Column.tags: '',
@@ -52,6 +54,7 @@ class _TitleListState extends ConsumerState<TitleList> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Space.xl),
           child: _Row(
+            trailing: true,
             cells: [
               for (final column in _Column.values)
                 _HeaderCell(
@@ -87,7 +90,7 @@ class _TitleListState extends ConsumerState<TitleList> {
               return TitleRow(
                 key: ValueKey(t.id),
                 title: t,
-                selected: selected == TitlePanel(t.id),
+                selected: selected == t.id,
                 child: _Row(
                   cells: [
                     _NameCell(t),
@@ -98,7 +101,10 @@ class _TitleListState extends ConsumerState<TitleList> {
                     ),
                     _Text('${t.versions.length}'),
                     _Text('${tempoOf(t) ?? ''}'),
-                    _Text(t.status == null ? '' : statusLabel(l10n, t.status!)),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 10, 6, 0),
+                      child: StatusTrail(t.status),
+                    ),
                     _Text(shortDate(l10n, lastModified(t))),
                   ],
                 ),
@@ -132,15 +138,19 @@ class _TitleListState extends ConsumerState<TitleList> {
 const _flex = [5, 4, 1, 1, 2, 2];
 
 class _Row extends StatelessWidget {
-  const _Row({required this.cells});
+  const _Row({required this.cells, this.trailing = false});
 
   final List<Widget> cells;
+
+  /// Leaves room for the row actions (header).
+  final bool trailing;
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
       for (final (i, cell) in cells.indexed)
         Expanded(flex: _flex[i], child: cell),
+      if (trailing) const SizedBox(width: titleActionsWidth + Space.s),
     ],
   );
 }
@@ -256,8 +266,9 @@ class _Swatch extends StatelessWidget {
   }
 }
 
-/// Clickable title row opening the detail panel.
-class TitleRow extends ConsumerWidget {
+/// Clickable title row: a click shows the title overview; its actions show
+/// on hover at the end of the row.
+class TitleRow extends ConsumerStatefulWidget {
   const TitleRow({
     super.key,
     required this.title,
@@ -270,16 +281,35 @@ class TitleRow extends ConsumerWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TitleRow> createState() => _TitleRowState();
+}
+
+class _TitleRowState extends ConsumerState<TitleRow> {
+  var _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
     final c = context.colors;
-    return Material(
-      color: selected ? c.accent.withValues(alpha: 0.12) : Colors.transparent,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: widget.selected
+            ? c.accent.withValues(alpha: 0.12)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
-        onTap: () =>
-            ref.read(panelProvider.notifier).toggle(TitlePanel(title.id)),
-        child: child,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () =>
+              ref.read(overviewProvider.notifier).toggle(widget.title.id),
+          child: Row(
+            children: [
+              Expanded(child: widget.child),
+              TitleActions(widget.title, visible: _hovered || widget.selected),
+              const SizedBox(width: Space.s),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -356,7 +386,7 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
         }
       }
     }
-    final selected = ref.watch(panelProvider);
+    final selected = ref.watch(overviewProvider);
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xl),
@@ -369,7 +399,7 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
           return TitleRow(
             key: ValueKey(row.key),
             title: t,
-            selected: selected == TitlePanel(t.id),
+            selected: selected == t.id,
             child: Padding(
               padding: EdgeInsets.only(left: indent + Space.l),
               child: Row(

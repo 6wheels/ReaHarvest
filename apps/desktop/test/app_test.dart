@@ -5,13 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/app.dart';
 import 'package:reaharvest/demo_titles.dart';
 import 'package:reaharvest/state/libraries.dart';
-import 'package:reaharvest/ui/side_panel.dart';
+import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
+import 'package:reaharvest/ui/title_detail.dart';
 import 'package:reaharvest/ui/title_card.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -44,6 +45,13 @@ class FakeLibraryService extends LibraryService {
   final removed = <LibraryId>[];
   final adopted = <(String, String)>[];
   final separated = <String>[];
+  final opened = <String>[];
+
+  @override
+  Future<bool> openVersion(Title title, Version version) async {
+    opened.add(version.fileName);
+    return true;
+  }
 
   @override
   Future<void> adopt(Title title, Version version, String label) async =>
@@ -159,7 +167,7 @@ void main() {
     await pumpApp(tester, titles: demoTitles());
     expect(find.byType(TitleCard), findsWidgets);
     expect(find.text('Northern Lights'), findsOneWidget);
-    expect(find.text('MIXING'), findsWidgets);
+    expect(find.text('Mixing'), findsWidgets);
 
     await tester.enterText(find.byType(TextField), 'tide');
     await tester.pumpAndSettle();
@@ -395,27 +403,102 @@ void main() {
     expect(find.text('Northern Lights'), findsOneWidget);
   });
 
-  testWidgets('opens the title detail with its versions', (tester) async {
+  testWidgets('shows a title overview with its recent versions', (
+    tester,
+  ) async {
     await pumpApp(tester, titles: demoTitles());
     await tester.tap(find.text('Midnight Ferry'));
     await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsOneWidget);
     expect(find.text('Midnight Ferry v1'), findsOneWidget);
-    expect(find.text('Create a backup point'), findsWidgets);
-    await tester.scrollUntilVisible(
-      find.text('Midnight Ferry v5'),
-      200,
-      scrollable: find
-          .descendant(
-            of: find.byType(SidePanel),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    expect(find.text('Midnight Ferry v5'), findsOneWidget);
+    expect(find.text('Midnight Ferry v3'), findsOneWidget);
+    expect(find.text('Midnight Ferry v4'), findsNothing);
+    expect(find.text('All 5 versions'), findsOneWidget);
+    expect(find.text('Create a backup point'), findsNothing);
 
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
     expect(find.text('Midnight Ferry v1'), findsNothing);
+  });
+
+  testWidgets('floating overview closes on a click outside, pinned stays', (
+    tester,
+  ) async {
+    await pumpApp(tester, titles: demoTitles());
+    await tester.tap(find.text('Midnight Ferry'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(20, 300));
+    await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsNothing);
+
+    await tester.tap(find.text('Midnight Ferry').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Pin below the titles'));
+    await tester.pumpAndSettle();
+    expect(settings.saved.last.navigation.overviewPinned, isTrue);
+    await tester.tapAt(const Offset(20, 300));
+    await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsOneWidget);
+  });
+
+  testWidgets('opens the title detail over the library and goes back', (
+    tester,
+  ) async {
+    await pumpApp(tester, titles: demoTitles());
+    await tester.tap(find.text('Midnight Ferry'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleDetailPage), findsOneWidget);
+    expect(find.text('Midnight Ferry v5'), findsOneWidget);
+    expect(find.text('Create a backup point'), findsOneWidget);
+    expect(find.text('No backup point yet.'), findsOneWidget);
+    expect(find.text('BPM'), findsOneWidget);
+    expect(find.text('TRACKS'), findsOneWidget);
+
+    await tester.tap(find.text('Midnight Ferry v5'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('take 5 · '), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleDetailPage), findsNothing);
+    expect(find.byType(Overview), findsOneWidget);
+
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleDetailPage), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleDetailPage), findsNothing);
+  });
+
+  testWidgets('a card opens its latest version in REAPER', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await tester.tap(find.text('Midnight Ferry'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.widgetWithText(TitleCard, 'Midnight Ferry'),
+        matching: find.byTooltip('Open in REAPER'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(libraries.opened, ['Midnight Ferry v1.rpp']);
+
+    await tester.tap(
+      find.descendant(
+        of: find.widgetWithText(TitleCard, 'Midnight Ferry'),
+        matching: find.byTooltip('More actions'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Show in file explorer'), findsOneWidget);
   });
 
   testWidgets('saves and applies a view', (tester) async {
@@ -445,7 +528,16 @@ void main() {
     await pumpApp(tester, titles: demoTitles(), reaperRunning: true);
     await tester.tap(find.text('To adopt · 1'));
     await tester.pumpAndSettle();
-    expect(find.text('Glass Garden v1'), findsOneWidget);
+    expect(find.byType(TitleCard), findsOneWidget);
+    await tester.tap(find.text('Glass Garden'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'intro');
     await tester.tap(find.text('Adopt'));
@@ -482,9 +574,11 @@ void main() {
     );
     await tester.tap(find.text('Song'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Same identity as'), findsNWidgets(2));
+    await tester.tap(find.text('2 duplicated versions'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Same identity as'), findsOneWidget);
 
-    await tester.tap(find.text('Make it a new version').last);
+    await tester.tap(find.text('Make it a new version'));
     await tester.pumpAndSettle();
     expect(libraries.separated, hasLength(1));
   });
