@@ -26,8 +26,9 @@ final class NodeFile {
   /// Title status key; null when not set.
   final String? status;
 
-  /// Version statuses, by version id.
-  final Map<VersionId, String> versionStatuses;
+  /// Version statuses, by [Version.key]: version id, or path relative to the
+  /// title folder in a free tree.
+  final Map<String, String> versionStatuses;
 
   /// Copy with the title status set to [status] (null or empty clears it).
   NodeFile withStatus(String? status) => NodeFile(
@@ -37,9 +38,9 @@ final class NodeFile {
     versionStatuses: versionStatuses,
   );
 
-  /// Copy with the status of [version] set to [status] (null or empty
-  /// clears it).
-  NodeFile withVersionStatus(VersionId version, String? status) {
+  /// Copy with the status of the version keyed [version] (see
+  /// [Version.key]) set to [status] (null or empty clears it).
+  NodeFile withVersionStatus(String version, String? status) {
     final statuses = {...versionStatuses}..remove(version);
     if (_orNull(status) case final s?) statuses[version] = s;
     return NodeFile(id, level, status: this.status, versionStatuses: statuses);
@@ -72,7 +73,7 @@ final class NodeFile {
       versionStatuses: {
         for (final e in versionStatuses.entries)
           if (_orNull(e.value as String) != null)
-            VersionId(e.key as String): e.value as String,
+            e.key as String: e.value as String,
       },
     );
   }
@@ -106,12 +107,12 @@ Future<NodeFile> setTitleStatus(
   String? status,
 ) => _updateNodeFile(storage, titlePath, (n) => n.withStatus(status));
 
-/// Sets the status of [version] in the title at [titlePath] (null clears
-/// it).
+/// Sets the status of the version keyed [version] (see [Version.key]) in
+/// the title at [titlePath] (null clears it).
 Future<NodeFile> setVersionStatus(
   RepositoryStorage storage,
   String titlePath,
-  VersionId version,
+  String version,
   String? status,
 ) => _updateNodeFile(
   storage,

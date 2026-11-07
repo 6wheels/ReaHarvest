@@ -20,6 +20,7 @@ final class ScanResult {
     this.toSort = const [],
     this.corrupted = const [],
     this.stamps = const {},
+    this.freeTree = false,
   });
 
   /// Titles found, sorted by path.
@@ -40,11 +41,16 @@ final class ScanResult {
   /// path; used to skip unchanged files on the next scan.
   final Map<String, FileStamp> stamps;
 
-  /// Versions without metadata ("To adopt", SPEC §4.2).
+  /// Whether the library is a free tree (SPEC §3.3).
+  final bool freeTree;
+
+  /// Versions without metadata ("To adopt", SPEC §4.2); always empty in a
+  /// free tree, whose versions are identified by their path.
   Iterable<(Title, Version)> get toAdopt => [
-    for (final t in titles)
-      for (final v in t.versions)
-        if (!v.isAdopted) (t, v),
+    if (!freeTree)
+      for (final t in titles)
+        for (final v in t.versions)
+          if (!v.isAdopted) (t, v),
   ];
 }
 
@@ -59,9 +65,10 @@ Future<ScanResult> scanFolder(
 
 /// Scans a library root following its layout, or as a free tree (SPEC §3).
 ///
-/// Files whose stamp did not change since [previous] are not read again.
-/// Missing `.node.json` files are written for layout nodes and free tree
-/// titles; this is the only write.
+/// Files whose stamp did not change since [previous] are not read again;
+/// free tree projects are never read (no metadata, SPEC §3.3). Missing
+/// `.node.json` files are written for layout nodes and free tree titles;
+/// this is the only write.
 Future<ScanResult> scan(
   RepositoryStorage storage,
   Library library, {
@@ -118,12 +125,28 @@ final class _Scanner {
       toSort: toSort,
       corrupted: corrupted,
       stamps: stamps,
+      freeTree: layout == null,
     );
   }
 
+  /// Titles are the topmost folders holding a project; every project below
+  /// a title, at any level, is one of its versions (SPEC §3.3).
   Future<void> _scanFreeTree(List<String> ordered) async {
+    // Ordered by depth: a title is found before any folder below it.
+    final versions = <String, List<Version>>{};
     for (final dir in ordered) {
-      if (_projects(dir).isEmpty) continue;
+      if (_projects(dir).isNotEmpty && _titleOf(dir, versions) == null) {
+        versions[dir] = [];
+      }
+    }
+    for (final MapEntry(key: dir, value: entries) in files.entries) {
+      if (_titleOf(dir, versions) case final title?) {
+        versions[title]!.addAll([
+          for (final e in entries.where(_isProject)) _version(title, e, null),
+        ]);
+      }
+    }
+    for (final MapEntry(key: dir, value: titleVersions) in versions.entries) {
       final node = await _node(dir, freeTreeLevel);
       if (node == null) continue;
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
@@ -132,7 +155,15 @@ final class _Scanner {
           'folder${i + 1}': segments[i],
         if (segments.isNotEmpty) 'title': segments.last,
       };
-      await _addTitle(dir, node, tags);
+      _addTitle(dir, node, tags, titleVersions);
+    }
+  }
+
+  /// Folder of [dir] or its closest parent that is a key of [titles].
+  static String? _titleOf(String dir, Map<String, Object?> titles) {
+    for (var d = dir; ; d = _parent(d)) {
+      if (titles.containsKey(d)) return d;
+      if (d.isEmpty) return null;
     }
   }
 
@@ -166,34 +197,38 @@ final class _Scanner {
         skipped.add(dir);
         continue;
       }
-      if (d == depth) await _addTitle(dir, node, layout.tagsOf(segments)!);
+      if (d == depth) {
+        final versions = <Version>[];
+        for (final e in _projects(dir)) {
+          try {
+            versions.add(_version(dir, e, await _metadata(e)));
+          } on Object catch (error) {
+            if (!_isCorruption(error)) rethrow;
+            corrupted.add(e.path);
+          }
+        }
+        _addTitle(dir, node, layout.tagsOf(segments)!, versions);
+      }
     }
   }
 
-  Future<void> _addTitle(
+  static Version _version(
+    String dir,
+    StorageEntry e,
+    VersionMetadata? metadata,
+  ) => Version(
+    fileName: e.path.substring(dir.isEmpty ? 0 : dir.length + 1),
+    modified: e.modified,
+    size: e.size,
+    metadata: metadata,
+  );
+
+  void _addTitle(
     String dir,
     NodeFile node,
     Map<String, String> tags,
-  ) async {
-    final versions = <Version>[];
-    for (final e in _projects(dir)) {
-      final VersionMetadata? metadata;
-      try {
-        metadata = await _metadata(e);
-      } on Object catch (error) {
-        if (!_isCorruption(error)) rethrow;
-        corrupted.add(e.path);
-        continue;
-      }
-      versions.add(
-        Version(
-          fileName: e.path.substring(dir.isEmpty ? 0 : dir.length + 1),
-          modified: e.modified,
-          size: e.size,
-          metadata: metadata,
-        ),
-      );
-    }
+    List<Version> versions,
+  ) {
     versions.sort((a, b) => a.fileName.compareTo(b.fileName));
     titles.add(
       Title(
@@ -250,7 +285,9 @@ final class _Scanner {
   }
 
   Iterable<StorageEntry> _projects(String dir) =>
-      (files[dir] ?? const []).where((e) => isProjectFile(e.path));
+      (files[dir] ?? const []).where(_isProject);
+
+  static bool _isProject(StorageEntry e) => isProjectFile(e.path);
 
   /// Read failure (I/O error) or invalid content (bad syntax or JSON shape).
   static bool _isCorruption(Object error) =>

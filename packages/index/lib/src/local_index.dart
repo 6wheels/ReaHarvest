@@ -225,7 +225,7 @@ final class LocalIndex {
           versionStatuses: {
             for (final e
                 in (jsonDecode(r['version_statuses'] as String) as Map).entries)
-              VersionId(e.key as String): e.value as String,
+              e.key as String: e.value as String,
           },
         ),
     ];
@@ -234,8 +234,11 @@ final class LocalIndex {
   /// Last scan stored for [id], to rescan incrementally after a restart;
   /// null if the library was never indexed.
   ScanResult? scanResult(LibraryId id) {
-    final known = _db.select('SELECT 1 FROM libraries WHERE id = ?', [id]);
+    final known = _db.select('SELECT json FROM libraries WHERE id = ?', [id]);
     if (known.isEmpty) return null;
+    final library = Library.fromJson(
+      (jsonDecode(known.single['json'] as String) as Map).cast(),
+    );
     List<String> issues(String kind) => [
       for (final r in _db.select(
         'SELECT path FROM issues WHERE library_id = ? AND kind = ? '
@@ -262,6 +265,7 @@ final class LocalIndex {
       toSort: issues('toSort'),
       corrupted: issues('corrupted'),
       stamps: {for (final f in files(id)) f.path: f.stamp},
+      freeTree: library.isFreeTree,
     );
   }
 

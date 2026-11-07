@@ -336,30 +336,78 @@ void main() {
   });
 
   group('free tree scan', () {
-    test('makes a title of every folder holding a project', () async {
+    test('makes a title of every topmost folder holding a project', () async {
       put('band/2024/demo/demo.rpp', unknown);
       put('band/2024/demo/drums/v2/take.rpp', adopted);
+      put('band/2024/demo/drums/notes.txt');
       put('band/2024/demo/Backups/demo-2024-01-02_1030.rpp', unknown);
+      put('band/2024/demo/.trash/old.rpp', unknown);
       put('band/2024/demo/audio-files/a.wav');
-      put('top.rpp', unknown);
+      put('band/other/Song.RPP', unknown);
+      final counting = CountingStorage(storage);
 
-      final result = await scan(storage, library(null));
+      final result = await scan(counting, library(null));
 
       expect(result.titles.map((t) => t.path), [
-        '',
         'band/2024/demo',
-        'band/2024/demo/drums/v2',
+        'band/other',
       ]);
-      expect(result.titles[1].tags, {
+      final demo = result.titles.first;
+      expect(demo.tags, {
         'folder1': 'band',
         'folder2': '2024',
         'title': 'demo',
       });
-      expect(result.titles[2].tags['title'], 'v2');
+      expect(demo.versions.map((v) => v.fileName), [
+        'demo.rpp',
+        'drums/v2/take.rpp',
+      ]);
+      expect(demo.versions.map((v) => v.key), [
+        'demo.rpp',
+        'drums/v2/take.rpp',
+      ]);
+      expect(demo.versions.every((v) => !v.isAdopted), isTrue);
+      expect(result.freeTree, isTrue);
+      expect(result.toAdopt, isEmpty);
       expect(result.toSort, isEmpty);
+      expect(counting.reads.where(isProjectFile), isEmpty);
       expect(exists('band/2024/demo/.node.json'), isTrue);
+      expect(exists('band/2024/demo/drums/v2/.node.json'), isFalse);
       expect(exists('band/.node.json'), isFalse);
+      expect(result.nodes.keys, {'band/2024/demo', 'band/other'});
       expect(result.nodes['band/2024/demo']!.level, freeTreeLevel);
+    });
+
+    test('makes the root a single title when it holds a project', () async {
+      put('top.rpp', unknown);
+      put('band/demo/demo.rpp', unknown);
+
+      final result = await scan(storage, library(null));
+
+      expect(result.titles.single.path, '');
+      expect(result.titles.single.versions.map((v) => v.fileName), [
+        'band/demo/demo.rpp',
+        'top.rpp',
+      ]);
+    });
+
+    test('keys version statuses by relative path', () async {
+      put('song/song.rpp', unknown);
+      put('song/live/take.rpp', unknown);
+      final lib = library(null);
+      final first = await scan(storage, lib);
+      final version = first.titles.single.versions.first;
+      expect(version.fileName, 'live/take.rpp');
+
+      await setVersionStatus(storage, 'song', version.key, 'done');
+      final saved = jsonDecode(
+        File(p.join(root.path, 'song', '.node.json')).readAsStringSync(),
+      );
+      expect(saved['versionStatuses'], {'live/take.rpp': 'done'});
+
+      final title = (await scan(storage, lib, previous: first)).titles.single;
+      expect(title.statusOf(title.versions.first), 'done');
+      expect(title.statusOf(title.versions.last), isNull);
     });
   });
 }

@@ -127,6 +127,7 @@ void main() {
         'Band/First Album/Song/a.RPP': (size: 10, modified: t0),
       });
       expect(restored.toAdopt.single.$2.fileName, 'b.rpp');
+      expect(restored.freeTree, isFalse);
 
       expect(index.scanResult(LibraryId.generate()), isNull);
       index.removeLibrary(lib.id);

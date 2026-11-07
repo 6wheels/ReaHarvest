@@ -36,15 +36,12 @@ final class Title {
   /// Title status key (e.g. `mixing`); null when not set.
   final String? status;
 
-  /// Status of each version, by version id. May hold ids of versions that
-  /// no longer exist.
-  final Map<VersionId, String> versionStatuses;
+  /// Status of each version, by [Version.key]. May hold keys of versions
+  /// that no longer exist.
+  final Map<String, String> versionStatuses;
 
-  /// Status of [version]; null when not set or not adopted.
-  String? statusOf(Version version) => switch (version.metadata) {
-    final m? => versionStatuses[m.id],
-    null => null,
-  };
+  /// Status of [version]; null when not set.
+  String? statusOf(Version version) => versionStatuses[version.key];
 }
 
 /// Version metadata stored in the `.RPP` EXTSTATE section (SPEC §4.2).
@@ -96,7 +93,9 @@ final class Version {
     this.metadata,
   });
 
-  /// File name; free, not part of the identity.
+  /// File path relative to the title folder, `/`-separated: a plain file
+  /// name in layout libraries, possibly nested in a free tree (SPEC §3.3).
+  /// Free in layout libraries, not part of the identity.
   final String fileName;
 
   /// Version date (file modification time).
@@ -108,6 +107,10 @@ final class Version {
   final VersionMetadata? metadata;
 
   bool get isAdopted => metadata != null;
+
+  /// Version identity used for statuses: the version id, or [fileName] when
+  /// the version has no metadata (free tree versions, SPEC §3.3).
+  String get key => metadata?.id ?? fileName;
 }
 
 /// A media file referenced by a version.
