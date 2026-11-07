@@ -3,21 +3,21 @@ import 'package:path/path.dart' as p;
 import 'mounted_folder_storage.dart';
 
 /// Collab journal folder, at the library root (SPEC §6.3).
-const collabFolderName = '_collab';
+const collabFolderName = '.collab';
 
 /// Title subfolders holding no versions (SPEC §3.2), lowercase.
 const reservedTitleFolders = {
   'media',
   'renders',
   'assets',
-  '_versions',
-  '_trash',
+  '.history',
+  '.trash',
   'backups',
 };
 
 /// Folders never scanned for versions, wherever they are, lowercase:
 /// REAPER backups, history and trash.
-const _excludedFolders = {'backups', '_versions', '_trash'};
+const _excludedFolders = {'backups', '.history', '.trash'};
 
 const _excludedNames = {'.ds_store', 'desktop.ini', 'thumbs.db'};
 

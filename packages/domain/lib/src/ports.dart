@@ -33,7 +33,7 @@ abstract interface class RepositoryStorage {
   /// parent folders.
   Future<void> write(String path, Stream<List<int>> content);
 
-  /// Moves [from] to [to] (e.g. to `_trash/` or `_versions/`).
+  /// Moves [from] to [to] (e.g. to `.trash/` or `.history/`).
   Future<void> move(String from, String to);
 
   Future<void> createDirectory(String path);
@@ -94,8 +94,8 @@ final class CollabFilter {
 }
 
 /// Full store content, used to switch store implementations.
-final class CanonicalSnapshot {
-  const CanonicalSnapshot(this.records);
+final class CanonicalExport {
+  const CanonicalExport(this.records);
 
   final List<CollabRecord> records;
 }
@@ -119,8 +119,8 @@ abstract interface class CollabStore {
   /// Changed records matching [filter].
   Stream<CollabRecord> subscribe([CollabFilter filter = const CollabFilter()]);
 
-  Future<CanonicalSnapshot> exportSnapshot();
+  Future<CanonicalExport> exportAll();
 
   /// Idempotent upsert by uid, LWW applied.
-  Future<void> importSnapshot(CanonicalSnapshot snapshot);
+  Future<void> importAll(CanonicalExport export);
 }

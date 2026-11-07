@@ -479,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @errorInvalidFile.
   ///
   /// In en, this message translates to:
-  /// **'This folder holds an unreadable _library.json file.'**
+  /// **'This folder holds an unreadable .library.json file.'**
   String get errorInvalidFile;
 
   /// No description provided for @reaperStepHint.

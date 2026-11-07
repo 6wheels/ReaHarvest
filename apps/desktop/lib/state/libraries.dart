@@ -18,7 +18,7 @@ enum LibraryProblem {
   /// The folder is, contains or is inside a folder of another library.
   overlap,
 
-  /// The folder holds an unreadable `_library.json`.
+  /// The folder holds an unreadable `.library.json`.
   invalidFile,
 
   /// The library already holds titles: its layout cannot change without a
@@ -42,7 +42,7 @@ class LibraryService {
 
   final Ref ref;
 
-  /// Library already described in [folder] (`_library.json`), or null.
+  /// Library already described in [folder] (`.library.json`), or null.
   /// Throws [LibraryException] if the file is unreadable.
   Future<Library?> existing(String folder) async {
     try {
@@ -54,10 +54,9 @@ class LibraryService {
     }
   }
 
-  /// Whether the layout of [library], described in [folder], can no longer
-  /// change: frozen, or the folder already holds projects (SPEC §3.1).
-  Future<bool> isLayoutLocked(String folder, Library library) async =>
-      (library.layout?.frozen ?? false) || await _hasProjects(folder);
+  /// Whether the layout of the library at [folder] can no longer change:
+  /// the folder already holds projects (SPEC §3.1).
+  Future<bool> isLayoutLocked(String folder) => _hasProjects(folder);
 
   /// Adds the local library at [folder] with [layout] (null: free tree):
   /// attaches the library already described there (keeping its id, and
@@ -73,7 +72,7 @@ class LibraryService {
       throw const LibraryException(LibraryProblem.unsupportedMode);
     }
     final changed = found == null || !sameLayout(found.layout, layout);
-    if (found != null && changed && await isLayoutLocked(folder, found)) {
+    if (found != null && changed && await isLayoutLocked(folder)) {
       throw const LibraryException(LibraryProblem.layoutLocked);
     }
     final library = changed
@@ -124,7 +123,7 @@ class LibraryService {
     try {
       final root = entry.libraryRoot;
       final storage = MountedFolderStorage(root);
-      var library = await readLibrary(storage);
+      final library = await readLibrary(storage);
       if (library == null) return;
       final index = ref.read(localIndexProvider);
       final result = await scanFolder(
@@ -132,17 +131,6 @@ class LibraryService {
         library,
         previous: index.scanResult(library.id),
       );
-      // The layout is frozen as soon as the library holds a title (§3.1).
-      final layout = library.layout;
-      if (layout != null && !layout.frozen && result.titles.isNotEmpty) {
-        library = Library(
-          id: library.id,
-          mode: library.mode,
-          layout: layout.freeze(),
-          collab: library.collab,
-        );
-        await writeLibrary(storage, library);
-      }
       index.update(library, result);
       ref.read(indexRevisionProvider.notifier).bump();
     } on Object catch (error) {
@@ -168,8 +156,8 @@ Future<bool> _hasProjects(String folder) => Isolate.run(() async {
   return false;
 });
 
-/// Same layout levels and render mapping (the frozen flag is ignored).
+/// Same layout levels and render mapping.
 bool sameLayout(Layout? a, Layout? b) =>
-    jsonEncode(a?.freeze().toJson()) == jsonEncode(b?.freeze().toJson());
+    jsonEncode(a?.toJson()) == jsonEncode(b?.toJson());
 
 final libraryServiceProvider = Provider<LibraryService>(LibraryService.new);

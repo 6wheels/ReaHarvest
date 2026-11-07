@@ -48,9 +48,8 @@ void main() {
     final band = folder('Band');
     final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
       ..createSync(recursive: true);
-    File(
-      '../../test/fixtures/project-1.rpp',
-    ).copySync(p.join(song.path, 'v1.rpp'));
+    File('../../test/fixtures/project-1.rpp')
+        .copySync(p.join(song.path, 'v1.rpp'));
     final revision = container.read(indexRevisionProvider);
 
     await service().addLocal(
@@ -71,9 +70,8 @@ void main() {
       'title',
     ]);
     expect(index.titles().single.tags['title'], 'Song');
-    // Frozen by the scan, as soon as a title exists (SPEC §3.1).
-    expect(library.layout!.frozen, isTrue);
-    expect(index.libraries().single.layout!.frozen, isTrue);
+    // Frozen as soon as a title exists (SPEC §3.1).
+    expect(await service().isLayoutLocked(band), isTrue);
     expect(container.read(indexRevisionProvider), greaterThan(revision));
   });
 
@@ -124,9 +122,8 @@ void main() {
     final band = folder('Band');
     final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
       ..createSync(recursive: true);
-    File(
-      '../../test/fixtures/project-1.rpp',
-    ).copySync(p.join(song.path, 'v1.rpp'));
+    File('../../test/fixtures/project-1.rpp')
+        .copySync(p.join(song.path, 'v1.rpp'));
     await service().addLocal(
       folder: band,
       displayName: '',
@@ -134,8 +131,8 @@ void main() {
     );
     final id = container.read(settingsProvider).libraries.single.id;
     await service().remove(id);
-    final found = (await service().existing(band))!;
-    expect(await service().isLayoutLocked(band, found), isTrue);
+    expect(await service().existing(band), isNotNull);
+    expect(await service().isLayoutLocked(band), isTrue);
 
     await expectLater(
       service().addLocal(folder: band, displayName: '', layout: Layout.film()),
@@ -167,10 +164,10 @@ void main() {
     await writeLibrary(MountedFolderStorage(solo), library);
     Directory(p.join(solo, 'Backups')).createSync();
     File(p.join(solo, 'Backups', 'old.rpp')).writeAsStringSync('');
-    expect(await service().isLayoutLocked(solo, library), isFalse);
+    expect(await service().isLayoutLocked(solo), isFalse);
 
     File(p.join(solo, 'Demo.RPP')).writeAsStringSync('');
-    expect(await service().isLayoutLocked(solo, library), isTrue);
+    expect(await service().isLayoutLocked(solo), isTrue);
   });
 
   test('rejects cloud libraries, overlaps and invalid files', () async {

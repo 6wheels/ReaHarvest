@@ -45,8 +45,7 @@ class FakeLibraryService extends LibraryService {
   Future<Library?> existing(String folder) async => existingLibrary;
 
   @override
-  Future<bool> isLayoutLocked(String folder, Library library) async =>
-      existingLocked;
+  Future<bool> isLayoutLocked(String folder) async => existingLocked;
 
   @override
   Future<void> addLocal({
@@ -60,13 +59,17 @@ class FakeLibraryService extends LibraryService {
       displayName: displayName,
       workspaceRoot: folder,
     );
-    await ref.read(settingsProvider.notifier).change((s) => s.addLibrary(entry));
+    await ref
+        .read(settingsProvider.notifier)
+        .change((s) => s.addLibrary(entry));
   }
 
   @override
   Future<void> remove(LibraryId id) async {
     removed.add(id);
-    await ref.read(settingsProvider.notifier).change((s) => s.removeLibrary(id));
+    await ref
+        .read(settingsProvider.notifier)
+        .change((s) => s.removeLibrary(id));
   }
 }
 
@@ -112,7 +115,9 @@ void main() {
             (ref) => libraries = FakeLibraryService(ref),
           ),
           pickersProvider.overrideWithValue(const FakePickers()),
-          detectedReaperProvider.overrideWith((ref) async => '/detected/reaper'),
+          detectedReaperProvider.overrideWith(
+            (ref) async => '/detected/reaper',
+          ),
           defaultReaperResourcesProvider.overrideWithValue('/resources'),
           peaksPreferenceProvider.overrideWith((ref) async => peaks),
         ],
@@ -161,9 +166,7 @@ void main() {
     expect(find.text('APPEARANCE'), findsNothing);
   });
 
-  testWidgets('first run wizard sets name, library and REAPER', (
-    tester,
-  ) async {
+  testWidgets('first run wizard sets name, library and REAPER', (tester) async {
     await pumpApp(
       tester,
       configured: const [],
@@ -285,7 +288,7 @@ void main() {
     existingLibrary = Library(
       id: LibraryId.generate(),
       mode: LibraryMode.local,
-      layout: Layout.film().freeze(),
+      layout: Layout.film(),
     );
     await tester.tap(find.text('Choose…'));
     await tester.pumpAndSettle();
@@ -296,16 +299,14 @@ void main() {
     expect(libraries.added.single.$3!.leaf.key, 'scene');
   });
 
-  testWidgets('a library holding titles shows its layout only', (
-    tester,
-  ) async {
+  testWidgets('a library holding titles shows its layout only', (tester) async {
     await pumpApp(tester, configured: const []);
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     existingLibrary = Library(
       id: LibraryId.generate(),
       mode: LibraryMode.local,
-      layout: Layout.projectOriented().freeze(),
+      layout: Layout.projectOriented(),
     );
     existingLocked = true;
     await tester.tap(find.text('Choose…'));

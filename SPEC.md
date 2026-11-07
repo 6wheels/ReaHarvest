@@ -46,7 +46,7 @@ Public release considered in the long run: no hard dependency on Google Drive, o
 | Node | Folder matching a layout level. Has a stable `nodeId`. |
 | Title (leaf node) | Last level of the layout, whatever its displayed name (title, scene…). Folder holding the media pool, the assets and the versions. Its `nodeId` serves as `titleId`. |
 | Version | A distinct `.RPP` file in a title folder (variant of the title, e.g. another arrangement, or the version of another member). Has a stable `versionId`, an owner, a label. |
-| Backup (UI: « Point de sauvegarde ») | Copy of a version at a given time, kept in the title's `_history/` folder: the history of a version. Distinct from REAPER's own backups (`.rpp-bak`, `Backups/`). |
+| Backup (UI: « Point de sauvegarde ») | Copy of a version at a given time, kept in the title's `.history/` folder: the history of a version. Distinct from REAPER's own backups (`.rpp-bak`, `Backups/`). |
 | Media pool | `Media/` folder of the title, shared by all its versions, append-only. |
 | Checkout (UI: « Récupérer ») | Copy repository → workspace. |
 | Publish (UI: « Publier ») | Copy workspace → repository. |
@@ -118,21 +118,21 @@ Example with the classic template:
         Renders/                  # default render folder; published in phase 3 (cf. §5.3)
         Assets/                   # attached files: scores, tabs, images, docs (cf. §5.9)
         <any name>.RPP            # versions (flat list)
-        _history/                 # backups of the versions (history), cf. §5.4
-        _trash/                   # deleted versions and assets
+        .history/                 # backups of the versions (history), cf. §5.4
+        .trash/                   # deleted versions and assets
 ```
 
 Rules:
-- Scaffolding: the library initialization only writes `.library.json`. Creating or adopting a title creates its folders (`Media/`, `Renders/`, `Assets/`, `_history/`, `_trash/`) and its `.node.json`.
+- Scaffolding: the library initialization only writes `.library.json`. Creating or adopting a title creates its folders (`Media/`, `Renders/`, `Assets/`, `.history/`, `.trash/`) and its `.node.json`.
 - In `cloud` and `collab` modes, the workspace mirrors the repository tree for checked-out titles. The repository's `.library.json` is authoritative; the workspace keeps a copy of it to work offline.
-- Application system files and folders (`.library.json`, `.node.json`, `.collab/`) start with a dot, and are also given the hidden attribute on Windows **[TO VALIDATE: synchronization of dot files and hidden files by each cloud client]**. `_history/` and `_trash/` hold project data and stay visible.
-- `.RPP` files in `_history/` and `_trash/` are never listed as versions, nor in the "To sort" or "To adopt" sections, nor treated as duplicates (§4.2). They are not shown in the main library view; they enrich the title card and the detail view (history, trash).
+- Application files and folders (`.library.json`, `.node.json`, `.collab/`, `.history/`, `.trash/`) start with a dot, and are also given the hidden attribute on Windows when the application creates them. They stay reachable from the application (title card, detail view). Their subfolders take no prefix (e.g. `.collab/exports/`). Validated (2026-11-07, Google Drive for desktop, streaming mode, Windows): dot-prefixed files and folders, with or without the hidden attribute, and hidden folders without a dot are all synchronized; the hidden attribute is kept locally after synchronization. Other cloud clients **[TO VALIDATE]** (e.g. Box Sync is reported to ignore dot-prefixed files).
+- `.RPP` files in `.history/` and `.trash/` are never listed as versions, nor in the "To sort" or "To adopt" sections, nor treated as duplicates (§4.2). They are not shown in the main library view; they enrich the title card and the detail view (history, trash).
 - The **path** defines the tag values. `.node.json` files only carry **stable identifiers** and the level, so that moving or renaming a folder does not break collaborative data.
 - Any folder or `.RPP` whose position does not match the layout appears in the "To sort" section (UI: « À ranger », §5.2).
 - The name of a `.RPP` is free: the identity of a version does not depend on its name (cf. §4.2).
 - Extension comparisons are **case-insensitive** (`.rpp` and `.RPP` coexist in real projects).
 - Files excluded from any synchronization and from indexing (surveyed on a real repository):
-  - REAPER: `*.reapeaks`, `*.rpp-bak` (including timestamped ones: `<name>-YYYY-MM-DD_HHMM.rpp-bak`), the title's `Backups/` subfolder (timestamped backups), `*.rpp-undo`, `*.rpp-prox`, `*.reapindex`. REAPER backups remain a **local** safety net: shared history is provided by the backups in `_history/` (§5.4) and by the cloud provider's history;
+  - REAPER: `*.reapeaks`, `*.rpp-bak` (including timestamped ones: `<name>-YYYY-MM-DD_HHMM.rpp-bak`), the title's `Backups/` subfolder (timestamped backups), `*.rpp-undo`, `*.rpp-prox`, `*.reapindex`. REAPER backups remain a **local** safety net: shared history is provided by the backups in `.history/` (§5.4) and by the cloud provider's history;
   - system: `.DS_Store`, `._*` (macOS AppleDouble), `desktop.ini`, `Thumbs.db`;
   - cloud provider: Google Drive shortcuts (`*.gdoc`, `*.gsheet`…).
 
@@ -147,7 +147,7 @@ Rules:
 2. **Title identity**: a `.node.json` is written in each title folder (stable identity, eases a later migration to a layout). This is the application's only write in the tree outside explicit actions.
 3. **Project files untouched**: `.rpp` files are never modified nor moved, except an explicit deletion (rule 5). No `EXTSTATE`, hence no `versionId` nor owner: a version is identified by its path relative to the title folder (a rename outside the application loses its status). No "To adopt" section.
 4. **Media pool**: no `Media/` constraint, no path normalization, no "To sort" section. Only missing media are reported.
-5. **Creation, deletion**: new titles created in a folder chosen by the user. Deletion (explicit, confirmed) moves the `.rpp` to a `_trash/` placed in its folder, created on first use. No backups (`_history/`).
+5. **Creation, deletion**: new titles created in a folder chosen by the user. Deletion (explicit, confirmed) moves the `.rpp` to a `.trash/` placed in its folder, created on first use. No backups (`.history/`).
 6. **Nested folders** containing `.rpp` files, on one or several levels (real case: `title/member/v2/…`): they belong to the title of the topmost folder, and their `.rpp` files are its versions.
 7. **Configuration**: watched roots and the library configuration are stored in the application configuration, not in the folders. A root located under an already declared root (in any library) is refused, to avoid duplicates.
 8. **Mode change**: switching to `cloud` or `collab` is impossible without a prior migration to a layout.
@@ -217,7 +217,7 @@ Versions form a **flat list** (no tree, no parent version).
 - Adding a library: creation of a new one (choice of mode and layout) or attachment to an existing repository (reading its `.library.json`, case of a member joining a group).
 - **Removing a library** from the application, whatever its mode, after confirmation:
   - removed: the library from the application configuration and from the index; in the local folder (workspace, or free tree roots), the application files `.library.json`, `.node.json` and `.collab/`. The confirmation states that the statuses stored in the `.node.json` files are lost;
-  - kept: all REAPER and audio content (`.RPP`, `Media/`, `Renders/`, `Assets/`, REAPER backups, peaks…), `_history/` and `_trash/` (project data), and the `ReaHarvest` `EXTSTATE` section of the `.RPP` files (version identity, reused if the folder is added again);
+  - kept: all REAPER and audio content (`.RPP`, `Media/`, `Renders/`, `Assets/`, REAPER backups, peaks…), `.history/` and `.trash/` (project data), and the `ReaHarvest` `EXTSTATE` section of the `.RPP` files (version identity, reused if the folder is added again);
   - in `cloud` and `collab` modes, the repository is never touched. Deleting the application data from the repository is a separate critical action (outside the MVP);
   - goal: the folder can be added again later, with any layout, without leftovers from the previous library.
 - First-run wizard: creation of the first library, REAPER detection.
@@ -281,14 +281,14 @@ Parsing of the `.RPP`, without REAPER:
 Actions performed from the title detail (§5.2).
 - **Create a version** (a new, distinct `.RPP`): blank, from a template or by duplicating an existing version. New ID; the owner is the current user by default. In `collab` mode, the owner can be chosen at creation (e.g. a version prepared for another member) or changed afterwards by its current owner only. The file name matters (it identifies the version for the members): pre-filled as `<title> - <label>.RPP`, followed by the owner's name when the owner is not the current user, and editable.
 - **Rename** the file and/or modify the label. A rename made in the application is tracked through the `versionId`, and published as a rename of the remote file, together with any modification of its content (§5.5).
-- **Delete**: move to `_trash/`.
-- **Purge**: permanent deletion from `_trash/`, with confirmation. Then, list of pool media referenced by no version, then purge on confirmation. Purging unreferenced media only applies to `Media/`: `Assets/` is never concerned. Purge acts on the workspace only; the repository follows through the synchronization of the mode (§5.5). Sensitive, destructive feature.
-- **Back up a version** (UI: « Créer un point de sauvegarde »): copies the `.RPP` of the version into `_history/`, named after the version (name and date). The version itself is unchanged.
+- **Delete**: move to `.trash/`.
+- **Purge**: permanent deletion from `.trash/`, with confirmation. Then, list of pool media referenced by no version, then purge on confirmation. Purging unreferenced media only applies to `Media/`: `Assets/` is never concerned. Purge acts on the workspace only; the repository follows through the synchronization of the mode (§5.5). Sensitive, destructive feature.
+- **Back up a version** (UI: « Créer un point de sauvegarde »): copies the `.RPP` of the version into `.history/`, named after the version (name and date). The version itself is unchanged.
 - **History**: browsing and restoring the backups of a version (manual backups, and versions overwritten by a forced publish, §5.5).
 
 ### 5.5 Synchronization
 **Checkout**
-- By default: full title folder (all versions, `Media/`, `Renders/`, `Assets/`, `_history/`, `_trash/`).
+- By default: full title folder (all versions, `Media/`, `Renders/`, `Assets/`, `.history/`, `.trash/`).
 - Options (outside the MVP): exclude versions (media referenced only by the excluded versions are then not copied) or `Renders/`. User preference per library or per title, persisted client-side.
 - Local storage of the hash (cf. §7.1) of each checked-out file, used as the comparison base.
 
@@ -300,7 +300,7 @@ Actions performed from the title detail (§5.2).
 3. For each modified `.RPP`:
    - **conflict** if the remote hash differs from the base hash: refusal, conflict display, user choice (keep remote, publish as new version, or force);
    - **version of another member**: refused by default, with an offer to save it as a new version under one's own name. Exception: a version never published (absent from the repository) can be published by the member who created it, whatever its owner (e.g. a version prepared for another member);
-   - **forcing**: overwrites the remote version with the local one, after explicit confirmation and a warning when a conflict was detected. In `collab` mode it bypasses the ownership check or the conflict; in `cloud` mode, the conflict only. The overwritten remote version is first backed up into `_history/`; in `collab` mode, an activity event is sent to the owner.
+   - **forcing**: overwrites the remote version with the local one, after explicit confirmation and a warning when a conflict was detected. In `collab` mode it bypasses the ownership check or the conflict; in `cloud` mode, the conflict only. The overwritten remote version is first backed up into `.history/`; in `collab` mode, an activity event is sent to the owner.
 4. Update of the base hashes; in `collab` mode, emission of an activity event ("X published Y", UI: « X a publié Y »).
 
 **Release**
@@ -360,7 +360,7 @@ Statuses and asset files are available in **all modes**; the other features requ
 - **Notes** per title or per version, written by the members in ReaHarvest. Distinct from the REAPER project notes (`<NOTES` chunk, visible in REAPER's project settings, §5.6).
 - **Lyrics** per title, with modification history.
 - **Shared assets** per title (scores, tabs, images, PDF, other files):
-  - files are stored in the title's `Assets/` and synchronized with the title (§5.5). They are **not versioned** (no backups in `_history/`); a deleted asset is moved to the title's `_trash/`;
+  - files are stored in the title's `Assets/` and synchronized with the title (§5.5). They are **not versioned** (no backups in `.history/`); a deleted asset is moved to the title's `.trash/`;
   - metadata (description, author, optional associated version) is in the collab store (`asset` entity);
   - built-in preview for images and PDF, opening with the system application otherwise;
   - in `local` and `cloud` modes, `Assets/` is available without collaborative metadata.
@@ -406,7 +406,7 @@ CollabStore
 ### 6.3 Journal adapter (`JournalStore`)
 ```
 <repositoryRoot>/.collab/<memberId>/<yyyy-mm>.jsonl     # append-only, one writer per directory
-<repositoryRoot>/.collab/_exports/<timestamp>.json      # full exports of the store, optional baselines
+<repositoryRoot>/.collab/exports/<timestamp>.json       # full exports of the store, optional baselines
 ```
 - Each member writes **only** in their own folder: no Drive synchronization conflict possible.
 - One line = one operation: `{ v, opId, groupId, author, hlc, entity, uid, op: "upsert"|"delete", fields }`.
@@ -453,7 +453,7 @@ Switch procedure (single action in the settings):
 2. `importAll()` into the target adapter, then verification by count per entity.
 3. Writing of `.library.json` with the new store.
 4. The other members' applications detect the change of `.library.json` and switch automatically.
-5. PocketBase → journal switch: the export is written into `.collab/_exports/` as the starting baseline.
+5. PocketBase → journal switch: the export is written into `.collab/exports/` as the starting baseline.
 
 ---
 

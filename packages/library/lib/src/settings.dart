@@ -26,7 +26,7 @@ final class LocalIdentity {
 }
 
 /// A library configured on this machine (SPEC §5.1). Mode and layout live in
-/// the library's `_library.json`.
+/// the library's `.library.json`.
 final class LibraryEntry {
   const LibraryEntry({
     required this.id,
@@ -46,7 +46,7 @@ final class LibraryEntry {
   /// Templates folder specific to this library.
   final String? templatesFolder;
 
-  /// Folder holding `_library.json`.
+  /// Folder holding `.library.json`.
   String get libraryRoot => repositoryRoot ?? workspaceRoot;
 
   List<String> get roots => [workspaceRoot, ?repositoryRoot];
@@ -183,7 +183,8 @@ final class AppSettings {
       reaperExecutable: json['reaperExecutable'] as String?,
       reaperResources: json['reaperResources'] as String?,
       templatesFolder: json['templatesFolder'] as String?,
-      theme: ThemePreference.values.asNameMap()[json['theme']] ??
+      theme:
+          ThemePreference.values.asNameMap()[json['theme']] ??
           ThemePreference.system,
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
       language: json['language'] as String? ?? systemLanguage,

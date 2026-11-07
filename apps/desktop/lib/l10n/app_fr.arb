@@ -63,7 +63,7 @@
   "addLibrary": "Ajouter une bibliothèque",
   "errorUnsupportedMode": "Ce dossier contient une bibliothèque cloud ou collaborative, pas encore prise en charge.",
   "errorOverlap": "Ce dossier est, contient ou se trouve dans une autre bibliothèque.",
-  "errorInvalidFile": "Ce dossier contient un fichier _library.json illisible.",
+  "errorInvalidFile": "Ce dossier contient un fichier .library.json illisible.",
   "reaperStepHint": "ReaHarvest ouvre vos projets dans REAPER et vérifie vos plugins.",
   "reaperExecutable": "Application",
   "reaperResources": "Dossier de ressources",

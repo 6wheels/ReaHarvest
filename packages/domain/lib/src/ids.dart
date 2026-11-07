@@ -28,7 +28,7 @@ extension type const MemberId(String value) implements String {
   MemberId.generate() : this(newUlid());
 }
 
-/// Library identity, stored in `_library.json`.
+/// Library identity, stored in `.library.json`.
 extension type const LibraryId(String value) implements String {
   LibraryId.generate() : this(newUlid());
 }

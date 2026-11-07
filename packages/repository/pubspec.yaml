@@ -8,6 +8,7 @@ environment:
 dev_dependencies:
   test: ^1.31.1
 dependencies:
+  ffi: ^2.2.0
   path: ^1.9.1
   reaharvest_domain:
     path: ../domain

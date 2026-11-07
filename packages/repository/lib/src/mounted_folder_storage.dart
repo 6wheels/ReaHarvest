@@ -3,8 +3,12 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
+import 'windows_hidden.dart' as windows;
+
 /// [RepositoryStorage] over a local, mounted or provider-synchronized folder
-/// (SPEC §3.0). Symbolic links are not followed.
+/// (SPEC §3.0). Symbolic links are not followed. On Windows, the files and
+/// folders it creates with a dot-prefixed name get the hidden attribute
+/// (SPEC §3.2).
 final class MountedFolderStorage implements RepositoryStorage {
   MountedFolderStorage(this.root);
 
@@ -17,6 +21,17 @@ final class MountedFolderStorage implements RepositoryStorage {
       path.isEmpty ? root : p.joinAll([root, ...path.split('/')]);
 
   String _rel(String abs) => p.split(p.relative(abs, from: root)).join('/');
+
+  /// Hides the dot-prefixed segments of [path] on Windows.
+  void _hideDotSegments(String path) {
+    if (!Platform.isWindows) return;
+    final segments = path.split('/');
+    for (var i = 0; i < segments.length; i++) {
+      if (segments[i].startsWith('.')) {
+        windows.hide(_abs(segments.sublist(0, i + 1).join('/')));
+      }
+    }
+  }
 
   StorageEntry _entry(String path, FileStat stat) => StorageEntry(
     path: path,
@@ -62,6 +77,7 @@ final class MountedFolderStorage implements RepositoryStorage {
       await sink.close();
     }
     await tmp.rename(target.path);
+    _hideDotSegments(path);
   }
 
   @override
@@ -77,9 +93,12 @@ final class MountedFolderStorage implements RepositoryStorage {
     } else {
       await File(source).rename(target);
     }
+    _hideDotSegments(to);
   }
 
   @override
-  Future<void> createDirectory(String path) =>
-      Directory(_abs(path)).create(recursive: true);
+  Future<void> createDirectory(String path) async {
+    await Directory(_abs(path)).create(recursive: true);
+    _hideDotSegments(path);
+  }
 }

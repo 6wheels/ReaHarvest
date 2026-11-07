@@ -224,7 +224,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get errorInvalidFile =>
-      'Ce dossier contient un fichier _library.json illisible.';
+      'Ce dossier contient un fichier .library.json illisible.';
 
   @override
   String get reaperStepHint =>

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
+import 'package:reaharvest_repository/src/windows_hidden.dart' as windows;
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'package:test/test.dart';
 
@@ -87,15 +88,39 @@ void main() {
       );
       expect((await storage.stat('a/b/c.txt'))!.size, 2);
       expect(await storage.stat('missing'), isNull);
-      await storage.move('a/b/c.txt', 'a/_trash/c.txt');
-      expect(exists('a/_trash/c.txt'), isTrue);
+      await storage.move('a/b/c.txt', 'a/.trash/c.txt');
+      expect(exists('a/.trash/c.txt'), isTrue);
       expect(exists('a/b/c.txt'), isFalse);
       await storage.write('a/b/c.txt', Stream.value(utf8.encode('x')));
       expect(
-        () => storage.move('a/b/c.txt', 'a/_trash/c.txt'),
+        () => storage.move('a/b/c.txt', 'a/.trash/c.txt'),
         throwsA(isA<FileSystemException>()),
       );
     });
+
+    test(
+      'hides dot-prefixed files and folders on Windows (SPEC §3.2)',
+      () async {
+        bool hidden(String path) => windows.isHidden(p.join(root.path, path));
+
+        await storage.write('.library.json', Stream.value(utf8.encode('{}')));
+        await storage.write('a/.node.json', Stream.value(utf8.encode('{}')));
+        // Rewriting replaces the file: it must stay hidden.
+        await storage.write('a/.node.json', Stream.value(utf8.encode('{ }')));
+        await storage.createDirectory('.collab/m1');
+        await storage.write('a/b.rpp', Stream.value(utf8.encode('')));
+        await storage.move('a/b.rpp', 'a/.trash/b.rpp');
+
+        expect(hidden('.library.json'), isTrue);
+        expect(hidden('a/.node.json'), isTrue);
+        expect(hidden('.collab'), isTrue);
+        expect(hidden('a/.trash'), isTrue);
+        expect(hidden('a'), isFalse);
+        expect(hidden('.collab/m1'), isFalse);
+        expect(hidden('a/.trash/b.rpp'), isFalse);
+      },
+      testOn: 'windows',
+    );
   });
 
   group('conventions', () {
@@ -129,14 +154,14 @@ void main() {
       put('band/album/song/v2.RPP', unknown);
       put('band/album/song/v2.rpp-bak', unknown);
       put('band/album/song/Backups/v2-2024-01-02_1030.rpp', unknown);
-      put('band/album/song/_versions/old.rpp', unknown);
+      put('band/album/song/.history/old.rpp', unknown);
       put('band/album/song/Media/a.wav');
       put('band/album/song/old-takes/notes.txt');
       put('band/album/song/old-takes/take.rpp', unknown);
       put('band/_Unassigned/other/v1.rpp', unknown);
       put('band/loose.rpp', unknown);
       put('root.rpp', unknown);
-      put('_collab/x.rpp', unknown);
+      put('.collab/x.rpp', unknown);
 
       final result = await scan(storage, lib);
 

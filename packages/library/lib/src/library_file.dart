@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 /// Name of the library description file, at the library root (SPEC §6.5).
-const libraryFileName = '_library.json';
+const libraryFileName = '.library.json';
 
 /// Layout templates provided out of the box (SPEC §3.1).
 enum LayoutTemplate {
@@ -20,7 +20,7 @@ enum LayoutTemplate {
   };
 }
 
-/// Reads `_library.json` from [storage] (the repository root in cloud and
+/// Reads `.library.json` from [storage] (the repository root in cloud and
 /// collab modes, the workspace root in local mode), or null if absent.
 Future<Library?> readLibrary(RepositoryStorage storage) async {
   if (await storage.stat(libraryFileName) == null) return null;
@@ -28,7 +28,7 @@ Future<Library?> readLibrary(RepositoryStorage storage) async {
   return Library.fromJson((jsonDecode(text) as Map).cast());
 }
 
-/// Writes `_library.json` atomically to [storage].
+/// Writes `.library.json` atomically to [storage].
 Future<void> writeLibrary(RepositoryStorage storage, Library library) {
   final text = const JsonEncoder.withIndent('  ').convert(library.toJson());
   return storage.write(libraryFileName, Stream.value(utf8.encode('$text\n')));

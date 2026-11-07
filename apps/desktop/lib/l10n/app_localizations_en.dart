@@ -223,7 +223,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorInvalidFile =>
-      'This folder holds an unreadable _library.json file.';
+      'This folder holds an unreadable .library.json file.';
 
   @override
   String get reaperStepHint =>

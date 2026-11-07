@@ -116,11 +116,11 @@ void main() {
   });
 
   group('library', () {
-    test('round-trips _library.json', () {
+    test('round-trips .library.json', () {
       final library = Library(
         id: LibraryId.generate(),
         mode: LibraryMode.collab,
-        layout: Layout.classic().freeze(),
+        layout: Layout.classic(),
         collab: CollabSettings(
           groupId: GroupId.generate(),
           backendUrl: 'https://example.org',
@@ -134,7 +134,6 @@ void main() {
       final read = Library.fromJson(json);
       expect(read.id, library.id);
       expect(read.mode, LibraryMode.collab);
-      expect(read.layout!.frozen, isTrue);
       expect(read.layout!.levels.map((l) => l.key), [
         'artist',
         'album',

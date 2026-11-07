@@ -3,7 +3,7 @@ import 'ids.dart';
 /// Sharing level of a library (SPEC §3.0).
 enum LibraryMode { local, cloud, collab }
 
-/// Collab store implementation selected in `_library.json`.
+/// Collab store implementation selected in `.library.json`.
 enum CollabStoreKind { journal, pocketbase }
 
 /// One layout level: a folder level bound to a language-independent tag key
@@ -36,12 +36,9 @@ final class LayoutLevel {
 
 /// Ordered folder levels of a library; the last one is the leaf (title).
 final class Layout {
-  Layout(
-    this.levels, {
-    Map<String, String>? renderMetadata,
-    this.frozen = false,
-  }) : renderMetadata =
-           renderMetadata ?? {for (final l in levels) l.key: l.key} {
+  Layout(this.levels, {Map<String, String>? renderMetadata})
+    : renderMetadata =
+          renderMetadata ?? {for (final l in levels) l.key: l.key} {
     if (levels.isEmpty || levels.length > maxLevels) {
       throw ArgumentError('A layout has 1 to $maxLevels levels');
     }
@@ -62,10 +59,8 @@ final class Layout {
     LayoutLevel('title'),
   ]);
 
-  static Layout projectOriented() => Layout(const [
-    LayoutLevel('artist'),
-    LayoutLevel('title'),
-  ]);
+  static Layout projectOriented() =>
+      Layout(const [LayoutLevel('artist'), LayoutLevel('title')]);
 
   static Layout film() => Layout(const [
     LayoutLevel('project'),
@@ -78,13 +73,7 @@ final class Layout {
   /// Tag key -> render metadata field (e.g. `artist` -> `artist`).
   final Map<String, String> renderMetadata;
 
-  /// Frozen once the first title exists; changing it is a migration.
-  final bool frozen;
-
   LayoutLevel get leaf => levels.last;
-
-  Layout freeze() =>
-      Layout(levels, renderMetadata: renderMetadata, frozen: true);
 
   /// Tags of a title located at [folders] (relative to the library root),
   /// or null if the path does not match the layout depth.
@@ -96,17 +85,12 @@ final class Layout {
   Map<String, Object?> toJson() => {
     'levels': [for (final l in levels) l.toJson()],
     'renderMetadata': renderMetadata,
-    'frozen': frozen,
   };
 
-  static Layout fromJson(Map<String, Object?> json) => Layout(
-    [
-      for (final l in json['levels'] as List)
-        LayoutLevel.fromJson((l as Map).cast()),
-    ],
-    renderMetadata: (json['renderMetadata'] as Map?)?.cast(),
-    frozen: json['frozen'] as bool? ?? false,
-  );
+  static Layout fromJson(Map<String, Object?> json) => Layout([
+    for (final l in json['levels'] as List)
+      LayoutLevel.fromJson((l as Map).cast()),
+  ], renderMetadata: (json['renderMetadata'] as Map?)?.cast());
 }
 
 /// Collab settings of a library (collab mode only).
@@ -136,7 +120,7 @@ final class CollabSettings {
   );
 }
 
-/// Library description, as stored in `_library.json` (SPEC §6.5).
+/// Library description, as stored in `.library.json` (SPEC §6.5).
 final class Library {
   Library({
     required this.id,
@@ -175,7 +159,7 @@ final class Library {
   static Library fromJson(Map<String, Object?> json) {
     final version = json['schemaVersion'];
     if (version != schemaVersion) {
-      throw FormatException('Unsupported _library.json schema: $version');
+      throw FormatException('Unsupported .library.json schema: $version');
     }
     final layout = json['layout'] as Map?;
     final collab = json['collab'] as Map?;

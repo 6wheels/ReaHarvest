@@ -42,7 +42,7 @@ final class MemoryStorage implements RepositoryStorage {
 }
 
 void main() {
-  group('_library.json', () {
+  group('.library.json', () {
     test('is absent from an empty root', () async {
       expect(await readLibrary(MemoryStorage()), isNull);
     });
@@ -52,7 +52,7 @@ void main() {
       final library = Library(
         id: LibraryId.generate(),
         mode: LibraryMode.collab,
-        layout: LayoutTemplate.classic.create().freeze(),
+        layout: LayoutTemplate.classic.create(),
         collab: CollabSettings(
           groupId: GroupId.generate(),
           store: CollabStoreKind.pocketbase,
@@ -68,7 +68,6 @@ void main() {
       final read = (await readLibrary(storage))!;
       expect(read.id, library.id);
       expect(read.mode, LibraryMode.collab);
-      expect(read.layout!.frozen, isTrue);
       expect(read.layout!.levels.map((l) => l.key), [
         'artist',
         'album',
@@ -196,7 +195,10 @@ void main() {
 
       final kept = read.copyWith(theme: ThemePreference.light);
       expect(kept.reaperExecutable, '/opt/reaper/reaper');
-      final reset = read.copyWith(reaperExecutable: null, templatesFolder: null);
+      final reset = read.copyWith(
+        reaperExecutable: null,
+        templatesFolder: null,
+      );
       expect(reset.reaperExecutable, isNull);
       expect(reset.templatesFolder, isNull);
       expect(reset.reaperResources, '/home/alice/.config/REAPER');

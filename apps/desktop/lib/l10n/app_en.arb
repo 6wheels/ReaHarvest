@@ -75,7 +75,7 @@
   "addLibrary": "Add a library",
   "errorUnsupportedMode": "This folder holds a cloud or collaboration library, which is not supported yet.",
   "errorOverlap": "This folder is, contains or is inside another library.",
-  "errorInvalidFile": "This folder holds an unreadable _library.json file.",
+  "errorInvalidFile": "This folder holds an unreadable .library.json file.",
   "reaperStepHint": "ReaHarvest opens your projects in REAPER and checks your plugins.",
   "reaperExecutable": "Application",
   "reaperResources": "Resource folder",
