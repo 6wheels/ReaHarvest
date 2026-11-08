@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest/state/libraries.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/providers.dart';
+import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
@@ -36,6 +37,9 @@ void main() {
         ),
         settingsProvider.overrideWith(MemorySettings.new),
         localIndexProvider.overrideWithValue(index),
+        defaultReaperResourcesProvider.overrideWithValue(
+          p.join(root.path, 'resources'),
+        ),
       ],
     );
   });
@@ -251,5 +255,88 @@ void main() {
     );
     await service().scanAll();
     expect(index.libraries(), isEmpty);
+  });
+
+  test('manages the versions of a title', () async {
+    final band = folder('Band');
+    final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
+      ..createSync(recursive: true);
+    File('../../test/fixtures/project-1.rpp')
+        .copySync(p.join(song.path, 'v1.rpp'));
+    File(p.join(song.path, 'Media', 'unused.wav'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('x');
+    await service().addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    Title title() => index.titles().single;
+    Version version(String name) =>
+        title().versions.firstWhere((v) => v.fileName == name);
+
+    expect(
+      await service().addVersion(title(), 'Song - a.RPP', ' a '),
+      'Song - a.RPP',
+    );
+    final blank = version('Song - a.RPP').metadata!;
+    expect((blank.owner, blank.label), (const MemberId('M'), 'a'));
+    await service().addVersion(
+      title(),
+      'copy.RPP',
+      'b',
+      source: version('Song - a.RPP'),
+    );
+    final copy = version('copy.RPP').metadata!;
+    expect(copy.id, isNot(blank.id));
+    expect(copy.label, 'b');
+
+    expect(
+      await service().editVersion(
+        title(),
+        version('copy.RPP'),
+        fileName: 'Song - c.RPP',
+        label: 'c',
+      ),
+      'Song - c.RPP',
+    );
+    final edited = version('Song - c.RPP').metadata!;
+    expect((edited.id, edited.label), (copy.id, 'c'));
+
+    await service().setStatusOf(title(), version('Song - c.RPP'), 'mixing');
+    expect(title().statusOf(version('Song - c.RPP')), 'mixing');
+
+    await service().trashVersion(title(), version('Song - c.RPP'));
+    expect(
+      title().versions.map((v) => v.fileName),
+      isNot(contains('Song - c.RPP')),
+    );
+    final trash = await container.read(trashProvider(title().id).future);
+    expect(trash.map((e) => e.path), ['Artist/Album/Song/.trash/Song - c.RPP']);
+
+    final unused = await service().purge(title(), [trash.single.path]);
+    expect(
+      File(p.join(song.path, '.trash', 'Song - c.RPP')).existsSync(),
+      isFalse,
+    );
+    expect(unused.map((e) => e.path), ['Artist/Album/Song/Media/unused.wav']);
+    await service().purgeUnusedMedia(title(), [unused.single.path]);
+    expect(
+      File(p.join(song.path, 'Media', 'unused.wav')).existsSync(),
+      isFalse,
+    );
+  });
+
+  test('lists the project templates of a library', () async {
+    final templates = Directory(
+      p.join(root.path, 'resources', 'ProjectTemplates'),
+    )..createSync(recursive: true);
+    File(p.join(templates.path, 'band.RPP')).createSync();
+    expect(
+      await container.read(
+        projectTemplatesProvider(LibraryId.generate()).future,
+      ),
+      [p.join(templates.path, 'band.RPP')],
+    );
   });
 }

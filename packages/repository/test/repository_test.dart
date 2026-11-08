@@ -633,6 +633,15 @@ void main() {
 
   group('versions', () {
     const title = 'band/album/song';
+
+    test('suggests a file name from title, label and owner', () {
+      expect(suggestedVersionName('Song', 'chorus B'), 'Song - chorus B.RPP');
+      expect(suggestedVersionName('Song', ' '), 'Song.RPP');
+      expect(
+        suggestedVersionName('Song', 'demo', owner: 'Bob'),
+        'Song - demo - Bob.RPP',
+      );
+    });
     final owner = MemberId.generate();
 
     String read(String path) =>

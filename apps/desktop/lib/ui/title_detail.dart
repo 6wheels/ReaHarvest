@@ -15,6 +15,7 @@ import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
 import 'status_trail.dart';
+import 'version_actions.dart';
 import 'widgets.dart';
 
 /// Route of a page shown over the library (title detail, "To sort").
@@ -150,6 +151,16 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
   /// File name of the selected version; the latest one when null.
   String? _selected;
 
+  /// Trash tab shown instead of the versions.
+  var _trash = false;
+
+  void _select(String fileName) => setState(() => _selected = fileName);
+
+  Future<void> _newVersion(Title title, Version? selected) async {
+    final name = await showNewVersionDialog(context, title, selected);
+    if (name != null) _select(name);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -161,14 +172,38 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
     final selected =
         versions.where((v) => v.fileName == _selected).firstOrNull ??
         versions.firstOrNull;
+    final freeTree =
+        title == null ||
+        (ref.watch(indexedLibrariesProvider)[title.libraryId]?.isFreeTree ??
+            true);
+    final l10n = AppLocalizations.of(context);
     return BackNavigation(
       child: Scaffold(
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _Header(title, selected),
-            Divider(height: 1, color: c.border),
             if (title != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Space.m),
+                child: Row(
+                  children: [
+                    _Tab(
+                      l10n.versions,
+                      selected: !_trash,
+                      onTap: () => setState(() => _trash = false),
+                    ),
+                    _Tab(
+                      l10n.trash,
+                      selected: _trash,
+                      onTap: () => setState(() => _trash = true),
+                    ),
+                  ],
+                ),
+              ),
+            Divider(height: 1, color: c.border),
+            if (title != null && _trash) Expanded(child: TrashView(title)),
+            if (title != null && !_trash)
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -178,13 +213,21 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                       child: ListView(
                         padding: const EdgeInsets.all(Space.m),
                         children: [
+                          if (!freeTree)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: Space.s),
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                onPressed: () => _newVersion(title, selected),
+                                label: Text(l10n.newVersion),
+                              ),
+                            ),
                           for (final v in versions)
                             _VersionItem(
                               title,
                               v,
                               selected: v == selected,
-                              onTap: () =>
-                                  setState(() => _selected = v.fileName),
+                              onTap: () => _select(v.fileName),
                             ),
                         ],
                       ),
@@ -198,6 +241,9 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                             : _VersionPane(
                                 title,
                                 selected,
+                                onSelect: _select,
+                                onNewVersion: () =>
+                                    _newVersion(title, selected),
                                 key: ValueKey(selected.fileName),
                               ),
                       ),
@@ -206,6 +252,43 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tab of the title detail (versions, trash).
+class _Tab extends StatelessWidget {
+  const _Tab(this.label, {required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.m,
+          vertical: Space.s,
+        ),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              width: 2,
+              color: selected ? c.accent : Colors.transparent,
+            ),
+          ),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge
+              ?.copyWith(color: selected ? null : c.muted),
         ),
       ),
     );
@@ -372,7 +455,9 @@ class _VersionItem extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     final alerts = versionAlerts(ref, title, version);
-    final label = version.metadata?.label ?? '';
+    final identity = ref.watch(settingsProvider.select((s) => s.identity));
+    final m = version.metadata;
+    final status = title.statusOf(version);
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
@@ -403,7 +488,9 @@ class _VersionItem extends ConsumerWidget {
                       Text(
                         [
                           shortDate(l10n, version.modified),
-                          if (label.isNotEmpty) label,
+                          if (m != null && m.label.isNotEmpty) m.label,
+                          if (m != null) ownerName(identity, m.owner),
+                          if (status != null) statusLabel(l10n, status),
                         ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -499,10 +586,27 @@ class _AdoptState extends ConsumerState<_Adopt> {
 /// Selected version: details, actions, missing plugins, duplicates and
 /// history.
 class _VersionPane extends ConsumerWidget {
-  const _VersionPane(this.title, this.version, {super.key});
+  const _VersionPane(
+    this.title,
+    this.version, {
+    super.key,
+    required this.onSelect,
+    required this.onNewVersion,
+  });
 
   final Title title;
   final Version version;
+
+  /// Selects the version of this file name (after a rename).
+  final ValueChanged<String> onSelect;
+
+  /// Opens the new version dialog, this version offered as source.
+  final VoidCallback onNewVersion;
+
+  Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    final name = await showEditVersionDialog(context, ref, title, version);
+    if (name != null) onSelect(name);
+  }
 
   Future<void> _backup(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
@@ -581,6 +685,66 @@ class _VersionPane extends ConsumerWidget {
                 onPressed: () => _backup(context, ref),
                 label: Text(l10n.createBackup),
               ),
+            MenuAnchor(
+              menuChildren: [
+                if (!freeTree) ...[
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.copy_rounded),
+                    onPressed: onNewVersion,
+                    child: Text(l10n.duplicateVersion),
+                  ),
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.edit_outlined),
+                    onPressed: () => _edit(context, ref),
+                    child: Text(l10n.editVersion),
+                  ),
+                ],
+                SubmenuButton(
+                  leadingIcon: const Icon(Icons.flag_outlined),
+                  menuChildren: [
+                    for (final s in {...Title.defaultStatuses, ?status})
+                      MenuItemButton(
+                        trailingIcon: s == status
+                            ? const Icon(Icons.check_rounded, size: 18)
+                            : null,
+                        onPressed: () => setVersionStatusFromUi(
+                          context,
+                          ref,
+                          title,
+                          version,
+                          s,
+                        ),
+                        child: Text(statusLabel(l10n, s)),
+                      ),
+                    MenuItemButton(
+                      onPressed: status == null
+                          ? null
+                          : () => setVersionStatusFromUi(
+                              context,
+                              ref,
+                              title,
+                              version,
+                              null,
+                            ),
+                      child: Text(l10n.noStatus),
+                    ),
+                  ],
+                  child: Text(l10n.changeStatus),
+                ),
+                MenuItemButton(
+                  leadingIcon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: () =>
+                      deleteVersionFromUi(context, ref, title, version),
+                  child: Text(l10n.deleteVersion),
+                ),
+              ],
+              builder: (context, controller, _) => IconButton(
+                tooltip: l10n.moreActions,
+                onPressed: () =>
+                    controller.isOpen ? controller.close() : controller.open(),
+                icon: const Icon(Icons.more_horiz_rounded),
+              ),
+            ),
           ],
         ),
         if (alerts.missing.isNotEmpty) ...[

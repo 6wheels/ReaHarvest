@@ -248,6 +248,20 @@ void main() {
     });
   });
 
+  test('lists project templates in a folder and its subfolders', () async {
+    expect(await listProjectTemplates('/no/such/folder'), isEmpty);
+    final dir = Directory.systemTemp.createTempSync('reaharvest_tmpls_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    for (final name in ['b.RPP', 'a.rpp', 'notes.txt', 'sub/c.rpp']) {
+      File(p.join(dir.path, name)).createSync(recursive: true);
+    }
+    expect(await listProjectTemplates(dir.path), [
+      p.join(dir.path, 'a.rpp'),
+      p.join(dir.path, 'b.RPP'),
+      p.join(dir.path, 'sub', 'c.rpp'),
+    ]);
+  });
+
   group('launcher', () {
     test('open command per OS', () {
       final (winExe, winArgs) = openProjectCommand(

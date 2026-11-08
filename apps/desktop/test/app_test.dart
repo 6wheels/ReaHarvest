@@ -46,6 +46,44 @@ class FakeLibraryService extends LibraryService {
   final adopted = <(String, String)>[];
   final separated = <String>[];
   final opened = <String>[];
+  final created = <(String, String, String?)>[];
+  final edited = <(String, String, String)>[];
+  final statuses = <(String, String?)>[];
+  final trashed = <String>[];
+
+  @override
+  Future<String> addVersion(
+    Title title,
+    String fileName,
+    String label, {
+    Version? source,
+    String? template,
+  }) async {
+    created.add((fileName, label, source?.fileName));
+    return fileName;
+  }
+
+  @override
+  Future<String> editVersion(
+    Title title,
+    Version version, {
+    required String fileName,
+    required String label,
+  }) async {
+    edited.add((version.fileName, fileName, label));
+    return fileName;
+  }
+
+  @override
+  Future<void> setStatusOf(
+    Title title,
+    Version version,
+    String? status,
+  ) async => statuses.add((version.fileName, status));
+
+  @override
+  Future<void> trashVersion(Title title, Version version) async =>
+      trashed.add(version.fileName);
 
   @override
   Future<bool> openVersion(Title title, Version version) async {
@@ -139,6 +177,17 @@ void main() {
           }),
           toSortProvider.overrideWithValue(const []),
           historyProvider.overrideWith((ref, id) async => const {}),
+          trashProvider.overrideWith(
+            (ref, id) async => [
+              StorageEntry(
+                path: 'Sample Artist/Album 2/Midnight Ferry/.trash/old.rpp',
+                isDirectory: false,
+                size: 2048,
+                modified: DateTime(2026, 11, 1),
+              ),
+            ],
+          ),
+          projectTemplatesProvider.overrideWith((ref, id) async => const []),
           pluginCacheProvider.overrideWith((ref) async => null),
           reaperRunningProvider.overrideWithValue(() async => reaperRunning),
           libraryServiceProvider.overrideWith(
@@ -463,7 +512,7 @@ void main() {
 
     await tester.tap(find.text('Midnight Ferry v5'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('take 5 · '), findsOneWidget);
+    expect(find.textContaining(RegExp('^take 5 · ')), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
@@ -581,6 +630,97 @@ void main() {
     await tester.tap(find.text('Make it a new version'));
     await tester.pumpAndSettle();
     expect(libraries.separated, hasLength(1));
+  });
+
+  Future<void> openMidnightFerry(WidgetTester tester) async {
+    await tester.tap(find.text('Midnight Ferry'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('creates a version with a suggested file name', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await openMidnightFerry(tester);
+    await tester.tap(find.text('New version'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Midnight Ferry.RPP'), findsOne);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Label'), 'bridge');
+    await tester.pumpAndSettle();
+    expect(
+      find.widgetWithText(TextField, 'Midnight Ferry - bridge.RPP'),
+      findsOne,
+    );
+    await tester.tap(find.text('Copy of “Midnight Ferry v1”'));
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    expect(libraries.created, [
+      ('Midnight Ferry - bridge.RPP', 'bridge', 'Midnight Ferry v1.rpp'),
+    ]);
+  });
+
+  testWidgets('refuses the name of another version', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await openMidnightFerry(tester);
+    await tester.tap(find.byTooltip('More actions').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename…'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'File name'),
+      'Midnight Ferry v2',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('A version already has this name'), findsOne);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'File name'),
+      'intro',
+    );
+    await tester.enterText(find.widgetWithText(TextField, 'Label'), 'first');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(libraries.edited, [('Midnight Ferry v1.rpp', 'intro.RPP', 'first')]);
+  });
+
+  testWidgets('sets the status and deletes a version', (tester) async {
+    await pumpApp(tester, titles: demoTitles(), reaperRunning: true);
+    await openMidnightFerry(tester);
+    await tester.tap(find.byTooltip('More actions').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change status'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mixing').last);
+    await tester.pumpAndSettle();
+    expect(libraries.statuses, [('Midnight Ferry v1.rpp', 'mixing')]);
+
+    await tester.tap(find.byTooltip('More actions').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to the trash'));
+    await tester.pumpAndSettle();
+    expect(find.text('Move “Midnight Ferry v1” to the trash?'), findsOne);
+    await tester.tap(find.text('Move to the trash').last);
+    await tester.pumpAndSettle();
+    expect(find.text('REAPER is open'), findsOne);
+    await tester.tap(find.text('Continue anyway'));
+    await tester.pumpAndSettle();
+    expect(libraries.trashed, ['Midnight Ferry v1.rpp']);
+  });
+
+  testWidgets('shows the trash of a title', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await openMidnightFerry(tester);
+    await tester.tap(find.text('Trash'));
+    await tester.pumpAndSettle();
+    expect(find.text('Empty the trash'), findsOne);
+    expect(find.text('old.rpp'), findsOne);
+    expect(find.textContaining('2.0 KB'), findsWidgets);
   });
 
   testWidgets('uses French when chosen', (tester) async {

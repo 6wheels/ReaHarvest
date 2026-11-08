@@ -58,6 +58,17 @@ Future<String?> loadDefaultProjectTemplate(String resourcePath) async {
   return path != null && await File(path).exists() ? path : null;
 }
 
+/// Project templates (`.rpp` files) in [folder] and its subfolders, sorted
+/// by path; empty when the folder does not exist.
+Future<List<String>> listProjectTemplates(String folder) async {
+  final dir = Directory(folder);
+  if (!await dir.exists()) return const [];
+  return [
+    await for (final e in dir.list(recursive: true))
+      if (e is File && p.extension(e.path).toLowerCase() == '.rpp') e.path,
+  ]..sort();
+}
+
 Map<String, String> _readSection(String ini, String section) {
   final values = <String, String>{};
   final header = '[${section.toLowerCase()}]';

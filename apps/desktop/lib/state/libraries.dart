@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
@@ -238,6 +239,139 @@ class LibraryService {
     return true;
   }
 
+  /// Creates the version [fileName] of [title] with [label], owned by the
+  /// local member (SPEC §5.4): a copy of [source] when given, else from the
+  /// project file [template], else blank (REAPER's default template for new
+  /// projects when set). Then rescans. Returns its file name.
+  Future<String> addVersion(
+    Title title,
+    String fileName,
+    String label, {
+    Version? source,
+    String? template,
+  }) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    final metadata = VersionMetadata(
+      id: VersionId.generate(),
+      owner: ref.read(settingsProvider).identity.memberId,
+      label: label.trim(),
+    );
+    final String path;
+    if (source != null) {
+      final from = source.fileName;
+      path = await Isolate.run(
+        () => duplicateVersion(
+          MountedFolderStorage(root),
+          dir,
+          from,
+          fileName,
+          metadata,
+        ),
+      );
+    } else {
+      final file = template ?? await _defaultTemplate();
+      final text = file == null ? null : await File(file).readAsString();
+      path = await Isolate.run(
+        () => createVersion(
+          MountedFolderStorage(root),
+          dir,
+          fileName,
+          metadata,
+          template: text,
+        ),
+      );
+    }
+    await scan(entry);
+    return p.posix.basename(path);
+  }
+
+  Future<String?> _defaultTemplate() async {
+    final resources = ref.read(reaperResourcesProvider);
+    return resources == null ? null : loadDefaultProjectTemplate(resources);
+  }
+
+  /// Sets the [label] of [version] of [title] (adopted versions only) and
+  /// renames its file to [fileName] (SPEC §5.4); unchanged values are left
+  /// as is. Then rescans. Returns its file name.
+  Future<String> editVersion(
+    Title title,
+    Version version, {
+    required String fileName,
+    required String label,
+  }) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    final old = version.fileName;
+    final m = version.metadata;
+    final relabel = m != null && m.label != label.trim();
+    final name = await Isolate.run(() async {
+      final storage = MountedFolderStorage(root);
+      if (relabel) await setVersionLabel(storage, dir, old, label.trim());
+      if (fileName == old) return old;
+      return p.posix.basename(await renameVersion(storage, dir, old, fileName));
+    });
+    await scan(entry);
+    return name;
+  }
+
+  /// Sets the [status] of [version] of [title] (null clears it), in the
+  /// title's `.node.json` (SPEC §5.9). Then rescans.
+  Future<void> setStatusOf(Title title, Version version, String? status) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    final key = version.key;
+    await Isolate.run(
+      () => setVersionStatus(MountedFolderStorage(root), dir, key, status),
+    );
+    await scan(entry);
+  }
+
+  /// Moves [version] of [title] to the trash (SPEC §5.4). Then rescans.
+  Future<void> trashVersion(Title title, Version version) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    final name = version.fileName;
+    await Isolate.run(
+      () => deleteVersion(MountedFolderStorage(root), dir, name),
+    );
+    ref.invalidate(trashProvider(title.id));
+    await scan(entry);
+  }
+
+  /// Permanently deletes the trash files [paths] of [title] (SPEC §5.4).
+  /// Then returns the media of its pool used by no project any more, to
+  /// offer their purge; empty in a free tree, which has no pool. Throws
+  /// [FormatException] if a project cannot be read.
+  Future<List<StorageEntry>> purge(Title title, List<String> paths) async {
+    final root = _entry(title.libraryId).libraryRoot;
+    final dir = title.path;
+    final freeTree = _isFreeTree(title);
+    await Isolate.run(() => purgeTrash(MountedFolderStorage(root), dir, paths));
+    ref.invalidate(trashProvider(title.id));
+    if (freeTree) return const [];
+    return Isolate.run(
+      () => unreferencedMedia(MountedFolderStorage(root), dir),
+    );
+  }
+
+  /// Permanently deletes the media [paths] of the pool of [title], as
+  /// returned by [purge]. Then rescans.
+  Future<void> purgeUnusedMedia(Title title, List<String> paths) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    await Isolate.run(() => purgeMedia(MountedFolderStorage(root), dir, paths));
+    await scan(entry);
+  }
+
+  bool _isFreeTree(Title title) =>
+      ref.read(indexedLibrariesProvider)[title.libraryId]?.isFreeTree ?? true;
+
   LibraryEntry _entry(LibraryId id) =>
       ref.read(settingsProvider).libraries.firstWhere((l) => l.id == id);
 
@@ -312,4 +446,33 @@ final historyProvider = FutureProvider.autoDispose
           .libraryRoot;
       final dir = title.path;
       return Isolate.run(() => readHistory(MountedFolderStorage(root), dir));
+    });
+
+/// Files in the trash of a title, versions and assets (SPEC §5.4).
+final trashProvider = FutureProvider.autoDispose
+    .family<List<StorageEntry>, NodeId>((ref, id) async {
+      final title = ref
+          .watch(titlesProvider)
+          .where((t) => t.id == id)
+          .firstOrNull;
+      if (title == null) return const [];
+      final root = ref
+          .watch(settingsProvider.select((s) => s.libraries))
+          .firstWhere((l) => l.id == title.libraryId)
+          .libraryRoot;
+      final dir = title.path;
+      return Isolate.run(() => readTrash(MountedFolderStorage(root), dir));
+    });
+
+/// Project templates offered for a new version in library [id]: those of
+/// its own templates folder, else of the configured one (SPEC §5.1).
+final projectTemplatesProvider = FutureProvider.autoDispose
+    .family<List<String>, LibraryId>((ref, id) async {
+      final own = ref
+          .watch(settingsProvider.select((s) => s.libraries))
+          .where((l) => l.id == id)
+          .firstOrNull
+          ?.templatesFolder;
+      final folder = own ?? ref.watch(templatesFolderProvider);
+      return folder == null ? const [] : listProjectTemplates(folder);
     });

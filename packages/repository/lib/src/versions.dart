@@ -12,6 +12,12 @@ import 'scaffold.dart';
 /// REAPER fills in its defaults on the first save.
 const blankProject = '<REAPER_PROJECT 0.1 "7.0" 0\n>\n';
 
+/// File name offered for a new version of the title [title] (SPEC §5.4):
+/// `<title> - <label>.RPP`, followed by the name of its [owner] when it is
+/// not the current member. Empty parts are left out.
+String suggestedVersionName(String title, String label, {String? owner}) =>
+    '${[title, label, ?owner].map((s) => s.trim()).where((s) => s.isNotEmpty).join(' - ')}.RPP';
+
 /// Creates the version [fileName] in the title folder [titleDir], blank or
 /// from the project [template] (SPEC §5.4): [metadata] written in its
 /// EXTSTATE, record path `Media` and render folder `Renders`. Throws

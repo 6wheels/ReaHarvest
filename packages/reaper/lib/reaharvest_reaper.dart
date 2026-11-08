@@ -7,6 +7,7 @@ export 'src/plugin_cache.dart' show PluginCache, PluginStatus;
 export 'src/preferences.dart'
     show
         PeaksPreference,
+        listProjectTemplates,
         loadDefaultProjectTemplate,
         loadPeaksPreference,
         parseDefaultProjectTemplate,
