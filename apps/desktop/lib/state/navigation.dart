@@ -244,6 +244,18 @@ final toSortProvider = Provider<List<({LibraryId library, String path})>>((
   return ref.watch(localIndexProvider).toSort();
 });
 
+/// Files the scan could not use, of kind `corrupted` (unreadable) or
+/// `orphanNode` (`.node.json` of a folder without project, #54), shown with
+/// "To sort".
+final scanIssuesProvider =
+    Provider.family<List<({LibraryId library, String path})>, String>((
+      ref,
+      kind,
+    ) {
+      ref.watch(indexRevisionProvider);
+      return ref.watch(localIndexProvider).issues(kind);
+    });
+
 /// Versions without metadata in layout libraries ("To adopt", SPEC §4.2).
 final toAdoptProvider = Provider<List<(Title, Version)>>((ref) {
   final libraries = ref.watch(indexedLibrariesProvider);

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show IOException;
 import 'dart:isolate';
 
+import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
@@ -20,6 +21,7 @@ final class ScanResult {
     this.nodes = const {},
     this.toSort = const [],
     this.corrupted = const [],
+    this.orphanNodes = const [],
     this.stamps = const {},
     this.freeTree = false,
   });
@@ -37,6 +39,10 @@ final class ScanResult {
   /// Paths of unreadable or corrupted `.RPP` and node files. A folder whose
   /// node file is corrupted is not scanned further.
   final List<String> corrupted;
+
+  /// Paths of `.node.json` files found in folders that are not nodes (no
+  /// project in or below them): reported, never used nor deleted (#54).
+  final List<String> orphanNodes;
 
   /// Stamps of all scanned files (excluded files and folders left out), by
   /// path; used to skip unchanged files on the next scan.
@@ -67,10 +73,12 @@ Future<ScanResult> scanFolder(
 /// Scans a library root following its layout, or as a free tree (SPEC §3).
 ///
 /// Files whose stamp did not change since [previous] are not read again;
-/// free tree projects are never read (no metadata, SPEC §3.3). Missing
-/// `.node.json` files are written for layout nodes and free tree titles, and
-/// layout titles without one are scaffolded ([scaffoldTitle]); these are the
-/// only writes.
+/// free tree projects are never read (no metadata, SPEC §3.3). A layout
+/// folder is a node only if a project lies in it or below it (outside the
+/// reserved title folders), or, for a title, if its trash or history still
+/// holds one (#54). Missing `.node.json` files are written for these nodes
+/// and for free tree titles, and layout titles without one are scaffolded
+/// ([scaffoldTitle]); these are the only writes.
 Future<ScanResult> scan(
   RepositoryStorage storage,
   Library library, {
@@ -97,12 +105,23 @@ final class _Scanner {
   final corrupted = <String>[];
   final stamps = <String, FileStamp>{};
 
+  /// Folders whose trash or history holds a project.
+  final traces = <String>{};
+
   Future<ScanResult> run() async {
     for (final e in await storage.list('', recursive: true)) {
       final segments = e.path.split('/');
       final parents = segments.sublist(0, segments.length - 1);
-      if (parents.any(isExcludedFolder)) continue;
       if (segments.first == collabFolderName) continue;
+      if (parents.any(isExcludedFolder)) {
+        final last = parents.lastOrNull?.toLowerCase();
+        if (!e.isDirectory &&
+            (last == trashFolderName || last == historyFolderName) &&
+            isProjectFile(e.path)) {
+          traces.add(_parent(_parent(e.path)));
+        }
+        continue;
+      }
       if (e.isDirectory) {
         if (!isExcludedFolder(segments.last)) dirs.add(e.path);
       } else if (!isExcludedFile(segments.last)) {
@@ -118,6 +137,14 @@ final class _Scanner {
     } else {
       await _scanLayout(ordered, layout);
     }
+    final orphanNodes = [
+      for (final MapEntry(key: dir, value: entries) in files.entries)
+        if (!nodes.containsKey(dir))
+          for (final e in entries)
+            if (p.posix.basename(e.path) == nodeFileName &&
+                !corrupted.contains(e.path))
+              e.path,
+    ]..sort();
     titles.sort((a, b) => a.path.compareTo(b.path));
     toSort.sort();
     corrupted.sort();
@@ -126,6 +153,7 @@ final class _Scanner {
       nodes: nodes,
       toSort: toSort,
       corrupted: corrupted,
+      orphanNodes: orphanNodes,
       stamps: stamps,
       freeTree: layout == null,
     );
@@ -171,11 +199,17 @@ final class _Scanner {
 
   Future<void> _scanLayout(List<String> ordered, Layout layout) async {
     final depth = layout.levels.length;
+    final qualified = _qualified(depth);
     final skipped = <String>{};
     for (final dir in ordered) {
       if (skipped.any((s) => _isWithin(dir, s))) continue;
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
       final d = segments.length;
+      if (d > 0 && d <= depth && !qualified.contains(dir)) {
+        // Not a node: no project in or below it, or a reserved folder.
+        skipped.add(dir);
+        continue;
+      }
       if (d > depth) {
         // Inside a title: only out-of-place versions matter.
         if (reservedTitleFolders.contains(segments[depth].toLowerCase())) {
@@ -213,6 +247,34 @@ final class _Scanner {
       }
     }
   }
+
+  /// Layout folders, up to [depth], that can be nodes: those holding a
+  /// project in them or below them, and titles whose trash or history
+  /// holds one; reserved title folders (`Media/`…) never are (#54).
+  Set<String> _qualified(int depth) {
+    final qualified = <String>{};
+    void addWithParents(String dir) {
+      for (var d = dir; qualified.add(d) && d.isNotEmpty; d = _parent(d)) {}
+    }
+
+    for (final MapEntry(key: dir, value: entries) in files.entries) {
+      final segments = dir.isEmpty ? <String>[] : dir.split('/');
+      if (!entries.any(_isProject) || segments.take(depth).any(_isReserved)) {
+        continue;
+      }
+      addWithParents(dir);
+    }
+    for (final dir in traces) {
+      final segments = dir.isEmpty ? <String>[] : dir.split('/');
+      if (segments.length == depth && !segments.any(_isReserved)) {
+        addWithParents(dir);
+      }
+    }
+    return qualified;
+  }
+
+  static bool _isReserved(String name) =>
+      reservedTitleFolders.contains(name.toLowerCase());
 
   /// Version without project data (free tree projects are never read).
   static Version _version(String dir, StorageEntry e) => Version(

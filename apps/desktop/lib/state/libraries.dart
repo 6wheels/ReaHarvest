@@ -177,6 +177,23 @@ class LibraryService {
     return report;
   }
 
+  /// Deletes the `.node.json` file [path] of [library], found in a folder
+  /// without project (#54). Then rescans. Throws [ArgumentError] for any
+  /// other file.
+  Future<void> deleteOrphanNode(LibraryId library, String path) async {
+    if (p.posix.basename(path) != nodeFileName) {
+      throw ArgumentError.value(path, 'path', 'Not a node file');
+    }
+    final entry = _entry(library);
+    final root = entry.libraryRoot;
+    final known = ref.read(localIndexProvider).scanResult(library);
+    if (!(known?.orphanNodes.contains(path) ?? false)) {
+      throw ArgumentError.value(path, 'path', 'Not an orphan node file');
+    }
+    await MountedFolderStorage(root).delete(path);
+    await scan(entry);
+  }
+
   /// Backs up [version] of [title] into its `.history/` (UI: « Créer un
   /// point de sauvegarde », SPEC §5.4); the version is unchanged.
   Future<void> backup(Title title, Version version) async {

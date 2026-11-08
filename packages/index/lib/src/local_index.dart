@@ -11,7 +11,7 @@ typedef FileHasher = Future<String> Function(String path);
 /// A file tracked by the index.
 typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 
-const _schemaVersion = 4;
+const _schemaVersion = 5;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -60,7 +60,7 @@ CREATE TABLE files (
 );
 CREATE TABLE issues (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('toSort', 'corrupted')),
+  kind TEXT NOT NULL CHECK (kind IN ('toSort', 'corrupted', 'orphanNode')),
   path TEXT NOT NULL,
   PRIMARY KEY (library_id, kind, path)
 );
@@ -164,6 +164,7 @@ final class LocalIndex {
         [
           for (final p in scan.toSort) [id, 'toSort', p],
           for (final p in scan.corrupted) [id, 'corrupted', p],
+          for (final p in scan.orphanNodes) [id, 'orphanNode', p],
         ],
       );
       _updateFiles(id, scan.stamps);
@@ -276,6 +277,7 @@ final class LocalIndex {
       },
       toSort: issues('toSort'),
       corrupted: issues('corrupted'),
+      orphanNodes: issues('orphanNode'),
       stamps: {for (final f in files(id)) f.path: f.stamp},
       freeTree: library.isFreeTree,
     );
@@ -283,10 +285,15 @@ final class LocalIndex {
 
   /// `.RPP` files and folders outside the layout ("To sort", SPEC §5.2) of
   /// all libraries, sorted by library then path.
-  List<({LibraryId library, String path})> toSort() => [
+  List<({LibraryId library, String path})> toSort() => issues('toSort');
+
+  /// Issues of [kind] (`toSort`, `corrupted` or `orphanNode`, see
+  /// [ScanResult]) of all libraries, sorted by library then path.
+  List<({LibraryId library, String path})> issues(String kind) => [
     for (final r in _db.select(
-      "SELECT library_id, path FROM issues WHERE kind = 'toSort' "
+      'SELECT library_id, path FROM issues WHERE kind = ? '
       'ORDER BY library_id, path',
+      [kind],
     ))
       (
         library: LibraryId(r['library_id'] as String),

@@ -229,6 +229,7 @@ void main() {
       put('other/broken/.node.json', 'not json');
       put('other/broken/song/v1.rpp', unknown);
       put('other/shape/.node.json', '["array"]');
+      put('other/shape/song/v1.rpp', unknown);
       put('band/album/song/v1.rpp', unknown);
       put('band/album/song/bad.rpp', r'<REAPER_PROJECT  <TRACK');
 
@@ -241,6 +242,81 @@ void main() {
         'other/broken/.node.json',
         'other/shape/.node.json',
       ]);
+    });
+
+    test('folders without projects are not nodes (#54)', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1.rpp', unknown);
+      put('band/audio-files/kick.wav', 'x');
+      put('band/render/sub/mix.wav', 'x');
+      put('band/album/empty/notes.txt', 'x');
+      // Misplaced project with its own media folder at the album level.
+      put('proj/proj.rpp', unknown);
+      put('proj/Media/peaks/kick.reapeaks', 'x');
+      put('proj/Media/peaks/song/stray.rpp', unknown);
+
+      final result = await scan(storage, lib);
+
+      expect(result.titles.map((t) => t.path), ['band/album/song']);
+      expect(result.nodes.keys.toSet(), {
+        'band',
+        'band/album',
+        'band/album/song',
+        'proj',
+      });
+      expect(result.toSort, ['proj/proj.rpp']);
+      for (final dir in [
+        'band/audio-files',
+        'band/render',
+        'band/render/sub',
+        'band/album/empty',
+        'proj/Media',
+        'proj/Media/peaks',
+        'proj/Media/peaks/song',
+      ]) {
+        expect(exists('$dir/.node.json'), isFalse, reason: dir);
+      }
+      expect(exists('band/album/empty/Media'), isFalse);
+    });
+
+    test('a title whose versions are all in its trash stays a title', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1.rpp', unknown);
+      final first = await scan(storage, lib);
+      final id = first.titles.single.id;
+      await deleteVersion(storage, 'band/album/song', 'v1.rpp');
+
+      final second = await scan(storage, lib, previous: first);
+
+      expect(second.titles.single.id, id);
+      expect(second.titles.single.versions, isEmpty);
+      expect(second.orphanNodes, isEmpty);
+
+      await purgeTrash(storage, 'band/album/song', [
+        'band/album/song/.trash/v1.rpp',
+      ]);
+      final third = await scan(storage, lib, previous: second);
+      expect(third.titles, isEmpty);
+      expect(third.orphanNodes, [
+        'band/.node.json',
+        'band/album/.node.json',
+        'band/album/song/.node.json',
+      ]);
+      expect(exists('band/album/song/.node.json'), isTrue);
+    });
+
+    test('reports node files of folders that are not nodes', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1.rpp', unknown);
+      put('band/audio-files/.node.json', '{"nodeId": "01X", "level": "album"}');
+      put('band/audio-files/kick.wav', 'x');
+
+      final result = await scan(storage, lib);
+
+      expect(result.orphanNodes, ['band/audio-files/.node.json']);
+      expect(result.corrupted, isEmpty);
+      expect(result.nodes.containsKey('band/audio-files'), isFalse);
+      expect(exists('band/audio-files/.node.json'), isTrue);
     });
 
     test('is incremental by size and mtime', () async {

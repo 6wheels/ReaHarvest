@@ -50,6 +50,11 @@ class FakeLibraryService extends LibraryService {
   final edited = <(String, String, String)>[];
   final statuses = <(String, String?)>[];
   final trashed = <String>[];
+  final orphansDeleted = <String>[];
+
+  @override
+  Future<void> deleteOrphanNode(LibraryId library, String path) async =>
+      orphansDeleted.add(path);
 
   @override
   Future<String> addVersion(
@@ -147,6 +152,7 @@ void main() {
     bool reaperRunning = false,
     NavigationSettings navigation = const NavigationSettings(),
     String language = 'en',
+    List<String> orphanNodes = const [],
     List<LibraryEntry> configured = const [band],
     PeaksPreference? peaks = const PeaksPreference(
       altPeaks: true,
@@ -176,6 +182,11 @@ void main() {
             demoLibrary.id: demoLibrary,
           }),
           toSortProvider.overrideWithValue(const []),
+          scanIssuesProvider.overrideWith(
+            (ref, kind) => kind == 'orphanNode'
+                ? [for (final o in orphanNodes) (library: band.id, path: o)]
+                : const [],
+          ),
           historyProvider.overrideWith((ref, id) async => const {}),
           trashProvider.overrideWith(
             (ref, id) async => [
@@ -721,6 +732,25 @@ void main() {
     expect(find.text('Empty the trash'), findsOne);
     expect(find.text('old.rpp'), findsOne);
     expect(find.textContaining('2.0 KB'), findsWidgets);
+  });
+
+  testWidgets('lists and deletes node files without project', (tester) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      orphanNodes: ['Artist/render/.node.json'],
+    );
+    await tester.tap(find.text('To sort · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('REAHARVEST FILES WITHOUT PROJECT'), findsOne);
+    expect(find.text('Artist/render'), findsOne);
+
+    await tester.tap(find.text('Delete this file'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete this ReaHarvest file?'), findsOne);
+    await tester.tap(find.text('Delete this file').last);
+    await tester.pumpAndSettle();
+    expect(libraries.orphansDeleted, ['Artist/render/.node.json']);
   });
 
   testWidgets('uses French when chosen', (tester) async {

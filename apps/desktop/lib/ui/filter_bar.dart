@@ -23,7 +23,10 @@ class FilterBar extends ConsumerWidget {
     final filter = navigation.filter;
     final notifier = ref.read(navigationProvider.notifier);
     final identity = ref.watch(settingsProvider.select((s) => s.identity));
-    final toSort = ref.watch(toSortProvider).length;
+    final toSort =
+        ref.watch(toSortProvider).length +
+        ref.watch(scanIssuesProvider('orphanNode')).length +
+        ref.watch(scanIssuesProvider('corrupted')).length;
     final toAdopt = ref.watch(toAdoptProvider).length;
     void set(TitleFilter f) => notifier.setFilter(f);
 

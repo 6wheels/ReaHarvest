@@ -79,23 +79,39 @@ class _ToSortList extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     final items = ref.watch(toSortProvider);
+    final orphans = ref.watch(scanIssuesProvider('orphanNode'));
+    final corrupted = ref.watch(scanIssuesProvider('corrupted'));
     final names = {
       for (final l in ref.watch(settingsProvider.select((s) => s.libraries)))
         l.id: l.displayName,
     };
-    final multiple = {for (final i in items) i.library}.length > 1;
+    final multiple =
+        {
+          for (final i in [...items, ...orphans, ...corrupted]) i.library,
+        }.length >
+        1;
+    String subtitle(({LibraryId library, String path}) item, String path) => [
+      if (multiple) ?names[item.library],
+      path,
+    ].where((s) => s != '.' && s.isNotEmpty).join(' · ');
+    Widget hint(String value) => Padding(
+      padding: const EdgeInsets.only(top: Space.l),
+      child: Text(value, style: text.bodyMedium?.copyWith(color: c.muted)),
+    );
     return ListView(
       padding: const EdgeInsets.all(Space.l),
       children: [
-        Text(l10n.toSortHint, style: text.bodyMedium?.copyWith(color: c.muted)),
-        const SizedBox(height: Space.s),
+        if (items.isNotEmpty) ...[
+          Text(
+            l10n.toSortHint,
+            style: text.bodyMedium?.copyWith(color: c.muted),
+          ),
+          const SizedBox(height: Space.s),
+        ],
         for (final item in items)
           _Item(
             title: p.posix.basename(item.path),
-            subtitle: [
-              if (multiple) ?names[item.library],
-              p.posix.dirname(item.path),
-            ].where((s) => s != '.').join(' · '),
+            subtitle: subtitle(item, p.posix.dirname(item.path)),
             child: isProjectFile(item.path)
                 ? Align(
                     alignment: Alignment.centerRight,
@@ -113,8 +129,72 @@ class _ToSortList extends ConsumerWidget {
                     style: text.bodySmall?.copyWith(color: c.muted),
                   ),
           ),
+        if (orphans.isNotEmpty) ...[
+          const SizedBox(height: Space.m),
+          SectionLabel(l10n.orphanNodesTitle),
+          hint(l10n.orphanNodesHint),
+          for (final item in orphans)
+            _Item(
+              title: p.posix.dirname(item.path),
+              subtitle: subtitle(item, p.posix.basename(item.path)),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  onPressed: () => _deleteOrphan(context, ref, item),
+                  child: Text(l10n.deleteOrphanNode),
+                ),
+              ),
+            ),
+        ],
+        if (corrupted.isNotEmpty) ...[
+          const SizedBox(height: Space.m),
+          SectionLabel(l10n.corruptedTitle),
+          hint(l10n.corruptedHint),
+          for (final item in corrupted)
+            _Item(
+              title: p.posix.basename(item.path),
+              subtitle: subtitle(item, p.posix.dirname(item.path)),
+              child: const SizedBox.shrink(),
+            ),
+        ],
       ],
     );
+  }
+
+  Future<void> _deleteOrphan(
+    BuildContext context,
+    WidgetRef ref,
+    ({LibraryId library, String path}) item,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.deleteOrphanNodeTitle),
+        content: Text(l10n.deleteOrphanNodeHint(p.posix.dirname(item.path))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.deleteOrphanNode),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref
+          .read(libraryServiceProvider)
+          .deleteOrphanNode(item.library, item.path);
+    } on Object catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.actionFailed('$error'))),
+      );
+    }
   }
 }
 

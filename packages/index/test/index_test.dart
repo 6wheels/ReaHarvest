@@ -118,6 +118,7 @@ void main() {
           nodes: {'Band': NodeFile(nodeId, 'artist')},
           toSort: ['loose.rpp'],
           corrupted: ['Band/bad.rpp'],
+          orphanNodes: ['Band/render/.node.json'],
           stamps: {'Band/First Album/Song/a.RPP': (size: 10, modified: t0)},
         ),
       );
@@ -145,6 +146,10 @@ void main() {
       expect(restored.toSort, ['loose.rpp']);
       expect(index.toSort(), [(library: lib.id, path: 'loose.rpp')]);
       expect(restored.corrupted, ['Band/bad.rpp']);
+      expect(restored.orphanNodes, ['Band/render/.node.json']);
+      expect(index.issues('orphanNode'), [
+        (library: lib.id, path: 'Band/render/.node.json'),
+      ]);
       expect(restored.stamps, {
         'Band/First Album/Song/a.RPP': (size: 10, modified: t0),
       });

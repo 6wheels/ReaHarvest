@@ -327,6 +327,39 @@ void main() {
     );
   });
 
+  test('deletes only node files of folders without project', () async {
+    final band = folder('Band');
+    final song = p.join(band, 'Artist', 'Album', 'Song');
+    Directory(song).createSync(recursive: true);
+    File('../../test/fixtures/project-1.rpp').copySync(p.join(song, 'v1.rpp'));
+    final orphan = File(p.join(band, 'Artist', 'render', '.node.json'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('{"nodeId": "01X", "level": "album"}');
+    await service().addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    final id = container.read(settingsProvider).libraries.single.id;
+    expect(index.issues('orphanNode'), [
+      (library: id, path: 'Artist/render/.node.json'),
+    ]);
+
+    await expectLater(
+      service().deleteOrphanNode(id, 'Artist/Album/Song/.node.json'),
+      throwsArgumentError,
+    );
+    await expectLater(
+      service().deleteOrphanNode(id, 'Artist/Album/Song/v1.rpp'),
+      throwsArgumentError,
+    );
+    await service().deleteOrphanNode(id, 'Artist/render/.node.json');
+
+    expect(orphan.existsSync(), isFalse);
+    expect(index.issues('orphanNode'), isEmpty);
+    expect(File(p.join(song, '.node.json')).existsSync(), isTrue);
+  });
+
   test('lists the project templates of a library', () async {
     final templates = Directory(
       p.join(root.path, 'resources', 'ProjectTemplates'),

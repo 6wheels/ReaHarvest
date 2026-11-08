@@ -179,5 +179,12 @@
   "unusedMediaHint": "{count, plural, =1{1 média ({size}) n'est plus utilisé par aucune version ni aucun point de sauvegarde. Le supprimer définitivement ?} other{{count} médias ({size}) ne sont plus utilisés par aucune version ni aucun point de sauvegarde. Les supprimer définitivement ?}}",
   "keep": "Conserver",
   "mediaPurged": "Médias inutilisés supprimés",
-  "mediaUnreadable": "Un projet n'a pas pu être lu : les médias inutilisés n'ont pas été listés."
+  "mediaUnreadable": "Un projet n'a pas pu être lu : les médias inutilisés n'ont pas été listés.",
+  "orphanNodesTitle": "Fichiers ReaHarvest sans projet",
+  "orphanNodesHint": "Ces dossiers ne contiennent aucun projet REAPER : leur fichier ReaHarvest (.node.json) n'est pas utilisé.",
+  "deleteOrphanNode": "Supprimer ce fichier",
+  "deleteOrphanNodeTitle": "Supprimer ce fichier ReaHarvest ?",
+  "deleteOrphanNodeHint": "Seul le fichier .node.json de « {folder} » est supprimé : le dossier garde son contenu. Les statuts enregistrés dans ce fichier sont perdus.",
+  "corruptedTitle": "Fichiers illisibles",
+  "corruptedHint": "ReaHarvest ne peut pas lire ces fichiers. Vérifiez-les ou restaurez-les depuis une sauvegarde."
 }
