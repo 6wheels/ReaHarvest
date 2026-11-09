@@ -352,4 +352,54 @@ void main() {
     );
     expect(const CollabFilter(fields: {'done': true}).matches(record), isFalse);
   });
+
+  group('report', () {
+    test('sorts non-empty sections by level, then kind', () {
+      final report = Report({
+        ReportKind.libraryScanned: [const ReportItem('/a')],
+        ReportKind.toSort: const [],
+        ReportKind.orphanNode: [const ReportItem('/a/.node.json')],
+        ReportKind.scanFailed: [const ReportItem('/b', 'boom')],
+      });
+      expect(
+        [for (final (kind, _) in report.sections) kind],
+        [
+          ReportKind.scanFailed,
+          ReportKind.orphanNode,
+          ReportKind.libraryScanned,
+        ],
+      );
+      expect(report.hasErrors, isTrue);
+      expect(report.hasWarnings, isTrue);
+      expect(report.isEmpty, isFalse);
+      expect(
+        report.toString(),
+        'scanFailed (1)\n  /b: boom\n'
+        'orphanNode (1)\n  /a/.node.json\n'
+        'libraryScanned (1)\n  /a',
+      );
+    });
+
+    test('adds up two reports', () {
+      const empty = Report({ReportKind.toSort: []});
+      expect(empty.isEmpty, isTrue);
+      expect(empty.hasErrors, isFalse);
+      expect(empty.hasWarnings, isFalse);
+      final sum =
+          const Report({
+            ReportKind.mediaMoved: [ReportItem('a')],
+          }) +
+          const Report({
+            ReportKind.mediaMoved: [ReportItem('b')],
+            ReportKind.corrupted: [ReportItem('c')],
+          });
+      expect(sum.items[ReportKind.mediaMoved], [
+        const ReportItem('a'),
+        const ReportItem('b'),
+      ]);
+      expect(sum.items[ReportKind.corrupted], [const ReportItem('c')]);
+      expect(const ReportItem('a').hashCode, const ReportItem('a').hashCode);
+      expect(const ReportItem('a', 'x'), isNot(const ReportItem('a')));
+    });
+  });
 }

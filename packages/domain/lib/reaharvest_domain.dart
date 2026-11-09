@@ -5,4 +5,5 @@ export 'src/hlc.dart';
 export 'src/ids.dart';
 export 'src/library.dart';
 export 'src/ports.dart';
+export 'src/report.dart';
 export 'src/title.dart';

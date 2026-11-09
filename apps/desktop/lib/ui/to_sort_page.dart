@@ -308,33 +308,19 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
     }.toList()..sort();
   }
 
+  /// Moves the project; its report opens at the end of the task.
   Future<void> _move() async {
-    final l10n = AppLocalizations.of(context);
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    MoveReport? report;
-    final done = await runProjectChange(context, ref, () async {
-      report = await ref.read(libraryServiceProvider).moveToTitle(
+    final done = await runProjectChange(
+      context,
+      ref,
+      () => ref.read(libraryServiceProvider).moveToTitle(
         widget.library,
         widget.path,
         [for (final c in _values) c.text.trim()],
-      );
-    });
-    if (!done) return;
-    navigator.pop();
-    final r = report!;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          [
-            l10n.sortDone,
-            if (r.missing.isNotEmpty) l10n.sortMissingMedia(r.missing.length),
-            if (r.external.isNotEmpty)
-              l10n.sortExternalMedia(r.external.length),
-          ].join(' '),
-        ),
       ),
     );
+    if (done) navigator.pop();
   }
 
   @override

@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/theme/app_theme.dart';
+import 'package:reaharvest/ui/report_dialog.dart';
 import 'package:reaharvest/ui/tasks_zone.dart';
+import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 void main() {
   late ProviderContainer container;
@@ -80,19 +82,22 @@ void main() {
     });
   });
 
-  testWidgets('tasks zone', (tester) async {
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          theme: buildTheme(Brightness.light),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          home: const Scaffold(
-            body: Align(alignment: Alignment.bottomCenter, child: TasksZone()),
-          ),
+  Future<void> pumpZone(WidgetTester tester) => tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        navigatorKey: appNavigatorKey,
+        theme: buildTheme(Brightness.light),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: const Scaffold(
+          body: Align(alignment: Alignment.bottomCenter, child: TasksZone()),
         ),
       ),
-    );
+    ),
+  );
+
+  testWidgets('tasks zone', (tester) async {
+    await pumpZone(tester);
     expect(find.byType(TextButton), findsNothing, reason: 'hidden if empty');
 
     await tasks().run((l10n) => 'Broken', (_) async => throw 'boom');
@@ -142,5 +147,63 @@ void main() {
     await tester.tap(find.text('Tasks · 1'));
     await tester.pumpAndSettle();
     expect(find.text('Last'), findsOneWidget);
+  });
+
+  test('a report with errors fails its task', () async {
+    const report = Report({
+      ReportKind.corrupted: [ReportItem('x')],
+    });
+    expect(await tasks().run((l10n) => 'A', (_) async => report), report);
+    final task = container.read(tasksProvider).single;
+    expect(task.state, TaskState.failed);
+    expect(task.report, report);
+    expect(task.error, isNull);
+  });
+
+  testWidgets('reports open at the end, then from the zone', (tester) async {
+    await pumpZone(tester);
+    await tasks().run(
+      (l10n) => 'Move',
+      (_) async => const Report({
+        ReportKind.missingMedia: [ReportItem('/lib/a.rpp', 'gone.wav')],
+        ReportKind.libraryUnavailable: [ReportItem('/other')],
+        ReportKind.mediaMoved: [ReportItem('/lib/Media/kick.wav')],
+        ReportKind.scanFailed: [ReportItem('/broken', 'boom')],
+      }),
+      openReport: true,
+    );
+    await tester.pumpAndSettle();
+
+    // Problems expanded, the rest collapsed.
+    expect(find.text('Move'), findsNWidgets(2));
+    expect(find.text('Scan failed · 1'), findsOneWidget);
+    expect(find.text('Media not found · 1'), findsOneWidget);
+    expect(find.text('Libraries not available · 1'), findsOneWidget);
+    expect(find.text('Media moved · 1'), findsOneWidget);
+    expect(find.textContaining('gone.wav'), findsOneWidget);
+    expect(find.textContaining('boom'), findsOneWidget);
+    expect(find.textContaining('kick.wav'), findsNothing);
+    await tester.tap(find.text('Media moved · 1'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('kick.wav'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Media moved · 1'), findsNothing);
+
+    // Without openReport, the report waits in the zone.
+    await tasks().run((l10n) => 'Scan', (_) async => const Report());
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing to report.'), findsNothing);
+    await tester.tap(find.text('Report'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing to report.'), findsOneWidget);
+  });
+
+  test('every report kind has a label', () {
+    final l10n = lookupAppLocalizations(const Locale('fr'));
+    final labels = {
+      for (final k in ReportKind.values) reportKindLabel(l10n, k),
+    };
+    expect(labels, hasLength(ReportKind.values.length));
   });
 }

@@ -120,15 +120,6 @@
   "sortHint": "The project moves into this title, with its media, and its media paths are updated.",
   "sortConfirm": "Move",
   "invalidFolderName": "Invalid folder name",
-  "sortDone": "Project moved.",
-  "sortMissingMedia": "{count, plural, =1{1 media file was not found.} other{{count} media files were not found.}}",
-  "@sortMissingMedia": {
-    "placeholders": { "count": { "type": "int" } }
-  },
-  "sortExternalMedia": "{count, plural, =1{1 media file is outside the library: fix it in REAPER.} other{{count} media files are outside the library: fix them in REAPER.}}",
-  "@sortExternalMedia": {
-    "placeholders": { "count": { "type": "int" } }
-  },
   "toAdoptHint": "ReaHarvest does not know these versions yet. Adopting one writes its identity into the project.",
   "versionLabel": "Label",
   "adopt": "Adopt",
@@ -254,5 +245,17 @@
   "taskFailed": "Failed",
   "taskCancelled": "Cancelled",
   "taskCancelling": "Cancelling…",
-  "clearFinishedTasks": "Clear finished"
+  "clearFinishedTasks": "Clear finished",
+  "taskMove": "Move of “{project}”",
+  "@taskMove": {"placeholders": {"project": {"type": "String"}}},
+  "report": "Report",
+  "reportEmpty": "Nothing to report.",
+  "reportScanFailed": "Scan failed",
+  "reportMissingMedia": "Media not found",
+  "reportExternalMedia": "Media outside the library: fix them in REAPER",
+  "reportLibraryUnavailable": "Libraries not available",
+  "reportLibraryScanned": "Libraries scanned",
+  "reportProjectMoved": "Project moved",
+  "reportMediaMoved": "Media moved",
+  "reportMediaCopied": "Media copied, shared with other projects"
 }

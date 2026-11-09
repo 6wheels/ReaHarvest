@@ -482,11 +482,26 @@ void main() {
       'Loose',
     ]);
 
-    expect(report.project, 'Artist/Album/Loose/loose.rpp');
+    final root = container.read(settingsProvider).libraries.single.libraryRoot;
+    expect(container.read(tasksProvider).last.error, isNull);
+    expect(report!.items[ReportKind.projectMoved], [
+      ReportItem(p.join(root, 'Artist', 'Album', 'Loose', 'loose.rpp')),
+    ]);
     expect(
       index.titles().map((t) => t.tags['title']),
       containsAll(['Song', 'Loose']),
     );
+    final task = container.read(tasksProvider).last;
+    expect(task.openReport, isTrue);
+    expect(task.report, same(report));
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    expect(task.label(l10n), 'Move of “loose.rpp”');
+
+    expect(
+      await service().moveToTitle(id, 'Artist/gone.rpp', ['A', 'B', 'C']),
+      isNull,
+    );
+    expect(container.read(tasksProvider).last.state, TaskState.failed);
   });
 
   test('reports unreadable library files and survives failed scans', () async {
@@ -516,7 +531,10 @@ void main() {
     expect(index.libraries(), isEmpty);
     final task = container.read(tasksProvider).single;
     expect(task.state, TaskState.failed);
-    expect(task.error, startsWith('Broken: '));
+    expect(task.openReport, isFalse);
+    final failed = task.report!.items[ReportKind.scanFailed]!.single;
+    expect(failed.path, broken);
+    expect(failed.detail, isNotEmpty);
 
     // A rescan after a small action fails silently, without task.
     await service().scan(container.read(settingsProvider).libraries.single);
@@ -532,10 +550,30 @@ void main() {
       displayName: 'Band',
       layout: null,
     );
+    // A library whose .library.json is gone (unmounted drive) is skipped.
+    final gone = folder('Gone');
+    await container
+        .read(settingsProvider.notifier)
+        .change(
+          (s) => s.addLibrary(
+            LibraryEntry(
+              id: LibraryId.generate(),
+              displayName: 'Gone',
+              workspaceRoot: gone,
+            ),
+          ),
+        );
     await service().scanAll();
     final tasks = container.read(tasksProvider);
     expect([for (final t in tasks) t.state], [TaskState.done, TaskState.done]);
+    expect([for (final t in tasks) t.openReport], [true, false]);
     expect(tasks.last.progress, 1);
+    expect(tasks.first.report!.items[ReportKind.libraryScanned], [
+      ReportItem(folder('Band')),
+    ]);
+    expect(tasks.last.report!.items[ReportKind.libraryUnavailable], [
+      ReportItem(gone),
+    ]);
     final l10n = lookupAppLocalizations(const Locale('en'));
     expect(tasks.first.label(l10n), 'Scan of “Band”');
     expect(tasks.last.label(l10n), 'Scan of the libraries');

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:reaharvest_domain/reaharvest_domain.dart' show Report;
 
 import '../l10n/app_localizations.dart';
 
@@ -38,6 +39,8 @@ final class BackgroundTask {
     this.progress,
     this.cancelling = false,
     this.error,
+    this.report,
+    this.openReport = false,
   });
 
   final int id;
@@ -53,6 +56,12 @@ final class BackgroundTask {
   /// Why the task failed.
   final String? error;
 
+  /// Report of the finished task, if it produces one.
+  final Report? report;
+
+  /// Whether the report is shown as soon as the task ends.
+  final bool openReport;
+
   bool get isRunning => state == TaskState.running;
 
   BackgroundTask _with({
@@ -60,6 +69,7 @@ final class BackgroundTask {
     double? progress,
     bool? cancelling,
     String? error,
+    Report? report,
   }) => BackgroundTask(
     id: id,
     label: label,
@@ -67,6 +77,8 @@ final class BackgroundTask {
     progress: progress ?? this.progress,
     cancelling: cancelling ?? this.cancelling,
     error: error ?? this.error,
+    report: report ?? this.report,
+    openReport: openReport,
   );
 }
 
@@ -78,16 +90,31 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   List<BackgroundTask> build() => const [];
 
   /// Runs [body] as a task labelled [label]. Returns its result, or null if
-  /// it failed or was cancelled (the outcome stays in the task).
+  /// it failed or was cancelled (the outcome stays in the task). A [Report]
+  /// result is kept in the task, which fails if it holds errors; with
+  /// [openReport], the tasks zone opens it at the end (actions launched by
+  /// the user, SPEC §5.2).
   Future<T?> run<T>(
     String Function(AppLocalizations l10n) label,
-    Future<T> Function(TaskControl task) body,
-  ) async {
+    Future<T> Function(TaskControl task) body, {
+    bool openReport = false,
+  }) async {
     final id = _next++;
-    state = [...state, BackgroundTask(id: id, label: label)];
+    state = [
+      ...state,
+      BackgroundTask(id: id, label: label, openReport: openReport),
+    ];
     try {
       final result = await body(TaskControl._(this, id));
-      _update(id, (t) => t._with(state: TaskState.done, progress: 1));
+      final report = result is Report ? result : null;
+      _update(
+        id,
+        (t) => t._with(
+          state: report?.hasErrors ?? false ? TaskState.failed : TaskState.done,
+          progress: 1,
+          report: report,
+        ),
+      );
       return result;
     } on TaskCancelled {
       _update(id, (t) => t._with(state: TaskState.cancelled));

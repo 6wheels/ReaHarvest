@@ -51,6 +51,19 @@ final class MoveReport {
   /// Absolute references or references outside the library (left as is,
   /// SPEC §4.3).
   final List<String> external;
+
+  /// Structured report (SPEC §5.2), paths relative to the library. Missing
+  /// and external media are reported on the project, with the reference as
+  /// written in it.
+  Report toReport() => Report({
+    ReportKind.projectMoved: [ReportItem(project)],
+    ReportKind.mediaMoved: [for (final m in moved) ReportItem(m)],
+    ReportKind.mediaCopied: [for (final m in copied) ReportItem(m)],
+    ReportKind.missingMedia: [for (final m in missing) ReportItem(project, m)],
+    ReportKind.externalMedia: [
+      for (final m in external) ReportItem(project, m),
+    ],
+  });
 }
 
 /// Moves the misplaced project [project] into the title folder [titleDir]

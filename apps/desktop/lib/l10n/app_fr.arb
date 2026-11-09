@@ -102,9 +102,6 @@
   "sortHint": "Le projet est déplacé dans ce titre avec ses médias, et les chemins de ses médias sont mis à jour.",
   "sortConfirm": "Ranger",
   "invalidFolderName": "Nom de dossier invalide",
-  "sortDone": "Projet rangé.",
-  "sortMissingMedia": "{count, plural, =1{1 fichier média est introuvable.} other{{count} fichiers médias sont introuvables.}}",
-  "sortExternalMedia": "{count, plural, =1{1 fichier média est hors de la bibliothèque : corrigez-le dans REAPER.} other{{count} fichiers médias sont hors de la bibliothèque : corrigez-les dans REAPER.}}",
   "toAdoptHint": "ReaHarvest ne connaît pas encore ces versions. Adopter une version inscrit son identité dans le projet.",
   "versionLabel": "Libellé",
   "adopt": "Adopter",
@@ -194,5 +191,16 @@
   "taskFailed": "Échec",
   "taskCancelled": "Annulé",
   "taskCancelling": "Annulation…",
-  "clearFinishedTasks": "Effacer les terminées"
+  "clearFinishedTasks": "Effacer les terminées",
+  "taskMove": "Rangement de « {project} »",
+  "report": "Rapport",
+  "reportEmpty": "Rien à signaler.",
+  "reportScanFailed": "Échec de l'analyse",
+  "reportMissingMedia": "Médias introuvables",
+  "reportExternalMedia": "Médias hors de la bibliothèque : corrigez-les dans REAPER",
+  "reportLibraryUnavailable": "Bibliothèques indisponibles",
+  "reportLibraryScanned": "Bibliothèques analysées",
+  "reportProjectMoved": "Projet rangé",
+  "reportMediaMoved": "Médias déplacés",
+  "reportMediaCopied": "Médias copiés, partagés avec d'autres projets"
 }

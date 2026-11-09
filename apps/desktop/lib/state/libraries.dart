@@ -105,7 +105,11 @@ class LibraryService {
     await ref.read(settingsProvider.notifier).change((_) => updated);
     await ref
         .read(tasksProvider.notifier)
-        .run((l10n) => l10n.taskScan(entry.displayName), (_) => _scan(entry));
+        .run(
+          (l10n) => l10n.taskScan(entry.displayName),
+          (_) => _scan(entry),
+          openReport: true,
+        );
   }
 
   /// Forgets [id]: settings and index only, files are left untouched.
@@ -164,23 +168,24 @@ class LibraryService {
 
   /// Moves the misplaced project [path] of [library] into the title at
   /// [folders] (one folder name per layout level), with its media ("To
-  /// sort", SPEC §5.2). Then rescans.
-  Future<MoveReport> moveToTitle(
+  /// sort", SPEC §5.2), as a task whose report is shown at the end. Then
+  /// rescans. Returns the report, or null if the move failed.
+  Future<Report?> moveToTitle(
     LibraryId library,
     String path,
     List<String> folders,
-  ) async {
+  ) {
     final entry = _entry(library);
     final root = entry.libraryRoot;
-    final report = await Isolate.run(
-      () => moveProjectToTitle(
-        MountedFolderStorage(root),
-        path,
-        folders.join('/'),
-      ),
+    return ref.read(tasksProvider.notifier).run(
+      (l10n) => l10n.taskMove(p.posix.basename(path)),
+      (_) async {
+        final report = await _move(root, path, folders.join('/'));
+        await scan(entry);
+        return report;
+      },
+      openReport: true,
     );
-    await scan(entry);
-    return report;
   }
 
   /// Deletes the `.node.json` file [path] of [library], found in a folder
@@ -403,24 +408,26 @@ class LibraryService {
 
   /// Scans every configured library, one after the other, as a background
   /// task cancellable between two libraries (SPEC §5.2). A failed library
-  /// does not stop the others; the task then ends failed, naming them.
+  /// does not stop the others; it is reported.
   Future<void> scanAll() async {
     final entries = ref.read(settingsProvider).libraries;
     if (entries.isEmpty) return;
     await ref.read(tasksProvider.notifier).run((l10n) => l10n.taskScanAll, (
       task,
     ) async {
-      final failed = <String>[];
+      var report = const Report();
       for (final (i, entry) in entries.indexed) {
         task.checkCancelled();
         try {
-          await _scan(entry);
+          report += await _scan(entry);
         } on Object catch (error) {
-          failed.add('${entry.displayName}: $error');
+          report += Report({
+            ReportKind.scanFailed: [ReportItem(entry.libraryRoot, '$error')],
+          });
         }
         task.progress((i + 1) / entries.length);
       }
-      if (failed.isNotEmpty) throw ScanFailure(failed);
+      return report;
     });
   }
 
@@ -435,12 +442,17 @@ class LibraryService {
   }
 
   /// Scans [entry] in an isolate, incrementally from the stored scan, and
-  /// updates the index. Unavailable libraries are skipped.
-  Future<void> _scan(LibraryEntry entry) async {
+  /// updates the index. Unavailable libraries are skipped. Reports the
+  /// problems found (SPEC §5.2).
+  Future<Report> _scan(LibraryEntry entry) async {
     final root = entry.libraryRoot;
     final storage = MountedFolderStorage(root);
     final library = await readLibrary(storage);
-    if (library == null) return;
+    if (library == null) {
+      return Report({
+        ReportKind.libraryUnavailable: [ReportItem(root)],
+      });
+    }
     final index = ref.read(localIndexProvider);
     final result = await scanFolder(
       root,
@@ -449,18 +461,44 @@ class LibraryService {
     );
     index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();
+    return Report({
+      ReportKind.libraryScanned: [ReportItem(root)],
+      ReportKind.corrupted: _items(root, result.corrupted),
+      ReportKind.orphanNode: _items(root, result.orphanNodes),
+      ReportKind.toSort: _items(root, result.toSort),
+    });
   }
 }
 
-/// Libraries whose scan failed, with their error.
-final class ScanFailure implements Exception {
-  const ScanFailure(this.libraries);
+/// Moves [project] of the library at [root] into [titleDir], in an isolate
+/// (top-level: the closure must not capture the service).
+Future<Report> _move(String root, String project, String titleDir) =>
+    Isolate.run(() async {
+      final moved = await moveProjectToTitle(
+        MountedFolderStorage(root),
+        project,
+        titleDir,
+      );
+      return _rooted(root, moved.toReport());
+    });
 
-  final List<String> libraries;
+/// Absolute path of [path], relative to the library at [root].
+String _absolute(String root, String path) =>
+    p.joinAll([root, ...path.split('/')]);
 
-  @override
-  String toString() => libraries.join('\n');
-}
+/// Items for [paths] of the library at [root], as absolute paths.
+List<ReportItem> _items(String root, List<String> paths) => [
+  for (final path in paths) ReportItem(_absolute(root, path)),
+];
+
+/// [report] of the library at [root], with absolute paths.
+Report _rooted(String root, Report report) => Report({
+  for (final MapEntry(key: kind, value: items) in report.items.entries)
+    kind: [
+      for (final item in items)
+        ReportItem(_absolute(root, item.path), item.detail),
+    ],
+});
 
 /// Whether [folder] holds a REAPER project (backups, history and trash left
 /// out), listed in an isolate.

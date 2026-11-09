@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "memberId": "01M70B3JEFQS30ZMDK32ZC4NA6",
+    "displayName": "bebR"
+  },
+  "libraries": [],
+  "theme": "system",
+  "textScale": 1.0,
+  "language": "system",
+  "navigation": {
+    "displayMode": "cards",
+    "query": "",
+    "filter": {},
+    "savedViews": [],
+    "overviewPinned": false
+  }
+}

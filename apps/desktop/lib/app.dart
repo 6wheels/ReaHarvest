@@ -21,6 +21,7 @@ class ReaHarvestApp extends ConsumerWidget {
       settingsProvider.select((s) => (s.theme, s.language, s.textScale)),
     );
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:reaharvest_domain/reaharvest_domain.dart' show Report;
 
 import '../l10n/app_localizations.dart';
 import '../state/tasks.dart';
 import '../theme/app_theme.dart';
+import 'report_dialog.dart';
 
 /// Background tasks zone at the bottom of the application (SPEC §5.2): the
 /// latest task, expandable into the list of all of them. Hidden when there
@@ -15,6 +17,17 @@ class TasksZone extends ConsumerStatefulWidget {
   ConsumerState<TasksZone> createState() => _TasksZoneState();
 }
 
+/// Navigator of the application, for the tasks zone which sits outside of
+/// it.
+final appNavigatorKey = GlobalKey<NavigatorState>();
+
+/// Opens [report] over the pages of the application.
+void _openReport(String title, Report report) {
+  if (appNavigatorKey.currentContext case final context?) {
+    showReport(context, title, report);
+  }
+}
+
 class _TasksZoneState extends ConsumerState<TasksZone> {
   var _expanded = false;
 
@@ -23,6 +36,20 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
     final tasks = ref.watch(tasksProvider);
     final c = context.colors;
     final l10n = AppLocalizations.of(context);
+    // Reports of the actions launched by the user open when they end.
+    ref.listen(tasksProvider, (previous, next) {
+      final running = {
+        for (final t in previous ?? const <BackgroundTask>[])
+          if (t.isRunning) t.id,
+      };
+      for (final t in next) {
+        if (t.openReport && !t.isRunning && running.contains(t.id)) {
+          if (t.report case final report?) {
+            _openReport(t.label(l10n), report);
+          }
+        }
+      }
+    });
     final Widget content;
     if (tasks.isEmpty) {
       content = const SizedBox(width: double.infinity);
@@ -185,6 +212,13 @@ class _TaskRow extends ConsumerWidget {
           ],
           const SizedBox(width: Space.m),
           trailing,
+          if (task.report case final report?) ...[
+            const SizedBox(width: Space.s),
+            TextButton(
+              onPressed: () => _openReport(task.label(l10n), report),
+              child: Text(l10n.report),
+            ),
+          ],
         ],
       ),
     );

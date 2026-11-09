@@ -974,6 +974,15 @@ void main() {
       expect(report.moved, ['band/_Unassigned/loose/Media/kick.wav']);
       expect(report.missing, ['gone.wav']);
       expect(report.external, [r'C:\elsewhere\x.wav']);
+      expect(report.toReport().items, {
+        ReportKind.projectMoved: [ReportItem(report.project)],
+        ReportKind.mediaMoved: [ReportItem(report.moved.single)],
+        ReportKind.mediaCopied: isEmpty,
+        ReportKind.missingMedia: [ReportItem(report.project, 'gone.wav')],
+        ReportKind.externalMedia: [
+          ReportItem(report.project, r'C:\elsewhere\x.wav'),
+        ],
+      });
       expect(exists('band/loose.rpp'), isFalse);
       expect(exists('band/audio-files/kick.wav'), isFalse);
       final moved = read(report.project);

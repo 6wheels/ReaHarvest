@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="ReaHarvest (demo)" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="--dart-define=REAHARVEST_DEMO=true" />
+    <option name="additionalArgs" value="--dart-define=REAHARVEST_DEMO=true --dart-define=REAHARVEST_DATA_DIR=." />
     <option name="filePath" value="$PROJECT_DIR$/apps/desktop/lib/main.dart" />
     <method v="2" />
   </configuration>
