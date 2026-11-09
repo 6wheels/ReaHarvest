@@ -28,6 +28,7 @@ void main() {
     test('typed ids generate ulids', () {
       expect(isUlid(MemberId.generate()), isTrue);
       expect(isUlid(VersionId.generate()), isTrue);
+      expect(isUlid(NodeId.generate()), isTrue);
     });
   });
 
@@ -54,6 +55,13 @@ void main() {
       expect(h > remote, isTrue);
       final same = local.receive(const Hlc(1000, 7, b), t0);
       expect((same.millis, same.counter), (1000, 8));
+      final ahead = local.receive(const Hlc(500, 9, b), t0);
+      expect((ahead.millis, ahead.counter), (1000, 4));
+    });
+
+    test('equal clocks have equal hash codes', () {
+      expect(Hlc(1, 2, a).hashCode, Hlc(1, 2, a).hashCode);
+      expect(Hlc(1, 2, a), isNot(Hlc(1, 2, b)));
     });
 
     test('ties are broken by node', () {
@@ -212,6 +220,85 @@ void main() {
       expect(VersionMetadata.fromExtState({'VERSIONID': 'V'}), isNull);
       expect(VersionMetadata.fromExtState(const {}), isNull);
     });
+  });
+
+  group('title', () {
+    Version version(String fileName, {String? id}) => Version(
+      fileName: fileName,
+      modified: DateTime.utc(2026),
+      size: 1,
+      metadata: id == null
+          ? null
+          : VersionMetadata(id: VersionId(id), owner: const MemberId('M')),
+    );
+
+    test('keys version statuses by version id, else by file name', () {
+      final adopted = version('a.rpp', id: 'V1');
+      final free = version('sub/b.rpp');
+      final title = Title(
+        id: NodeId.generate(),
+        libraryId: LibraryId.generate(),
+        path: 'Artist/Album/Song',
+        tags: const {'title': 'Song'},
+        versions: [adopted, free],
+        status: 'mixing',
+        versionStatuses: const {'V1': 'done', 'sub/b.rpp': 'idea'},
+      );
+      expect((adopted.isAdopted, adopted.key), (true, 'V1'));
+      expect((free.isAdopted, free.key), (false, 'sub/b.rpp'));
+      expect(title.statusOf(adopted), 'done');
+      expect(title.statusOf(free), 'idea');
+      expect(title.statusOf(version('c.rpp')), isNull);
+    });
+
+    test('finds versions sharing a version id', () {
+      Title title(String path, List<Version> versions) => Title(
+        id: NodeId.generate(),
+        libraryId: const LibraryId('L'),
+        path: path,
+        tags: const {},
+        versions: versions,
+      );
+      final first = title('A', [version('a.rpp', id: 'V1'), version('b.rpp')]);
+      final second = title('B', [
+        version('c.rpp', id: 'V1'),
+        version('d.rpp', id: 'V2'),
+      ]);
+      final duplicates = duplicateVersions([first, second]);
+      expect(duplicates.keys, ['V1']);
+      expect(
+        [for (final (t, v) in duplicates['V1']!) '${t.path}/${v.fileName}'],
+        ['A/a.rpp', 'B/c.rpp'],
+      );
+    });
+  });
+
+  test('plugin refs round-trip JSON and compare by value', () {
+    final plugin = PluginRef(
+      kind: 'VST3',
+      name: 'ReaEQ (Cockos)',
+      identifier: 'reaeq.vst3',
+    );
+    final read = PluginRef.fromJson(
+      jsonDecode(jsonEncode(plugin.toJson())) as Map<String, Object?>,
+    );
+    expect(read, plugin);
+    expect(read.hashCode, plugin.hashCode);
+    expect(
+      read,
+      isNot(PluginRef(kind: 'JS', name: plugin.name, identifier: 'x')),
+    );
+  });
+
+  test('storage entries and exports hold their values', () {
+    final entry = StorageEntry(
+      path: 'a/b.rpp',
+      isDirectory: false,
+      size: 3,
+      modified: DateTime.utc(2026),
+    );
+    expect((entry.path, entry.isDirectory, entry.size), ('a/b.rpp', false, 3));
+    expect(CanonicalExport([]).records, isEmpty);
   });
 
   test('media presence follows size', () {
