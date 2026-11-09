@@ -4,11 +4,15 @@ import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest/app.dart';
+import 'package:reaharvest/app_paths.dart';
+import 'package:reaharvest/logs.dart';
 import 'package:reaharvest/state/libraries.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
+import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
@@ -305,5 +309,95 @@ void main() {
       findsOne,
     );
     expect(find.textContaining('Expected level: Album'), findsOne);
+  });
+
+  testWidgets('runs portable data, tasks, reports and logs (M0)', (
+    tester,
+  ) async {
+    // Logs: the file sink of the app, in the temp folder (#64).
+    final logs = Directory(p.join(root.path, 'logs'))..createSync();
+    final logFiles = LogFiles(logs.path);
+    final logging = Logger.root.onRecord.listen(logFiles.write);
+    addTearDown(logging.cancel);
+
+    // Portable mode: an empty settings.json next to the executable wins
+    // and starts a new member (#61).
+    final exe = Directory(p.join(root.path, 'app'))..createSync();
+    File(p.join(exe.path, 'settings.json')).writeAsStringSync('');
+    final portable = dataFilePath(
+      'settings.json',
+      appData: p.join(root.path, 'data'),
+      executableDir: exe.path,
+    );
+    expect(portable, p.join(exe.path, 'settings.json'));
+    final second = await tester.runAsync(() => SettingsFile(portable).load());
+    expect(
+      second!.identity.memberId,
+      isNot(container.read(settingsProvider).identity.memberId),
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const ReaHarvestApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    List<BackgroundTask> tasks() => container.read(tasksProvider);
+
+    // A second library, to cancel the scan between two libraries (#62).
+    final other = p.join(root.path, 'Other', 'Artist', 'Album', 'Song');
+    Directory(other).createSync(recursive: true);
+    File(fixture('project-2.rpp')).copySync(p.join(other, 'v.rpp'));
+    final service = container.read(libraryServiceProvider);
+    final adding = service.addLocal(
+      folder: p.join(root.path, 'Other'),
+      displayName: 'Other',
+      layout: Layout.classic(),
+    );
+    await waitFor(
+      tester,
+      () => tasks().length == 2 && !tasks().last.isRunning,
+      reason: 'library added',
+    );
+    await adding;
+    // Its report opens at the end of the launched action (#63).
+    expect(find.text('Libraries scanned · 1'), findsOne);
+    await tapText(tester, 'Close');
+
+    final cancelled = service.scanAll();
+    container.read(tasksProvider.notifier).cancel(tasks().last.id);
+    await waitFor(
+      tester,
+      () => !tasks().last.isRunning,
+      reason: 'scan cancelled',
+    );
+    await cancelled;
+    expect(tasks().last.state, TaskState.cancelled);
+    expect(find.text('Cancelled'), findsOne);
+
+    final scanning = service.scanAll();
+    await waitFor(tester, () => !tasks().last.isRunning, reason: 'scan done');
+    await scanning;
+    expect(tasks().last.state, TaskState.done);
+    expect(tasks().last.progress, 1);
+
+    // The report of the startup-like scan waits in the tasks zone (#63).
+    expect(find.text('Libraries scanned · 2'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Report').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Libraries scanned · 2'), findsOne);
+    await tapText(tester, 'Close');
+    await tapText(tester, 'Tasks · 4');
+    expect(find.text('Scan of “Other”'), findsOne);
+    await tapText(tester, 'Clear finished');
+    expect(tasks(), isEmpty);
+
+    // Outcomes and reports are in the log of the day (#64).
+    final log = File(logFiles.pathFor(DateTime.now())).readAsStringSync();
+    expect(log, contains('INFO tasks: Scan of “Other”: done'));
+    expect(log, contains('WARNING tasks: Scan of the libraries: cancelled'));
+    expect(log, contains('INFO tasks: Scan of the libraries: done'));
+    expect(log, contains('libraryScanned (2)'));
   });
 }
