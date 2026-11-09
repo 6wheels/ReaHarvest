@@ -107,7 +107,8 @@ Example with the classic template:
 ```
 <libraryRoot>/                   # repository root (modes cloud/collab) or workspace root (mode local)
   .library.json                   # libraryId, mode, layout, statuses, collab settings (cf. §6.5)
-  .collab/                        # collab mode with journal store only (cf. §6.3)
+  .collab/                        # collab mode: joined members (cf. §5.1), journal store (cf. §6.3)
+  .migration/                     # migration inventories, original projects and reports (cf. §5.8)
   <artist>/
     .node.json                    # { nodeId, level: "artist" }
     <album>/
@@ -126,7 +127,7 @@ Rules:
 - Scaffolding: the library initialization only writes `.library.json`. Creating or adopting a title creates its folders (`Media/`, `Renders/`, `Assets/`, `.history/`, `.trash/`) and its `.node.json`.
 - Nodes: a layout folder is a node (and gets a `.node.json` on scan) only if an `.RPP` lies in it or below it, outside the reserved title folders (`Media/`, `Renders/`, `Assets/`, `Backups/`, `.history/`, `.trash/`), which are never nodes. A title whose versions are all in its `.trash/` or `.history/` stays a title. A `.node.json` found in a folder that is not a node is neither used nor deleted: it is listed in the "To sort" page, where the user can delete it after confirmation (the statuses it stores are lost). Unreadable application files are listed there too.
 - In `cloud` and `collab` modes, the workspace mirrors the repository tree for checked-out titles. The repository's `.library.json` is authoritative; the workspace keeps a copy of it to work offline.
-- Application files and folders (`.library.json`, `.node.json`, `.collab/`, `.history/`, `.trash/`) start with a dot, and are also given the hidden attribute on Windows when the application creates them. They stay reachable from the application (title card, detail view). Their subfolders take no prefix (e.g. `.collab/exports/`). Validated (2026-11-07, Google Drive for desktop, streaming mode, Windows): dot-prefixed files and folders, with or without the hidden attribute, and hidden folders without a dot are all synchronized; the hidden attribute is kept locally after synchronization. Other cloud clients **[TO VALIDATE]** (e.g. Box Sync is reported to ignore dot-prefixed files).
+- Application files and folders (`.library.json`, `.node.json`, `.collab/`, `.migration/`, `.history/`, `.trash/`) start with a dot, and are also given the hidden attribute on Windows when the application creates them. They stay reachable from the application (title card, detail view). Their subfolders take no prefix (e.g. `.collab/exports/`). Validated (2026-11-07, Google Drive for desktop, streaming mode, Windows): dot-prefixed files and folders, with or without the hidden attribute, and hidden folders without a dot are all synchronized; the hidden attribute is kept locally after synchronization. Other cloud clients **[TO VALIDATE]** (e.g. Box Sync is reported to ignore dot-prefixed files).
 - `.RPP` files in `.history/` and `.trash/` are never listed as versions, nor in the "To sort" or "To adopt" sections, nor treated as duplicates (§4.2). They are not shown in the main library view; they enrich the title card and the detail view (history, trash).
 - The **path** defines the tag values. `.node.json` files only carry **stable identifiers** and the level, so that moving or renaming a folder does not break collaborative data.
 - Any folder or `.RPP` whose position does not match the layout appears in the "To sort" section (UI: « À ranger », §5.2).
@@ -221,7 +222,13 @@ Versions form a **flat list** (no tree, no parent version).
   - kept: all REAPER and audio content (`.RPP`, `Media/`, `Renders/`, `Assets/`, REAPER backups, peaks…), `.history/` and `.trash/` (project data), and the `ReaHarvest` `EXTSTATE` section of the `.RPP` files (version identity, reused if the folder is added again);
   - in `cloud` and `collab` modes, the repository is never touched. Deleting the application data from the repository is a separate critical action (outside the MVP);
   - goal: the folder can be added again later, with any layout, without leftovers from the previous library.
-- First-run wizard: creation of the first library, REAPER detection.
+- First-run wizard: REAPER detection, then three choices on its first page (also offered later by "Add a library" in the settings):
+  - **Join my band's library** (UI: « Rejoindre la bibliothèque de mon groupe »): choice of the repository folder (e.g. the Drive folder), reading of its `.library.json`.
+    - Collab repository: the members declared in `.library.json` (§6.5) and **not yet joined** are listed; the user picks who they are (UI: « Qui suis-je ? »), and the local identity takes that `memberId`. Then choice of the workspace, which must be an **empty** folder (a non-empty folder is refused in the MVP). Joining writes `.collab/<memberId>/member.json` (one writer per folder, no cloud synchronization conflict); a member who has this file is no longer offered to the others. The claim is checked again just before writing. Then offer to check out titles (§5.5).
+    - Folder without `.library.json`, or not in `collab` mode: clear message (the folder is not set up yet, ask the person who manages it); nothing is written.
+  - **Organize my band's folder** (UI: « Organiser le dossier de mon groupe »): migration wizard (§5.8).
+  - **Create a new library**.
+- **Portable mode**: a `settings.json` and/or an `index.sqlite` placed next to the executable are used first, instead of the user application data folder. Used by the demo mode and local tests, and to run two members on one machine (two copies of the application folder).
 - Local member identity (`memberId`, display name), created on first run and used in all modes (version owner). In the MVP, one identity per installation. Later (outside the MVP): one identity shared by all the machines of a user, linked through a confirmed email, each machine identified by its own client identifier.
 - Path of the REAPER executable and of the REAPER resource folder (defaults per OS). Executable detection: first the location reported by the OS (Windows: default value of `HKLM\SOFTWARE\REAPER` = install folder, validated; macOS: Spotlight `mdfind "kMDItemCFBundleIdentifier == 'com.cockos.reaper'"`; Linux: `which reaper`), then the usual install locations (Windows: `%ProgramFiles%\REAPER (x64)`, `%ProgramFiles%\REAPER`; macOS: `/Applications/REAPER.app`, `/Applications/REAPER64.app`, `~/Applications/REAPER.app`; Linux: `~/opt/REAPER/reaper`, `/opt/REAPER/reaper`). Resource folder: `%APPDATA%\REAPER`, `~/Library/Application Support/REAPER`, `~/.config/REAPER`. macOS and Linux values **[TO VALIDATE]**.
 - Project templates folder (default: `ProjectTemplates` in the REAPER resource folder).
@@ -255,6 +262,8 @@ Main window: the application opens directly on the library. Clean but functional
 - **Status progress trail**: one segment per status, passed ones green, the current one orange, the next ones grey; "done" reached shows the whole trail green. Only the current status shows its label; hovering the trail reveals the other labels, with an animation. A status outside the list is shown as a plain label. Display only (status changes come with the title actions).
 - "To sort" section (UI: « À ranger »): `.RPP` or folders outside the convention, with guided move. Opened from its counter in the filter bar, as a page over the library (same back navigation as the title detail).
 - "To adopt" (UI: « À adopter », cf. §4.2): a filter (titles having a version to adopt), with its counter in the filter bar; adoption is done in the title detail, on the selected version.
+- **Background tasks zone** at the bottom of the application (following the theme; the overview dock sits above it): running tasks with progress and cancellation, finished tasks with their outcome, expandable list.
+- **Reports**: every long action (scan, migration fix, checkout, publish, purge…) produces a report **structured in sections by kind of problem or conflict** (done, skipped, warnings, errors; each item with its path), shown in a popup at the end and reachable from the tasks zone. Reports are also written to the log (§8).
 
 ### 5.3 Version detail view
 Parsing of the `.RPP`, without REAPER:
@@ -348,15 +357,27 @@ Actions performed from the title detail (§5.2).
   - Validated: REAPER **does not lock** the open `.rpp` (exclusive write open and rename succeeded while the project was open). No lock-based detection is possible, and REAPER will overwrite the modification on the next save of the project: the warning must say so clearly.
 
 ### 5.8 Adoption of existing projects (migration)
-Included in the MVP (milestone C). Targets local folders only: a `cloud` or `collab` repository always follows its layout. A local folder is either migrated into a layout by this wizard, or kept as a free tree (§3.3). Wizard taking over the current folder tree (`proaudio/reaper/projects/<group>/<title>[/<member>]`):
-- choice of the target layout, mapping of existing levels to its levels (`_Unassigned` value offered for a missing level, for example the album), then move of the titles into the new structure;
-- reading of each `.rpp` to know its path configuration: `RECORD_PATH` (e.g. `audio-files`), `FILE` references of sources (relative, absolute, outside the title folder), `RENDER_FILE` (cf. forms in §5.3). For each case, the report states whether the application can fix it:
-  - fix possible: offer to move the files into the right folder (`Media/`, `Renders/`) and to update the `.rpp` accordingly (targeted patch, cf. §7.3);
-  - fix impossible (e.g. media not found, absolute path from another machine with no matching file): reported, `.rpp` left intact;
-- merge of the per-member subfolders' media into the single pool, with collision handling by hash;
-- adoption of each `.RPP` (owner deduced from the subfolder when it exists, asked otherwise);
-- deduplication of identical media (same hash);
-- dry-run mode with a report before execution.
+MVP milestone M1 (§9). The migration organizes a folder **in place**, through the `RepositoryStorage` port: for the band, directly the shared Drive folder (first a copy holding a sample, then the real folder, e.g. `proaudio/reaper/projects/<group>/<title>[/<member>]`); later, for `local` libraries, a local folder first (then published, `local` → `cloud`). A folder that is not migrated can be kept as a free tree (§3.3, `local` only).
+
+Flow (wizard "Organize my band's folder", §5.1):
+1. Choice of the folder and of the target layout, declaration of the members (§6.5).
+2. **Inventory** before the first change (relative path, size, XXH3 hash of every file), stored in `.migration/<timestamp>/`. Hashing reads every file: on a streaming cloud folder, the whole folder is downloaded once (background task, cancellable, resumable from the already hashed stamps).
+3. Scan against the layout. Every inconsistency is an **issue**, listed by kind in the "To sort" page (§5.2) with a counter per kind:
+   - project too deep (e.g. `<title>/<member>/x.rpp`) or too shallow (`.rpp` at an intermediate level), folder outside the layout;
+   - media outside `Media/` (relative), media referenced through an absolute path, missing media, `RECORD_PATH` other than `Media` (e.g. `audio-files`), `RENDER_FILE` forms (§5.3);
+   - other files to move into `Assets/`, or blocked because a project references them;
+   - versions not adopted, duplicated `versionId` (§4.2);
+   - cloud provider conflict copies (e.g. `x (1).rpp`), reported only.
+4. **Fixes in the interface**, each with a preview (dry run) and a report (§5.2):
+   - move of a folder or project to its layout position, `_Unassigned` value for a missing level (e.g. the album);
+   - **member subfolder** (`<title>/<member>/…`): its projects are moved up into the title, owner = that member, names de-duplicated;
+   - media (audio, video, MIDI, subprojects `<SOURCE RPP_PROJECT` with their `.rpp-PROX`) moved into `Media/`, references rewritten, `RECORD_PATH` set to `Media` (targeted patch, §7.3); per-member media merged into the single pool; identical media (same hash) share one pool file and the duplicate is **moved** into `.trash/`; name collision: suffix and reference rewrite;
+   - **any other file** (neither a project, nor a media, nor a REAPER file such as `.rpp-bak`, `Backups/`, peaks) is moved into `Assets/`. Before moving it, the application looks for its name in the projects of the title, in plain text and in the decoded base64 plugin states: a referenced file (e.g. impulse response, sampler file) is not moved automatically, it is reported for a manual decision;
+   - fix impossible (media not found, absolute path from another machine): reported, `.rpp` left intact;
+   - adoption of the `.RPP` files in batch, owner chosen among the declared members (deduced from the member subfolder when there is one);
+   - warning before any `.rpp` rewrite when REAPER is running (§5.7).
+5. **No file is ever deleted.** Every change is a move or a targeted rewrite; before rewriting a `.rpp`, its raw original is copied into `.migration/<timestamp>/`. After each batch of fixes and at the end, the inventory is checked: same number of files, every original hash still present, every move accounted for. Any gap is reported and blocks the conversion.
+6. **Conversion to a collab repository**: final inventory check, then the `collab` block (`groupId`, store `journal`) is written into `.library.json`. The folder is now the repository; the user joins it with an empty workspace, like the other members (§5.1).
 
 ### 5.9 Statuses, assets and collaboration
 Statuses and asset files are available in **all modes**; the other features require the `collab` mode and the collab store (§6).
@@ -453,9 +474,13 @@ CollabStore
     "groupId": "...",
     "store": "journal" | "pocketbase",
     "backendUrl": "https://..."
-  }
+  },
+  "members": [                     // declared during the migration (§5.8)
+    { "memberId": "...", "name": "..." }
+  ]
 }
 ```
+Members are declared by the person who prepares the library, before the others install the application, so that versions get their owner during the migration. A member joins by picking their entry (§5.1); `.collab/<memberId>/member.json` marks a joined member.
 Switch procedure (single action in the settings):
 1. `exportAll()` from the current adapter.
 2. `importAll()` into the target adapter, then verification by count per entity.
@@ -546,6 +571,8 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
 - **License**: GPL-3.0 (`LICENSE`).
 - **Application identifier**: `io.github.6wheels.reaharvest` (Windows, macOS); `io.github._6wheels.reaharvest` on Linux (freedesktop rule: a segment cannot start with a digit; format compatible with Flathub verification).
 - **Internationalization**: interface in **English and French** (ARB files, `gen-l10n`); system language on startup, English if it is not supported; language can be changed in the settings.
+- **Logging**: `package:logging` with a file sink next to the settings (one file per day, the last ones kept), reachable from the settings; reports (§5.2) are written to it.
+- **Tests**: line coverage measured and enforced in CI (the build fails below the threshold): 95 to 100 % for the core packages, the widget tests and the integration tests. Any uncovered line carries a written justification (`// coverage:ignore-…` with the reason).
 - **Footprint**: stay light, in the spirit of REAPER (16 MB installer for a full DAW). Measured (2026-11-06, Flutter 3.47.9, empty app, Windows x64 release): 24.7 MB on disk (Flutter engine 20.3 MB, compiled Dart 3.3 MB, ICU data 0.8 MB), 10.3 MB zipped. With the app shell (#9: Riverpod, localizations, Inter subset to Latin ~114 KB, SQLite 1.7 MB): 28.9 MB on disk, 12.2 MB zipped.
 
 ---
@@ -558,10 +585,13 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
 | **2 — Backend** | `PocketBaseStore`, one-click switch, authentication, real-time notifications; prerequisite for mobile applications |
 | **3 — Tools** | Renders: built-in player, on-demand render, render publication (repository and export folders); track import between versions; companion Lua scripts (for example audio render of tracks whose plugins are missing) |
 
-Internal MVP milestones, delivered and tested in this order, each usable on its own:
-1. **Milestone A — `local` mode**: configuration and libraries, layouts and free tree, scan and index, navigation, detail view, version management, creation from template, opening in REAPER.
-2. **Milestone B — `cloud` mode**: `RepositoryStorage` port + `MountedFolderStorage`, Checkout / Publish / Release, conflict detection, mode change `local` ↔ `cloud`.
-3. **Milestone C — `collab` mode**: members, ownership and forcing, `CollabStore` + `JournalStore`, statuses, tasks, notes, lyrics, shared assets, activity, adoption wizard for existing projects.
+**Re-oriented MVP** (decided 2026-11-09). The primary goal is to move the band onto a structured shared Drive folder, Windows only (macOS best effort). Work already done (`local` mode, free tree, layouts, scan and index, navigation, detail view, version management) is kept as is. Internal milestones, delivered and tested in this order, each usable on its own:
+1. **M0 — Foundations**: portable mode (§5.1), background tasks zone and structured reports (§5.2), logging and coverage gate (§8).
+2. **M1 — Migration**: in-place organization of the band folder (§5.8): inventory, typed issues in "To sort", fixes in the interface, members (§6.5), conversion to a collab repository.
+3. **M2 — Join and synchronize**: first-run wizard (§5.1), repository view, Checkout / Publish / Release with conflicts, ownership and forcing (§5.5), versions in `collab` mode, Windows distribution as a zip built by CI.
+4. **M3 — Shared statuses and activity**: `JournalStore` limited to statuses (`titleMeta`, `versionMeta`) and `activity` (§6.3), activity feed (§5.9).
+
+Parked until after the re-oriented MVP (milestone "Later"): version detail view beyond what M1 needs, creation from template, mode change wizards, file watching, tasks / notes / lyrics, shared asset metadata, installer and auto-update, macOS / Linux validation, CLAP / AU / LV2 caches, library removal, configurable statuses, custom layout editor, card actions menu, checkout options. Former milestones A (`local`), B (`cloud`) and C (`collab`) are superseded by this order.
 
 Plan from milestone A: local `memberId` and version `owner`, `libraryId`, `.library.json` (including the `collab` block), `groupId`, ULID `uid`, HLC, configurable backend URL, `RepositoryStorage` and `CollabStore` ports.
 
