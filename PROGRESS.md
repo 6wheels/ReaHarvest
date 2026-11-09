@@ -23,10 +23,11 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [ ] #59 integration tests (moves with the milestones)
 
 ## M1 — Migration (umbrella #30)
-- [ ] #77 known level values (artists, albums) for layout recognition
+- [x] #77 known level values (artists, albums) for layout recognition
 - [ ] #66 inventory and no-loss check
 - [ ] #67 typed migration issues in To sort
 - [ ] #68 layout moves and member subfolders
+- [ ] #80 number of versions to adopt on the card, overview and detail
 - [ ] #69 media normalization and pool merge
 - [ ] #70 other files to Assets with reference check
 - [ ] #71 members list in `.library.json`
@@ -53,7 +54,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [ ] #29 activity feed
 
 ## Parked (Backlog)
-#12, #14, #22, #25, #27, #28, #31, #32, #38, #40, #43, #46, #47, #48, #52, #53, #58, #60. Phases 2 and 3 unchanged.
+#12, #14, #22, #25, #27, #28, #31, #32, #38, #40, #43, #46, #47, #48, #52, #53, #58, #60, #78, #79. Phases 2 and 3 unchanged.
 
 ## Pending outside the plan
 - New fixture corpus parked in a git stash (`fixtures: new anonymized corpus in progress`), TODO in `test/fixtures/README.md`.

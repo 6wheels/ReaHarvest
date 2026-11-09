@@ -548,25 +548,26 @@ void main() {
     ]);
   });
 
-  testWidgets('level chips show a single value, unassigned included', (
+  testWidgets('level chips hide a single value and offer unassigned', (
     tester,
   ) async {
-    await pumpApp(
-      tester,
-      titles: [
-        Title(
-          id: NodeId.generate(),
-          libraryId: demoLibrary.id,
-          path: '1980/Pandemia',
-          tags: const {
-            'artist': '1980',
-            'album': Layout.unassigned,
-            'title': 'Pandemia',
-          },
-        ),
+    Title title(String album, String name) => Title(
+      id: NodeId.generate(),
+      libraryId: demoLibrary.id,
+      path: '1980/$album/$name',
+      tags: {'artist': '1980', 'album': album, 'title': name},
+      // Two versions to adopt: the counter still counts one title.
+      versions: [
+        for (final file in ['$name.rpp', '$name 2.rpp'])
+          Version(fileName: file, modified: DateTime(2026), size: 1),
       ],
     );
-    expect(find.text('Artist'), findsOneWidget);
+    await pumpApp(
+      tester,
+      titles: [title(Layout.unassigned, 'Pandemia'), title('Live', 'Reunite')],
+    );
+    expect(find.text('Artist'), findsNothing);
+    expect(find.text('To adopt · 2'), findsOneWidget);
     await tester.tap(find.text('Album'));
     await tester.pumpAndSettle();
     expect(find.text('Unassigned'), findsOneWidget);
