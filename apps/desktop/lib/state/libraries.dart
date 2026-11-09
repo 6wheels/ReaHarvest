@@ -13,6 +13,7 @@ import 'package:reaharvest_repository/reaharvest_repository.dart';
 import 'navigation.dart';
 import 'providers.dart';
 import 'reaper.dart';
+import 'tasks.dart';
 
 /// Why a folder cannot become a library.
 enum LibraryProblem {
@@ -102,7 +103,9 @@ class LibraryService {
     }
     if (changed) await writeLibrary(MountedFolderStorage(folder), library);
     await ref.read(settingsProvider.notifier).change((_) => updated);
-    await scan(entry);
+    await ref
+        .read(tasksProvider.notifier)
+        .run((l10n) => l10n.taskScan(entry.displayName), (_) => _scan(entry));
   }
 
   /// Forgets [id]: settings and index only, files are left untouched.
@@ -398,34 +401,65 @@ class LibraryService {
   LibraryEntry _entry(LibraryId id) =>
       ref.read(settingsProvider).libraries.firstWhere((l) => l.id == id);
 
-  /// Scans every configured library, one after the other.
+  /// Scans every configured library, one after the other, as a background
+  /// task cancellable between two libraries (SPEC §5.2). A failed library
+  /// does not stop the others; the task then ends failed, naming them.
   Future<void> scanAll() async {
-    for (final entry in ref.read(settingsProvider).libraries) {
-      await scan(entry);
+    final entries = ref.read(settingsProvider).libraries;
+    if (entries.isEmpty) return;
+    await ref.read(tasksProvider.notifier).run((l10n) => l10n.taskScanAll, (
+      task,
+    ) async {
+      final failed = <String>[];
+      for (final (i, entry) in entries.indexed) {
+        task.checkCancelled();
+        try {
+          await _scan(entry);
+        } on Object catch (error) {
+          failed.add('${entry.displayName}: $error');
+        }
+        task.progress((i + 1) / entries.length);
+      }
+      if (failed.isNotEmpty) throw ScanFailure(failed);
+    });
+  }
+
+  /// Scans [entry]; failures are only logged, the library stays configured
+  /// and is scanned again on next start.
+  Future<void> scan(LibraryEntry entry) async {
+    try {
+      await _scan(entry);
+    } on Object catch (error) {
+      debugPrint('Scan of ${entry.displayName} failed: $error');
     }
   }
 
   /// Scans [entry] in an isolate, incrementally from the stored scan, and
   /// updates the index. Unavailable libraries are skipped.
-  Future<void> scan(LibraryEntry entry) async {
-    try {
-      final root = entry.libraryRoot;
-      final storage = MountedFolderStorage(root);
-      final library = await readLibrary(storage);
-      if (library == null) return;
-      final index = ref.read(localIndexProvider);
-      final result = await scanFolder(
-        root,
-        library,
-        previous: index.scanResult(library.id),
-      );
-      index.update(library, result);
-      ref.read(indexRevisionProvider.notifier).bump();
-    } on Object catch (error) {
-      // The library stays configured; it is scanned again on next start.
-      debugPrint('Scan of ${entry.displayName} failed: $error');
-    }
+  Future<void> _scan(LibraryEntry entry) async {
+    final root = entry.libraryRoot;
+    final storage = MountedFolderStorage(root);
+    final library = await readLibrary(storage);
+    if (library == null) return;
+    final index = ref.read(localIndexProvider);
+    final result = await scanFolder(
+      root,
+      library,
+      previous: index.scanResult(library.id),
+    );
+    index.update(library, result);
+    ref.read(indexRevisionProvider.notifier).bump();
   }
+}
+
+/// Libraries whose scan failed, with their error.
+final class ScanFailure implements Exception {
+  const ScanFailure(this.libraries);
+
+  final List<String> libraries;
+
+  @override
+  String toString() => libraries.join('\n');
 }
 
 /// Whether [folder] holds a REAPER project (backups, history and trash left

@@ -186,5 +186,13 @@
   "deleteOrphanNodeTitle": "Supprimer ce fichier ReaHarvest ?",
   "deleteOrphanNodeHint": "Seul le fichier .node.json de « {folder} » est supprimé : le dossier garde son contenu. Les statuts enregistrés dans ce fichier sont perdus.",
   "corruptedTitle": "Fichiers illisibles",
-  "corruptedHint": "ReaHarvest ne peut pas lire ces fichiers. Vérifiez-les ou restaurez-les depuis une sauvegarde."
+  "corruptedHint": "ReaHarvest ne peut pas lire ces fichiers. Vérifiez-les ou restaurez-les depuis une sauvegarde.",
+  "tasks": "Tâches",
+  "taskScanAll": "Analyse des bibliothèques",
+  "taskScan": "Analyse de « {library} »",
+  "taskDone": "Terminé",
+  "taskFailed": "Échec",
+  "taskCancelled": "Annulé",
+  "taskCancelling": "Annulation…",
+  "clearFinishedTasks": "Effacer les terminées"
 }

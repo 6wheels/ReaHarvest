@@ -8,6 +8,7 @@ import 'state/providers.dart';
 import 'theme/app_theme.dart';
 import 'ui/first_run_wizard.dart';
 import 'ui/library_page.dart';
+import 'ui/tasks_zone.dart';
 
 class ReaHarvestApp extends ConsumerWidget {
   const ReaHarvestApp({super.key});
@@ -43,7 +44,13 @@ class ReaHarvestApp extends ConsumerWidget {
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context)
             .copyWith(textScaler: TextScaler.linear(textScale)),
-        child: child!,
+        // The tasks zone stays at the bottom, below every page.
+        child: Column(
+          children: [
+            Expanded(child: child!),
+            const TasksZone(),
+          ],
+        ),
       ),
       home: AnimatedSwitcher(
         duration: Motion.slow,

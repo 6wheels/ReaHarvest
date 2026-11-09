@@ -245,5 +245,14 @@
   "deleteOrphanNodeHint": "Only the .node.json file of “{folder}” is deleted: the folder keeps its content. Statuses stored in this file are lost.",
   "@deleteOrphanNodeHint": {"placeholders": {"folder": {"type": "String"}}},
   "corruptedTitle": "Unreadable files",
-  "corruptedHint": "ReaHarvest cannot read these files. Check them, or restore them from a backup."
+  "corruptedHint": "ReaHarvest cannot read these files. Check them, or restore them from a backup.",
+  "tasks": "Tasks",
+  "taskScanAll": "Scan of the libraries",
+  "taskScan": "Scan of “{library}”",
+  "@taskScan": {"placeholders": {"library": {"type": "String"}}},
+  "taskDone": "Done",
+  "taskFailed": "Failed",
+  "taskCancelled": "Cancelled",
+  "taskCancelling": "Cancelling…",
+  "clearFinishedTasks": "Clear finished"
 }

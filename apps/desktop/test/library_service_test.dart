@@ -1,12 +1,15 @@
 import 'dart:io';
 
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/libraries.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
+import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
@@ -511,6 +514,31 @@ void main() {
         );
     await service().scanAll();
     expect(index.libraries(), isEmpty);
+    final task = container.read(tasksProvider).single;
+    expect(task.state, TaskState.failed);
+    expect(task.error, startsWith('Broken: '));
+
+    // A rescan after a small action fails silently, without task.
+    await service().scan(container.read(settingsProvider).libraries.single);
+    expect(container.read(tasksProvider), [task]);
+  });
+
+  test('scans as background tasks', () async {
+    await service().scanAll();
+    expect(container.read(tasksProvider), isEmpty, reason: 'no library');
+
+    await service().addLocal(
+      folder: folder('Band'),
+      displayName: 'Band',
+      layout: null,
+    );
+    await service().scanAll();
+    final tasks = container.read(tasksProvider);
+    expect([for (final t in tasks) t.state], [TaskState.done, TaskState.done]);
+    expect(tasks.last.progress, 1);
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    expect(tasks.first.label(l10n), 'Scan of “Band”');
+    expect(tasks.last.label(l10n), 'Scan of the libraries');
   });
 
   group('REAPER providers', () {
