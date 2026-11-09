@@ -93,6 +93,128 @@ final class Layout {
   ], renderMetadata: (json['renderMetadata'] as Map?)?.cast());
 }
 
+/// Known value of an intermediate layout level, with the known values of the
+/// next level below it (SPEC §3.1). The leaf level is never listed.
+final class KnownValue {
+  const KnownValue(this.value, [this.children = const []]);
+
+  final String value;
+  final List<KnownValue> children;
+
+  @override
+  bool operator ==(Object other) =>
+      other is KnownValue &&
+      other.value == value &&
+      _sameValues(other.children, children);
+
+  @override
+  int get hashCode => Object.hash(value, Object.hashAll(children));
+
+  @override
+  String toString() =>
+      children.isEmpty ? value : '$value(${children.join(', ')})';
+
+  Map<String, Object?> toJson() => {
+    'value': value,
+    if (children.isNotEmpty) 'children': [for (final c in children) c.toJson()],
+  };
+
+  static KnownValue fromJson(Map<String, Object?> json) => KnownValue(
+    json['value'] as String,
+    knownValuesFromJson(json['children'] as List?),
+  );
+}
+
+List<KnownValue> knownValuesFromJson(List<Object?>? json) => [
+  for (final v in json ?? const []) KnownValue.fromJson((v as Map).cast()),
+];
+
+bool _sameValues(List<KnownValue> a, List<KnownValue> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+/// Why known values are incomplete for a layout (SPEC §3.1).
+enum KnownValuesProblem {
+  /// No value for the first intermediate level.
+  empty,
+
+  /// A value of a non-last intermediate level has no child.
+  missingChild,
+
+  /// A value is too deep for the layout (below the last intermediate level).
+  tooDeep,
+
+  /// Two values with the same name under the same parent.
+  duplicate,
+}
+
+/// Known values of the intermediate levels of a layout, as a tree.
+extension KnownValues on List<KnownValue> {
+  /// First problem of these values for a layout of [depth] levels (leaf
+  /// included), or null if they are complete. A layout without intermediate
+  /// level takes no value.
+  KnownValuesProblem? problemFor(int depth) {
+    final intermediate = depth - 1;
+    if (intermediate == 0) return isEmpty ? null : KnownValuesProblem.tooDeep;
+    if (isEmpty) return KnownValuesProblem.empty;
+    KnownValuesProblem? check(List<KnownValue> values, int level) {
+      if (values.map((v) => v.value).toSet().length != values.length) {
+        return KnownValuesProblem.duplicate;
+      }
+      for (final v in values) {
+        final last = level == intermediate;
+        if (last && v.children.isNotEmpty) return KnownValuesProblem.tooDeep;
+        if (!last && v.children.isEmpty) return KnownValuesProblem.missingChild;
+        if (check(v.children, level + 1) case final problem?) return problem;
+      }
+      return null;
+    }
+
+    return check(this, 1);
+  }
+
+  /// Whether the folders [path] (one value per level, from the top) are
+  /// known; `_Unassigned` is always known, even when not declared (with
+  /// no known value below it then).
+  bool knows(List<String> path) {
+    var values = this;
+    for (final name in path) {
+      final found = values.where((v) => v.value == name).firstOrNull;
+      if (found == null && name != Layout.unassigned) return false;
+      values = found?.children ?? const [];
+    }
+    return true;
+  }
+
+  /// Paths (one value per level, from the top) of the known values named
+  /// [name], at any level.
+  List<List<String>> pathsOf(String name) => [
+    for (final v in this) ...[
+      if (v.value == name) [v.value],
+      for (final rest in v.children.pathsOf(name)) [v.value, ...rest],
+    ],
+  ];
+
+  /// These values with the folders [path] (one value per level, from the
+  /// top) added where missing.
+  List<KnownValue> withPath(List<String> path) {
+    if (path.isEmpty) return this;
+    final [name, ...rest] = path;
+    final found = any((v) => v.value == name);
+    return [
+      for (final v in this)
+        v.value == name ? KnownValue(name, v.children.withPath(rest)) : v,
+      if (!found) KnownValue(name, const <KnownValue>[].withPath(rest)),
+    ];
+  }
+
+  List<Map<String, Object?>> toJson() => [for (final v in this) v.toJson()];
+}
+
 /// Collab settings of a library (collab mode only).
 final class CollabSettings {
   const CollabSettings({
@@ -127,6 +249,7 @@ final class Library {
     required this.mode,
     required this.layout,
     this.collab,
+    this.knownValues = const [],
   }) {
     if (layout == null && mode != LibraryMode.local) {
       throw ArgumentError('Free tree is only allowed in local mode');
@@ -146,13 +269,27 @@ final class Library {
 
   final CollabSettings? collab;
 
+  /// Known values of the intermediate levels (SPEC §3.1); empty while not
+  /// declared, the scan then recognizes levels by depth only.
+  final List<KnownValue> knownValues;
+
   bool get isFreeTree => layout == null;
+
+  /// This library with [knownValues] replaced.
+  Library withKnownValues(List<KnownValue> knownValues) => Library(
+    id: id,
+    mode: mode,
+    layout: layout,
+    collab: collab,
+    knownValues: knownValues,
+  );
 
   Map<String, Object?> toJson() => {
     'libraryId': id,
     'schemaVersion': schemaVersion,
     'mode': mode.name,
     'layout': layout?.toJson(),
+    if (knownValues.isNotEmpty) 'knownValues': knownValues.toJson(),
     'collab': ?collab?.toJson(),
   };
 
@@ -168,6 +305,7 @@ final class Library {
       mode: LibraryMode.values.byName(json['mode'] as String),
       layout: layout == null ? null : Layout.fromJson(layout.cast()),
       collab: collab == null ? null : CollabSettings.fromJson(collab.cast()),
+      knownValues: knownValuesFromJson(json['knownValues'] as List?),
     );
   }
 }

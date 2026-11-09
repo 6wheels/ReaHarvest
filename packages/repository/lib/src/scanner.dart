@@ -24,6 +24,7 @@ final class ScanResult {
     this.orphanNodes = const [],
     this.stamps = const {},
     this.freeTree = false,
+    this.levelIssues = const Report(),
   });
 
   /// Titles found, sorted by path.
@@ -50,6 +51,12 @@ final class ScanResult {
 
   /// Whether the library is a free tree (SPEC §3.3).
   final bool freeTree;
+
+  /// Unknown intermediate folders, recognized through the known values of
+  /// the library (SPEC §5.8), each with its expected level and proposed
+  /// target. They are also listed in [toSort] and not scanned further.
+  /// Recomputed on every scan, not stored in the index.
+  final Report levelIssues;
 
   /// Versions without metadata ("To adopt", SPEC §4.2); always empty in a
   /// free tree, whose versions are identified by their path.
@@ -104,6 +111,7 @@ final class _Scanner {
   final toSort = <String>[];
   final corrupted = <String>[];
   final stamps = <String, FileStamp>{};
+  var levelIssues = const Report();
 
   /// Folders whose trash or history holds a project.
   final traces = <String>{};
@@ -156,6 +164,7 @@ final class _Scanner {
       orphanNodes: orphanNodes,
       stamps: stamps,
       freeTree: layout == null,
+      levelIssues: levelIssues,
     );
   }
 
@@ -218,6 +227,15 @@ final class _Scanner {
         toSort.addAll(_projects(dir).map((e) => e.path));
         continue;
       }
+      if (d > 0 && d < depth && !_isKnown(segments)) {
+        final (kind, item) = _levelIssue(segments, layout);
+        levelIssues += Report({
+          kind: [item],
+        });
+        toSort.add(dir);
+        skipped.add(dir);
+        continue;
+      }
       if (d < depth) {
         toSort.addAll(_projects(dir).map((e) => e.path));
         if (d == 0) continue;
@@ -246,6 +264,50 @@ final class _Scanner {
         _addTitle(dir, node, layout.tagsOf(segments)!, versions);
       }
     }
+  }
+
+  /// Whether the intermediate folders [segments] are known values (SPEC
+  /// §3.1); always true while the library declares none.
+  bool _isKnown(List<String> segments) =>
+      library.knownValues.isEmpty || library.knownValues.knows(segments);
+
+  /// Issue of the unknown intermediate folder [segments] (SPEC §5.8), with
+  /// the level it is expected at and its proposed target: named after a
+  /// single known value elsewhere (moved there), holding projects (a title
+  /// placed too high, moved under `_Unassigned` levels), or unknown (value
+  /// to declare or folder to move).
+  (ReportKind, ReportItem) _levelIssue(List<String> segments, Layout layout) {
+    final dir = segments.join('/');
+    final d = segments.length;
+    final known = library.knownValues.pathsOf(segments.last);
+    if (known.length == 1) {
+      return (
+        ReportKind.misplacedLevel,
+        ReportItem.misplaced(
+          dir,
+          level: layout.levels[known.single.length - 1],
+          target: known.single.join('/'),
+        ),
+      );
+    }
+    if (_projects(dir).isNotEmpty) {
+      return (
+        ReportKind.titleTooHigh,
+        ReportItem.misplaced(
+          dir,
+          level: layout.leaf,
+          target: [
+            ...segments.take(d - 1),
+            for (var i = d; i < layout.levels.length; i++) Layout.unassigned,
+            segments.last,
+          ].join('/'),
+        ),
+      );
+    }
+    return (
+      ReportKind.unknownValue,
+      ReportItem.misplaced(dir, level: layout.levels[d - 1]),
+    );
   }
 
   /// Layout folders, up to [depth], that can be nodes: those holding a

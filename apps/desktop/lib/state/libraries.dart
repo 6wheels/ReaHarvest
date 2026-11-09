@@ -463,12 +463,21 @@ class LibraryService {
     );
     index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();
+    // Misplaced levels are reported with their target, not again as to sort.
+    final misplaced = {
+      for (final (_, items) in result.levelIssues.sections)
+        for (final item in items) item.path,
+    };
     return Report({
-      ReportKind.libraryScanned: [ReportItem(root)],
-      ReportKind.corrupted: _items(root, result.corrupted),
-      ReportKind.orphanNode: _items(root, result.orphanNodes),
-      ReportKind.toSort: _items(root, result.toSort),
-    });
+          ReportKind.libraryScanned: [ReportItem(root)],
+          ReportKind.corrupted: _items(root, result.corrupted),
+          ReportKind.orphanNode: _items(root, result.orphanNodes),
+          ReportKind.toSort: _items(root, [
+            for (final path in result.toSort)
+              if (!misplaced.contains(path)) path,
+          ]),
+        }) +
+        _rooted(root, result.levelIssues);
   }
 }
 
@@ -496,10 +505,7 @@ List<ReportItem> _items(String root, List<String> paths) => [
 /// [report] of the library at [root], with absolute paths.
 Report _rooted(String root, Report report) => Report({
   for (final MapEntry(key: kind, value: items) in report.items.entries)
-    kind: [
-      for (final item in items)
-        ReportItem(_absolute(root, item.path), item.detail),
-    ],
+    kind: [for (final item in items) item.withPath(_absolute(root, item.path))],
 });
 
 /// Whether [folder] holds a REAPER project (backups, history and trash left

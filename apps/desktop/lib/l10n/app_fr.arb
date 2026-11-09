@@ -205,5 +205,10 @@
   "reportMediaCopied": "Médias copiés, partagés avec d'autres projets",
   "logs": "Journaux",
   "logFolder": "Dossier des journaux",
-  "openFolder": "Ouvrir"
+  "openFolder": "Ouvrir",
+  "reportTitleTooHigh": "Titres placés trop haut",
+  "reportMisplacedLevel": "Dossiers au mauvais niveau",
+  "reportUnknownValue": "Dossiers inconnus : déclarez-les dans les réglages de la bibliothèque, ou déplacez-les",
+  "reportExpectedLevel": "Niveau attendu : {level}",
+  "reportTarget": "Emplacement proposé : {path}"
 }

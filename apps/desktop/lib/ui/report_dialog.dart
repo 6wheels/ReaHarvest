@@ -3,6 +3,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'layout_labels.dart';
 
 /// Shows [report] of the action [title] (SPEC §5.2): one section per kind of
 /// outcome, problems first and expanded, each item with its path.
@@ -16,6 +17,9 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
     switch (kind) {
       ReportKind.scanFailed => l10n.reportScanFailed,
       ReportKind.corrupted => l10n.corruptedTitle,
+      ReportKind.titleTooHigh => l10n.reportTitleTooHigh,
+      ReportKind.misplacedLevel => l10n.reportMisplacedLevel,
+      ReportKind.unknownValue => l10n.reportUnknownValue,
       ReportKind.orphanNode => l10n.orphanNodesTitle,
       ReportKind.toSort => l10n.toSort,
       ReportKind.missingMedia => l10n.reportMissingMedia,
@@ -96,6 +100,17 @@ class _ReportDialog extends StatelessWidget {
                                   children: [
                                     if (item.detail case final detail?)
                                       TextSpan(text: '\n$detail', style: muted),
+                                    if (item.level case final level?)
+                                      TextSpan(
+                                        text:
+                                            '\n${l10n.reportExpectedLevel(layoutLevelLabel(l10n, level))}',
+                                        style: muted,
+                                      ),
+                                    if (item.target case final target?)
+                                      TextSpan(
+                                        text: '\n${l10n.reportTarget(target)}',
+                                        style: muted,
+                                      ),
                                   ],
                                 ),
                               ),

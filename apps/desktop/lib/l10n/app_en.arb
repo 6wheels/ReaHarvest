@@ -260,5 +260,12 @@
   "reportMediaCopied": "Media copied, shared with other projects",
   "logs": "Logs",
   "logFolder": "Log folder",
-  "openFolder": "Open"
+  "openFolder": "Open",
+  "reportTitleTooHigh": "Titles placed too high",
+  "reportMisplacedLevel": "Folders at the wrong level",
+  "reportUnknownValue": "Unknown folders: declare them in the library settings, or move them",
+  "reportExpectedLevel": "Expected level: {level}",
+  "@reportExpectedLevel": {"placeholders": {"level": {"type": "String"}}},
+  "reportTarget": "Proposed target: {path}",
+  "@reportTarget": {"placeholders": {"path": {"type": "String"}}}
 }

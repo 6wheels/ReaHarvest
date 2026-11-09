@@ -1032,4 +1032,95 @@ void main() {
       },
     );
   });
+
+  group('known values', () {
+    test('are pre-filled from the folders of the titles', () async {
+      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/Media/x.rpp', unknown);
+      put('band/_Unassigned/other/v1.rpp', unknown);
+      put('solo/live/song/member/x.rpp', unknown);
+      put('loose/a.rpp', unknown);
+      put('a/Media/b/x.rpp', unknown);
+      put('a/b/c/Backups/x.rpp', unknown);
+      put('.collab/m/a/b/x.rpp', unknown);
+
+      expect(await prefillKnownValues(storage, Layout.classic()), const [
+        KnownValue('band', [
+          KnownValue(Layout.unassigned),
+          KnownValue('album'),
+        ]),
+        KnownValue('solo', [KnownValue('live')]),
+      ]);
+      expect(
+        await prefillKnownValuesIn(root.path, Layout.projectOriented()),
+        const [KnownValue('band'), KnownValue('solo')],
+      );
+      expect(
+        await prefillKnownValues(storage, Layout([const LayoutLevel('t')])),
+        isEmpty,
+      );
+    });
+
+    test('recognize misplaced levels with their target', () async {
+      final lib = library(Layout.classic()).withKnownValues(const [
+        KnownValue('Band', [
+          KnownValue('First album'),
+          KnownValue(Layout.unassigned),
+        ]),
+      ]);
+      put('Band/First album/Song/v.rpp', unknown);
+      put('Band/_Unassigned/Other/v.rpp', unknown);
+      put('First album/Song2/v.rpp', unknown);
+      put('Loose/v.rpp', unknown);
+      put('Band/Loose2/v.rpp', unknown);
+      put('Stranger/Album/Song/v.rpp', unknown);
+
+      final result = await scan(storage, lib);
+
+      expect(result.titles.map((t) => t.path), [
+        'Band/First album/Song',
+        'Band/_Unassigned/Other',
+      ]);
+      expect(result.levelIssues.items, {
+        ReportKind.misplacedLevel: [
+          const ReportItem.misplaced(
+            'First album',
+            level: LayoutLevel('album'),
+            target: 'Band/First album',
+          ),
+        ],
+        ReportKind.titleTooHigh: [
+          const ReportItem.misplaced(
+            'Loose',
+            level: LayoutLevel('title'),
+            target: '_Unassigned/_Unassigned/Loose',
+          ),
+          const ReportItem.misplaced(
+            'Band/Loose2',
+            level: LayoutLevel('title'),
+            target: 'Band/_Unassigned/Loose2',
+          ),
+        ],
+        ReportKind.unknownValue: [
+          const ReportItem.misplaced('Stranger', level: LayoutLevel('artist')),
+        ],
+      });
+      expect(result.toSort, [
+        'Band/Loose2',
+        'First album',
+        'Loose',
+        'Stranger',
+      ]);
+      expect(exists('Stranger/$nodeFileName'), isFalse);
+      expect(exists('Stranger/Album/Song/$nodeFileName'), isFalse);
+
+      // Without known values, levels are recognized by depth only.
+      final byDepth = await scan(storage, library(Layout.classic()));
+      expect(byDepth.levelIssues.isEmpty, isTrue);
+      expect(
+        byDepth.titles.map((t) => t.path),
+        contains('Stranger/Album/Song'),
+      );
+    });
+  });
 }

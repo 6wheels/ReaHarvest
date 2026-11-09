@@ -380,6 +380,42 @@ void main() {
       );
     });
 
+    test('items of misplaced folders name their level and target', () {
+      const item = ReportItem.misplaced(
+        'Song',
+        level: LayoutLevel('title'),
+        target: '_Unassigned/_Unassigned/Song',
+      );
+      expect(item.toString(), 'Song [title] -> _Unassigned/_Unassigned/Song');
+      expect(
+        item,
+        const ReportItem.misplaced(
+          'Song',
+          level: LayoutLevel('title'),
+          target: '_Unassigned/_Unassigned/Song',
+        ),
+      );
+      expect(item, isNot(const ReportItem('Song')));
+      expect(item.withPath('/lib/Song').target, item.target);
+      expect(
+        const ReportItem('a', 'x').withPath('b'),
+        const ReportItem('b', 'x'),
+      );
+      expect(
+        item.hashCode,
+        isNot(
+          const ReportItem.misplaced('Song', level: LayoutLevel('x')).hashCode,
+        ),
+      );
+      expect(
+        const ReportItem.misplaced(
+          'X',
+          level: LayoutLevel('artist'),
+        ).toString(),
+        'X [artist]',
+      );
+    });
+
     test('adds up two reports', () {
       const empty = Report({ReportKind.toSort: []});
       expect(empty.isEmpty, isTrue);
@@ -400,6 +436,90 @@ void main() {
       expect(sum.items[ReportKind.corrupted], [const ReportItem('c')]);
       expect(const ReportItem('a').hashCode, const ReportItem('a').hashCode);
       expect(const ReportItem('a', 'x'), isNot(const ReportItem('a')));
+    });
+  });
+
+  group('known values', () {
+    const band = KnownValue('Band', [
+      KnownValue('First album'),
+      KnownValue(Layout.unassigned),
+    ]);
+    const solo = KnownValue('Solo', [KnownValue('Live')]);
+    const values = [band, solo];
+
+    test('round-trip through .library.json', () {
+      final library = Library(
+        id: LibraryId('L'),
+        mode: LibraryMode.local,
+        layout: Layout.classic(),
+      );
+      expect(library.toJson().containsKey('knownValues'), isFalse);
+      final json = jsonDecode(
+        jsonEncode(library.withKnownValues(values).toJson()),
+      );
+      final read = Library.fromJson((json as Map).cast());
+      expect(read.knownValues, values);
+      expect(read.layout!.levels.length, 3);
+      expect(Library.fromJson(library.toJson()).knownValues, isEmpty);
+      expect(
+        band.hashCode,
+        const KnownValue('Band', [
+          KnownValue('First album'),
+          KnownValue(Layout.unassigned),
+        ]).hashCode,
+      );
+      expect(band, isNot(const KnownValue('Band', [KnownValue('x')])));
+      expect(band, isNot(const KnownValue('Band')));
+      expect(band.toString(), 'Band(First album, _Unassigned)');
+    });
+
+    test('are complete with one value per intermediate level', () {
+      expect(values.problemFor(3), isNull);
+      expect(const <KnownValue>[].problemFor(3), KnownValuesProblem.empty);
+      expect(
+        const [KnownValue('Band')].problemFor(3),
+        KnownValuesProblem.missingChild,
+      );
+      expect(values.problemFor(2), KnownValuesProblem.tooDeep);
+      expect(
+        const [KnownValue('A'), KnownValue('A')].problemFor(2),
+        KnownValuesProblem.duplicate,
+      );
+      expect(const [KnownValue('A')].problemFor(2), isNull);
+      expect(const <KnownValue>[].problemFor(1), isNull);
+      expect(const [KnownValue('A')].problemFor(1), KnownValuesProblem.tooDeep);
+    });
+
+    test('know paths, find values and add new ones', () {
+      expect(values.knows(['Band', 'First album']), isTrue);
+      expect(values.knows([Layout.unassigned, Layout.unassigned]), isTrue);
+      expect(values.knows([Layout.unassigned, 'Anything']), isFalse);
+      expect(values.knows(['Band', Layout.unassigned]), isTrue);
+      expect(values.knows(['Band', 'Other']), isFalse);
+      expect(values.knows(['Other']), isFalse);
+      expect(values.pathsOf('Live'), [
+        ['Solo', 'Live'],
+      ]);
+      expect(values.pathsOf('Band'), [
+        ['Band'],
+      ]);
+      expect(values.pathsOf('Nothing'), isEmpty);
+
+      expect(values.withPath(['Band', 'First album']), values);
+      expect(values.withPath(const []), values);
+      expect(values.withPath(['Band', 'Second']), [
+        const KnownValue('Band', [
+          KnownValue('First album'),
+          KnownValue(Layout.unassigned),
+          KnownValue('Second'),
+        ]),
+        solo,
+      ]);
+      expect(values.withPath(['New', 'One']), [
+        band,
+        solo,
+        const KnownValue('New', [KnownValue('One')]),
+      ]);
     });
   });
 }

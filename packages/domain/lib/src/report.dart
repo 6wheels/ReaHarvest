@@ -1,3 +1,5 @@
+import 'library.dart';
+
 /// Level of a report section, in display order.
 enum ReportLevel { error, warning, skipped, done }
 
@@ -6,6 +8,9 @@ enum ReportLevel { error, warning, skipped, done }
 enum ReportKind {
   scanFailed(ReportLevel.error),
   corrupted(ReportLevel.error),
+  titleTooHigh(ReportLevel.warning),
+  misplacedLevel(ReportLevel.warning),
+  unknownValue(ReportLevel.warning),
   orphanNode(ReportLevel.warning),
   toSort(ReportLevel.warning),
   missingMedia(ReportLevel.warning),
@@ -21,22 +26,44 @@ enum ReportKind {
   final ReportLevel level;
 }
 
-/// One reported file or folder, with an optional detail (an error message).
+/// One reported file or folder, with an optional detail (an error message),
+/// and for a misplaced folder, the layout level it was expected at and the
+/// proposed target path (SPEC §5.8).
 final class ReportItem {
-  const ReportItem(this.path, [this.detail]);
+  const ReportItem(this.path, [this.detail]) : level = null, target = null;
+
+  /// Folder found where [level] was expected, to move to [target] if known.
+  const ReportItem.misplaced(this.path, {required this.level, this.target})
+    : detail = null;
 
   final String path;
   final String? detail;
+  final LayoutLevel? level;
+  final String? target;
+
+  /// This item at [path].
+  ReportItem withPath(String path) => level == null
+      ? ReportItem(path, detail)
+      : ReportItem.misplaced(path, level: level, target: target);
 
   @override
   bool operator ==(Object other) =>
-      other is ReportItem && other.path == path && other.detail == detail;
+      other is ReportItem &&
+      other.path == path &&
+      other.detail == detail &&
+      other.level?.key == level?.key &&
+      other.target == target;
 
   @override
-  int get hashCode => Object.hash(path, detail);
+  int get hashCode => Object.hash(path, detail, level?.key, target);
 
   @override
-  String toString() => detail == null ? path : '$path: $detail';
+  String toString() => [
+    path,
+    if (detail != null) ': $detail',
+    if (level != null) ' [${level!.key}]',
+    if (target != null) ' -> $target',
+  ].join();
 }
 
 /// Report of a long action (SPEC §5.2): items by kind of outcome.

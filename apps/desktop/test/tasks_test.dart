@@ -170,6 +170,13 @@ void main() {
         ReportKind.libraryUnavailable: [ReportItem('/other')],
         ReportKind.mediaMoved: [ReportItem('/lib/Media/kick.wav')],
         ReportKind.scanFailed: [ReportItem('/broken', 'boom')],
+        ReportKind.titleTooHigh: [
+          ReportItem.misplaced(
+            '/lib/Loose',
+            level: LayoutLevel('title'),
+            target: '_Unassigned/_Unassigned/Loose',
+          ),
+        ],
       }),
       openReport: true,
     );
@@ -183,7 +190,14 @@ void main() {
     expect(find.text('Media moved · 1'), findsOneWidget);
     expect(find.textContaining('gone.wav'), findsOneWidget);
     expect(find.textContaining('boom'), findsOneWidget);
+    expect(find.textContaining('Expected level: Title'), findsOneWidget);
+    expect(
+      find.textContaining('Proposed target: _Unassigned/_Unassigned/Loose'),
+      findsOneWidget,
+    );
     expect(find.textContaining('kick.wav'), findsNothing);
+    await tester.ensureVisible(find.text('Media moved · 1'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Media moved · 1'));
     await tester.pumpAndSettle();
     expect(find.textContaining('kick.wav'), findsOneWidget);

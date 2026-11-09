@@ -542,6 +542,34 @@ void main() {
     expect(container.read(tasksProvider), [task]);
   });
 
+  test('reports misplaced levels through the known values', () async {
+    final song = await bandWithSong();
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    final storage = MountedFolderStorage(band);
+    final library = await readLibrary(storage);
+    await writeLibrary(
+      storage,
+      library!.withKnownValues(const [
+        KnownValue('Artist', [KnownValue('Album')]),
+      ]),
+    );
+    Directory(p.join(band, 'Album')).createSync();
+    File('../../test/fixtures/project-2.rpp')
+        .copySync(p.join(band, 'Album', 'loose.rpp'));
+    container.read(tasksProvider.notifier).clearFinished();
+
+    await service().scanAll();
+    final report = container.read(tasksProvider).single.report!;
+    expect(report.items[ReportKind.misplacedLevel], [
+      ReportItem.misplaced(
+        p.join(band, 'Album'),
+        level: const LayoutLevel('album'),
+        target: 'Artist/Album',
+      ),
+    ]);
+    expect(report.items[ReportKind.toSort], isEmpty);
+  });
+
   test('scans as background tasks', () async {
     await service().scanAll();
     expect(container.read(tasksProvider), isEmpty, reason: 'no library');
