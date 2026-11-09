@@ -515,6 +515,19 @@ void main() {
         ]),
         solo,
       ]);
+      expect(values.withoutPath(['Band', 'First album']), [
+        const KnownValue('Band', [KnownValue(Layout.unassigned)]),
+        solo,
+      ]);
+      expect(values.withoutPath(['Solo']), [band]);
+      expect(values.withoutPath(const []), values);
+      expect(values.paths, [
+        ['Band'],
+        ['Band', 'First album'],
+        ['Band', Layout.unassigned],
+        ['Solo'],
+        ['Solo', 'Live'],
+      ]);
       expect(values.withPath(['New', 'One']), [
         band,
         solo,

@@ -260,4 +260,50 @@ void main() {
     expect(file('Song - bridge.RPP').existsSync(), isTrue);
     expect(file('v1.rpp').existsSync(), isTrue);
   });
+
+  testWidgets('reports misplaced levels of a misorganized folder', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const ReaHarvestApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // A title in place, an album without its artist, a title placed high.
+    final mess = p.join(root.path, 'Mess');
+    for (final dir in ['Artist/Album/Song', 'Album/Song2', 'Loose']) {
+      final folder = p.joinAll([mess, ...dir.split('/')]);
+      Directory(folder).createSync(recursive: true);
+      File(fixture('project-1.rpp')).copySync(p.join(folder, 'v.rpp'));
+    }
+    final service = container.read(libraryServiceProvider);
+    final values = await tester.runAsync(
+      () => service.prefillKnownValues(mess, Layout.classic()),
+    );
+    expect(values, const [
+      KnownValue('Artist', [KnownValue('Album')]),
+    ]);
+    final adding = service.addLocal(
+      folder: mess,
+      displayName: 'Mess',
+      layout: Layout.classic(),
+      knownValues: values!,
+    );
+    await waitFor(
+      tester,
+      () => find.text('Folders at the wrong level · 1').evaluate().isNotEmpty,
+      reason: 'report opened',
+    );
+    await adding;
+    expect(find.text('Titles placed too high · 1'), findsOne);
+    expect(find.textContaining('Proposed target: Artist/Album'), findsOne);
+    expect(
+      find.textContaining('Proposed target: _Unassigned/_Unassigned/Loose'),
+      findsOne,
+    );
+    expect(find.textContaining('Expected level: Album'), findsOne);
+  });
 }

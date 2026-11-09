@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../state/libraries.dart';
 import '../state/pickers.dart';
 import '../theme/app_theme.dart';
+import 'known_values_editor.dart';
 import 'layout_labels.dart';
 import 'path_row.dart';
 
@@ -44,6 +45,12 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
   LibraryProblem? _problem;
   var _busy = false;
 
+  /// The folder holds projects: known values are asked (SPEC §3.1).
+  var _hasProjects = false;
+
+  /// Known values being checked, for [_layout]; null while not asked.
+  List<KnownValue>? _values;
+
   @override
   void dispose() {
     _name.dispose();
@@ -57,12 +64,14 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
     Library? existing;
     var locked = false;
     LibraryProblem? problem;
+    var hasProjects = false;
     try {
       existing = await service.existing(folder);
       if (existing != null && existing.mode != LibraryMode.local) {
         problem = LibraryProblem.unsupportedMode;
-      } else if (existing != null) {
-        locked = await service.isLayoutLocked(folder);
+      } else {
+        hasProjects = await service.hasProjects(folder);
+        if (existing != null) locked = await service.isLayoutLocked(folder);
       }
     } on LibraryException catch (e) {
       problem = e.problem;
@@ -73,9 +82,11 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
       _existing = existing;
       _locked = locked;
       _problem = problem;
+      _hasProjects = hasProjects;
       if (existing != null) _choice = _choiceOf(existing.layout);
       if (_name.text.trim().isEmpty) _name.text = p.basename(folder);
     });
+    await _refreshValues();
   }
 
   /// Choice matching [layout]: a template, the free tree, or the custom one.
@@ -99,12 +110,46 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
       ? null
       : _custom;
 
+  /// Asks the known values of the intermediate levels when the folder holds
+  /// projects, pre-filled from its folders, unless the existing library
+  /// already declares them for this layout (SPEC §3.1, §5.1).
+  Future<void> _refreshValues() async {
+    final layout = _layout;
+    final declared = _existing?.knownValues ?? const [];
+    final asked =
+        _folder != null &&
+        _hasProjects &&
+        layout != null &&
+        layout.levels.length > 1 &&
+        !(declared.isNotEmpty && sameLayout(_existing?.layout, layout));
+    if (!asked) {
+      setState(() => _values = null);
+      return;
+    }
+    final choice = _choice;
+    final values = await ref
+        .read(libraryServiceProvider)
+        .prefillKnownValues(_folder!, layout);
+    // Ignore a pre-fill outdated by another choice meanwhile.
+    if (mounted && choice == _choice) setState(() => _values = values);
+  }
+
+  void _choose(int choice) {
+    setState(() => _choice = choice);
+    _refreshValues();
+  }
+
   Future<void> _submit() async {
     setState(() => _busy = true);
     try {
       await ref
           .read(libraryServiceProvider)
-          .addLocal(folder: _folder!, displayName: _name.text, layout: _layout);
+          .addLocal(
+            folder: _folder!,
+            displayName: _name.text,
+            layout: _layout,
+            knownValues: _values ?? const [],
+          );
       widget.onAdded();
     } on LibraryException catch (e) {
       if (mounted) setState(() => _problem = e.problem);
@@ -118,7 +163,12 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final canSubmit = _folder != null && _problem == null && !_busy;
+    final canSubmit =
+        _folder != null &&
+        _problem == null &&
+        !_busy &&
+        (_layout == null ||
+            _values?.problemFor(_layout!.levels.length) == null);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -197,25 +247,45 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
                     detail: _levels(l10n, t.create()),
                     recommended: t == LayoutTemplate.recommended,
                     selected: _choice == t.index,
-                    onTap: () => setState(() => _choice = t.index),
+                    onTap: () => _choose(t.index),
                   ),
               if (!_locked || _choice == _freeTreeChoice)
                 _LayoutChoice(
                   name: l10n.layoutFreeTree,
                   detail: l10n.layoutFreeTreeHint,
                   selected: _choice == _freeTreeChoice,
-                  onTap: () => setState(() => _choice = _freeTreeChoice),
+                  onTap: () => _choose(_freeTreeChoice),
                 ),
               if (_custom case final custom?)
                 _LayoutChoice(
                   name: l10n.layoutCurrent,
                   detail: _levels(l10n, custom),
                   selected: _choice > _freeTreeChoice,
-                  onTap: () => setState(() => _choice = _freeTreeChoice + 1),
+                  onTap: () => _choose(_freeTreeChoice + 1),
                 ),
             ],
           ),
         ),
+        if ((_values, _layout) case (final values?, final layout?))
+          FormRow(
+            label: l10n.knownValues,
+            alignTop: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.knownValuesHint,
+                  style: text.bodySmall?.copyWith(color: c.muted),
+                ),
+                const SizedBox(height: Space.s),
+                KnownValuesEditor(
+                  layout: layout,
+                  values: values,
+                  onChanged: (v) => setState(() => _values = v),
+                ),
+              ],
+            ),
+          ),
         if (_problem case final problem?)
           Padding(
             padding: const EdgeInsets.only(bottom: Space.m),

@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../state/libraries.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'known_values_editor.dart';
 import 'library_form.dart';
 import 'path_row.dart';
 import 'reaper_settings.dart';
@@ -301,6 +302,7 @@ class _Libraries extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     final libraries = ref.watch(settingsProvider.select((s) => s.libraries));
+    final indexed = ref.watch(indexedLibrariesProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -328,6 +330,13 @@ class _Libraries extends ConsumerWidget {
                     ],
                   ),
                 ),
+                // Known values of the intermediate levels (SPEC §3.1).
+                if (indexed[library.id]?.layout case final layout?
+                    when layout.levels.length > 1)
+                  TextButton(
+                    onPressed: () => showKnownValues(context, library, layout),
+                    child: Text(l10n.knownValues),
+                  ),
                 TextButton(
                   onPressed: () => _confirmRemoval(context, ref, library),
                   child: Text(l10n.removeLibrary),

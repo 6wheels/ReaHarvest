@@ -63,16 +63,26 @@ class LibraryService {
 
   /// Whether the layout of the library at [folder] can no longer change:
   /// the folder already holds projects (SPEC §3.1).
-  Future<bool> isLayoutLocked(String folder) => _hasProjects(folder);
+  Future<bool> isLayoutLocked(String folder) => hasProjects(folder);
+
+  /// Whether [folder] holds a REAPER project (backups, history and trash
+  /// left out).
+  Future<bool> hasProjects(String folder) => _hasProjects(folder);
+
+  /// Known values to offer for [layout] in [folder] (SPEC §3.1).
+  Future<List<KnownValue>> prefillKnownValues(String folder, Layout layout) =>
+      prefillKnownValuesIn(folder, layout);
 
   /// Adds the local library at [folder] with [layout] (null: free tree):
   /// attaches the library already described there (keeping its id, and
-  /// replacing its layout if it differs and is not locked), or creates it.
-  /// Then scans it. Throws [LibraryException].
+  /// replacing its layout if it differs and is not locked), or creates it,
+  /// with [knownValues] when given (SPEC §3.1). Then scans it. Throws
+  /// [LibraryException].
   Future<void> addLocal({
     required String folder,
     required String displayName,
     required Layout? layout,
+    List<KnownValue> knownValues = const [],
   }) async {
     final found = await existing(folder);
     if (found != null && found.mode != LibraryMode.local) {
@@ -82,13 +92,16 @@ class LibraryService {
     if (found != null && changed && await isLayoutLocked(folder)) {
       throw const LibraryException(LibraryProblem.layoutLocked);
     }
-    final library = changed
+    final kept = changed
         ? Library(
             id: found?.id ?? LibraryId.generate(),
             mode: LibraryMode.local,
             layout: layout,
           )
         : found;
+    final library = knownValues.isEmpty
+        ? kept
+        : kept.withKnownValues(knownValues);
     final entry = LibraryEntry(
       id: library.id,
       displayName: displayName.trim().isEmpty
@@ -103,7 +116,9 @@ class LibraryService {
     } on ArgumentError {
       throw const LibraryException(LibraryProblem.overlap);
     }
-    if (changed) await writeLibrary(MountedFolderStorage(folder), library);
+    if (changed || knownValues.isNotEmpty) {
+      await writeLibrary(MountedFolderStorage(folder), library);
+    }
     await ref.read(settingsProvider.notifier).change((_) => updated);
     await ref
         .read(tasksProvider.notifier)
@@ -112,6 +127,56 @@ class LibraryService {
           (_) => _scan(entry),
           openReport: true,
         );
+  }
+
+  /// Known values of the library [entry], and those still used by a folder
+  /// (paths joined with `/`), which cannot be removed (SPEC §3.1).
+  Future<({List<KnownValue> values, Set<String> used})> knownValuesOf(
+    LibraryEntry entry,
+  ) async {
+    final root = entry.libraryRoot;
+    final library = await readLibrary(MountedFolderStorage(root));
+    final values = library?.knownValues ?? const <KnownValue>[];
+    final used = <String>{};
+    for (final path in values.paths) {
+      if (await Directory(p.joinAll([root, ...path])).exists()) {
+        used.add(path.join('/'));
+      }
+    }
+    return (values: values, used: used);
+  }
+
+  /// Replaces the known values of the library [entry] (SPEC §3.1). Then
+  /// rescans it, as a task whose report is shown at the end.
+  Future<void> setKnownValues(
+    LibraryEntry entry,
+    List<KnownValue> values,
+  ) async {
+    final storage = MountedFolderStorage(entry.libraryRoot);
+    final library = await readLibrary(storage);
+    if (library == null) return;
+    await writeLibrary(storage, library.withKnownValues(values));
+    await ref
+        .read(tasksProvider.notifier)
+        .run(
+          (l10n) => l10n.taskScan(entry.displayName),
+          (_) => _scan(entry),
+          openReport: true,
+        );
+  }
+
+  /// Adds the intermediate [folders] of a title created in the library
+  /// [entry] to its known values, when it declares some (SPEC §3.1).
+  Future<void> _rememberValues(LibraryEntry entry, List<String> folders) async {
+    final storage = MountedFolderStorage(entry.libraryRoot);
+    final library = await readLibrary(storage);
+    if (library == null || library.knownValues.isEmpty) return;
+    final path = folders.take(folders.length - 1).toList();
+    if (library.knownValues.knows(path)) return;
+    await writeLibrary(
+      storage,
+      library.withKnownValues(library.knownValues.withPath(path)),
+    );
   }
 
   /// Forgets [id]: settings and index only, files are left untouched.
@@ -183,6 +248,7 @@ class LibraryService {
       (l10n) => l10n.taskMove(p.posix.basename(path)),
       (_) async {
         final report = await _move(root, path, folders.join('/'));
+        await _rememberValues(entry, folders);
         await scan(entry);
         return report;
       },

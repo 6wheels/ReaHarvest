@@ -267,5 +267,15 @@
   "reportExpectedLevel": "Expected level: {level}",
   "@reportExpectedLevel": {"placeholders": {"level": {"type": "String"}}},
   "reportTarget": "Proposed target: {path}",
-  "@reportTarget": {"placeholders": {"path": {"type": "String"}}}
+  "@reportTarget": {"placeholders": {"path": {"type": "String"}}},
+  "knownValues": "Known values",
+  "knownValuesHint": "The folders of each level, found in this folder. Check them: ReaHarvest uses them to recognize each level and to point out misplaced folders.",
+  "addValue": "Add {level}",
+  "@addValue": {"placeholders": {"level": {"type": "String"}}},
+  "removeValue": "Remove “{value}”",
+  "@removeValue": {"placeholders": {"value": {"type": "String"}}},
+  "knownValuesEmpty": "Add at least one value.",
+  "knownValuesMissingChild": "Each value needs at least one value below it (or Unassigned).",
+  "knownValuesInvalid": "These values do not match the layout.",
+  "knownValuesUsed": "A value still used by a folder cannot be removed."
 }

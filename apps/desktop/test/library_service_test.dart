@@ -570,6 +570,69 @@ void main() {
     expect(report.items[ReportKind.toSort], isEmpty);
   });
 
+  test('declares, edits and extends the known values', () async {
+    final band = folder('Declared');
+    final song = p.join(band, 'Artist', 'Album', 'Song');
+    Directory(song).createSync(recursive: true);
+    File('../../test/fixtures/project-1.rpp').copySync(p.join(song, 'v1.rpp'));
+    expect(await service().hasProjects(band), isTrue);
+    final prefilled = await service().prefillKnownValues(
+      band,
+      Layout.classic(),
+    );
+    expect(prefilled, const [
+      KnownValue('Artist', [KnownValue('Album')]),
+    ]);
+
+    await service().addLocal(
+      folder: band,
+      displayName: 'Declared',
+      layout: Layout.classic(),
+      knownValues: prefilled,
+    );
+    final storage = MountedFolderStorage(band);
+    expect((await readLibrary(storage))!.knownValues, prefilled);
+    final entry = container.read(settingsProvider).libraries.single;
+
+    final values = const [
+      KnownValue('Artist', [KnownValue('Album'), KnownValue('Live')]),
+    ];
+    await service().setKnownValues(entry, values);
+    expect((await readLibrary(storage))!.knownValues, values);
+    expect(container.read(tasksProvider).last.openReport, isTrue);
+    final known = await service().knownValuesOf(entry);
+    expect(known.values, values);
+    expect(known.used, {'Artist', 'Artist/Album'});
+
+    // A title moved under a new artist adds it to the known values.
+    File('../../test/fixtures/project-2.rpp')
+        .copySync(p.join(band, 'loose.rpp'));
+    await service().scanAll();
+    await service().moveToTitle(entry.id, 'loose.rpp', ['Solo', 'Demo', 'X']);
+    expect((await readLibrary(storage))!.knownValues, [
+      ...values,
+      const KnownValue('Solo', [KnownValue('Demo')]),
+    ]);
+    // Already known: unchanged.
+    File('../../test/fixtures/project-2.rpp')
+        .copySync(p.join(band, 'other.rpp'));
+    await service().scanAll();
+    await service().moveToTitle(entry.id, 'other.rpp', ['Solo', 'Demo', 'Y']);
+    expect((await readLibrary(storage))!.knownValues, hasLength(2));
+
+    // A library without known values keeps none, and one without
+    // .library.json is left alone.
+    await service().setKnownValues(
+      LibraryEntry(
+        id: LibraryId.generate(),
+        displayName: 'None',
+        workspaceRoot: folder('None'),
+      ),
+      values,
+    );
+    expect(await readLibrary(MountedFolderStorage(folder('None'))), isNull);
+  });
+
   test('scans as background tasks', () async {
     await service().scanAll();
     expect(container.read(tasksProvider), isEmpty, reason: 'no library');

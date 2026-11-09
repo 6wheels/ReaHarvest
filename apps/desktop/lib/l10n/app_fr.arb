@@ -210,5 +210,13 @@
   "reportMisplacedLevel": "Dossiers au mauvais niveau",
   "reportUnknownValue": "Dossiers inconnus : déclarez-les dans les réglages de la bibliothèque, ou déplacez-les",
   "reportExpectedLevel": "Niveau attendu : {level}",
-  "reportTarget": "Emplacement proposé : {path}"
+  "reportTarget": "Emplacement proposé : {path}",
+  "knownValues": "Valeurs connues",
+  "knownValuesHint": "Les dossiers de chaque niveau, trouvés dans ce dossier. Vérifiez-les : ReaHarvest s'en sert pour reconnaître chaque niveau et signaler les dossiers mal placés.",
+  "addValue": "Ajouter : {level}",
+  "removeValue": "Retirer « {value} »",
+  "knownValuesEmpty": "Ajoutez au moins une valeur.",
+  "knownValuesMissingChild": "Chaque valeur doit avoir au moins une valeur en dessous (ou Non classé).",
+  "knownValuesInvalid": "Ces valeurs ne correspondent pas à l'organisation.",
+  "knownValuesUsed": "Une valeur encore utilisée par un dossier ne peut pas être retirée."
 }

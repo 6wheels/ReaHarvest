@@ -13,6 +13,8 @@ import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
+import 'package:reaharvest/l10n/app_localizations.dart';
+import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_detail.dart';
 import 'package:reaharvest/ui/title_card.dart';
@@ -40,6 +42,9 @@ Library? existingLibrary;
 /// Whether [existingLibrary] holds titles.
 var existingLocked = false;
 
+/// Whether the folder picked in the library form holds projects.
+var existingProjects = false;
+
 /// Outcome of opening a backup: a bool, or an error thrown.
 Object backupOpening = true;
 
@@ -61,6 +66,9 @@ class FakeLibraryService extends LibraryService {
   final trashed = <String>[];
   final orphansDeleted = <String>[];
   final restored = <String>[];
+
+  /// Known values given to addLocal or setKnownValues.
+  List<KnownValue>? knownValues;
 
   @override
   Future<bool> openBackup(Title title, Backup backup) async {
@@ -131,12 +139,41 @@ class FakeLibraryService extends LibraryService {
   Future<bool> isLayoutLocked(String folder) async => existingLocked;
 
   @override
+  Future<bool> hasProjects(String folder) async => existingProjects;
+
+  @override
+  Future<List<KnownValue>> prefillKnownValues(
+    String folder,
+    Layout layout,
+  ) async => const [
+    KnownValue('Band', [KnownValue('First album')]),
+  ];
+
+  @override
+  Future<({List<KnownValue> values, Set<String> used})> knownValuesOf(
+    LibraryEntry entry,
+  ) async => (
+    values: const [
+      KnownValue('Band', [KnownValue('First album'), KnownValue('Live')]),
+    ],
+    used: {'Band', 'Band/First album'},
+  );
+
+  @override
+  Future<void> setKnownValues(
+    LibraryEntry entry,
+    List<KnownValue> values,
+  ) async => knownValues = values;
+
+  @override
   Future<void> addLocal({
     required String folder,
     required String displayName,
     required Layout? layout,
+    List<KnownValue> knownValues = const [],
   }) async {
     added.add((folder, displayName, layout));
+    this.knownValues = knownValues;
     final entry = LibraryEntry(
       id: LibraryId.generate(),
       displayName: displayName,
@@ -187,6 +224,7 @@ void main() {
     settings = MemorySettings();
     existingLibrary = null;
     existingLocked = false;
+    existingProjects = false;
     backupOpening = true;
     await tester.pumpWidget(
       ProviderScope(
@@ -444,6 +482,107 @@ void main() {
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
     expect(libraries.added.single.$3!.levels, hasLength(2));
+  });
+
+  testWidgets('a folder holding projects asks its known values', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingProjects = true;
+    await tester.tap(find.text('Choose…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Known values'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(KnownValuesEditor),
+        matching: find.text('Band'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('First album'), findsOneWidget);
+
+    // No known values for the free tree.
+    await tester.ensureVisible(find.text('Free tree'));
+    await tester.tap(find.text('Free tree'));
+    await tester.pumpAndSettle();
+    expect(find.text('Known values'), findsNothing);
+    await tester.tap(find.text('Classic'));
+    await tester.pumpAndSettle();
+    expect(find.text('First album'), findsOneWidget);
+
+    FilledButton submit() =>
+        tester.widget(find.widgetWithText(FilledButton, 'Create library'));
+    await tester.ensureVisible(find.byTooltip('Remove “First album”'));
+    await tester.tap(find.byTooltip('Remove “First album”'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('at least one value below it'), findsOneWidget);
+    expect(submit().onPressed, isNull);
+    await tester.tap(find.widgetWithText(TextButton, 'Unassigned'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('at least one value below it'), findsNothing);
+
+    // Add an artist, then its album.
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Add Artist'),
+      'Solo',
+    );
+    await tester.pump();
+    await tester.tap(find.byTooltip('Add Artist'));
+    await tester.pumpAndSettle();
+    expect(submit().onPressed, isNull);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Add Album').last,
+      'Live',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Create library'));
+    await tester.tap(find.text('Create library'));
+    await tester.pumpAndSettle();
+    expect(libraries.knownValues, const [
+      KnownValue('Band', [KnownValue(Layout.unassigned)]),
+      KnownValue('Solo', [KnownValue('Live')]),
+    ]);
+  });
+
+  testWidgets('settings edit the known values of a library', (tester) async {
+    await pumpApp(
+      tester,
+      indexed: {
+        band.id: Library(
+          id: band.id,
+          mode: LibraryMode.local,
+          layout: Layout.classic(),
+        ),
+      },
+    );
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Known values'));
+    await tester.pumpAndSettle();
+    expect(find.text('Known values · Band'), findsOneWidget);
+    expect(find.textContaining('still used by a folder'), findsOneWidget);
+
+    IconButton remove(String value) => tester.widget(
+      find.ancestor(
+        of: find.byTooltip('Remove “$value”'),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(remove('First album').onPressed, isNull);
+    expect(remove('Band').onPressed, isNull);
+    await tester.tap(find.byTooltip('Remove “Live”'));
+    await tester.pumpAndSettle();
+    expect(find.text('Live'), findsNothing);
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(libraries.knownValues, const [
+      KnownValue('Band', [KnownValue('First album')]),
+    ]);
   });
 
   testWidgets('filters by tag and saves the filter', (tester) async {
@@ -1059,6 +1198,18 @@ void main() {
     expect(
       AuroraPalette.of('01JC1').lights.first,
       isNot(AuroraPalette.of('01JC2').lights.first),
+    );
+  });
+
+  test('every known values problem has a label', () {
+    final l10n = lookupAppLocalizations(const Locale('fr'));
+    expect(
+      {
+        for (final problem in KnownValuesProblem.values)
+          knownValuesProblemLabel(l10n, problem),
+      },
+      hasLength(KnownValuesProblem.values.length - 1),
+      reason: 'tooDeep and duplicate share a label',
     );
   });
 }

@@ -212,6 +212,29 @@ extension KnownValues on List<KnownValue> {
     ];
   }
 
+  /// These values without the one at [path] (one value per level, from the
+  /// top) and its children.
+  List<KnownValue> withoutPath(List<String> path) {
+    if (path.isEmpty) return this;
+    final [name, ...rest] = path;
+    return [
+      for (final v in this)
+        if (v.value != name)
+          v
+        else if (rest.isNotEmpty)
+          KnownValue(name, v.children.withoutPath(rest)),
+    ];
+  }
+
+  /// Paths (one value per level, from the top) of every value, parents
+  /// first.
+  List<List<String>> get paths => [
+    for (final v in this) ...[
+      [v.value],
+      for (final rest in v.children.paths) [v.value, ...rest],
+    ],
+  ];
+
   List<Map<String, Object?>> toJson() => [for (final v in this) v.toJson()];
 }
 
