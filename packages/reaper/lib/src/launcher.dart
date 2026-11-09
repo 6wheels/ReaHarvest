@@ -31,8 +31,11 @@ Future<bool> isReaperRunning({String? os, RunCommand run = runProcess}) async {
   return (executable, ['-nonewinst', projectFile]);
 }
 
+// coverage:ignore-start
+// Starts REAPER for real; the command line is tested via openProjectCommand.
 /// Opens [projectFile] in REAPER, without waiting for it.
 Future<void> openInReaper(String executable, String projectFile) async {
   final (exe, args) = openProjectCommand(executable, projectFile);
   await Process.start(exe, args, mode: ProcessStartMode.detached);
 }
+// coverage:ignore-end

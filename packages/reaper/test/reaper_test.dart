@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
+import 'package:reaharvest_reaper/src/run_command.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'package:test/test.dart';
 
@@ -100,6 +101,19 @@ void main() {
         exists: (_) => false,
       );
       expect(none, isNull);
+    });
+
+    test('defaults to the current environment and file system', () async {
+      final exe = await detectReaperExecutable(
+        run: (cmd, args) async => result(1, ''),
+      );
+      // Depends on the machine: null, or an existing install location.
+      if (exe != null) {
+        expect(
+          FileSystemEntity.typeSync(exe),
+          isNot(FileSystemEntityType.notFound),
+        );
+      }
     });
   });
 
@@ -214,6 +228,16 @@ void main() {
       expect(await loadDefaultProjectTemplate('/no/such/folder'), isNull);
     });
 
+    test('loads the peaks preference from REAPER.ini', () async {
+      final dir = Directory.systemTemp.createTempSync('reaharvest_ini_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      File(p.join(dir.path, 'REAPER.ini'))
+          .writeAsStringSync('[REAPER]\naltpeaks=1\naltpeakspath=C:\\Peaks\n');
+      final preference = (await loadPeaksPreference(dir.path))!;
+      expect(preference.isRecommended, isTrue);
+      expect(preference.altPeaksPath, r'C:\Peaks');
+    });
+
     test('resolves the default project template', () async {
       final res = p.join('res', 'REAPER');
       expect(
@@ -279,6 +303,27 @@ void main() {
       );
       expect(macExe, 'open');
       expect(macArgs, ['-a', '/Applications/REAPER.app', '/p/a.rpp']);
+
+      final (exe, args) = openProjectCommand('reaper', 'a.rpp');
+      expect(args.last, 'a.rpp');
+      expect(exe, Platform.isMacOS ? 'open' : 'reaper');
+    });
+
+    test('process detection defaults to the current OS', () async {
+      final commands = <String>[];
+      final running = await isReaperRunning(
+        run: (cmd, args) async {
+          commands.add(cmd);
+          return result(1, '');
+        },
+      );
+      expect(running, isFalse);
+      expect(commands, [Platform.isWindows ? 'tasklist' : 'pgrep']);
+    });
+
+    test('runs real processes', () async {
+      final r = await runProcess(Platform.resolvedExecutable, ['--version']);
+      expect(r.exitCode, 0);
     });
 
     test('process detection', () async {

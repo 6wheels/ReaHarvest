@@ -18,7 +18,7 @@ const _target = 95.0;
 /// Temporary floors at the measured coverage, for suites still below the
 /// target. Raise them as the code is brought up; remove an entry once its
 /// suite reaches the target.
-const _floors = {'reaper': 92.0, 'app': 86.0};
+const _floors = {'app': 86.0};
 
 final _root = Directory.current.path;
 final _out = '$_root${Platform.pathSeparator}coverage';
