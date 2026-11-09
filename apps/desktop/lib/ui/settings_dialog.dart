@@ -10,6 +10,7 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'known_values_editor.dart';
 import 'library_form.dart';
+import 'members_editor.dart';
 import 'path_row.dart';
 import 'reaper_settings.dart';
 
@@ -337,6 +338,10 @@ class _Libraries extends ConsumerWidget {
                     onPressed: () => showKnownValues(context, library, layout),
                     child: Text(l10n.knownValues),
                   ),
+                TextButton(
+                  onPressed: () => showMembers(context, library),
+                  child: Text(l10n.members),
+                ),
                 TextButton(
                   onPressed: () => _confirmRemoval(context, ref, library),
                   child: Text(l10n.removeLibrary),

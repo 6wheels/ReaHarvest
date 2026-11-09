@@ -22,7 +22,7 @@ class FilterBar extends ConsumerWidget {
     final navigation = ref.watch(navigationProvider);
     final filter = navigation.filter;
     final notifier = ref.read(navigationProvider.notifier);
-    final identity = ref.watch(settingsProvider.select((s) => s.identity));
+    final owners = ref.watch(ownerNamesProvider);
     final configured = ref.watch(settingsProvider.select((s) => s.libraries));
     final toSort = ref.watch(issuesProvider).length;
     // Titles with a version to adopt, as shown once filtered.
@@ -73,7 +73,7 @@ class FilterBar extends ConsumerWidget {
           label: l10n.filterOwner,
           options: options.owners,
           selected: filter.owners,
-          labelOf: (o) => ownerName(identity, o),
+          labelOf: (o) => ownerName(owners, o),
           onChanged: (s) => set(filter.copyWith(owners: s)),
         ),
       if (options.missingPlugins || filter.missingPlugins)

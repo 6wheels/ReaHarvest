@@ -265,6 +265,28 @@ final class CollabSettings {
   );
 }
 
+/// A member of the band, declared in `.library.json` by the person who
+/// prepares the library, so that versions get their owner during the
+/// migration (SPEC §6.5).
+final class Member {
+  const Member(this.id, this.name);
+
+  final MemberId id;
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Member && other.id == id && other.name == name;
+
+  @override
+  int get hashCode => Object.hash(id, name);
+
+  Map<String, Object?> toJson() => {'memberId': id, 'name': name};
+
+  static Member fromJson(Map<String, Object?> json) =>
+      Member(MemberId(json['memberId'] as String), json['name'] as String);
+}
+
 /// Library description, as stored in `.library.json` (SPEC §6.5).
 final class Library {
   Library({
@@ -273,6 +295,7 @@ final class Library {
     required this.layout,
     this.collab,
     this.knownValues = const [],
+    this.members = const [],
   }) {
     if (layout == null && mode != LibraryMode.local) {
       throw ArgumentError('Free tree is only allowed in local mode');
@@ -296,6 +319,9 @@ final class Library {
   /// declared, the scan then recognizes levels by depth only.
   final List<KnownValue> knownValues;
 
+  /// Declared members (SPEC §6.5); empty while not declared.
+  final List<Member> members;
+
   bool get isFreeTree => layout == null;
 
   /// This library with [knownValues] replaced.
@@ -305,6 +331,17 @@ final class Library {
     layout: layout,
     collab: collab,
     knownValues: knownValues,
+    members: members,
+  );
+
+  /// This library with [members] replaced.
+  Library withMembers(List<Member> members) => Library(
+    id: id,
+    mode: mode,
+    layout: layout,
+    collab: collab,
+    knownValues: knownValues,
+    members: members,
   );
 
   Map<String, Object?> toJson() => {
@@ -314,6 +351,7 @@ final class Library {
     'layout': layout?.toJson(),
     if (knownValues.isNotEmpty) 'knownValues': knownValues.toJson(),
     'collab': ?collab?.toJson(),
+    if (members.isNotEmpty) 'members': [for (final m in members) m.toJson()],
   };
 
   static Library fromJson(Map<String, Object?> json) {
@@ -329,6 +367,10 @@ final class Library {
       layout: layout == null ? null : Layout.fromJson(layout.cast()),
       collab: collab == null ? null : CollabSettings.fromJson(collab.cast()),
       knownValues: knownValuesFromJson(json['knownValues'] as List?),
+      members: [
+        for (final m in (json['members'] as List?) ?? const [])
+          Member.fromJson((m as Map).cast()),
+      ],
     );
   }
 }

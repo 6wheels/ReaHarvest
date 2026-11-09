@@ -115,11 +115,11 @@ String titleSubtitle(WidgetRef ref, AppLocalizations l10n, Title title) => [
 
 /// Label, owner, date and tempo of [version], joined.
 String versionDetails(WidgetRef ref, AppLocalizations l10n, Version version) {
-  final identity = ref.watch(settingsProvider.select((s) => s.identity));
+  final owners = ref.watch(ownerNamesProvider);
   final m = version.metadata;
   return [
     if (m != null && m.label.isNotEmpty) m.label,
-    if (m != null) ownerName(identity, m.owner),
+    if (m != null) ownerName(owners, m.owner),
     shortDate(l10n, version.modified),
     if (version.tempo case final bpm?) l10n.bpm(bpm.round()),
   ].join(' · ');
@@ -455,7 +455,7 @@ class _VersionItem extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     final alerts = versionAlerts(ref, title, version);
-    final identity = ref.watch(settingsProvider.select((s) => s.identity));
+    final owners = ref.watch(ownerNamesProvider);
     final m = version.metadata;
     final status = title.statusOf(version);
     return Padding(
@@ -489,7 +489,7 @@ class _VersionItem extends ConsumerWidget {
                         [
                           shortDate(l10n, version.modified),
                           if (m != null && m.label.isNotEmpty) m.label,
-                          if (m != null) ownerName(identity, m.owner),
+                          if (m != null) ownerName(owners, m.owner),
                           if (status != null) statusLabel(l10n, status),
                         ].join(' · '),
                         maxLines: 1,
@@ -514,8 +514,9 @@ class _VersionItem extends ConsumerWidget {
   }
 }
 
-/// Adoption of a version without metadata: label, then identity written
-/// into the project (SPEC §4.2).
+/// Adoption of a version without metadata: label and owner (chosen among
+/// the declared members, if any, else the local member), written into the
+/// project (SPEC §4.2).
 class _Adopt extends ConsumerStatefulWidget {
   const _Adopt(this.title, this.version);
 
@@ -529,6 +530,26 @@ class _Adopt extends ConsumerStatefulWidget {
 class _AdoptState extends ConsumerState<_Adopt> {
   final _label = TextEditingController();
 
+  /// Owner picked among the declared members; null for the default.
+  MemberId? _picked;
+
+  List<Member> get _members =>
+      ref.watch(indexedLibrariesProvider)[widget.title.libraryId]?.members ??
+      const [];
+
+  /// Owner written on adoption: the picked member, else the local member if
+  /// declared (or none is), else the first declared member.
+  MemberId get _owner {
+    final local = ref.watch(
+      settingsProvider.select((s) => s.identity.memberId),
+    );
+    final members = _members;
+    return _picked ??
+        (members.isEmpty || members.any((m) => m.id == local)
+            ? local
+            : members.first.id);
+  }
+
   @override
   void dispose() {
     _label.dispose();
@@ -540,15 +561,14 @@ class _AdoptState extends ConsumerState<_Adopt> {
     ref,
     () => ref
         .read(libraryServiceProvider)
-        .adopt(widget.title, widget.version, _label.text),
+        .adopt(widget.title, widget.version, _label.text, owner: _owner),
   );
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final owner = ref.watch(
-      settingsProvider.select((s) => s.identity.displayName),
-    );
+    final members = _members;
+    final owner = _owner;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -568,11 +588,35 @@ class _AdoptState extends ConsumerState<_Adopt> {
                   onSubmitted: (_) => _adopt(),
                   decoration: InputDecoration(
                     labelText: l10n.versionLabel,
-                    helperText: l10n.filterValue(l10n.filterOwner, owner),
+                    helperText: members.isEmpty
+                        ? l10n.filterValue(
+                            l10n.filterOwner,
+                            ownerName(ref.watch(ownerNamesProvider), owner),
+                          )
+                        : null,
                     isDense: true,
                   ),
                 ),
               ),
+              if (members.isNotEmpty) ...[
+                const SizedBox(width: Space.s),
+                SizedBox(
+                  width: 160,
+                  child: DropdownButtonFormField<MemberId>(
+                    initialValue: owner,
+                    isDense: true,
+                    decoration: InputDecoration(
+                      labelText: l10n.filterOwner,
+                      isDense: true,
+                    ),
+                    items: [
+                      for (final m in members)
+                        DropdownMenuItem(value: m.id, child: Text(m.name)),
+                    ],
+                    onChanged: (id) => setState(() => _picked = id),
+                  ),
+                ),
+              ],
               const SizedBox(width: Space.s),
               FilledButton(onPressed: _adopt, child: Text(l10n.adopt)),
             ],

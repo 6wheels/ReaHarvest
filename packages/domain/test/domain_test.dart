@@ -461,6 +461,32 @@ void main() {
       expect(read.knownValues, values);
       expect(read.layout!.levels.length, 3);
       expect(Library.fromJson(library.toJson()).knownValues, isEmpty);
+      expect(read.members, isEmpty);
+    });
+
+    test('members round-trip through .library.json', () {
+      const alice = Member(MemberId('A'), 'Alice');
+      final library =
+          Library(
+            id: LibraryId('L'),
+            mode: LibraryMode.local,
+            layout: Layout.classic(),
+          ).withKnownValues(values).withMembers([
+            alice,
+            Member(MemberId('B'), 'Bob'),
+          ]);
+      expect(library.toJson()['members'], [
+        {'memberId': 'A', 'name': 'Alice'},
+        {'memberId': 'B', 'name': 'Bob'},
+      ]);
+      final read = Library.fromJson(
+        (jsonDecode(jsonEncode(library.toJson())) as Map).cast(),
+      );
+      expect(read.members, library.members);
+      expect(read.withKnownValues(const []).members, library.members);
+      expect(read.knownValues, values);
+      expect(alice.hashCode, const Member(MemberId('A'), 'Alice').hashCode);
+      expect(alice, isNot(const Member(MemberId('A'), 'Bob')));
       expect(
         band.hashCode,
         const KnownValue('Band', [

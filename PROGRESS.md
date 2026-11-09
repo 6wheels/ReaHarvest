@@ -27,11 +27,11 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #77 known level values (artists, albums) for layout recognition
 - [x] #66 inventory and no-loss check (logic in `repository`; started as a background task by the M1 fix flows)
 - [x] #67 typed migration issues in To sort (layout, levels, duplicated `versionId`; media, Assets and conflict-copy detectors come with #69, #70, #23)
+- [x] #71 members list in `.library.json` (done before #68, which needs the declared members)
 - [ ] #68 layout moves and member subfolders
 - [ ] #80 number of versions to adopt on the card, overview and detail
 - [ ] #69 media normalization and pool merge
 - [ ] #70 other files to Assets with reference check
-- [ ] #71 members list in `.library.json`
 - [ ] #72 convert to a collab repository
 - [ ] #15 REAPER-running warning before `.rpp` rewrites
 - [ ] #23 Google Drive conflict copies (reported only)

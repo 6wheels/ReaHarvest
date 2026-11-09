@@ -59,6 +59,7 @@ class FakeLibraryService extends LibraryService {
   final added = <(String, String, Layout?)>[];
   final removed = <LibraryId>[];
   final adopted = <(String, String)>[];
+  final adoptedOwners = <MemberId?>[];
   final separated = <String>[];
   final opened = <String>[];
   final created = <(String, String, String?)>[];
@@ -71,6 +72,9 @@ class FakeLibraryService extends LibraryService {
 
   /// Known values given to addLocal or setKnownValues.
   List<KnownValue>? knownValues;
+
+  /// Members returned by membersOf, then given to setMembers.
+  List<Member> members = const [];
 
   @override
   Future<bool> openBackup(Title title, Backup backup) async {
@@ -139,8 +143,15 @@ class FakeLibraryService extends LibraryService {
   }
 
   @override
-  Future<void> adopt(Title title, Version version, String label) async =>
-      adopted.add((version.fileName, label));
+  Future<void> adopt(
+    Title title,
+    Version version,
+    String label, {
+    MemberId? owner,
+  }) async {
+    adopted.add((version.fileName, label));
+    adoptedOwners.add(owner);
+  }
 
   @override
   Future<void> separateDuplicate(Title title, Version version) async =>
@@ -172,6 +183,13 @@ class FakeLibraryService extends LibraryService {
     ],
     used: {'Band', 'Band/First album'},
   );
+
+  @override
+  Future<List<Member>> membersOf(LibraryEntry entry) async => members;
+
+  @override
+  Future<void> setMembers(LibraryEntry entry, List<Member> members) async =>
+      this.members = members;
 
   @override
   Future<void> setKnownValues(
@@ -635,6 +653,54 @@ void main() {
     ]);
   });
 
+  testWidgets('settings declare the members of a library', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Members'));
+    await tester.pumpAndSettle();
+    expect(find.text('Members · Band'), findsOneWidget);
+    Finder field([String? text]) => find.descendant(
+      of: find.byType(AlertDialog),
+      matching: text == null
+          ? find.byType(TextField)
+          : find.widgetWithText(TextField, text),
+    );
+    // Without declared members, the local member is proposed.
+    expect(field('Alice'), findsOneWidget);
+
+    FilledButton save() =>
+        tester.widget(find.widgetWithText(FilledButton, 'Save'));
+    await tester.tap(find.text('Add a member'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a name'), findsOneWidget);
+    expect(save().onPressed, isNull);
+    await tester.enterText(field().last, 'alice ');
+    await tester.pumpAndSettle();
+    expect(find.text('Name already used'), findsOneWidget);
+    await tester.enterText(field().last, 'Bob');
+    await tester.tap(find.text('Add a member'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Remove this member').last);
+    await tester.pumpAndSettle();
+    expect(field(), findsNWidgets(2));
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(libraries.members, [
+      const Member(MemberId('M'), 'Alice'),
+      isA<Member>().having((m) => m.name, 'name', 'Bob'),
+    ]);
+
+    // Declared members are loaded as they are.
+    await tester.tap(find.text('Members'));
+    await tester.pumpAndSettle();
+    expect(field('Bob'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Members · Band'), findsNothing);
+  });
+
   testWidgets('filters by tag and saves the filter', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     expect(find.byType(TitleCard), findsNWidgets(12));
@@ -1091,6 +1157,40 @@ void main() {
     await tester.tap(find.text('Continue anyway'));
     await tester.pumpAndSettle();
     expect(libraries.adopted, [('Glass Garden v1.rpp', 'intro')]);
+  });
+
+  testWidgets('adopts a version for a declared member', (tester) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {
+        demoLibrary.id: demoLibrary.withMembers(const [
+          Member(MemberId('B'), 'Bob'),
+          Member(MemberId('demo-member'), 'Carol'),
+        ]),
+      },
+    );
+    await tester.tap(find.text('To adopt · 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Glass Garden'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The local member is not declared: the first member is proposed.
+    expect(find.text('Bob'), findsOneWidget);
+    await tester.tap(find.text('Bob'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Carol').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Adopt'));
+    await tester.pumpAndSettle();
+    expect(libraries.adoptedOwners, [const MemberId('demo-member')]);
   });
 
   testWidgets('offers to make a duplicate a new version', (tester) async {

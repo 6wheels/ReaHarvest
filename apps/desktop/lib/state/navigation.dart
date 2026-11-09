@@ -112,12 +112,21 @@ final titlesMissingPluginsProvider = Provider<Set<NodeId>>((ref) {
   };
 });
 
-/// Display name of a version owner: the local member's name, else a short
-/// id (members arrive with the collab mode).
-String ownerName(LocalIdentity identity, MemberId owner) =>
-    owner == identity.memberId
-    ? identity.displayName
-    : owner.substring(0, owner.length < 8 ? owner.length : 8);
+/// Display names of the version owners: the members declared in the
+/// indexed libraries (SPEC §6.5), and the local member.
+final ownerNamesProvider = Provider<Map<MemberId, String>>((ref) {
+  final identity = ref.watch(settingsProvider.select((s) => s.identity));
+  return {
+    for (final library in ref.watch(indexedLibrariesProvider).values)
+      for (final m in library.members) m.id: m.name,
+    identity.memberId: identity.displayName,
+  };
+});
+
+/// Display name of a version owner, from [names] ([ownerNamesProvider]),
+/// else a short id.
+String ownerName(Map<MemberId, String> names, MemberId owner) =>
+    names[owner] ?? owner.substring(0, owner.length < 8 ? owner.length : 8);
 
 /// Tempo of the latest version that has one; null when unknown.
 int? tempoOf(Title t) {

@@ -165,6 +165,21 @@ class LibraryService {
         );
   }
 
+  /// Declared members of the library [entry] (SPEC §6.5).
+  Future<List<Member>> membersOf(LibraryEntry entry) async =>
+      (await readLibrary(MountedFolderStorage(entry.libraryRoot)))?.members ??
+      const [];
+
+  /// Replaces the declared members of the library [entry] (SPEC §6.5).
+  /// Then rescans it, to index them.
+  Future<void> setMembers(LibraryEntry entry, List<Member> members) async {
+    final storage = MountedFolderStorage(entry.libraryRoot);
+    final library = await readLibrary(storage);
+    if (library == null) return;
+    await writeLibrary(storage, library.withMembers(members));
+    await scan(entry);
+  }
+
   /// Adds the intermediate [folders] of a title created in the library
   /// [entry] to its known values, when it declares some (SPEC §3.1).
   Future<void> _rememberValues(LibraryEntry entry, List<String> folders) async {
@@ -191,18 +206,22 @@ class LibraryService {
   }
 
   /// Adopts [version] of [title] ("To adopt", SPEC §4.2): writes a new
-  /// version id, the local member as owner and [label] into the project,
-  /// then rescans.
-  Future<void> adopt(Title title, Version version, String label) =>
-      _writeMetadata(
-        title,
-        version,
-        VersionMetadata(
-          id: VersionId.generate(),
-          owner: ref.read(settingsProvider).identity.memberId,
-          label: label.trim(),
-        ),
-      );
+  /// version id, [owner] (by default the local member) and [label] into the
+  /// project, then rescans.
+  Future<void> adopt(
+    Title title,
+    Version version,
+    String label, {
+    MemberId? owner,
+  }) => _writeMetadata(
+    title,
+    version,
+    VersionMetadata(
+      id: VersionId.generate(),
+      owner: owner ?? ref.read(settingsProvider).identity.memberId,
+      label: label.trim(),
+    ),
+  );
 
   /// Makes the manual duplicate [version] of [title] a new version (SPEC
   /// §4.2): new id, owned by the local member, label kept. Then rescans.

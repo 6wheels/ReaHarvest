@@ -432,6 +432,21 @@ void main() {
     expect(duplicateVersions(index.titles()), isEmpty);
   });
 
+  test('declares members and adopts for one of them', () async {
+    await bandWithSong();
+    final entry = container.read(settingsProvider).libraries.single;
+    expect(await service().membersOf(entry), isEmpty);
+    const bob = Member(MemberId('B'), 'Bob');
+    await service().setMembers(entry, const [bob]);
+    expect(await service().membersOf(entry), const [bob]);
+    expect(container.read(indexedLibrariesProvider).values.single.members, [
+      bob,
+    ]);
+
+    await service().adopt(title(), version('v1.rpp'), '', owner: bob.id);
+    expect(version('v1.rpp').metadata!.owner, bob.id);
+  });
+
   test('backs up, restores and opens versions in REAPER', () async {
     final song = await bandWithSong();
     await service().adopt(title(), version('v1.rpp'), 'main');
