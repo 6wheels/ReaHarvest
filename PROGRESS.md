@@ -14,15 +14,16 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - Every long action: background task (tasks zone) + report structured by kind of problem + log.
 - Portable mode: `settings.json` / `index.sqlite` next to the executable are used first (demo, tests, two members on one machine).
 
-## M0 — Foundations
+## M0 — Foundations (closed)
 - [x] #61 portable mode
 - [x] #62 background tasks zone
 - [x] #63 structured reports popup
 - [x] #64 file logging
 - [x] #65 coverage gate in CI (measure first, then raise the existing MVP-path code to the target)
-- [ ] #59 integration tests (moves with the milestones)
 
 ## M1 — Migration (umbrella #30)
+- [ ] #79 center the main window at launch (priority 1)
+- [ ] #59 integration tests (moves with the milestones; regression net of the existing features and the M0 steps still open)
 - [x] #77 known level values (artists, albums) for layout recognition
 - [ ] #66 inventory and no-loss check
 - [ ] #67 typed migration issues in To sort
@@ -54,7 +55,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [ ] #29 activity feed
 
 ## Parked (Backlog)
-#12, #14, #22, #25, #27, #28, #31, #32, #38, #40, #43, #46, #47, #48, #52, #53, #58, #60, #78, #79. Phases 2 and 3 unchanged.
+#12, #14, #22, #25, #27, #28, #31, #32, #38, #40, #43, #46, #47, #48, #52, #53, #58, #60, #78. Phases 2 and 3 unchanged.
 
 ## Pending outside the plan
 - New fixture corpus parked in a git stash (`fixtures: new anonymized corpus in progress`), TODO in `test/fixtures/README.md`.
