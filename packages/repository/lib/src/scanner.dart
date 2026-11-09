@@ -121,7 +121,10 @@ final class _Scanner {
     for (final e in await storage.list('', recursive: true)) {
       final segments = e.path.split('/');
       final parents = segments.sublist(0, segments.length - 1);
-      if (segments.first == collabFolderName) continue;
+      if (segments.first == collabFolderName ||
+          segments.first == migrationFolderName) {
+        continue;
+      }
       if (parents.any(isExcludedFolder)) {
         final last = parents.lastOrNull?.toLowerCase();
         if (!e.isDirectory &&

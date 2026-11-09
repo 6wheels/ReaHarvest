@@ -203,6 +203,7 @@
   "reportProjectMoved": "Projet rangé",
   "reportMediaMoved": "Médias déplacés",
   "reportMediaCopied": "Médias copiés, partagés avec d'autres projets",
+  "reportFileLost": "Fichiers manquants ou modifiés depuis l'inventaire",
   "logs": "Journaux",
   "logFolder": "Dossier des journaux",
   "openFolder": "Ouvrir",

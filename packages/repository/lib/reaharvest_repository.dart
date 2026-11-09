@@ -5,6 +5,7 @@ export 'src/adoption.dart' hide freePath, separatorOf;
 export 'src/conventions.dart';
 export 'src/history.dart';
 export 'src/known_values.dart';
+export 'src/migration.dart';
 export 'src/mounted_folder_storage.dart';
 export 'src/node_file.dart';
 export 'src/scaffold.dart';

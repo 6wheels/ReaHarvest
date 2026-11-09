@@ -258,6 +258,7 @@
   "reportProjectMoved": "Project moved",
   "reportMediaMoved": "Media moved",
   "reportMediaCopied": "Media copied, shared with other projects",
+  "reportFileLost": "Files missing or changed since the inventory",
   "logs": "Logs",
   "logFolder": "Log folder",
   "openFolder": "Open",

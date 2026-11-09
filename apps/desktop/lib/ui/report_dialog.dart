@@ -17,6 +17,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
     switch (kind) {
       ReportKind.scanFailed => l10n.reportScanFailed,
       ReportKind.corrupted => l10n.corruptedTitle,
+      ReportKind.fileLost => l10n.reportFileLost,
       ReportKind.titleTooHigh => l10n.reportTitleTooHigh,
       ReportKind.misplacedLevel => l10n.reportMisplacedLevel,
       ReportKind.unknownValue => l10n.reportUnknownValue,

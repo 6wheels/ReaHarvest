@@ -5,6 +5,10 @@ import 'mounted_folder_storage.dart';
 /// Collab journal folder, at the library root (SPEC §6.3).
 const collabFolderName = '.collab';
 
+/// Migration inventories and original projects, at the library root
+/// (SPEC §5.8).
+const migrationFolderName = '.migration';
+
 /// Title subfolders holding no versions (SPEC §3.2), lowercase.
 const reservedTitleFolders = {
   'media',

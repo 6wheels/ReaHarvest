@@ -8,6 +8,7 @@ enum ReportLevel { error, warning, skipped, done }
 enum ReportKind {
   scanFailed(ReportLevel.error),
   corrupted(ReportLevel.error),
+  fileLost(ReportLevel.error),
   titleTooHigh(ReportLevel.warning),
   misplacedLevel(ReportLevel.warning),
   unknownValue(ReportLevel.warning),
