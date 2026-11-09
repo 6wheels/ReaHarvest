@@ -23,6 +23,7 @@ class FilterBar extends ConsumerWidget {
     final filter = navigation.filter;
     final notifier = ref.read(navigationProvider.notifier);
     final identity = ref.watch(settingsProvider.select((s) => s.identity));
+    final configured = ref.watch(settingsProvider.select((s) => s.libraries));
     final toSort =
         ref.watch(toSortProvider).length +
         ref.watch(scanIssuesProvider('orphanNode')).length +
@@ -45,12 +46,10 @@ class FilterBar extends ConsumerWidget {
           label: l10n.filterLibrary,
           options: [for (final l in options.libraries) l.id],
           selected: filter.libraries,
-          // A saved filter may name a library without titles any more.
+          // A saved filter may name a library without titles any more, or
+          // even a removed one (raw id).
           labelOf: (id) =>
-              options.libraries
-                  .where((l) => l.id == id)
-                  .firstOrNull
-                  ?.displayName ??
+              configured.where((l) => l.id == id).firstOrNull?.displayName ??
               id,
           onChanged: (s) => set(filter.copyWith(libraries: s)),
         ),

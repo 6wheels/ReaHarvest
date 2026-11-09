@@ -466,11 +466,19 @@ void main() {
     await pumpApp(
       tester,
       titles: demoTitles(),
-      configured: const [demo],
+      configured: const [
+        demo,
+        LibraryEntry(
+          id: LibraryId('empty'),
+          displayName: 'Empty',
+          workspaceRoot: '/music/Empty',
+        ),
+      ],
       navigation: const NavigationSettings(
         filter: TitleFilter(
-          // A saved filter may name a library without titles any more.
-          libraries: {LibraryId('demo'), LibraryId('gone')},
+          // A saved filter may name a library without titles, or a removed
+          // one.
+          libraries: {LibraryId('demo'), LibraryId('empty'), LibraryId('gone')},
           modes: {LibraryMode.local},
           owners: {MemberId('demo-member')},
           missingPlugins: true,
@@ -488,7 +496,8 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    await toggle('Library: 2', 'gone');
+    await toggle('Library: 3', 'gone');
+    await toggle('Library: 2', 'Empty');
     expect(filter().libraries, {const LibraryId('demo')});
     await toggle('Library: Demo', 'Demo');
     expect(filter().libraries, isEmpty);
