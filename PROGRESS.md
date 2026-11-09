@@ -15,14 +15,15 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - Portable mode: `settings.json` / `index.sqlite` next to the executable are used first (demo, tests, two members on one machine).
 
 ## M0 — Foundations
-- [ ] #61 portable mode
-- [ ] #62 background tasks zone
-- [ ] #63 structured reports popup
+- [x] #61 portable mode
+- [x] #62 background tasks zone
+- [x] #63 structured reports popup
 - [ ] #64 file logging
-- [ ] #65 coverage gate in CI (measure first, then raise the existing MVP-path code to the target)
+- [x] #65 coverage gate in CI (measure first, then raise the existing MVP-path code to the target)
 - [ ] #59 integration tests (moves with the milestones)
 
 ## M1 — Migration (umbrella #30)
+- [ ] #77 known level values (artists, albums) for layout recognition
 - [ ] #66 inventory and no-loss check
 - [ ] #67 typed migration issues in To sort
 - [ ] #68 layout moves and member subfolders

@@ -97,6 +97,7 @@ Layout rules:
 - The last level is always the **leaf node** (title): it holds `Media/` and the versions.
 - A layout has 1 to 4 levels. Each level is a **token** (placeholder, written `<key>`, e.g. `<album>`): a language-independent tag key (technical identifier, in English), so that a configuration can be reproduced as is. Labels are never stored as plain text: the displayed label is the translation of the key (key → value per language). Keys of the provided templates are translated by the application; custom keys carry their own translations in `.library.json` (`labels`, by language code), with fallback to English, then to the key itself.
 - All levels are mandatory. Each intermediate level has a reserved value (`_Unassigned`, UI: « Non classé ») for items that are not attached.
+- **Known values** of the intermediate levels (e.g. classic: the artists, and the albums of each artist), stored in `.library.json` (`knownValues`, §6.5) as a tree that follows the levels; the leaf level (title) is never listed. The depth of a folder alone cannot tell an artist from a title placed too high: the scan uses the known values to recognize each level and to report precisely what is wrong (§5.8). They are asked when a library is added on a folder that already holds projects (§5.1) and during the migration (§5.8), pre-filled with the folders found at each depth: at least one value per intermediate level, each value of a non-last intermediate level having at least one child (`_Unassigned` allowed, e.g. a band without albums). A value created in the application (new title under a new artist or album) is added to the tree. They are editable in the library settings; a value still used by a folder cannot be removed. Not used by the free tree (§3.3).
 - In `local` mode only, a layout can be replaced by the **free tree** (§3.3).
 - The layout is defined **per library**, in `.library.json`. It is **frozen as soon as the first title is created** (derived from the presence of titles, not stored): changing it afterwards is a migration (outside the MVP).
 - Each layout declares a **tags → render metadata mapping** (e.g. classic: `artist` → artist, `album` → album, `title` → title). The mapping can be modified by the user.
@@ -106,7 +107,7 @@ Layout rules:
 Example with the classic template:
 ```
 <libraryRoot>/                   # repository root (modes cloud/collab) or workspace root (mode local)
-  .library.json                   # libraryId, mode, layout, statuses, collab settings (cf. §6.5)
+  .library.json                   # libraryId, mode, layout, known values, statuses, collab settings (cf. §6.5)
   .collab/                        # collab mode: joined members (cf. §5.1), journal store (cf. §6.3)
   .migration/                     # migration inventories, original projects and reports (cf. §5.8)
   <artist>/
@@ -216,7 +217,7 @@ Versions form a **flat list** (no tree, no parent version).
 
 ### 5.1 Configuration
 - **Libraries** (0..n), each with: display name, mode (§3.0), workspace root, repository root (`cloud` and `collab` modes), layout, optional templates folder specific to the library.
-- Adding a library: creation of a new one (choice of mode and layout) or attachment to an existing repository (reading its `.library.json`, case of a member joining a group).
+- Adding a library: creation of a new one (choice of mode and layout) or attachment to an existing repository (reading its `.library.json`, case of a member joining a group). When the folder already holds projects and the layout has intermediate levels, the form asks their **known values** (§3.1), pre-filled with the folders found at each depth, before the first scan; an attached library keeps the values of its `.library.json` (asked once if it has none).
 - **Removing a library** from the application, whatever its mode, after confirmation:
   - removed: the library from the application configuration and from the index; in the local folder (workspace, or free tree roots), the application files `.library.json`, `.node.json` and `.collab/`. The confirmation states that the statuses stored in the `.node.json` files are lost;
   - kept: all REAPER and audio content (`.RPP`, `Media/`, `Renders/`, `Assets/`, REAPER backups, peaks…), `.history/` and `.trash/` (project data), and the `ReaHarvest` `EXTSTATE` section of the `.RPP` files (version identity, reused if the folder is added again);
@@ -360,16 +361,17 @@ Actions performed from the title detail (§5.2).
 MVP milestone M1 (§9). The migration organizes a folder **in place**, through the `RepositoryStorage` port: for the band, directly the shared Drive folder (first a copy holding a sample, then the real folder, e.g. `proaudio/reaper/projects/<group>/<title>[/<member>]`); later, for `local` libraries, a local folder first (then published, `local` → `cloud`). A folder that is not migrated can be kept as a free tree (§3.3, `local` only).
 
 Flow (wizard "Organize my band's folder", §5.1):
-1. Choice of the folder and of the target layout, declaration of the members (§6.5).
+1. Choice of the folder and of the target layout, declaration of the **known values** of the intermediate levels (§3.1: e.g. the artists and their albums, pre-filled with the folders found at each depth, the user checks or corrects them), declaration of the members (§6.5).
 2. **Inventory** before the first change (relative path, size, XXH3 hash of every file), stored in `.migration/<timestamp>/`. Hashing reads every file: on a streaming cloud folder, the whole folder is downloaded once (background task, cancellable, resumable from the already hashed stamps).
 3. Scan against the layout. Every inconsistency is an **issue**, listed by kind in the "To sort" page (§5.2) with a counter per kind:
    - project too deep (e.g. `<title>/<member>/x.rpp`) or too shallow (`.rpp` at an intermediate level), folder outside the layout;
+   - level recognition through the known values (§3.1): unknown folder at an intermediate level holding projects = title placed too high (target `<parent>/_Unassigned/<folder>`); folder named after a known value of another level = skipped or misplaced level (target given by the tree, e.g. an album found at the artist level goes under its artist); other unknown folder = value to declare or folder to move. Each issue names the expected level and the proposed target;
    - media outside `Media/` (relative), media referenced through an absolute path, missing media, `RECORD_PATH` other than `Media` (e.g. `audio-files`), `RENDER_FILE` forms (§5.3);
    - other files to move into `Assets/`, or blocked because a project references them;
    - versions not adopted, duplicated `versionId` (§4.2);
    - cloud provider conflict copies (e.g. `x (1).rpp`), reported only.
 4. **Fixes in the interface**, each with a preview (dry run) and a report (§5.2):
-   - move of a folder or project to its layout position, `_Unassigned` value for a missing level (e.g. the album);
+   - move of a folder or project to its layout position (the target proposed from the known values), `_Unassigned` value for a missing level (e.g. the album);
    - **member subfolder** (`<title>/<member>/…`): its projects are moved up into the title, owner = that member, names de-duplicated;
    - media (audio, video, MIDI, subprojects `<SOURCE RPP_PROJECT` with their `.rpp-PROX`) moved into `Media/`, references rewritten, `RECORD_PATH` set to `Media` (targeted patch, §7.3); per-member media merged into the single pool; identical media (same hash) share one pool file and the duplicate is **moved** into `.trash/`; name collision: suffix and reference rewrite;
    - **any other file** (neither a project, nor a media, nor a REAPER file such as `.rpp-bak`, `Backups/`, peaks) is moved into `Assets/`. Before moving it, the application looks for its name in the projects of the title, in plain text and in the decoded base64 plugin states: a referenced file (e.g. impulse response, sampler file) is not moved automatically, it is reported for a manual decision;
@@ -466,6 +468,9 @@ CollabStore
     ],
     "renderMetadata": { "artist": "artist", "album": "album", "title": "title" }
   },
+  "knownValues": [                 // intermediate levels only, as a tree (§3.1)
+    { "value": "Band", "children": [ { "value": "First album" }, { "value": "_Unassigned" } ] }
+  ],
   "statuses": [
     { "key": "idea" }, { "key": "writing" }, { "key": "recording" }, { "key": "mixing" }, { "key": "done" }
     // custom value: { "key": "demo", "labels": { "en": "Demo", "fr": "Maquette" } }
