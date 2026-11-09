@@ -28,8 +28,9 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #66 inventory and no-loss check (logic in `repository`; started as a background task by the M1 fix flows)
 - [x] #67 typed migration issues in To sort (layout, levels, duplicated `versionId`; media, Assets and conflict-copy detectors come with #69, #70, #23)
 - [x] #71 members list in `.library.json` (done before #68, which needs the declared members)
-- [x] #68 layout moves and member subfolders (batch fix with preview, free move per item, inventory and check around every batch; batch adoption of the versions already in place: see #80)
+- [x] #68 layout moves and member subfolders (batch fix with preview and optional level values, unknown folders included with a chosen level, free move per item (level chosen for unknown folders), inventory and check around every batch; batch adoption of the versions already in place: see #80)
 - [ ] #81 merge folders moved to the same title
+- [ ] #82 select the To sort items to fix in bulk
 - [ ] #80 number of versions to adopt on the card, overview and detail
 - [ ] #69 media normalization and pool merge
 - [ ] #70 other files to Assets with reference check
@@ -62,4 +63,4 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - New fixture corpus parked in a git stash (`fixtures: new anonymized corpus in progress`), TODO in `test/fixtures/README.md`.
 
 ## Next step
-Start M0 with #65: measure the current coverage of every package and the app, report it, then decide the order with the user (#61 is small and unblocks multi-member testing).
+Continue M1 with #81 (merge folders moved to the same title), then #82.

@@ -1459,6 +1459,8 @@ void main() {
         band.id: demoLibrary.withMembers(const [
           alice,
           Member(MemberId('bob'), 'Bob'),
+          // The local member, owner by default.
+          Member(MemberId('M'), 'Me'),
         ]),
       },
       issues: [
@@ -1482,7 +1484,7 @@ void main() {
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
     // Projects outside a member folder go to Bob.
-    await tester.tap(find.text('Alice').first);
+    await tester.tap(find.text('Me').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bob').last);
     await tester.pumpAndSettle();
@@ -1530,58 +1532,116 @@ void main() {
   });
 
   testWidgets('fixes folders in batch or moves one anywhere', (tester) async {
+    LibraryIssue folder(
+      ReportKind kind,
+      String path,
+      String level, [
+      String? target,
+    ]) => (
+      library: demoLibrary.id,
+      kind: kind,
+      item: ReportItem.misplaced(
+        path,
+        level: LayoutLevel(level),
+        target: target,
+      ),
+    );
     await pumpApp(
       tester,
       titles: demoTitles(),
-      // The local member is declared: owner by default (unused here).
-      indexed: {
-        band.id: demoLibrary.withMembers(const [
-          Member(MemberId('M'), 'Alice'),
-        ]),
-      },
+      indexed: {demoLibrary.id: demoLibrary},
       issues: [
-        (
-          library: band.id,
-          kind: ReportKind.titleTooHigh,
-          item: const ReportItem.misplaced(
-            'Old',
-            level: LayoutLevel('title'),
-            target: '_Unassigned/_Unassigned/Old',
-          ),
+        folder(
+          ReportKind.titleTooHigh,
+          'Old',
+          'title',
+          '_Unassigned/_Unassigned/Old',
         ),
-        (
-          library: band.id,
-          kind: ReportKind.unknownValue,
-          item: const ReportItem.misplaced(
-            'Stranger',
-            level: LayoutLevel('artist'),
-          ),
+        folder(
+          ReportKind.titleTooHigh,
+          'Band/Loose',
+          'title',
+          'Band/_Unassigned/Loose',
         ),
+        folder(ReportKind.unknownValue, 'Stranger', 'artist'),
+        folder(ReportKind.unknownValue, 'Sample Artist/Odd', 'album'),
       ],
     );
-    await tester.tap(find.text('To sort · 2'));
+    await tester.tap(find.text('To sort · 4'));
     await tester.pumpAndSettle();
+    Finder field(String label) => find.widgetWithText(TextField, label);
+    String fieldText(String label) =>
+        tester.widget<TextField>(field(label)).controller!.text;
+    FilledButton confirm(String label) =>
+        tester.widget(find.widgetWithText(FilledButton, label));
 
-    await tester.tap(find.text('Fix…'));
+    // Titles placed too high: the album is proposed for all, the artists
+    // differ and stay per folder.
+    await tester.tap(find.text('Fix…').first);
     await tester.pumpAndSettle();
-    expect(find.text('→ _Unassigned/_Unassigned/Old'), findsOne);
-    // Nothing checked: nothing to fix.
-    await tester.tap(find.text('Old').last);
+    expect(fieldText('Artist'), isEmpty);
+    expect(fieldText('Album'), '_Unassigned');
+    expect(find.text('→ Band/_Unassigned/Loose'), findsOne);
+    await tester.enterText(field('Album'), 'Live');
     await tester.pumpAndSettle();
-    FilledButton confirm() =>
-        tester.widget(find.widgetWithText(FilledButton, 'Fix 0 items'));
-    expect(confirm().onPressed, isNull);
-    await tester.tap(find.text('Old').last);
+    expect(find.text('→ _Unassigned/Live/Old'), findsOne);
+    await tester.enterText(field('Artist'), 'a/b');
+    await tester.pumpAndSettle();
+    expect(find.text('Invalid folder name'), findsOne);
+    expect(confirm('Fix 2 items').onPressed, isNull);
+    await tester.enterText(field('Artist'), 'Sample');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sample Artist').last);
+    await tester.pumpAndSettle();
+    // Unchecked: left as it is.
+    await tester.tap(find.text('Band/Loose'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix 1 item'));
     await tester.pumpAndSettle();
     final batch = libraries.fixed.single.$2.single as MoveFolder;
-    expect((batch.path, batch.target), ('Old', '_Unassigned/_Unassigned/Old'));
+    expect((batch.path, batch.target), ('Old', 'Sample Artist/Live/Old'));
 
-    // An unknown artist folder: one level to type, any destination.
-    await tester.tap(find.text('Move…').last);
+    // Unknown folders: their level is chosen; at their own level, an
+    // artist folder has nothing to fix.
+    await tester.tap(find.text('Fix…').last);
+    await tester.pumpAndSettle();
+    expect(find.text('These folders are at the level'), findsOne);
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.text('Sample Artist/Odd'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix 1 item'));
+    await tester.pumpAndSettle();
+    expect(libraries.fixed, hasLength(1));
+
+    await tester.tap(find.text('Fix…').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Artist').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Title').last);
+    await tester.pumpAndSettle();
+    expect(fieldText('Album'), '_Unassigned');
+    await tester.enterText(field('Artist'), 'Band');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix 2 items'));
+    await tester.pumpAndSettle();
+    expect(
+      [
+        for (final f in libraries.fixed.last.$2.cast<MoveFolder>())
+          (f.path, f.target),
+      ],
+      [
+        ('Stranger', 'Band/_Unassigned/Stranger'),
+        ('Sample Artist/Odd', 'Band/_Unassigned/Odd'),
+      ],
+    );
+
+    // One unknown folder anywhere: one level to type.
+    await tester.ensureVisible(find.text('Move…').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move…').at(2));
     await tester.pumpAndSettle();
     expect(find.text('Move “Stranger”'), findsOne);
+    expect(find.text('This folder is at the level'), findsOne);
     expect(find.byType(TextField), findsOne);
     await tester.enterText(find.byType(TextField), 'Sample Artist');
     await tester.pumpAndSettle();
@@ -1589,6 +1649,24 @@ void main() {
     await tester.pumpAndSettle();
     final moved = libraries.fixed.last.$2.single as MoveFolder;
     expect((moved.path, moved.target), ('Stranger', 'Sample Artist'));
+
+    // Or at another level: the levels above it are proposed.
+    await tester.ensureVisible(find.text('Move…').at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move…').at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButton<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Title').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNWidgets(3));
+    await tester.tap(find.text('Move').last);
+    await tester.pumpAndSettle();
+    final title = libraries.fixed.last.$2.single as MoveFolder;
+    expect(
+      (title.path, title.target),
+      ('Stranger', '_Unassigned/_Unassigned/Stranger'),
+    );
   });
 
   test('statuses are proposed from status folder names', () {

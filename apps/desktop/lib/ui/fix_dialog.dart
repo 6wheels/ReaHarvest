@@ -9,19 +9,24 @@ import '../l10n/app_localizations.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
+import 'layout_labels.dart';
 import 'report_dialog.dart';
 
 /// Issue kinds fixed in batch from the "To sort" page (SPEC §5.8 step 4).
 const batchFixKinds = {
   ReportKind.titleTooHigh,
   ReportKind.misplacedLevel,
+  ReportKind.unknownValue,
   ReportKind.projectTooDeep,
 };
 
 /// Previews the batch fix of [issues], all of [kind] (dry run): each item
-/// with its target, checked by default; for projects too deep, their owner
-/// and the status deduced from their status subfolder. Returns the checked
-/// fixes by library, or null if cancelled.
+/// with its target, checked by default. Folders get optional values for
+/// the levels above them, applied to every item (prefilled when the
+/// proposals agree); unknown folders also get the level they belong to.
+/// Projects too deep get their owner and the status deduced from their
+/// status subfolder. Returns the checked fixes by library, or null if
+/// cancelled.
 Future<Map<LibraryId, List<MigrationFix>>?> showFixDialog(
   BuildContext context,
   ReportKind kind,
@@ -44,6 +49,27 @@ String? proposeStatus(AppLocalizations l10n, String folder) {
   return null;
 }
 
+/// Existing values of level [i] of [layout] among the [titles] of
+/// [libraries], under the values [above] (an empty value matches any).
+List<String> levelValues(
+  Iterable<Title> titles,
+  Set<LibraryId> libraries,
+  Layout layout,
+  int i,
+  List<String> above,
+) {
+  final keys = [for (final l in layout.levels) l.key];
+  return {
+    for (final t in titles)
+      if (libraries.contains(t.libraryId) &&
+          [
+            for (final (j, value) in above.indexed)
+              value.isEmpty || t.tags[keys[j]] == value,
+          ].every((ok) => ok))
+        ?t.tags[keys[i]],
+  }.toList()..sort();
+}
+
 class _FixDialog extends ConsumerStatefulWidget {
   const _FixDialog(this.kind, this.issues);
 
@@ -63,6 +89,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     for (var i = 0; i < widget.issues.length; i++) i,
   };
 
+  bool get _lifting => widget.kind == ReportKind.projectTooDeep;
+
+  // Projects too deep.
+
   /// Owner of the projects without member subfolder.
   late MemberId _owner;
 
@@ -72,45 +102,55 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   late final List<Member> _owners;
   late final List<_Lift> _lifts;
 
-  bool get _lifting => widget.kind == ReportKind.projectTooDeep;
+  // Folders.
+
+  late final Layout _layout;
+
+  /// Level of the unknown folders, chosen by the user (index in the
+  /// layout); null for the other kinds, whose items carry their level.
+  int? _level;
+
+  /// Values of the intermediate levels; empty keeps each proposal.
+  final _fields = <TextEditingController>[];
 
   @override
   void initState() {
     super.initState();
     final libraries = ref.read(indexedLibrariesProvider);
-    final identity = ref.read(settingsProvider).identity;
-    final members = {
-      for (final i in widget.issues)
-        for (final m in libraries[i.library]?.members ?? const <Member>[])
-          m.id: m,
-    };
-    _owners = members.isEmpty
-        ? [Member(identity.memberId, identity.displayName)]
-        : members.values.toList();
-    _owner = members.containsKey(identity.memberId)
-        ? identity.memberId
-        : _owners.first.id;
-    _lifts = [
-      for (final i in widget.issues)
-        _lift(i, libraries[i.library]?.members ?? const []),
-    ];
-  }
-
-  /// Member and status subfolders of the project too deep [issue].
-  _Lift _lift(LibraryIssue issue, List<Member> members) {
-    if (!_lifting) return (member: null, statusFolder: null);
-    final folder = p.posix.dirname(issue.item.path);
-    final segments = folder.substring(issue.item.target!.length + 1).split('/');
-    final member = members
-        .where((m) => m.name.toLowerCase() == segments.first.toLowerCase())
-        .firstOrNull;
-    final rest = member == null ? segments : segments.skip(1);
-    return (member: member, statusFolder: rest.lastOrNull);
+    if (_lifting) {
+      final identity = ref.read(settingsProvider).identity;
+      final members = {
+        for (final i in widget.issues)
+          for (final m in libraries[i.library]?.members ?? const <Member>[])
+            m.id: m,
+      };
+      _owners = members.isEmpty
+          ? [Member(identity.memberId, identity.displayName)]
+          : members.values.toList();
+      _owner = members.containsKey(identity.memberId)
+          ? identity.memberId
+          : _owners.first.id;
+      _lifts = [
+        for (final i in widget.issues)
+          _lift(i, libraries[i.library]?.members ?? const []),
+      ];
+      return;
+    }
+    _layout = libraries[widget.issues.first.library]!.layout!;
+    if (widget.kind == ReportKind.unknownValue) {
+      _level = _levelOf(widget.issues.first);
+    }
+    _fields.addAll([
+      for (var j = 0; j < _layout.levels.length - 1; j++)
+        TextEditingController(),
+    ]);
+    _prefill();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_lifting) return;
     // Proposed once, in the language of the interface.
     final l10n = AppLocalizations.of(context);
     for (final (member: _, :statusFolder) in _lifts) {
@@ -120,9 +160,85 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     }
   }
 
+  @override
+  void dispose() {
+    for (final c in _fields) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  /// Member and status subfolders of the project too deep [issue].
+  _Lift _lift(LibraryIssue issue, List<Member> members) {
+    final folder = p.posix.dirname(issue.item.path);
+    final segments = folder.substring(issue.item.target!.length + 1).split('/');
+    final member = members
+        .where((m) => m.name.toLowerCase() == segments.first.toLowerCase())
+        .firstOrNull;
+    final rest = member == null ? segments : segments.skip(1);
+    return (member: member, statusFolder: rest.lastOrNull);
+  }
+
+  /// Index in the layout of the level of the folder [issue].
+  int _levelOf(LibraryIssue issue) =>
+      _layout.levels.indexWhere((l) => l.key == issue.item.level!.key);
+
+  /// Level index of the item [i]: the chosen one for unknown folders.
+  int _levelOfItem(int i) => _level ?? _levelOf(widget.issues[i]);
+
+  /// Proposed values of the levels above the item [i]: its target, else
+  /// its current parents, `_Unassigned` for the missing ones.
+  List<String> _proposed(int i) {
+    final item = widget.issues[i].item;
+    final count = _levelOfItem(i);
+    final target = item.target?.split('/');
+    if (target != null && target.length == count + 1) {
+      return target.take(count).toList();
+    }
+    final parents = p.posix.dirname(item.path).split('/')
+      ..removeWhere((s) => s == '.');
+    return [
+      for (var j = 0; j < count; j++)
+        j < parents.length ? parents[j] : Layout.unassigned,
+    ];
+  }
+
+  /// Number of level fields shown: the levels above the deepest item.
+  int get _fieldCount =>
+      [for (var i = 0; i < widget.issues.length; i++) _levelOfItem(i)]
+          .reduce((a, b) => a > b ? a : b);
+
+  /// Fills each field with the value proposed for every item, if they
+  /// agree; empty otherwise.
+  void _prefill() {
+    final proposals = [
+      for (var i = 0; i < widget.issues.length; i++) _proposed(i),
+    ];
+    for (final (j, field) in _fields.indexed) {
+      final values = {
+        for (final proposed in proposals)
+          if (j < proposed.length) proposed[j],
+      };
+      field.text = values.length == 1 ? values.single : '';
+    }
+  }
+
+  /// Target of the folder item [i]: the field values, else its proposals,
+  /// then its name.
+  String _target(int i) => [
+    for (final (j, value) in _proposed(i).indexed)
+      _fields[j].text.trim().isEmpty ? value : _fields[j].text.trim(),
+    p.posix.basename(widget.issues[i].item.path),
+  ].join('/');
+
+  bool get _valid => _fields
+      .take(_lifting ? 0 : _fieldCount)
+      .map((f) => f.text.trim())
+      .every((v) => v.isEmpty || isValidFolderName(v));
+
   MigrationFix _fix(int i) {
     final item = widget.issues[i].item;
-    if (!_lifting) return MoveFolder(item.path, item.target!);
+    if (!_lifting) return MoveFolder(item.path, _target(i));
     final (:member, :statusFolder) = _lifts[i];
     final status = statusFolder == null ? null : _statuses[statusFolder];
     return LiftProject(
@@ -134,15 +250,14 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     );
   }
 
-  /// Target, owner and status of the item [i], joined.
+  /// Target, and for a project its owner and status, joined.
   String _details(AppLocalizations l10n, int i) {
-    final target = widget.issues[i].item.target!;
-    if (!_lifting) return '→ $target';
+    if (!_lifting) return '→ ${_target(i)}';
     final (:member, :statusFolder) = _lifts[i];
     final owner = member ?? _owners.firstWhere((m) => m.id == _owner);
     final status = statusFolder == null ? null : _statuses[statusFolder];
     return [
-      '→ $target',
+      '→ ${widget.issues[i].item.target}',
       owner.name,
       status == null ? l10n.noStatus : statusLabel(l10n, status),
     ].join(' · ');
@@ -151,9 +266,72 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   void _confirm() {
     final fixes = <LibraryId, List<MigrationFix>>{};
     for (final i in _checked.toList()..sort()) {
-      fixes.putIfAbsent(widget.issues[i].library, () => []).add(_fix(i));
+      final fix = _fix(i);
+      // A folder already at its place has nothing to fix.
+      if (fix is MoveFolder && fix.target == fix.path) continue;
+      fixes.putIfAbsent(widget.issues[i].library, () => []).add(fix);
     }
     Navigator.of(context).pop(fixes);
+  }
+
+  List<Widget> _liftChoices(AppLocalizations l10n) => [
+    Choice<MemberId>(
+      label: l10n.fixDefaultOwner,
+      value: _owner,
+      options: {for (final m in _owners) m.id: m.name},
+      onChanged: (id) => setState(() => _owner = id),
+    ),
+    for (final folder in _statuses.keys)
+      Choice<String?>(
+        label: l10n.fixStatusFor(folder),
+        value: _statuses[folder],
+        options: {
+          null: l10n.noStatus,
+          for (final s in Title.defaultStatuses) s: statusLabel(l10n, s),
+        },
+        onChanged: (s) => setState(() => _statuses[folder] = s),
+      ),
+  ];
+
+  List<Widget> _folderChoices(AppLocalizations l10n) {
+    final libraries = {for (final i in widget.issues) i.library};
+    return [
+      if (_level case final level?)
+        Choice<int>(
+          label: l10n.fixFoldersAre,
+          value: level,
+          options: {
+            for (final (j, l) in _layout.levels.indexed)
+              j: layoutLevelLabel(l10n, l),
+          },
+          onChanged: (j) => setState(() {
+            _level = j;
+            _prefill();
+          }),
+        ),
+      for (var j = 0; j < _fieldCount; j++)
+        Padding(
+          padding: const EdgeInsets.only(top: Space.s),
+          child: LevelField(
+            label: layoutLevelLabel(l10n, _layout.levels[j]),
+            hint: l10n.fixKeepProposed,
+            controller: _fields[j],
+            options: () => levelValues(
+              ref.read(titlesProvider),
+              libraries,
+              _layout,
+              j,
+              [for (final f in _fields.take(j)) f.text.trim()],
+            ),
+            error:
+                _fields[j].text.trim().isEmpty ||
+                    isValidFolderName(_fields[j].text.trim())
+                ? null
+                : l10n.invalidFolderName,
+            onChanged: () => setState(() {}),
+          ),
+        ),
+    ];
   }
 
   @override
@@ -170,26 +348,8 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(l10n.fixHint, style: muted),
-              if (_lifting) ...[
-                const SizedBox(height: Space.m),
-                _Choice<MemberId>(
-                  label: l10n.fixDefaultOwner,
-                  value: _owner,
-                  options: {for (final m in _owners) m.id: m.name},
-                  onChanged: (id) => setState(() => _owner = id),
-                ),
-                for (final folder in _statuses.keys)
-                  _Choice<String?>(
-                    label: l10n.fixStatusFor(folder),
-                    value: _statuses[folder],
-                    options: {
-                      null: l10n.noStatus,
-                      for (final s in Title.defaultStatuses)
-                        s: statusLabel(l10n, s),
-                    },
-                    onChanged: (s) => setState(() => _statuses[folder] = s),
-                  ),
-              ],
+              const SizedBox(height: Space.s),
+              ...(_lifting ? _liftChoices(l10n) : _folderChoices(l10n)),
               const SizedBox(height: Space.s),
               for (final (i, issue) in widget.issues.indexed)
                 CheckboxListTile(
@@ -213,7 +373,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           child: Text(l10n.cancel),
         ),
         FilledButton(
-          onPressed: _checked.isEmpty ? null : _confirm,
+          onPressed: _checked.isEmpty || !_valid ? null : _confirm,
           child: Text(l10n.taskFix(_checked.length)),
         ),
       ],
@@ -222,8 +382,9 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 }
 
 /// Labeled dropdown of [options] (value -> label).
-class _Choice<T> extends StatelessWidget {
-  const _Choice({
+class Choice<T> extends StatelessWidget {
+  const Choice({
+    super.key,
     required this.label,
     required this.value,
     required this.options,
@@ -250,6 +411,85 @@ class _Choice<T> extends StatelessWidget {
           onChanged: (v) => onChanged(v as T),
         ),
       ],
+    ),
+  );
+}
+
+/// Text field of one layout level, with autocompletion on existing values.
+class LevelField extends StatefulWidget {
+  const LevelField({
+    super.key,
+    required this.label,
+    required this.controller,
+    required this.options,
+    required this.error,
+    required this.onChanged,
+    this.hint,
+  });
+
+  final String label;
+
+  /// Shown while empty.
+  final String? hint;
+  final TextEditingController controller;
+  final List<String> Function() options;
+  final String? error;
+  final VoidCallback onChanged;
+
+  @override
+  State<LevelField> createState() => _LevelFieldState();
+}
+
+class _LevelFieldState extends State<LevelField> {
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RawAutocomplete<String>(
+    textEditingController: widget.controller,
+    focusNode: _focus,
+    optionsBuilder: (value) {
+      final typed = value.text.trim().toLowerCase();
+      return widget.options().where((o) => o.toLowerCase().contains(typed));
+    },
+    onSelected: (_) => widget.onChanged(),
+    fieldViewBuilder: (context, controller, focusNode, _) => TextField(
+      controller: controller,
+      focusNode: focusNode,
+      onChanged: (_) => widget.onChanged(),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        hintText: widget.hint,
+        errorText: widget.error,
+      ),
+    ),
+    optionsViewBuilder: (context, onSelected, options) => Align(
+      alignment: Alignment.topLeft,
+      child: Material(
+        elevation: 4,
+        color: context.colors.raised,
+        borderRadius: BorderRadius.circular(8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 420),
+          child: ListView(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            children: [
+              for (final o in options)
+                ListTile(
+                  dense: true,
+                  title: Text(o),
+                  onTap: () => onSelected(o),
+                ),
+            ],
+          ),
+        ),
+      ),
     ),
   );
 }

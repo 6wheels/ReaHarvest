@@ -187,6 +187,7 @@ class _ToSortList extends ConsumerWidget {
             path: path,
             target: target,
             folderLevel: level,
+            chooseLevel: issue.kind == ReportKind.unknownValue,
           ),
           child: Text(l10n.sortAction),
         ),
@@ -304,13 +305,15 @@ class _Item extends StatelessWidget {
 /// Guided move of the misplaced project [path] into a title of [library],
 /// or of the folder [path] expected at [folderLevel] to its position
 /// ("To sort", SPEC §5.2, §5.8 step 4); prefilled with [target] if known,
-/// any other destination can be typed.
+/// any other destination can be typed. With [chooseLevel], the level of
+/// the folder can be changed (unknown values).
 Future<void> showSortDialog(
   BuildContext context, {
   required LibraryId library,
   required String path,
   String? target,
   LayoutLevel? folderLevel,
+  bool chooseLevel = false,
 }) => showDialog<void>(
   context: context,
   builder: (_) => _SortDialog(
@@ -318,6 +321,7 @@ Future<void> showSortDialog(
     path: path,
     target: target,
     folderLevel: folderLevel,
+    chooseLevel: chooseLevel,
   ),
 );
 
@@ -327,12 +331,14 @@ class _SortDialog extends ConsumerStatefulWidget {
     required this.path,
     this.target,
     this.folderLevel,
+    this.chooseLevel = false,
   });
 
   final LibraryId library;
   final String path;
   final String? target;
   final LayoutLevel? folderLevel;
+  final bool chooseLevel;
 
   @override
   ConsumerState<_SortDialog> createState() => _SortDialogState();
@@ -341,41 +347,44 @@ class _SortDialog extends ConsumerStatefulWidget {
 class _SortDialogState extends ConsumerState<_SortDialog> {
   late final Layout _layout;
 
-  /// Levels down to the position: the title for a project, the expected
-  /// level for a folder.
-  late final List<LayoutLevel> _levels;
-  late final List<TextEditingController> _values;
+  /// Index in the layout of the position: the title for a project, the
+  /// expected (or chosen) level for a folder.
+  late int _level;
+
+  /// One value per layout level; those down to [_level] are shown.
+  late final List<TextEditingController> _all;
+
+  List<TextEditingController> get _values => _all.take(_level + 1).toList();
 
   @override
   void initState() {
     super.initState();
     _layout = ref.read(indexedLibrariesProvider)[widget.library]!.layout!;
     final key = (widget.folderLevel ?? _layout.leaf).key;
-    _levels = [
-      ..._layout.levels.takeWhile((l) => l.key != key),
-      _layout.levels.firstWhere((l) => l.key == key),
-    ];
-    // Prefilled from the target, else from the current folders and the
-    // file or folder name for the last level.
-    final count = _levels.length;
+    _level = _layout.levels.indexWhere((l) => l.key == key);
+    _all = [for (final _ in _layout.levels) TextEditingController()];
+    _prefill();
+  }
+
+  /// Prefills the shown values from the target, else from the current
+  /// folders and the file or folder name for the last level.
+  void _prefill() {
+    final count = _level + 1;
     final target = widget.target?.split('/');
     final folders = p.posix.dirname(widget.path).split('/')
       ..removeWhere((s) => s == '.');
-    _values = [
-      for (var i = 0; i < count; i++)
-        TextEditingController(
-          text: target != null && target.length == count
-              ? target[i]
-              : i == count - 1
-              ? p.posix.basenameWithoutExtension(widget.path)
-              : (i < folders.length ? folders[i] : Layout.unassigned),
-        ),
-    ];
+    for (var i = 0; i < count; i++) {
+      _all[i].text = target != null && target.length == count
+          ? target[i]
+          : i == count - 1
+          ? p.posix.basenameWithoutExtension(widget.path)
+          : (i < folders.length ? folders[i] : Layout.unassigned);
+    }
   }
 
   @override
   void dispose() {
-    for (final c in _values) {
+    for (final c in _all) {
       c.dispose();
     }
     super.dispose();
@@ -384,17 +393,13 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
   bool get _valid => _values.every((c) => isValidFolderName(c.text.trim()));
 
   /// Existing values of level [i] under the values typed above it.
-  List<String> _options(int i) {
-    final above = [for (final c in _values.take(i)) c.text.trim()];
-    final keys = [for (final l in _layout.levels) l.key];
-    return {
-      for (final t in ref.read(titlesProvider))
-        if (t.libraryId == widget.library &&
-            [for (var j = 0; j < i; j++) t.tags[keys[j]]].join('/') ==
-                above.join('/'))
-          ?t.tags[keys[i]],
-    }.toList()..sort();
-  }
+  List<String> _options(int i) => levelValues(
+    ref.read(titlesProvider),
+    {widget.library},
+    _layout,
+    i,
+    [for (final c in _values.take(i)) c.text.trim()],
+  );
 
   /// Moves the project; its report opens at the end of the task.
   Future<void> _move() async {
@@ -428,10 +433,23 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: c.muted),
             ),
-            for (final (i, level) in _levels.indexed) ...[
+            if (widget.chooseLevel)
+              Choice<int>(
+                label: l10n.sortFolderIs,
+                value: _level,
+                options: {
+                  for (final (j, l) in _layout.levels.indexed)
+                    j: layoutLevelLabel(l10n, l),
+                },
+                onChanged: (j) => setState(() {
+                  _level = j;
+                  _prefill();
+                }),
+              ),
+            for (var i = 0; i <= _level; i++) ...[
               const SizedBox(height: Space.m),
-              _LevelField(
-                label: layoutLevelLabel(l10n, level),
+              LevelField(
+                label: layoutLevelLabel(l10n, _layout.levels[i]),
                 controller: _values[i],
                 options: () => _options(i),
                 error: isValidFolderName(_values[i].text.trim())
@@ -455,77 +473,4 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
       ],
     );
   }
-}
-
-/// Text field of one layout level, with autocompletion on existing values.
-class _LevelField extends StatefulWidget {
-  const _LevelField({
-    required this.label,
-    required this.controller,
-    required this.options,
-    required this.error,
-    required this.onChanged,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final List<String> Function() options;
-  final String? error;
-  final VoidCallback onChanged;
-
-  @override
-  State<_LevelField> createState() => _LevelFieldState();
-}
-
-class _LevelFieldState extends State<_LevelField> {
-  final _focus = FocusNode();
-
-  @override
-  void dispose() {
-    _focus.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => RawAutocomplete<String>(
-    textEditingController: widget.controller,
-    focusNode: _focus,
-    optionsBuilder: (value) {
-      final typed = value.text.trim().toLowerCase();
-      return widget.options().where((o) => o.toLowerCase().contains(typed));
-    },
-    onSelected: (_) => widget.onChanged(),
-    fieldViewBuilder: (context, controller, focusNode, _) => TextField(
-      controller: controller,
-      focusNode: focusNode,
-      onChanged: (_) => widget.onChanged(),
-      decoration: InputDecoration(
-        labelText: widget.label,
-        errorText: widget.error,
-      ),
-    ),
-    optionsViewBuilder: (context, onSelected, options) => Align(
-      alignment: Alignment.topLeft,
-      child: Material(
-        elevation: 4,
-        color: context.colors.raised,
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 420),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            children: [
-              for (final o in options)
-                ListTile(
-                  dense: true,
-                  title: Text(o),
-                  onTap: () => onSelected(o),
-                ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }
