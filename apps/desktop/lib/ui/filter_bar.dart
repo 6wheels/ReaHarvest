@@ -45,8 +45,13 @@ class FilterBar extends ConsumerWidget {
           label: l10n.filterLibrary,
           options: [for (final l in options.libraries) l.id],
           selected: filter.libraries,
+          // A saved filter may name a library without titles any more.
           labelOf: (id) =>
-              options.libraries.firstWhere((l) => l.id == id).displayName,
+              options.libraries
+                  .where((l) => l.id == id)
+                  .firstOrNull
+                  ?.displayName ??
+              id,
           onChanged: (s) => set(filter.copyWith(libraries: s)),
         ),
       if (options.modes.length > 1 || filter.modes.isNotEmpty)
