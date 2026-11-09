@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
@@ -28,18 +27,18 @@ Future<void> main() async {
     ], await rootBundle.loadString('assets/fonts/Inter-OFL.txt'));
   });
 
-  final dir = appDataDirectory();
-  Directory(dir).createSync(recursive: true);
-  final settingsFile = SettingsFile(p.join(dir, 'settings.json'));
+  final appData = appDataDirectory();
+  final settingsPath = dataFilePath('settings.json', appData: appData);
+  final indexPath = dataFilePath('index.sqlite', appData: appData);
+  Directory(appData).createSync(recursive: true);
+  final settingsFile = SettingsFile(settingsPath);
   final settings = await settingsFile.load();
 
   final container = ProviderContainer(
     overrides: [
       settingsFileProvider.overrideWithValue(settingsFile),
       initialSettingsProvider.overrideWithValue(settings),
-      localIndexProvider.overrideWithValue(
-        LocalIndex.open(p.join(dir, 'index.sqlite')),
-      ),
+      localIndexProvider.overrideWithValue(LocalIndex.open(indexPath)),
       if (_demo) ...[
         titlesProvider.overrideWithValue(demoTitles()),
         indexedLibrariesProvider.overrideWithValue({

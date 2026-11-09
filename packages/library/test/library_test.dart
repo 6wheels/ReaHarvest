@@ -146,6 +146,15 @@ void main() {
       expect(again.identity.memberId, first.identity.memberId);
     });
 
+    test('treats an empty file as a first launch', () async {
+      File(path)
+        ..createSync(recursive: true)
+        ..writeAsStringSync('');
+      final settings = await SettingsFile(path).load();
+      expect(isUlid(settings.identity.memberId), isTrue);
+      expect(File(path).lengthSync(), greaterThan(0));
+    });
+
     test('round-trips libraries and paths', () async {
       final file = SettingsFile(path);
       final settings = (await file.load())

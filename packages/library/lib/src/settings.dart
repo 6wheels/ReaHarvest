@@ -405,7 +405,8 @@ final class SettingsFile {
   /// local identity named after the OS user, and saves them.
   Future<AppSettings> load() async {
     final file = File(path);
-    if (await file.exists()) {
+    // An empty file (portable mode marker) is a first launch.
+    if (await file.exists() && await file.length() > 0) {
       return AppSettings.fromJson(
         (jsonDecode(await file.readAsString()) as Map).cast(),
       );
