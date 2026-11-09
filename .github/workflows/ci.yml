@@ -37,19 +37,8 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
-      - name: Test packages
-        run: |
-          foreach ($package in Get-ChildItem packages -Directory) {
-            Push-Location $package.FullName
-            dart test
-            $code = $LASTEXITCODE
-            Pop-Location
-            if ($code -ne 0) { exit $code }
-          }
-
-      - name: Test app
-        working-directory: apps/desktop
-        run: flutter test
+      - name: Test with coverage gate
+        run: dart tool/coverage.dart
 
       - name: Build Windows app
         working-directory: apps/desktop
