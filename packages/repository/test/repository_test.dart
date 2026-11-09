@@ -1077,10 +1077,7 @@ void main() {
 
       final result = await scan(storage, lib);
 
-      expect(result.titles.map((t) => t.path), [
-        'Band/First album/Song',
-        'Band/_Unassigned/Other',
-      ]);
+      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.tags, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v.rpp');      expect(result.titles[1].tags['artist'], 'Band');
       expect(result.levelIssues.items, {
         ReportKind.misplacedLevel: [
           const ReportItem.misplaced(
@@ -1121,6 +1118,25 @@ void main() {
         byDepth.titles.map((t) => t.path),
         contains('Stranger/Album/Song'),
       );
+    });
+
+    test('keep a title placed too high hidden if its node is another '
+        'level', () async {
+      final lib = library(Layout.projectOriented())
+          .withKnownValues(const [KnownValue('Band')]);
+      put('Band/Song/v.rpp', unknown);
+      put('Old/v.rpp', unknown);
+      put('Old/$nodeFileName', '{"nodeId":"N","level":"artist"}');
+
+      final result = await scan(storage, lib);
+      expect(result.titles.map((t) => t.path), ['Band/Song']);
+      expect(result.levelIssues.items[ReportKind.titleTooHigh], [
+        const ReportItem.misplaced(
+          'Old',
+          level: LayoutLevel('title'),
+          target: '_Unassigned/Old',
+        ),
+      ]);
     });
   });
 }

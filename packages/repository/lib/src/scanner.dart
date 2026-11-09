@@ -54,8 +54,9 @@ final class ScanResult {
 
   /// Unknown intermediate folders, recognized through the known values of
   /// the library (SPEC §5.8), each with its expected level and proposed
-  /// target. They are also listed in [toSort] and not scanned further.
-  /// Recomputed on every scan, not stored in the index.
+  /// target. They are also listed in [toSort] and not scanned further,
+  /// except titles placed too high, indexed where they are with the tags of
+  /// their target. Recomputed on every scan, not stored in the index.
   final Report levelIssues;
 
   /// Versions without metadata ("To adopt", SPEC §4.2); always empty in a
@@ -234,6 +235,15 @@ final class _Scanner {
         });
         toSort.add(dir);
         skipped.add(dir);
+        // A title placed too high stays visible where it is, tagged as at
+        // its target (missing levels unassigned), until it is moved.
+        if (kind == ReportKind.titleTooHigh) {
+          final node = await _node(dir, layout.leaf.key);
+          if (node != null && node.level == layout.leaf.key) {
+            final tags = layout.tagsOf(item.target!.split('/'))!;
+            _addTitle(dir, node, tags, await _readVersions(dir));
+          }
+        }
         continue;
       }
       if (d < depth) {
@@ -252,18 +262,29 @@ final class _Scanner {
         continue;
       }
       if (d == depth) {
-        final versions = <Version>[];
-        for (final e in _projects(dir)) {
-          try {
-            versions.add(await _readVersion(dir, e));
-          } on Object catch (error) {
-            if (!_isCorruption(error)) rethrow;
-            corrupted.add(e.path);
-          }
-        }
-        _addTitle(dir, node, layout.tagsOf(segments)!, versions);
+        _addTitle(
+          dir,
+          node,
+          layout.tagsOf(segments)!,
+          await _readVersions(dir),
+        );
       }
     }
+  }
+
+  /// Versions of the projects in the title [dir]; unreadable ones are
+  /// reported as corrupted.
+  Future<List<Version>> _readVersions(String dir) async {
+    final versions = <Version>[];
+    for (final e in _projects(dir)) {
+      try {
+        versions.add(await _readVersion(dir, e));
+      } on Object catch (error) {
+        if (!_isCorruption(error)) rethrow;
+        corrupted.add(e.path);
+      }
+    }
+    return versions;
   }
 
   /// Whether the intermediate folders [segments] are known values (SPEC

@@ -29,6 +29,11 @@ class LibraryPage extends ConsumerWidget {
     final titles = ref.watch(visibleTitlesProvider);
     final navigation = ref.watch(navigationProvider);
     final hasTitles = ref.watch(titlesProvider).isNotEmpty;
+    // Without titles, the filter bar still leads to the items to sort.
+    final hasIssues =
+        ref.watch(toSortProvider).isNotEmpty ||
+        ref.watch(scanIssuesProvider('orphanNode')).isNotEmpty ||
+        ref.watch(scanIssuesProvider('corrupted')).isNotEmpty;
     final overview = ref.watch(overviewProvider);
     final pinned = navigation.overviewPinned;
     final l10n = AppLocalizations.of(context);
@@ -109,7 +114,7 @@ class LibraryPage extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      if (hasTitles) const FilterBar(),
+                      if (hasTitles || hasIssues) const FilterBar(),
                       Expanded(
                         child: AnimatedSwitcher(
                           duration: Motion.medium,

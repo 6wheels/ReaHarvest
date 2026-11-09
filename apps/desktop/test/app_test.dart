@@ -548,6 +548,13 @@ void main() {
     ]);
   });
 
+  testWidgets('a library without titles still leads to its items to sort', (
+    tester,
+  ) async {
+    await pumpApp(tester, orphanNodes: ['Band/Old/.node.json']);
+    expect(find.text('To sort · 1'), findsOneWidget);
+  });
+
   testWidgets('settings edit the known values of a library', (tester) async {
     await pumpApp(
       tester,
