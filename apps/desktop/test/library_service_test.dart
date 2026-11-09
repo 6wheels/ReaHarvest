@@ -11,6 +11,7 @@ import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
+import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import 'helpers.dart';
@@ -19,6 +20,7 @@ void main() {
   late Directory root;
   late ProviderContainer container;
   late LocalIndex index;
+  late List<String> launched;
 
   LibraryService service() => container.read(libraryServiceProvider);
 
@@ -28,6 +30,7 @@ void main() {
   }
 
   setUp(() {
+    launched = [];
     root = Directory.systemTemp.createTempSync('reaharvest_app_');
     index = LocalIndex.inMemory();
     container = ProviderContainer(
@@ -39,6 +42,10 @@ void main() {
         localIndexProvider.overrideWithValue(index),
         defaultReaperResourcesProvider.overrideWithValue(
           p.join(root.path, 'resources'),
+        ),
+        detectedReaperProvider.overrideWith((ref) async => null),
+        reaperLauncherProvider.overrideWithValue(
+          (executable, file) async => launched.add(file),
         ),
       ],
     );
@@ -371,5 +378,168 @@ void main() {
       ),
       [p.join(templates.path, 'band.RPP')],
     );
+  });
+
+  /// Library `Band` holding `Artist/Album/Song/v1.rpp` (not adopted).
+  Future<String> bandWithSong() async {
+    final band = folder('Band');
+    final song = p.join(band, 'Artist', 'Album', 'Song');
+    Directory(song).createSync(recursive: true);
+    File('../../test/fixtures/project-1.rpp').copySync(p.join(song, 'v1.rpp'));
+    await service().addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    return song;
+  }
+
+  Title title() => index.titles().single;
+  Version version(String name) =>
+      title().versions.firstWhere((v) => v.fileName == name);
+
+  test('adopts versions and separates manual duplicates', () async {
+    final song = await bandWithSong();
+    expect(version('v1.rpp').isAdopted, isFalse);
+
+    await service().adopt(title(), version('v1.rpp'), ' main ');
+    final adopted = version('v1.rpp').metadata!;
+    expect((adopted.owner, adopted.label), (const MemberId('M'), 'main'));
+
+    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'dup.rpp'));
+    await service().scanAll();
+    expect(duplicateVersions(index.titles()).keys, [adopted.id]);
+
+    await service().separateDuplicate(title(), version('dup.rpp'));
+    final separated = version('dup.rpp').metadata!;
+    expect(separated.id, isNot(adopted.id));
+    expect(separated.label, 'main');
+    expect(duplicateVersions(index.titles()), isEmpty);
+  });
+
+  test('backs up, restores and opens versions in REAPER', () async {
+    final song = await bandWithSong();
+    await service().adopt(title(), version('v1.rpp'), 'main');
+    final id = version('v1.rpp').metadata!.id;
+    Future<List<Backup>> backups() async =>
+        (await container.read(historyProvider(title().id).future))[id] ?? [];
+
+    await service().backup(title(), version('v1.rpp'));
+    final saved = (await backups()).single;
+    final project = File(p.join(song, 'v1.rpp'));
+    await service().editVersion(
+      title(),
+      version('v1.rpp'),
+      fileName: 'v1.rpp',
+      label: 'changed',
+    );
+
+    await service().restore(title(), version('v1.rpp'), saved);
+    expect(version('v1.rpp').metadata!.label, 'main');
+    // The state before the restore is backed up first.
+    expect(await backups(), hasLength(2));
+
+    // REAPER not found.
+    expect(await service().openVersion(title(), version('v1.rpp')), isFalse);
+    expect(await service().openBackup(title(), saved), isFalse);
+    expect(launched, isEmpty);
+
+    await container
+        .read(settingsProvider.notifier)
+        .change((s) => s.copyWith(reaperExecutable: 'reaper.exe'));
+    expect(await service().openVersion(title(), version('v1.rpp')), isTrue);
+    expect(await service().openBackup(title(), saved), isTrue);
+    expect(launched, [
+      project.path,
+      p.joinAll([
+        p.dirname(p.dirname(p.dirname(song))),
+        ...saved.path.split('/'),
+      ]),
+    ]);
+  });
+
+  test('moves a misplaced project into a title', () async {
+    final song = await bandWithSong();
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    File('../../test/fixtures/project-2.rpp')
+        .copySync(p.join(band, 'Artist', 'loose.rpp'));
+    await service().scanAll();
+    final id = container.read(settingsProvider).libraries.single.id;
+
+    final report = await service().moveToTitle(id, 'Artist/loose.rpp', [
+      'Artist',
+      'Album',
+      'Loose',
+    ]);
+
+    expect(report.project, 'Artist/Album/Loose/loose.rpp');
+    expect(
+      index.titles().map((t) => t.tags['title']),
+      containsAll(['Song', 'Loose']),
+    );
+  });
+
+  test('reports unreadable library files and survives failed scans', () async {
+    final broken = folder('Broken');
+    File(p.join(broken, libraryFileName)).writeAsStringSync('[]');
+    await expectLater(
+      service().existing(broken),
+      throwsA(
+        isA<LibraryException>()
+            .having((e) => e.problem, 'problem', LibraryProblem.invalidFile)
+            .having((e) => e.toString(), 'toString', contains('invalidFile')),
+      ),
+    );
+
+    await container
+        .read(settingsProvider.notifier)
+        .change(
+          (s) => s.addLibrary(
+            LibraryEntry(
+              id: LibraryId.generate(),
+              displayName: 'Broken',
+              workspaceRoot: broken,
+            ),
+          ),
+        );
+    await service().scanAll();
+    expect(index.libraries(), isEmpty);
+  });
+
+  group('REAPER providers', () {
+    test('read the peaks preference of the resource folder', () async {
+      final resources = Directory(p.join(root.path, 'resources'))..createSync();
+      final ini = File(p.join(resources.path, 'REAPER.ini'))
+        ..writeAsStringSync('[REAPER]\naltpeaks=1\naltpeakspath=P\n');
+      expect(
+        (await container.read(peaksPreferenceProvider.future))!.isRecommended,
+        isTrue,
+      );
+
+      ini.writeAsBytesSync([0xff, 0xfe, 0xfd]);
+      container.invalidate(peaksPreferenceProvider);
+      expect(await container.read(peaksPreferenceProvider.future), isNull);
+
+      final none = ProviderContainer(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            AppSettings(identity: const LocalIdentity(MemberId('M'), 'A')),
+          ),
+          defaultReaperResourcesProvider.overrideWithValue(null),
+        ],
+      );
+      addTearDown(none.dispose);
+      expect(await none.read(peaksPreferenceProvider.future), isNull);
+    });
+
+    test('default to this machine', () async {
+      final machine = ProviderContainer();
+      addTearDown(machine.dispose);
+      final detected = await machine.read(detectedReaperProvider.future);
+      if (detected != null) expect(File(detected).existsSync(), isTrue);
+      expect(machine.read(defaultReaperResourcesProvider), isNotNull);
+      expect(machine.read(reaperRunningProvider), isReaperRunning);
+      expect(machine.read(reaperLauncherProvider), openInReaper);
+    });
   });
 }

@@ -235,7 +235,10 @@ class LibraryService {
     final root = _entry(title.libraryId).libraryRoot;
     final path = backup.path;
     await Isolate.run(() => cleanBackupPaths(MountedFolderStorage(root), path));
-    await openInReaper(executable, p.joinAll([root, ...path.split('/')]));
+    await ref.read(reaperLauncherProvider)(
+      executable,
+      p.joinAll([root, ...path.split('/')]),
+    );
     return true;
   }
 
@@ -245,7 +248,7 @@ class LibraryService {
     final executable = await ref.read(reaperExecutableProvider.future);
     if (executable == null) return false;
     final root = _entry(title.libraryId).libraryRoot;
-    await openInReaper(
+    await ref.read(reaperLauncherProvider)(
       executable,
       p.joinAll([
         root,

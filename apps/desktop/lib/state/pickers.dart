@@ -1,3 +1,6 @@
+// coverage:ignore-file
+// Native file dialogs only: they cannot run in tests, which use fakes.
+
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
