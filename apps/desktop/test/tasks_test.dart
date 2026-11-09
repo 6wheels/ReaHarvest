@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logging/logging.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/theme/app_theme.dart';
@@ -205,5 +206,25 @@ void main() {
       for (final k in ReportKind.values) reportKindLabel(l10n, k),
     };
     expect(labels, hasLength(ReportKind.values.length));
+  });
+
+  test('tasks log their outcome and report, in English', () async {
+    final records = <String>[];
+    final sub = Logger.root.onRecord.listen(
+      (r) => records.add('${r.level.name} ${r.message} ${r.error ?? ''}'),
+    );
+    addTearDown(sub.cancel);
+    await tasks().run(
+      (l10n) => l10n.taskScanAll,
+      (_) async => const Report({
+        ReportKind.toSort: [ReportItem('/x')],
+      }),
+    );
+    await tasks().run((l10n) => 'B', (_) async => throw 'boom');
+    expect(records, [
+      'INFO Scan of the libraries: done\ntoSort (1)\n  /x ',
+      'SEVERE B boom',
+      'WARNING B: failed ',
+    ]);
   });
 }

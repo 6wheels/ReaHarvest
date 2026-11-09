@@ -74,6 +74,7 @@ void main() {
           p.join(root.path, 'resources'),
         ),
         reaperRunningProvider.overrideWithValue(() async => false),
+        logFolderProvider.overrideWithValue(p.join(data, 'logs')),
       ],
     );
     await container

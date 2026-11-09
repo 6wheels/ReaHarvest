@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest/l10n/app_localizations.dart';
+import 'package:reaharvest/logs.dart';
 import 'package:reaharvest/state/libraries.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/providers.dart';
@@ -622,5 +623,7 @@ void main() {
     expect(() => bare.read(settingsFileProvider), throwsA(anything));
     expect(() => bare.read(initialSettingsProvider), throwsA(anything));
     expect(() => bare.read(localIndexProvider), throwsA(anything));
+    expect(() => bare.read(logFolderProvider), throwsA(anything));
+    expect(bare.read(openFolderProvider), openFolder);
   });
 }

@@ -43,6 +43,9 @@ var existingLocked = false;
 /// Outcome of opening a backup: a bool, or an error thrown.
 Object backupOpening = true;
 
+/// Folders opened in the file manager.
+final openedFolders = <String>[];
+
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
   FakeLibraryService(super.ref);
@@ -221,6 +224,10 @@ void main() {
           projectTemplatesProvider.overrideWith((ref, id) async => const []),
           pluginCacheProvider.overrideWith((ref) async => null),
           reaperRunningProvider.overrideWithValue(() async => reaperRunning),
+          logFolderProvider.overrideWithValue('/data/logs'),
+          openFolderProvider.overrideWithValue(
+            (folder) async => openedFolders.add(folder),
+          ),
           libraryServiceProvider.overrideWith(
             (ref) => libraries = FakeLibraryService(ref),
           ),
@@ -270,6 +277,13 @@ void main() {
     expect(settings.saved.last.theme, ThemePreference.dark);
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.dark);
+
+    // The log folder opens in the file manager.
+    openedFolders.clear();
+    await tester.ensureVisible(find.text('/data/logs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Open'));
+    expect(openedFolders, ['/data/logs']);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();

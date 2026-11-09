@@ -4,6 +4,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
+import '../logs.dart';
+
 // Ports and resources: overridden with the concrete implementations in
 // `main()` only (SPEC §7.2), and with fakes in tests.
 
@@ -82,3 +84,13 @@ final indexedLibrariesProvider = Provider<Map<LibraryId, Library>>((ref) {
   ref.watch(indexRevisionProvider);
   return {for (final l in ref.watch(localIndexProvider).libraries()) l.id: l};
 });
+
+/// Folder of the daily log files (SPEC §8).
+final logFolderProvider = Provider<String>(
+  (ref) => throw UnimplementedError('Overridden in main()'),
+);
+
+/// Opens a folder in the system file manager; replaced by a fake in tests.
+final openFolderProvider = Provider<Future<void> Function(String folder)>(
+  (ref) => openFolder,
+);

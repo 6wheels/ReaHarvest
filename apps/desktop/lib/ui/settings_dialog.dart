@@ -195,6 +195,31 @@ class _SettingsPanel extends ConsumerWidget {
                         const _Libraries(),
                         const _Section('REAPER'),
                         const ReaperSettings(),
+                        _Section(l10n.logs),
+                        FormRow(
+                          label: l10n.logFolder,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  ref.watch(logFolderProvider),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: text.bodyMedium?.copyWith(
+                                    color: c.muted,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: Space.s),
+                              TextButton(
+                                onPressed: () => ref.read(openFolderProvider)(
+                                  ref.read(logFolderProvider),
+                                ),
+                                child: Text(l10n.openFolder),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),

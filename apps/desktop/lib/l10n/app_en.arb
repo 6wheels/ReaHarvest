@@ -257,5 +257,8 @@
   "reportLibraryScanned": "Libraries scanned",
   "reportProjectMoved": "Project moved",
   "reportMediaMoved": "Media moved",
-  "reportMediaCopied": "Media copied, shared with other projects"
+  "reportMediaCopied": "Media copied, shared with other projects",
+  "logs": "Logs",
+  "logFolder": "Log folder",
+  "openFolder": "Open"
 }

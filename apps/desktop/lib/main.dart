@@ -5,12 +5,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
+import 'package:path/path.dart' as p;
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
 import 'app.dart';
 import 'app_paths.dart';
 import 'demo_titles.dart';
+import 'logs.dart';
 import 'state/libraries.dart';
 import 'state/navigation.dart';
 import 'state/providers.dart';
@@ -36,11 +39,16 @@ Future<void> main() async {
   final settingsPath = path('settings.json');
   final indexPath = path('index.sqlite');
   Directory(appData).createSync(recursive: true);
+  // Logs next to the settings (portable mode included, SPEC §8).
+  final logFolder = p.join(p.dirname(settingsPath), 'logs');
+  startLogging(logFolder);
+  Logger('app').info('Started; settings: $settingsPath, index: $indexPath');
   final settingsFile = SettingsFile(settingsPath);
   final settings = await settingsFile.load();
 
   final container = ProviderContainer(
     overrides: [
+      logFolderProvider.overrideWithValue(logFolder),
       settingsFileProvider.overrideWithValue(settingsFile),
       initialSettingsProvider.overrideWithValue(settings),
       localIndexProvider.overrideWithValue(LocalIndex.open(indexPath)),

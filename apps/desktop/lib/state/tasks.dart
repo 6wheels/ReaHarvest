@@ -1,5 +1,8 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart' show Report;
 
 import '../l10n/app_localizations.dart';
@@ -82,6 +85,11 @@ final class BackgroundTask {
   );
 }
 
+final _log = Logger('tasks');
+
+/// Logs are in English, whatever the language of the interface.
+final _english = lookupAppLocalizations(const Locale('en'));
+
 /// Background tasks, oldest first.
 class TasksNotifier extends Notifier<List<BackgroundTask>> {
   var _next = 0;
@@ -118,11 +126,23 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       return result;
     } on TaskCancelled {
       _update(id, (t) => t._with(state: TaskState.cancelled));
-    } on Object catch (error) {
+    } on Object catch (error, stack) {
       _update(id, (t) => t._with(state: TaskState.failed, error: '$error'));
+      _log.severe(_task(id).label(_english), error, stack);
+    } finally {
+      _logEnd(_task(id));
     }
     return null;
   }
+
+  /// Writes the outcome of [task] and its report to the log (SPEC §8).
+  void _logEnd(BackgroundTask task) => _log.log(
+    task.state == TaskState.done ? Level.INFO : Level.WARNING,
+    [
+      '${task.label(_english)}: ${task.state.name}',
+      if (task.report case final report? when !report.isEmpty) '$report',
+    ].join('\n'),
+  );
 
   /// Asks the running task [id] to stop at its next step.
   void cancel(int id) => _update(id, (t) => t._with(cancelling: true));

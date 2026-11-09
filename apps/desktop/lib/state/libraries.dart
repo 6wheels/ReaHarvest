@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -14,6 +14,8 @@ import 'navigation.dart';
 import 'providers.dart';
 import 'reaper.dart';
 import 'tasks.dart';
+
+final _log = Logger('library');
 
 /// Why a folder cannot become a library.
 enum LibraryProblem {
@@ -437,7 +439,7 @@ class LibraryService {
     try {
       await _scan(entry);
     } on Object catch (error) {
-      debugPrint('Scan of ${entry.displayName} failed: $error');
+      _log.warning('Scan of ${entry.displayName} failed', error);
     }
   }
 

@@ -202,5 +202,8 @@
   "reportLibraryScanned": "Bibliothèques analysées",
   "reportProjectMoved": "Projet rangé",
   "reportMediaMoved": "Médias déplacés",
-  "reportMediaCopied": "Médias copiés, partagés avec d'autres projets"
+  "reportMediaCopied": "Médias copiés, partagés avec d'autres projets",
+  "logs": "Journaux",
+  "logFolder": "Dossier des journaux",
+  "openFolder": "Ouvrir"
 }
