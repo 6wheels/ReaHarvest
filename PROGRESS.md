@@ -57,7 +57,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [ ] #29 activity feed
 
 ## Parked (Backlog)
-#12, #14, #22, #25, #27, #28, #31, #32, #38, #40, #43, #46, #47, #48, #52, #53, #58, #60, #78. Phases 2 and 3 unchanged.
+#12, #14, #22, #25, #27, #28, #31, #32, #38, #40, #43, #46, #47, #48, #52, #53, #58, #60, #78, #83. Phases 2 and 3 unchanged.
 
 ## Pending outside the plan
 - New fixture corpus parked in a git stash (`fixtures: new anonymized corpus in progress`), TODO in `test/fixtures/README.md`.
