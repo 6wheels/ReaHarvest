@@ -18,7 +18,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #61 portable mode
 - [x] #62 background tasks zone
 - [x] #63 structured reports popup
-- [ ] #64 file logging
+- [x] #64 file logging
 - [x] #65 coverage gate in CI (measure first, then raise the existing MVP-path code to the target)
 - [ ] #59 integration tests (moves with the milestones)
 
