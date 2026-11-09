@@ -10,6 +10,7 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
+import 'navigation.dart';
 import 'providers.dart';
 import 'reaper.dart';
 
@@ -109,6 +110,8 @@ class LibraryService {
     await ref
         .read(settingsProvider.notifier)
         .change((s) => s.removeLibrary(id));
+    // Reload the filter and views, cleared of the library.
+    ref.invalidate(navigationProvider);
     ref.read(localIndexProvider).removeLibrary(id);
     ref.read(indexRevisionProvider.notifier).bump();
   }

@@ -339,8 +339,21 @@ final class AppSettings {
     return copyWith(libraries: [...libraries, entry]);
   }
 
-  AppSettings removeLibrary(LibraryId id) =>
-      copyWith(libraries: [...libraries.where((l) => l.id != id)]);
+  AppSettings removeLibrary(LibraryId id) {
+    // A removed library is dropped from the filter and the saved views.
+    TitleFilter without(TitleFilter f) =>
+        f.copyWith(libraries: {...f.libraries}..remove(id));
+    return copyWith(
+      libraries: [...libraries.where((l) => l.id != id)],
+      navigation: navigation.copyWith(
+        filter: without(navigation.filter),
+        savedViews: [
+          for (final v in navigation.savedViews)
+            SavedView(name: v.name, query: v.query, filter: without(v.filter)),
+        ],
+      ),
+    );
+  }
 
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,

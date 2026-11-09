@@ -291,4 +291,30 @@ void main() {
       );
     });
   });
+
+  test('removing a library drops it from the filter and saved views', () {
+    const kept = LibraryId('L1');
+    const removed = LibraryId('L2');
+    const filter = TitleFilter(libraries: {kept, removed}, statuses: {'idea'});
+    final settings = AppSettings(
+      identity: const LocalIdentity(MemberId('M'), 'Alice'),
+      libraries: const [
+        LibraryEntry(id: kept, displayName: 'A', workspaceRoot: '/a'),
+        LibraryEntry(id: removed, displayName: 'B', workspaceRoot: '/b'),
+      ],
+      navigation: const NavigationSettings(
+        query: 'tide',
+        filter: filter,
+        savedViews: [SavedView(name: 'Mine', query: 'q', filter: filter)],
+      ),
+    ).removeLibrary(removed);
+
+    final navigation = settings.navigation;
+    expect(navigation.query, 'tide');
+    expect(navigation.filter.libraries, {kept});
+    expect(navigation.filter.statuses, {'idea'});
+    final view = navigation.savedViews.single;
+    expect((view.name, view.query), ('Mine', 'q'));
+    expect(view.filter.libraries, {kept});
+  });
 }

@@ -242,9 +242,16 @@ void main() {
     await service().addLocal(folder: band, displayName: '', layout: null);
     final id = container.read(settingsProvider).libraries.single.id;
 
+    final navigation = container.read(navigationProvider.notifier);
+    navigation.setFilter(TitleFilter(libraries: {id}));
+    navigation.saveView('Band only');
+
     await service().remove(id);
 
     expect(container.read(settingsProvider).libraries, isEmpty);
+    final filtered = container.read(navigationProvider);
+    expect(filtered.filter.libraries, isEmpty);
+    expect(filtered.savedViews.single.filter.libraries, isEmpty);
     expect(index.libraries(), isEmpty);
     expect(File(p.join(band, libraryFileName)).existsSync(), isTrue);
   });
