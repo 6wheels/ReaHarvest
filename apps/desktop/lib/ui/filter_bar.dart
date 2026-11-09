@@ -11,7 +11,8 @@ import 'layout_labels.dart';
 import 'to_sort_page.dart';
 
 /// Filter chips, saved views, "To sort" / "To adopt" and display mode, below
-/// the search bar (SPEC §5.2). Chips offering a single value are hidden.
+/// the search bar (SPEC §5.2). Level chips show as soon as a level has a
+/// value; the other chips only when they offer more than one.
 class FilterBar extends ConsumerWidget {
   const FilterBar({super.key});
 
@@ -33,7 +34,7 @@ class FilterBar extends ConsumerWidget {
 
     final chips = <Widget>[
       for (final (:level, :values) in options.tags)
-        if (values.length > 1 || (filter.tags[level.key]?.isNotEmpty ?? false))
+        if (values.isNotEmpty || (filter.tags[level.key]?.isNotEmpty ?? false))
           _MultiChoiceChip<String>(
             label: layoutLevelLabel(l10n, level),
             options: values,

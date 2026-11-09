@@ -548,6 +548,30 @@ void main() {
     ]);
   });
 
+  testWidgets('level chips show a single value, unassigned included', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      titles: [
+        Title(
+          id: NodeId.generate(),
+          libraryId: demoLibrary.id,
+          path: '1980/Pandemia',
+          tags: const {
+            'artist': '1980',
+            'album': Layout.unassigned,
+            'title': 'Pandemia',
+          },
+        ),
+      ],
+    );
+    expect(find.text('Artist'), findsOneWidget);
+    await tester.tap(find.text('Album'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unassigned'), findsOneWidget);
+  });
+
   testWidgets('a library without titles still leads to its items to sort', (
     tester,
   ) async {

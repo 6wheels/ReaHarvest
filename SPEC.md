@@ -249,7 +249,7 @@ Main window: the application opens directly on the library. Clean but functional
   - **list**: dense table, sortable by column, status as a progress trail; the card quick actions are shown at the end of a row on hover;
   - **tree**: grouping by layout levels (e.g. Artist → Album → Title), offered as one view among others.
 - **Combinable filters** (chips or side panel):
-  - tags, one filter per layout level (e.g. `artist`, `album`). Libraries with different layouts expose their own filters; a common tag key (e.g. `artist`) is filtered across all of them;
+  - tags, one filter per layout level (e.g. `artist`, `album`), shown as soon as a level has a value, `_Unassigned` included (UI: « Non classé »). Libraries with different layouts expose their own filters; a common tag key (e.g. `artist`) is filtered across all of them. The other filters (library, mode, owner…) are shown only when they offer more than one value;
   - library and mode (`local`, `cloud`, `collab`);
   - source: **repository (cloud)**, **local**, or both (`cloud` and `collab` modes);
   - sync state: not checked out, up to date, locally modified, remotely updated, in conflict;
@@ -364,7 +364,7 @@ Flow (wizard "Organize my band's folder", §5.1):
 1. Choice of the folder and of the target layout, declaration of the **known values** of the intermediate levels (§3.1: e.g. the artists and their albums, pre-filled with the folders found at each depth, the user checks or corrects them), declaration of the members (§6.5).
 2. **Inventory** before the first change (relative path, size, XXH3 hash of every file), stored in `.migration/<timestamp>/`. Hashing reads every file: on a streaming cloud folder, the whole folder is downloaded once (background task, cancellable, resumable from the already hashed stamps).
 3. Scan against the layout. Every inconsistency is an **issue**, listed by kind in the "To sort" page (§5.2) with a counter per kind:
-   - project too deep (e.g. `<title>/<member>/x.rpp`) or too shallow (`.rpp` at an intermediate level), folder outside the layout;
+   - project too deep (e.g. `<title>/<member>/x.rpp`, or a status subfolder such as `<title>/mix/x.rpp`) or too shallow (`.rpp` at an intermediate level), folder outside the layout;
    - level recognition through the known values (§3.1): unknown folder at an intermediate level holding projects = title placed too high (target `<parent>/_Unassigned/<folder>`); folder named after a known value of another level = skipped or misplaced level (target given by the tree, e.g. an album found at the artist level goes under its artist); other unknown folder = value to declare or folder to move. Each issue names the expected level and the proposed target;
    - media outside `Media/` (relative), media referenced through an absolute path, missing media, `RECORD_PATH` other than `Media` (e.g. `audio-files`), `RENDER_FILE` forms (§5.3);
    - other files to move into `Assets/`, or blocked because a project references them;
@@ -373,6 +373,7 @@ Flow (wizard "Organize my band's folder", §5.1):
 4. **Fixes in the interface**, each with a preview (dry run) and a report (§5.2):
    - move of a folder or project to its layout position (the target proposed from the known values), `_Unassigned` value for a missing level (e.g. the album);
    - **member subfolder** (`<title>/<member>/…`): its projects are moved up into the title, owner = that member, names de-duplicated;
+   - **status subfolder** (`<title>/<status>/…` or `<title>/<member>/<status>/…`, e.g. `mix`, `demo`): reported as projects too deep; its projects are moved up into the title, with a version status (§5.9) deduced from the folder name through a proposed mapping to the statuses of the library, confirmed by the user (unmatched names: no status, folder name kept in the report); names de-duplicated;
    - media (audio, video, MIDI, subprojects `<SOURCE RPP_PROJECT` with their `.rpp-PROX`) moved into `Media/`, references rewritten, `RECORD_PATH` set to `Media` (targeted patch, §7.3); per-member media merged into the single pool; identical media (same hash) share one pool file and the duplicate is **moved** into `.trash/`; name collision: suffix and reference rewrite;
    - **any other file** (neither a project, nor a media, nor a REAPER file such as `.rpp-bak`, `Backups/`, peaks) is moved into `Assets/`. Before moving it, the application looks for its name in the projects of the title, in plain text and in the decoded base64 plugin states: a referenced file (e.g. impulse response, sampler file) is not moved automatically, it is reported for a manual decision;
    - fix impossible (media not found, absolute path from another machine): reported, `.rpp` left intact;
