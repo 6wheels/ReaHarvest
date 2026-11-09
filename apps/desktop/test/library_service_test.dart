@@ -542,4 +542,12 @@ void main() {
       expect(machine.read(reaperLauncherProvider), openInReaper);
     });
   });
+
+  test('ports must be provided by main()', () {
+    final bare = ProviderContainer();
+    addTearDown(bare.dispose);
+    expect(() => bare.read(settingsFileProvider), throwsA(anything));
+    expect(() => bare.read(initialSettingsProvider), throwsA(anything));
+    expect(() => bare.read(localIndexProvider), throwsA(anything));
+  });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Title;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,11 +13,13 @@ import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
+import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_detail.dart';
 import 'package:reaharvest/ui/title_card.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import 'helpers.dart';
 
@@ -37,6 +40,9 @@ Library? existingLibrary;
 /// Whether [existingLibrary] holds titles.
 var existingLocked = false;
 
+/// Outcome of opening a backup: a bool, or an error thrown.
+Object backupOpening = true;
+
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
   FakeLibraryService(super.ref);
@@ -51,6 +57,17 @@ class FakeLibraryService extends LibraryService {
   final statuses = <(String, String?)>[];
   final trashed = <String>[];
   final orphansDeleted = <String>[];
+  final restored = <String>[];
+
+  @override
+  Future<bool> openBackup(Title title, Backup backup) async {
+    if (backupOpening case final Error error) throw error;
+    return backupOpening as bool;
+  }
+
+  @override
+  Future<void> restore(Title title, Version version, Backup backup) async =>
+      restored.add(version.fileName);
 
   @override
   Future<void> deleteOrphanNode(LibraryId library, String path) async =>
@@ -154,6 +171,8 @@ void main() {
     String language = 'en',
     List<String> orphanNodes = const [],
     List<LibraryEntry> configured = const [band],
+    Map<LibraryId, Library>? indexed,
+    Map<VersionId, List<Backup>> history = const {},
     PeaksPreference? peaks = const PeaksPreference(
       altPeaks: true,
       altPeaksPath: '/peaks',
@@ -165,6 +184,7 @@ void main() {
     settings = MemorySettings();
     existingLibrary = null;
     existingLocked = false;
+    backupOpening = true;
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -178,16 +198,16 @@ void main() {
           ),
           settingsProvider.overrideWith(() => settings),
           titlesProvider.overrideWithValue(titles),
-          indexedLibrariesProvider.overrideWithValue({
-            demoLibrary.id: demoLibrary,
-          }),
+          indexedLibrariesProvider.overrideWithValue(
+            indexed ?? {demoLibrary.id: demoLibrary},
+          ),
           toSortProvider.overrideWithValue(const []),
           scanIssuesProvider.overrideWith(
             (ref, kind) => kind == 'orphanNode'
                 ? [for (final o in orphanNodes) (library: band.id, path: o)]
                 : const [],
           ),
-          historyProvider.overrideWith((ref, id) async => const {}),
+          historyProvider.overrideWith((ref, id) async => history),
           trashProvider.overrideWith(
             (ref, id) async => [
               StorageEntry(
@@ -433,6 +453,259 @@ void main() {
     await tester.tap(find.text('Clear filters'));
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsNWidgets(12));
+  });
+
+  testWidgets('filters by library, mode, status, owner and plugins', (
+    tester,
+  ) async {
+    const demo = LibraryEntry(
+      id: LibraryId('demo'),
+      displayName: 'Demo',
+      workspaceRoot: '/music/Demo',
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      configured: const [demo],
+      navigation: const NavigationSettings(
+        filter: TitleFilter(
+          // A saved filter may name a library without titles any more.
+          libraries: {LibraryId('demo'), LibraryId('gone')},
+          modes: {LibraryMode.local},
+          owners: {MemberId('demo-member')},
+          missingPlugins: true,
+        ),
+      ),
+    );
+    TitleFilter filter() => settings.saved.last.navigation.filter;
+
+    Future<void> toggle(String chip, String value) async {
+      await tester.tap(find.text(chip));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(CheckboxMenuButton, value));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(1200, 790));
+      await tester.pumpAndSettle();
+    }
+
+    await toggle('Library: 2', 'gone');
+    expect(filter().libraries, {const LibraryId('demo')});
+    await toggle('Library: Demo', 'Demo');
+    expect(filter().libraries, isEmpty);
+    await toggle('Mode: Local', 'Local');
+    expect(filter().modes, isEmpty);
+    await toggle('Owner: demo-mem', 'demo-mem');
+    expect(filter().owners, isEmpty);
+    await toggle('Status', 'Mixing');
+    expect(filter().statuses, {'mixing'});
+
+    await tester.tap(find.text('Missing plugins'));
+    await tester.pumpAndSettle();
+    expect(filter().missingPlugins, isFalse);
+    expect(find.text('Missing plugins'), findsNothing);
+  });
+
+  testWidgets('list view sorts by every column and opens the overview', (
+    tester,
+  ) async {
+    final titles = demoTitles();
+    await pumpApp(tester, titles: titles);
+    await tester.tap(find.byTooltip('List'));
+    await tester.pumpAndSettle();
+    final headers = find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_HeaderCell',
+    );
+    expect(headers, findsNWidgets(6));
+
+    // Name: ascending, then descending, then unsorted.
+    final names = [for (final t in titles) titleName(t)]..sort();
+    double top(String name) => tester.getTopLeft(find.text(name).first).dy;
+    await tester.tap(headers.first);
+    await tester.pumpAndSettle();
+    expect(top(names.first), lessThan(top(names[1])));
+    expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
+    await tester.tap(headers.first);
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.arrow_downward_rounded), findsOneWidget);
+    await tester.tap(headers.first);
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.arrow_downward_rounded), findsNothing);
+
+    for (var i = 1; i < 6; i++) {
+      for (var tap = 0; tap < 2; tap++) {
+        await tester.tap(headers.at(i));
+        await tester.pumpAndSettle();
+      }
+    }
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(find.text(names.first).first));
+    await tester.pumpAndSettle();
+    await mouse.moveTo(Offset.zero);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text(names.first).first);
+    await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsOneWidget);
+  });
+
+  testWidgets('tree view groups several libraries', (tester) async {
+    const other = LibraryEntry(
+      id: LibraryId('L2'),
+      displayName: 'Side project',
+      workspaceRoot: '/music/Side',
+    );
+    const demo = LibraryEntry(
+      id: LibraryId('demo'),
+      displayName: 'Demo',
+      workspaceRoot: '/music/Demo',
+    );
+    final titles = [
+      for (final (i, t) in demoTitles().indexed)
+        i.isEven
+            ? t
+            : Title(
+                id: t.id,
+                libraryId: other.id,
+                path: t.path,
+                tags: t.tags,
+                versions: t.versions,
+                status: t.status,
+              ),
+    ];
+    await pumpApp(
+      tester,
+      titles: titles,
+      configured: const [demo, other],
+      navigation: const NavigationSettings(displayMode: DisplayMode.tree),
+    );
+    expect(find.text('Demo'), findsWidgets);
+    expect(find.text('Side project'), findsOneWidget);
+    final hidden = titleName(titles[1]);
+    expect(find.text(hidden), findsOneWidget);
+
+    await tester.tap(find.text('Side project'));
+    await tester.pumpAndSettle();
+    expect(find.text(hidden), findsNothing);
+    await tester.tap(find.text('Side project'));
+    await tester.pumpAndSettle();
+    expect(find.text(hidden), findsOneWidget);
+  });
+
+  testWidgets('another member\'s version opens after confirmation', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {
+        demoLibrary.id: Library(
+          id: demoLibrary.id,
+          mode: LibraryMode.collab,
+          layout: demoLibrary.layout,
+          collab: const CollabSettings(groupId: GroupId('G')),
+        ),
+      },
+    );
+    Future<void> open() async {
+      await tester.tap(find.text('Midnight Ferry'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.widgetWithText(TitleCard, 'Midnight Ferry'),
+          matching: find.byTooltip('Open in REAPER'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Not your version'), findsOneWidget);
+    }
+
+    await open();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Not your version'), findsNothing);
+
+    await tester.tapAt(const Offset(1200, 790));
+    await tester.pumpAndSettle();
+    await open();
+    await tester.tap(find.text('Open anyway'));
+    await tester.pumpAndSettle();
+    expect(libraries.opened, ['Midnight Ferry v1.rpp']);
+  });
+
+  testWidgets('opens and restores the backup points of a version', (
+    tester,
+  ) async {
+    final titles = demoTitles();
+    final ferry = titles.firstWhere((t) => titleName(t) == 'Midnight Ferry');
+    await pumpApp(
+      tester,
+      titles: titles,
+      history: {
+        for (final v in ferry.versions)
+          if (v.metadata case final m?)
+            m.id: [
+              Backup(
+                path: 'x/.history/b.rpp',
+                versionId: m.id,
+                created: DateTime(2026, 11, 2, 10, 30),
+              ),
+            ],
+      },
+    );
+    await tester.tap(find.text('Midnight Ferry'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final backupRow = find.ancestor(
+      of: find.byIcon(Icons.history_rounded),
+      matching: find.byType(Row),
+    );
+    final open = find.descendant(
+      of: backupRow.first,
+      matching: find.byTooltip('Open in REAPER'),
+    );
+
+    Future<void> expectSnack(String text) async {
+      await tester.pumpAndSettle();
+      expect(find.text(text), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    }
+
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsNothing);
+    backupOpening = false;
+    await tester.tap(open);
+    await expectSnack(
+      'REAPER was not found. Set its location in the settings.',
+    );
+    backupOpening = StateError('boom');
+    await tester.tap(open);
+    await expectSnack('The operation failed: Bad state: boom');
+
+    final restore = find.descendant(
+      of: backupRow.first,
+      matching: find.text('Restore'),
+    );
+    await tester.tap(restore);
+    await tester.pumpAndSettle();
+    expect(find.text('Restore this backup point?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(restore);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Restore'));
+    await expectSnack('Backup point restored');
+    expect(libraries.restored, hasLength(1));
   });
 
   testWidgets('restores the search query', (tester) async {
