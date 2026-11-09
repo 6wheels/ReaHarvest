@@ -159,11 +159,33 @@ final class Migration {
   /// inventoried or already kept.
   Future<void> keepOriginal(String path) async {
     _requireInventory();
-    final original = _files.keys.where((o) => locate(o) == path).firstOrNull;
-    if (original == null) return;
+    final original = _origin(path);
+    if (!_files.containsKey(original)) return;
     final copy = _originalPath(original);
     if (await _storage.stat(copy) != null) return;
     await _storage.write(copy, _storage.read(path));
+  }
+
+  /// [RepositoryStorage] for the fixes of this migration: moves are
+  /// recorded ([move]), an existing file is kept ([keepOriginal]) before
+  /// it is overwritten, and deletion is refused (SPEC §5.8 step 5).
+  RepositoryStorage get storage {
+    _requireInventory();
+    return _GuardedStorage(this);
+  }
+
+  /// Path before the recorded moves of the file now at [path] (reverse of
+  /// [locate]).
+  String _origin(String path) {
+    var current = path;
+    for (final (from, to) in _moves.reversed) {
+      if (current == to) {
+        current = from;
+      } else if (current.startsWith('$to/')) {
+        current = '$from${current.substring(to.length)}';
+      }
+    }
+    return current;
   }
 
   /// Current library path of the inventoried file [path], following the
@@ -256,4 +278,38 @@ final class Migration {
     return '${t.year}-${two(t.month)}-${two(t.day)}_'
         '${two(t.hour)}${two(t.minute)}${two(t.second)}';
   }
+}
+
+final class _GuardedStorage implements RepositoryStorage {
+  _GuardedStorage(this._migration);
+
+  final Migration _migration;
+
+  RepositoryStorage get _inner => _migration._storage;
+
+  @override
+  Future<List<StorageEntry>> list(String dir, {bool recursive = false}) =>
+      _inner.list(dir, recursive: recursive);
+
+  @override
+  Future<StorageEntry?> stat(String path) => _inner.stat(path);
+
+  @override
+  Stream<List<int>> read(String path) => _inner.read(path);
+
+  @override
+  Future<void> write(String path, Stream<List<int>> content) async {
+    if (await _inner.stat(path) != null) await _migration.keepOriginal(path);
+    await _inner.write(path, content);
+  }
+
+  @override
+  Future<void> move(String from, String to) => _migration.move(from, to);
+
+  @override
+  Future<void> createDirectory(String path) => _inner.createDirectory(path);
+
+  @override
+  Future<void> delete(String path) async =>
+      throw UnsupportedError('No file is deleted during a migration: $path');
 }

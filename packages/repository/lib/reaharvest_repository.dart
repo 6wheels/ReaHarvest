@@ -3,6 +3,7 @@ library;
 
 export 'src/adoption.dart' hide freePath, separatorOf;
 export 'src/conventions.dart';
+export 'src/fixes.dart';
 export 'src/history.dart';
 export 'src/known_values.dart';
 export 'src/migration.dart';

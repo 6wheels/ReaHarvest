@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_index/reaharvest_index.dart' show xxh3Hasher;
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
+import '../l10n/app_localizations.dart';
 import 'navigation.dart';
 import 'providers.dart';
 import 'reaper.dart';
@@ -262,17 +264,53 @@ class LibraryService {
     List<String> folders,
   ) {
     final entry = _entry(library);
-    final root = entry.libraryRoot;
-    return ref.read(tasksProvider.notifier).run(
+    return _fix(
+      entry,
+      [MoveProject(path, folders.join('/'))],
       (l10n) => l10n.taskMove(p.posix.basename(path)),
-      (_) async {
-        final report = await _move(root, path, folders.join('/'));
-        await _rememberValues(entry, folders);
-        await scan(entry);
-        return report;
-      },
-      openReport: true,
+      then: () => _rememberValues(entry, folders),
     );
+  }
+
+  /// Applies the migration [fixes] to [library] (SPEC §5.8 step 4), as a
+  /// task whose report is shown at the end. Then rescans.
+  Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) =>
+      _fix(_entry(library), fixes, (l10n) => l10n.taskFix(fixes.length));
+
+  /// Runs [fixes] on [entry] so that no file is lost (SPEC §5.8 step 5):
+  /// first the inventory, taken or resumed (cancellable); then the fixes,
+  /// in an isolate; then the inventory check, whose gaps are reported as
+  /// errors; then [then] and a rescan.
+  Future<Report?> _fix(
+    LibraryEntry entry,
+    List<MigrationFix> fixes,
+    String Function(AppLocalizations l10n) label, {
+    Future<void> Function()? then,
+  }) {
+    final root = entry.libraryRoot;
+    return ref.read(tasksProvider.notifier).run(label, (task) async {
+      final storage = MountedFolderStorage(root);
+      final hash = xxh3Hasher(storage);
+      final migration =
+          await Migration.latest(storage) ?? Migration.start(storage);
+      if (!migration.inventoryComplete) {
+        await migration.takeInventory(
+          hash,
+          checkCancelled: task.checkCancelled,
+          onProgress: task.progress,
+        );
+      }
+      task.checkCancelled();
+      var report = await _applyFixes(root, fixes);
+      final latest = (await Migration.latest(storage))!;
+      report += _rooted(
+        root,
+        await latest.check(hash, onProgress: task.progress),
+      );
+      await then?.call();
+      await scan(entry);
+      return report;
+    }, openReport: true);
   }
 
   /// Deletes the `.node.json` file [path] of [library], found in a folder
@@ -557,16 +595,13 @@ class LibraryService {
   }
 }
 
-/// Moves [project] of the library at [root] into [titleDir], in an isolate
-/// (top-level: the closure must not capture the service).
-Future<Report> _move(String root, String project, String titleDir) =>
+/// Applies [fixes] to the library at [root] through its migration, in an
+/// isolate (top-level: the closure must not capture the service).
+Future<Report> _applyFixes(String root, List<MigrationFix> fixes) =>
     Isolate.run(() async {
-      final moved = await moveProjectToTitle(
-        MountedFolderStorage(root),
-        project,
-        titleDir,
-      );
-      return _rooted(root, moved.toReport());
+      final storage = MountedFolderStorage(root);
+      final migration = (await Migration.latest(storage))!;
+      return _rooted(root, await applyFixes(migration.storage, fixes));
     });
 
 /// Absolute path of [path], relative to the library at [root].

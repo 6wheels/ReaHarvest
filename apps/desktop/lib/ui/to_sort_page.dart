@@ -10,6 +10,7 @@ import '../state/libraries.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'fix_dialog.dart';
 import 'layout_labels.dart';
 import 'report_dialog.dart';
 import 'title_detail.dart';
@@ -114,8 +115,19 @@ class _ToSortList extends ConsumerWidget {
         if (issues.isNotEmpty) muted(l10n.toSortHint, text.bodyMedium),
         for (final kind in kinds) ...[
           const SizedBox(height: Space.l),
-          SectionLabel(
-            '${reportKindLabel(l10n, kind)} · ${byKind[kind]!.length}',
+          Row(
+            children: [
+              Expanded(
+                child: SectionLabel(
+                  '${reportKindLabel(l10n, kind)} · ${byKind[kind]!.length}',
+                ),
+              ),
+              if (batchFixKinds.contains(kind))
+                TextButton(
+                  onPressed: () => _fixAll(context, ref, kind, byKind[kind]!),
+                  child: Text(l10n.fixAction),
+                ),
+            ],
           ),
           if (_hint(l10n, kind) case final hint?) ...[
             const SizedBox(height: Space.xs),
@@ -165,6 +177,19 @@ class _ToSortList extends ConsumerWidget {
           ),
           child: Text(l10n.sortAction),
         ),
+        ReportKind.titleTooHigh ||
+        ReportKind.misplacedLevel ||
+        ReportKind.unknownValue ||
+        ReportKind.outsideLayout => OutlinedButton(
+          onPressed: () => showSortDialog(
+            context,
+            library: issue.library,
+            path: path,
+            target: target,
+            folderLevel: level,
+          ),
+          child: Text(l10n.sortAction),
+        ),
         ReportKind.orphanNode => OutlinedButton(
           onPressed: () => _deleteOrphan(context, ref, issue),
           child: Text(l10n.deleteOrphanNode),
@@ -172,6 +197,23 @@ class _ToSortList extends ConsumerWidget {
         _ => null,
       },
     );
+  }
+
+  /// Previews then applies the batch fix of [issues] of [kind], library by
+  /// library, after the REAPER warning.
+  Future<void> _fixAll(
+    BuildContext context,
+    WidgetRef ref,
+    ReportKind kind,
+    List<LibraryIssue> issues,
+  ) async {
+    final fixes = await showFixDialog(context, kind, issues);
+    if (fixes == null || !context.mounted) return;
+    await runProjectChange(context, ref, () async {
+      for (final MapEntry(key: library, value: list) in fixes.entries) {
+        await ref.read(libraryServiceProvider).fix(library, list);
+      }
+    });
   }
 
   Future<void> _deleteOrphan(
@@ -259,25 +301,38 @@ class _Item extends StatelessWidget {
   }
 }
 
-/// Guided move of the misplaced project [path] into a title of [library]
-/// ("To sort", SPEC §5.2), prefilled with the title folder [target] if
-/// known.
+/// Guided move of the misplaced project [path] into a title of [library],
+/// or of the folder [path] expected at [folderLevel] to its position
+/// ("To sort", SPEC §5.2, §5.8 step 4); prefilled with [target] if known,
+/// any other destination can be typed.
 Future<void> showSortDialog(
   BuildContext context, {
   required LibraryId library,
   required String path,
   String? target,
+  LayoutLevel? folderLevel,
 }) => showDialog<void>(
   context: context,
-  builder: (_) => _SortDialog(library: library, path: path, target: target),
+  builder: (_) => _SortDialog(
+    library: library,
+    path: path,
+    target: target,
+    folderLevel: folderLevel,
+  ),
 );
 
 class _SortDialog extends ConsumerStatefulWidget {
-  const _SortDialog({required this.library, required this.path, this.target});
+  const _SortDialog({
+    required this.library,
+    required this.path,
+    this.target,
+    this.folderLevel,
+  });
 
   final LibraryId library;
   final String path;
   final String? target;
+  final LayoutLevel? folderLevel;
 
   @override
   ConsumerState<_SortDialog> createState() => _SortDialogState();
@@ -285,24 +340,33 @@ class _SortDialog extends ConsumerStatefulWidget {
 
 class _SortDialogState extends ConsumerState<_SortDialog> {
   late final Layout _layout;
+
+  /// Levels down to the position: the title for a project, the expected
+  /// level for a folder.
+  late final List<LayoutLevel> _levels;
   late final List<TextEditingController> _values;
 
   @override
   void initState() {
     super.initState();
     _layout = ref.read(indexedLibrariesProvider)[widget.library]!.layout!;
-    // Prefilled from the target title, else from the current folders and
-    // the file name for the title.
-    final levels = _layout.levels.length;
+    final key = (widget.folderLevel ?? _layout.leaf).key;
+    _levels = [
+      ..._layout.levels.takeWhile((l) => l.key != key),
+      _layout.levels.firstWhere((l) => l.key == key),
+    ];
+    // Prefilled from the target, else from the current folders and the
+    // file or folder name for the last level.
+    final count = _levels.length;
     final target = widget.target?.split('/');
     final folders = p.posix.dirname(widget.path).split('/')
       ..removeWhere((s) => s == '.');
     _values = [
-      for (var i = 0; i < levels; i++)
+      for (var i = 0; i < count; i++)
         TextEditingController(
-          text: target != null && target.length == levels
+          text: target != null && target.length == count
               ? target[i]
-              : i == levels - 1
+              : i == count - 1
               ? p.posix.basenameWithoutExtension(widget.path)
               : (i < folders.length ? folders[i] : Layout.unassigned),
         ),
@@ -335,15 +399,15 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
   /// Moves the project; its report opens at the end of the task.
   Future<void> _move() async {
     final navigator = Navigator.of(context);
-    final done = await runProjectChange(
-      context,
-      ref,
-      () => ref.read(libraryServiceProvider).moveToTitle(
-        widget.library,
-        widget.path,
-        [for (final c in _values) c.text.trim()],
-      ),
-    );
+    final done = await runProjectChange(context, ref, () {
+      final values = [for (final c in _values) c.text.trim()];
+      final service = ref.read(libraryServiceProvider);
+      return widget.folderLevel == null
+          ? service.moveToTitle(widget.library, widget.path, values)
+          : service.fix(widget.library, [
+              MoveFolder(widget.path, values.join('/')),
+            ]);
+    });
     if (done) navigator.pop();
   }
 
@@ -364,7 +428,7 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: c.muted),
             ),
-            for (final (i, level) in _layout.levels.indexed) ...[
+            for (final (i, level) in _levels.indexed) ...[
               const SizedBox(height: Space.m),
               _LevelField(
                 label: layoutLevelLabel(l10n, level),

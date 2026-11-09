@@ -13,6 +13,7 @@ import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
+import 'package:reaharvest/ui/fix_dialog.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
@@ -69,6 +70,7 @@ class FakeLibraryService extends LibraryService {
   final orphansDeleted = <String>[];
   final restored = <String>[];
   final moved = <(String, List<String>)>[];
+  final fixed = <(LibraryId, List<MigrationFix>)>[];
 
   /// Known values given to addLocal or setKnownValues.
   List<KnownValue>? knownValues;
@@ -90,6 +92,12 @@ class FakeLibraryService extends LibraryService {
   Future<void> deleteOrphanNode(LibraryId library, String path) async {
     if (path.startsWith('locked/')) throw StateError('locked');
     orphansDeleted.add(path);
+  }
+
+  @override
+  Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) async {
+    fixed.add((library, fixes));
+    return const Report();
   }
 
   @override
@@ -1376,12 +1384,22 @@ void main() {
     );
     expect(find.text('UNREADABLE FILES · 1'), findsOne);
     expect(find.text('Band · Artist/Album/Song/Alice/mix'), findsOne);
-    expect(find.text('Expected: Title'), findsNWidgets(3));
+    expect(find.text('Expected: Title'), findsWidgets);
     expect(find.text('Proposed place: Artist/Album/Song'), findsOne);
     expect(find.text('Old'), findsOne);
 
-    // Too deep: prefilled with its title.
-    await tester.tap(find.text('Move…').first);
+    // Without declared members, the local member owns the lifted projects.
+    await tester.tap(find.text('Fix…').at(1));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Owner of the projects outside a member folder'),
+      findsOne,
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Too deep (after the folder placed too high): prefilled with its title.
+    await tester.tap(find.text('Move…').at(1));
     await tester.pumpAndSettle();
     expect(find.text('Move “a.rpp”'), findsOne);
     expect(find.widgetWithText(TextField, 'Song'), findsOne);
@@ -1418,6 +1436,170 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Old'), findsNothing);
+  });
+
+  testWidgets('fixes projects too deep in batch, with owner and status', (
+    tester,
+  ) async {
+    const title = LayoutLevel('title');
+    const alice = Member(MemberId('alice'), 'Alice');
+    LibraryIssue deep(String sub) => (
+      library: band.id,
+      kind: ReportKind.projectTooDeep,
+      item: ReportItem.misplaced(
+        'Artist/Album/Song/$sub',
+        level: title,
+        target: 'Artist/Album/Song',
+      ),
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {
+        band.id: demoLibrary.withMembers(const [
+          alice,
+          Member(MemberId('bob'), 'Bob'),
+        ]),
+      },
+      issues: [
+        deep('Alice/mix/a.rpp'),
+        deep('demo/b.rpp'),
+        deep('old/c.rpp'),
+        deep('Alice/d.rpp'),
+      ],
+    );
+    await tester.tap(find.text('To sort · 4'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Status for the “mix” folders'), findsOne);
+    expect(find.text('→ Artist/Album/Song · Alice · Mixing'), findsOne);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Status for the “mix” folders'), findsNothing);
+
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    // Projects outside a member folder go to Bob.
+    await tester.tap(find.text('Alice').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bob').last);
+    await tester.pumpAndSettle();
+    // "demo" matches no status: set one by hand.
+    await tester.tap(find.text('No status').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Recording').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Artist/Album/Song/old/c.rpp'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix 3 items'));
+    await tester.pumpAndSettle();
+
+    final (library, fixes) = libraries.fixed.single;
+    expect(library, band.id);
+    expect(
+      [
+        for (final f in fixes.cast<LiftProject>())
+          (f.path, f.titleDir, f.owner, f.status, f.statusFolder),
+      ],
+      [
+        (
+          'Artist/Album/Song/Alice/mix/a.rpp',
+          'Artist/Album/Song',
+          alice.id,
+          'mixing',
+          null,
+        ),
+        (
+          'Artist/Album/Song/demo/b.rpp',
+          'Artist/Album/Song',
+          const MemberId('bob'),
+          'recording',
+          null,
+        ),
+        (
+          'Artist/Album/Song/Alice/d.rpp',
+          'Artist/Album/Song',
+          alice.id,
+          null,
+          null,
+        ),
+      ],
+    );
+  });
+
+  testWidgets('fixes folders in batch or moves one anywhere', (tester) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      // The local member is declared: owner by default (unused here).
+      indexed: {
+        band.id: demoLibrary.withMembers(const [
+          Member(MemberId('M'), 'Alice'),
+        ]),
+      },
+      issues: [
+        (
+          library: band.id,
+          kind: ReportKind.titleTooHigh,
+          item: const ReportItem.misplaced(
+            'Old',
+            level: LayoutLevel('title'),
+            target: '_Unassigned/_Unassigned/Old',
+          ),
+        ),
+        (
+          library: band.id,
+          kind: ReportKind.unknownValue,
+          item: const ReportItem.misplaced(
+            'Stranger',
+            level: LayoutLevel('artist'),
+          ),
+        ),
+      ],
+    );
+    await tester.tap(find.text('To sort · 2'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(find.text('→ _Unassigned/_Unassigned/Old'), findsOne);
+    // Nothing checked: nothing to fix.
+    await tester.tap(find.text('Old').last);
+    await tester.pumpAndSettle();
+    FilledButton confirm() =>
+        tester.widget(find.widgetWithText(FilledButton, 'Fix 0 items'));
+    expect(confirm().onPressed, isNull);
+    await tester.tap(find.text('Old').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix 1 item'));
+    await tester.pumpAndSettle();
+    final batch = libraries.fixed.single.$2.single as MoveFolder;
+    expect((batch.path, batch.target), ('Old', '_Unassigned/_Unassigned/Old'));
+
+    // An unknown artist folder: one level to type, any destination.
+    await tester.tap(find.text('Move…').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Move “Stranger”'), findsOne);
+    expect(find.byType(TextField), findsOne);
+    await tester.enterText(find.byType(TextField), 'Sample Artist');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move').last);
+    await tester.pumpAndSettle();
+    final moved = libraries.fixed.last.$2.single as MoveFolder;
+    expect((moved.path, moved.target), ('Stranger', 'Sample Artist'));
+  });
+
+  test('statuses are proposed from status folder names', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final fr = lookupAppLocalizations(const Locale('fr'));
+    expect(proposeStatus(en, 'Mix'), 'mixing');
+    expect(proposeStatus(en, 'rec'), 'recording');
+    expect(proposeStatus(en, 'Done'), 'done');
+    expect(proposeStatus(fr, statusLabel(fr, 'writing')), 'writing');
+    expect(proposeStatus(en, 'demo'), isNull);
+    expect(proposeStatus(en, 'mi'), isNull);
   });
 
   testWidgets('lists and deletes node files without project', (tester) async {

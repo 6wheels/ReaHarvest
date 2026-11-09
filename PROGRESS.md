@@ -28,7 +28,8 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #66 inventory and no-loss check (logic in `repository`; started as a background task by the M1 fix flows)
 - [x] #67 typed migration issues in To sort (layout, levels, duplicated `versionId`; media, Assets and conflict-copy detectors come with #69, #70, #23)
 - [x] #71 members list in `.library.json` (done before #68, which needs the declared members)
-- [ ] #68 layout moves and member subfolders
+- [x] #68 layout moves and member subfolders (batch fix with preview, free move per item, inventory and check around every batch; batch adoption of the versions already in place: see #80)
+- [ ] #81 merge folders moved to the same title
 - [ ] #80 number of versions to adopt on the card, overview and detail
 - [ ] #69 media normalization and pool merge
 - [ ] #70 other files to Assets with reference check

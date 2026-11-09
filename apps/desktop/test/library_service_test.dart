@@ -517,11 +517,71 @@ void main() {
     final l10n = lookupAppLocalizations(const Locale('en'));
     expect(task.label(l10n), 'Move of “loose.rpp”');
 
+    // A failed move is reported; the inventory check still passes.
+    final failed = await service().moveToTitle(id, 'Artist/gone.rpp', [
+      'A',
+      'B',
+      'C',
+    ]);
     expect(
-      await service().moveToTitle(id, 'Artist/gone.rpp', ['A', 'B', 'C']),
-      isNull,
+      failed!.items[ReportKind.fixFailed]!.single.path,
+      endsWith('gone.rpp'),
     );
+    expect(failed.items[ReportKind.fileLost], isNull);
     expect(container.read(tasksProvider).last.state, TaskState.failed);
+    // The inventory was taken once, before the first move.
+    expect(Directory(p.join(root, '.migration')).listSync(), hasLength(1));
+  });
+
+  test('fixes misplaced folders and projects without losing a file', () async {
+    final song = await bandWithSong();
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    final member = Directory(p.join(song, 'Bob', 'mix'))
+      ..createSync(recursive: true);
+    File('../../test/fixtures/project-2.rpp')
+        .copySync(p.join(member.path, 'take.rpp'));
+    final old = Directory(p.join(band, 'Old'))..createSync();
+    File('../../test/fixtures/project-1.rpp')
+        .copySync(p.join(old.path, 'old.rpp'));
+    // With known values, Old is recognized as a title placed too high.
+    final entry = container.read(settingsProvider).libraries.single;
+    await service().setKnownValues(entry, const [
+      KnownValue('Artist', [
+        KnownValue('Album'),
+        KnownValue(Layout.unassigned),
+      ]),
+    ]);
+    final id = entry.id;
+
+    final report = await service().fix(id, const [
+      LiftProject(
+        'Artist/Album/Song/Bob/mix/take.rpp',
+        'Artist/Album/Song',
+        owner: MemberId('bob'),
+        status: 'mixing',
+      ),
+      MoveFolder('Old', 'Artist/_Unassigned/Old'),
+    ]);
+
+    expect(report!.hasErrors, isFalse);
+    expect(report.items[ReportKind.projectMoved], [
+      ReportItem(p.join(song, 'take.rpp')),
+    ]);
+    expect(report.items[ReportKind.folderMoved], [
+      ReportItem(p.join(band, 'Artist', '_Unassigned', 'Old')),
+    ]);
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    expect(container.read(tasksProvider).last.label(l10n), 'Fix 2 items');
+    final lifted = index
+        .titles()
+        .firstWhere((t) => t.tags['title'] == 'Song')
+        .versions
+        .firstWhere((v) => v.fileName == 'take.rpp');
+    expect(lifted.metadata!.owner, 'bob');
+    expect(
+      index.titles().map((t) => t.path),
+      contains('Artist/_Unassigned/Old'),
+    );
   });
 
   test('reports unreadable library files and survives failed scans', () async {
