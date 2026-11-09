@@ -73,8 +73,24 @@ class ToSortPage extends StatelessWidget {
   }
 }
 
-class _ToSortList extends ConsumerWidget {
+/// A "To sort" item, as selected: it stays selected through a rescan as
+/// long as an issue with the same key is still there.
+typedef _Key = (LibraryId, ReportKind, String);
+
+_Key _keyOf(LibraryIssue issue) => (issue.library, issue.kind, issue.item.path);
+
+class _ToSortList extends ConsumerStatefulWidget {
   const _ToSortList();
+
+  @override
+  ConsumerState<_ToSortList> createState() => _ToSortListState();
+}
+
+/// Issues of the libraries by kind, the batch-fixable ones selectable
+/// (#82): "Fix…" applies to the selected items of its section, or to all
+/// of them when none is selected.
+class _ToSortListState extends ConsumerState<_ToSortList> {
+  final _selected = <_Key>{};
 
   /// Hint shown under the section of [kind], if any.
   static String? _hint(AppLocalizations l10n, ReportKind kind) =>
@@ -89,8 +105,24 @@ class _ToSortList extends ConsumerWidget {
         _ => null,
       };
 
+  /// Selected items among [issues].
+  List<LibraryIssue> _selectedOf(List<LibraryIssue> issues) => [
+    for (final i in issues)
+      if (_selected.contains(_keyOf(i))) i,
+  ];
+
+  /// Selects every item of [issues], or none if all are selected.
+  void _toggleAll(List<LibraryIssue> issues) => setState(() {
+    final keys = issues.map(_keyOf);
+    if (_selectedOf(issues).length == issues.length) {
+      _selected.removeAll(keys);
+    } else {
+      _selected.addAll(keys);
+    }
+  });
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
@@ -115,20 +147,7 @@ class _ToSortList extends ConsumerWidget {
         if (issues.isNotEmpty) muted(l10n.toSortHint, text.bodyMedium),
         for (final kind in kinds) ...[
           const SizedBox(height: Space.l),
-          Row(
-            children: [
-              Expanded(
-                child: SectionLabel(
-                  '${reportKindLabel(l10n, kind)} · ${byKind[kind]!.length}',
-                ),
-              ),
-              if (batchFixKinds.contains(kind))
-                TextButton(
-                  onPressed: () => _fixAll(context, ref, kind, byKind[kind]!),
-                  child: Text(l10n.fixAction),
-                ),
-            ],
-          ),
+          _sectionHeader(l10n, kind, byKind[kind]!),
           if (_hint(l10n, kind) case final hint?) ...[
             const SizedBox(height: Space.xs),
             muted(hint, text.bodySmall),
@@ -136,6 +155,47 @@ class _ToSortList extends ConsumerWidget {
           for (final issue in byKind[kind]!)
             _issueItem(context, ref, issue, multiple ? names : null),
         ],
+      ],
+    );
+  }
+
+  /// Label and counter of the section of [issues], all of [kind]; for a
+  /// batch-fixable kind, its "select all" box, the number of selected
+  /// items and "Fix…".
+  Widget _sectionHeader(
+    AppLocalizations l10n,
+    ReportKind kind,
+    List<LibraryIssue> issues,
+  ) {
+    final label = SectionLabel(
+      '${reportKindLabel(l10n, kind)} · ${issues.length}',
+    );
+    if (!batchFixKinds.contains(kind)) return label;
+    final selected = _selectedOf(issues);
+    return Row(
+      children: [
+        Checkbox(
+          tristate: true,
+          value: selected.isEmpty
+              ? false
+              : selected.length == issues.length
+              ? true
+              : null,
+          semanticLabel: l10n.selectAll,
+          onChanged: (_) => _toggleAll(issues),
+        ),
+        Expanded(child: label),
+        if (selected.isNotEmpty)
+          Text(
+            l10n.selectedCount(selected.length),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: context.colors.muted),
+          ),
+        TextButton(
+          onPressed: () =>
+              _fixAll(context, ref, kind, selected.isEmpty ? issues : selected),
+          child: Text(l10n.fixAction),
+        ),
       ],
     );
   }
@@ -155,7 +215,13 @@ class _ToSortList extends ConsumerWidget {
         ? p.posix.dirname(path)
         : path;
     final folder = p.posix.dirname(shown);
+    final key = _keyOf(issue);
     return _Item(
+      selected: batchFixKinds.contains(issue.kind)
+          ? _selected.contains(key)
+          : null,
+      onSelected: (on) =>
+          setState(() => on ? _selected.add(key) : _selected.remove(key)),
       title: p.posix.basename(shown),
       subtitle: [
         if (names != null) ?names[issue.library],
@@ -261,7 +327,13 @@ class _Item extends StatelessWidget {
     required this.subtitle,
     this.details = const [],
     this.action,
+    this.selected,
+    this.onSelected,
   });
+
+  /// Whether the item is selected; null if it cannot be.
+  final bool? selected;
+  final ValueChanged<bool>? onSelected;
 
   final String title;
   final String subtitle;
@@ -273,7 +345,6 @@ class _Item extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final text = Theme.of(context).textTheme;
     return Container(
       margin: const EdgeInsets.only(top: Space.s),
       padding: const EdgeInsets.all(Space.m),
@@ -282,22 +353,42 @@ class _Item extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: c.border),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          if (subtitle.isNotEmpty)
-            Text(subtitle, style: text.bodySmall?.copyWith(color: c.muted)),
-          for (final line in details) Text(line, style: text.bodySmall),
-          if (action case final action?) ...[
-            const SizedBox(height: Space.s),
-            Align(alignment: Alignment.centerRight, child: action),
-          ],
+          if (selected case final value?)
+            Padding(
+              padding: const EdgeInsets.only(right: Space.s),
+              child: Checkbox(
+                value: value,
+                semanticLabel: title,
+                onChanged: (on) => onSelected?.call(on!),
+              ),
+            ),
+          Expanded(child: _content(context)),
         ],
       ),
+    );
+  }
+
+  Widget _content(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        if (subtitle.isNotEmpty)
+          Text(subtitle, style: text.bodySmall?.copyWith(color: c.muted)),
+        for (final line in details) Text(line, style: text.bodySmall),
+        if (action case final action?) ...[
+          const SizedBox(height: Space.s),
+          Align(alignment: Alignment.centerRight, child: action),
+        ],
+      ],
     );
   }
 }

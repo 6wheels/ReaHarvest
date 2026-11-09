@@ -1672,6 +1672,62 @@ void main() {
     );
   });
 
+  testWidgets('fixes the selected To sort items, kept through a rescan', (
+    tester,
+  ) async {
+    LibraryIssue high(String name) => (
+      library: demoLibrary.id,
+      kind: ReportKind.titleTooHigh,
+      item: ReportItem.misplaced(
+        name,
+        level: const LayoutLevel('title'),
+        target: '_Unassigned/_Unassigned/$name',
+      ),
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      issues: [high('A'), high('B'), high('C')],
+    );
+    await tester.tap(find.text('To sort · 3'));
+    await tester.pumpAndSettle();
+    Checkbox box(int i) => tester.widget(find.byType(Checkbox).at(i));
+
+    // Box 0 selects the section, then one box per card.
+    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.tap(find.byType(Checkbox).at(2));
+    await tester.pump();
+    expect(find.text('2 selected'), findsOne);
+    expect(box(0).value, isNull);
+
+    // A rescan without "A": "B" stays selected.
+    await pumpApp(tester, titles: demoTitles(), issues: [high('B'), high('C')]);
+    await tester.pumpAndSettle();
+    expect(find.textContaining(' · 2'), findsOne);
+    expect(find.text('1 selected'), findsOne);
+    expect([box(1).value, box(2).value], [true, false]);
+
+    // "Fix…" previews the selected items only.
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(find.text('C'), findsOne);
+    await tester.tap(find.text('Fix 1 item'));
+    await tester.pumpAndSettle();
+    expect([for (final f in libraries.fixed.single.$2) f.path], ['B']);
+
+    // Select all, then none: "Fix…" applies to the whole section again.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
+    expect(find.text('2 selected'), findsOne);
+    expect(box(0).value, isTrue);
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
+    expect(find.textContaining('selected'), findsNothing);
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Fix 2 items'), findsOne);
+  });
+
   test('a move onto a folder holding titles merges them', () {
     final titles = demoTitles();
     final library = titles.first.libraryId;
