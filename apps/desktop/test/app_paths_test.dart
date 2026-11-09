@@ -33,6 +33,19 @@ void main() {
       expect(path('index.sqlite'), p.join(exe.path, 'index.sqlite'));
     });
 
+    test('an injected folder wins over the executable folder', () {
+      File(p.join(exe.path, 'settings.json')).writeAsStringSync('{}');
+      expect(
+        dataFilePath(
+          'settings.json',
+          appData: appData,
+          injected: true,
+          executableDir: exe.path,
+        ),
+        p.join(appData, 'settings.json'),
+      );
+    });
+
     test('defaults to the folder of the running executable', () {
       expect(
         dataFilePath('settings.json', appData: appData),

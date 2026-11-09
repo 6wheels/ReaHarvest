@@ -17,6 +17,9 @@ import 'state/providers.dart';
 
 const _demo = bool.fromEnvironment('REAHARVEST_DEMO');
 
+/// Data folder injected at build time (demo, tests); wins over portable mode.
+const _dataDir = String.fromEnvironment('REAHARVEST_DATA_DIR');
+
 /// Entry point: the only place where concrete adapters are created and
 /// injected (SPEC §7.2).
 Future<void> main() async {
@@ -27,9 +30,11 @@ Future<void> main() async {
     ], await rootBundle.loadString('assets/fonts/Inter-OFL.txt'));
   });
 
-  final appData = appDataDirectory();
-  final settingsPath = dataFilePath('settings.json', appData: appData);
-  final indexPath = dataFilePath('index.sqlite', appData: appData);
+  final appData = _dataDir.isEmpty ? appDataDirectory() : _dataDir;
+  String path(String name) =>
+      dataFilePath(name, appData: appData, injected: _dataDir.isNotEmpty);
+  final settingsPath = path('settings.json');
+  final indexPath = path('index.sqlite');
   Directory(appData).createSync(recursive: true);
   final settingsFile = SettingsFile(settingsPath);
   final settings = await settingsFile.load();
