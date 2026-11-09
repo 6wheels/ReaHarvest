@@ -23,7 +23,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 
 ## M1 — Migration (umbrella #30)
 - [ ] #79 center the main window at launch (priority 1)
-- [ ] #59 integration tests (moves with the milestones; regression net of the existing features and the M0 steps still open)
+- [ ] #59 integration tests (moves with the milestones; M0 steps and #77 covered, regression net of the existing features still open)
 - [x] #77 known level values (artists, albums) for layout recognition
 - [ ] #66 inventory and no-loss check
 - [ ] #67 typed migration issues in To sort
