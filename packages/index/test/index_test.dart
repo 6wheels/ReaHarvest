@@ -116,7 +116,25 @@ void main() {
         ScanResult(
           titles: [song],
           nodes: {'Band': NodeFile(nodeId, 'artist')},
-          toSort: ['loose.rpp'],
+          issues: Report({
+            ReportKind.projectTooDeep: [
+              const ReportItem.misplaced(
+                'Band/First Album/Song/mix/x.rpp',
+                level: LayoutLevel('title'),
+                target: 'Band/First Album/Song',
+              ),
+            ],
+            ReportKind.projectTooShallow: [
+              const ReportItem.misplaced(
+                'loose.rpp',
+                level: LayoutLevel('gone'),
+              ),
+            ],
+            ReportKind.duplicateVersionId: [
+              const ReportItem('Band/First Album/Song/b.rpp', 'id1'),
+              const ReportItem('Band/First Album/Song/a.RPP', 'id1'),
+            ],
+          }),
           corrupted: ['Band/bad.rpp'],
           orphanNodes: ['Band/render/.node.json'],
           stamps: {'Band/First Album/Song/a.RPP': (size: 10, modified: t0)},
@@ -143,13 +161,55 @@ void main() {
       expect(t.versions.last.trackCount, isNull);
       expect(t.versions.last.plugins, isEmpty);
       expect(restored.nodes['Band']!.id, nodeId);
-      expect(restored.toSort, ['loose.rpp']);
-      expect(index.toSort(), [(library: lib.id, path: 'loose.rpp')]);
+      expect(restored.issues.items, {
+        ReportKind.projectTooDeep: [
+          const ReportItem.misplaced(
+            'Band/First Album/Song/mix/x.rpp',
+            level: LayoutLevel('title'),
+            target: 'Band/First Album/Song',
+          ),
+        ],
+        ReportKind.projectTooShallow: [
+          const ReportItem.misplaced('loose.rpp', level: LayoutLevel('gone')),
+        ],
+        ReportKind.duplicateVersionId: [
+          const ReportItem('Band/First Album/Song/a.RPP', 'id1'),
+          const ReportItem('Band/First Album/Song/b.rpp', 'id1'),
+        ],
+      });
       expect(restored.corrupted, ['Band/bad.rpp']);
       expect(restored.orphanNodes, ['Band/render/.node.json']);
-      expect(index.issues('orphanNode'), [
-        (library: lib.id, path: 'Band/render/.node.json'),
+      expect(index.issues(kind: ReportKind.orphanNode), [
+        (
+          library: lib.id,
+          kind: ReportKind.orphanNode,
+          item: const ReportItem('Band/render/.node.json'),
+        ),
       ]);
+      // Sorted by kind (display order), then path.
+      final all = index.issues();
+      expect(all.map((i) => i.kind), [
+        ReportKind.corrupted,
+        ReportKind.projectTooDeep,
+        ReportKind.projectTooShallow,
+        ReportKind.duplicateVersionId,
+        ReportKind.duplicateVersionId,
+        ReportKind.orphanNode,
+      ]);
+      expect(
+        [for (final i in all) i.item.level?.key],
+        [null, 'title', 'gone', null, null, null],
+      );
+      final other = library();
+      index.update(
+        other,
+        ScanResult(corrupted: ['a.rpp'], orphanNodes: ['b/.node.json']),
+      );
+      final libraries = [for (final i in index.issues()) i.library];
+      expect(libraries, [...libraries]..sort());
+      expect(libraries.toSet(), {lib.id, other.id});
+      expect(index.issues(library: other.id), hasLength(2));
+      index.removeLibrary(other.id);
       expect(restored.stamps, {
         'Band/First Album/Song/a.RPP': (size: 10, modified: t0),
       });

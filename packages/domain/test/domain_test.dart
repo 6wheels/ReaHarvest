@@ -357,7 +357,7 @@ void main() {
     test('sorts non-empty sections by level, then kind', () {
       final report = Report({
         ReportKind.libraryScanned: [const ReportItem('/a')],
-        ReportKind.toSort: const [],
+        ReportKind.projectTooShallow: const [],
         ReportKind.orphanNode: [const ReportItem('/a/.node.json')],
         ReportKind.scanFailed: [const ReportItem('/b', 'boom')],
       });
@@ -417,7 +417,7 @@ void main() {
     });
 
     test('adds up two reports', () {
-      const empty = Report({ReportKind.toSort: []});
+      const empty = Report({ReportKind.projectTooShallow: []});
       expect(empty.isEmpty, isTrue);
       expect(empty.hasErrors, isFalse);
       expect(empty.hasWarnings, isFalse);

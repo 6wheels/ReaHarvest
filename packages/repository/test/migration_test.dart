@@ -204,6 +204,6 @@ void main() {
       ),
     );
     expect(result.titles, isEmpty);
-    expect(result.toSort, isEmpty);
+    expect(result.issues.isEmpty, isTrue);
   });
 }

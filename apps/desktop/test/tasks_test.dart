@@ -231,12 +231,12 @@ void main() {
     await tasks().run(
       (l10n) => l10n.taskScanAll,
       (_) async => const Report({
-        ReportKind.toSort: [ReportItem('/x')],
+        ReportKind.projectTooShallow: [ReportItem('/x')],
       }),
     );
     await tasks().run((l10n) => 'B', (_) async => throw 'boom');
     expect(records, [
-      'INFO Scan of the libraries: done\ntoSort (1)\n  /x ',
+      'INFO Scan of the libraries: done\nprojectTooShallow (1)\n  /x ',
       'SEVERE B boom',
       'WARNING B: failed ',
     ]);

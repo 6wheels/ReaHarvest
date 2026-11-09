@@ -57,7 +57,7 @@ Future<void> main() async {
         indexedLibrariesProvider.overrideWithValue({
           demoLibrary.id: demoLibrary,
         }),
-        toSortProvider.overrideWithValue(const []),
+        issuesProvider.overrideWithValue(const []),
       ],
     ],
   );

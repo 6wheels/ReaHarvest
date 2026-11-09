@@ -11,7 +11,11 @@ typedef FileHasher = Future<String> Function(String path);
 /// A file tracked by the index.
 typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 
-const _schemaVersion = 5;
+/// An issue of a library: a [ScanResult.issues] item, or a corrupted
+/// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
+typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
+
+const _schemaVersion = 6;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -60,8 +64,11 @@ CREATE TABLE files (
 );
 CREATE TABLE issues (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('toSort', 'corrupted', 'orphanNode')),
+  kind TEXT NOT NULL,
   path TEXT NOT NULL,
+  detail TEXT,
+  level TEXT,
+  target TEXT,
   PRIMARY KEY (library_id, kind, path)
 );
 ''';
@@ -160,11 +167,16 @@ final class LocalIndex {
         ],
       );
       _insertAll(
-        'INSERT INTO issues (library_id, kind, path) VALUES (?, ?, ?)',
+        'INSERT INTO issues (library_id, kind, path, detail, level, target) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
         [
-          for (final p in scan.toSort) [id, 'toSort', p],
-          for (final p in scan.corrupted) [id, 'corrupted', p],
-          for (final p in scan.orphanNodes) [id, 'orphanNode', p],
+          for (final (kind, items) in scan.issues.sections)
+            for (final i in items)
+              [id, kind.name, i.path, i.detail, i.level?.key, i.target],
+          for (final p in scan.corrupted)
+            [id, ReportKind.corrupted.name, p, null, null, null],
+          for (final p in scan.orphanNodes)
+            [id, ReportKind.orphanNode.name, p, null, null, null],
         ],
       );
       _updateFiles(id, scan.stamps);
@@ -252,13 +264,10 @@ final class LocalIndex {
     final library = Library.fromJson(
       (jsonDecode(known.single['json'] as String) as Map).cast(),
     );
-    List<String> issues(String kind) => [
-      for (final r in _db.select(
-        'SELECT path FROM issues WHERE library_id = ? AND kind = ? '
-        'ORDER BY path',
-        [id, kind],
-      ))
-        r['path'] as String,
+    final stored = issues(library: id);
+    List<String> paths(ReportKind kind) => [
+      for (final i in stored)
+        if (i.kind == kind) i.item.path,
     ];
     final restored = titles(library: id);
     final byPath = {for (final t in restored) t.path: t};
@@ -275,31 +284,67 @@ final class LocalIndex {
             versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
           ),
       },
-      toSort: issues('toSort'),
-      corrupted: issues('corrupted'),
-      orphanNodes: issues('orphanNode'),
+      issues: Report({
+        for (final kind in {for (final i in stored) i.kind}.difference({
+          ReportKind.corrupted,
+          ReportKind.orphanNode,
+        }))
+          kind: [
+            for (final i in stored)
+              if (i.kind == kind) i.item,
+          ],
+      }),
+      corrupted: paths(ReportKind.corrupted),
+      orphanNodes: paths(ReportKind.orphanNode),
       stamps: {for (final f in files(id)) f.path: f.stamp},
       freeTree: library.isFreeTree,
     );
   }
 
-  /// `.RPP` files and folders outside the layout ("To sort", SPEC §5.2) of
-  /// all libraries, sorted by library then path.
-  List<({LibraryId library, String path})> toSort() => issues('toSort');
-
-  /// Issues of [kind] (`toSort`, `corrupted` or `orphanNode`, see
-  /// [ScanResult]) of all libraries, sorted by library then path.
-  List<({LibraryId library, String path})> issues(String kind) => [
-    for (final r in _db.select(
-      'SELECT library_id, path FROM issues WHERE kind = ? '
-      'ORDER BY library_id, path',
-      [kind],
-    ))
-      (
-        library: LibraryId(r['library_id'] as String),
-        path: r['path'] as String,
-      ),
-  ];
+  /// Issues ("To sort", SPEC §5.2) of [library], or of all libraries, of
+  /// [kind] if set; sorted by library, kind (display order) then path.
+  /// Expected levels carry the labels of their library's layout.
+  List<LibraryIssue> issues({LibraryId? library, ReportKind? kind}) {
+    final layouts = {
+      for (final r in _db.select('SELECT id, json FROM libraries'))
+        r['id'] as String: Library.fromJson(
+          (jsonDecode(r['json'] as String) as Map).cast(),
+        ).layout,
+    };
+    final rows = _db.select(
+      'SELECT * FROM issues WHERE (?1 IS NULL OR library_id = ?1) '
+      'AND (?2 IS NULL OR kind = ?2)',
+      [library, kind?.name],
+    );
+    return [
+      for (final r in rows)
+        (
+          library: LibraryId(r['library_id'] as String),
+          kind: ReportKind.values.byName(r['kind'] as String),
+          item: switch (r['level'] as String?) {
+            null => ReportItem(r['path'] as String, r['detail'] as String?),
+            final key => ReportItem.misplaced(
+              r['path'] as String,
+              level:
+                  layouts[r['library_id']]?.levels
+                      .where((l) => l.key == key)
+                      .firstOrNull ??
+                  LayoutLevel(key),
+              target: r['target'] as String?,
+            ),
+          },
+        ),
+    ]..sort(
+      (a, b) => switch ((
+        a.library.compareTo(b.library),
+        a.kind.index.compareTo(b.kind.index),
+      )) {
+        (0, 0) => a.item.path.compareTo(b.item.path),
+        (0, final byKind) => byKind,
+        (final byLibrary, _) => byLibrary,
+      },
+    );
+  }
 
   /// Stored hash of [path], or null if not computed yet.
   String? hashOf(LibraryId id, String path) {

@@ -10,6 +10,11 @@ import 'package:test/test.dart';
 
 const fixtures = '../../test/fixtures';
 
+/// Paths of the issues of [result], by kind then path.
+List<String> issuePaths(ScanResult result) => [
+  for (final (_, items) in result.issues.sections) ...items.map((i) => i.path),
+];
+
 /// Storage recording the paths read.
 final class CountingStorage implements RepositoryStorage {
   CountingStorage(this.inner);
@@ -49,11 +54,12 @@ void main() {
   late MountedFolderStorage storage;
 
   final unknown = File('$fixtures/project-1.rpp').readAsStringSync();
+  final adoptedId = VersionId.generate();
   final adopted = setExtState(
     unknown,
     VersionMetadata.section,
     VersionMetadata(
-      id: VersionId.generate(),
+      id: adoptedId,
       owner: MemberId.generate(),
       label: 'chorus B',
     ).toExtState(),
@@ -161,7 +167,9 @@ void main() {
       put('band/album/song/Media/a.wav');
       put('band/album/song/old-takes/notes.txt');
       put('band/album/song/old-takes/take.rpp', unknown);
+      put('band/album/song/Alice/mix/a.rpp', unknown);
       put('band/_Unassigned/other/v1.rpp', unknown);
+      put('band/_Unassigned/other/copy.rpp', adopted);
       put('band/loose.rpp', unknown);
       put('root.rpp', unknown);
       put('.collab/x.rpp', unknown);
@@ -178,11 +186,27 @@ void main() {
       expect(song.versions.map((v) => v.fileName), ['v1.rpp', 'v2.RPP']);
       expect(song.versions[0].isAdopted, isTrue);
       expect(song.versions[1].isAdopted, isFalse);
-      expect(result.toSort, [
-        'band/album/song/old-takes/take.rpp',
-        'band/loose.rpp',
-        'root.rpp',
-      ]);
+      expect(result.issues.items, {
+        ReportKind.projectTooDeep: [
+          for (final path in ['Alice/mix/a.rpp', 'old-takes/take.rpp'])
+            ReportItem.misplaced(
+              'band/album/song/$path',
+              level: lib.layout!.leaf,
+              target: 'band/album/song',
+            ),
+        ],
+        ReportKind.projectTooShallow: [
+          for (final path in ['band/loose.rpp', 'root.rpp'])
+            ReportItem.misplaced(path, level: lib.layout!.leaf),
+        ],
+        ReportKind.duplicateVersionId: [
+          for (final path in [
+            'band/_Unassigned/other/copy.rpp',
+            'band/album/song/v1.rpp',
+          ])
+            ReportItem(path, adoptedId),
+        ],
+      });
       expect(result.toAdopt.map((e) => '${e.$1.path}/${e.$2.fileName}'), [
         'band/_Unassigned/other/v1.rpp',
         'band/album/song/v2.RPP',
@@ -220,7 +244,11 @@ void main() {
       final result = await scan(storage, lib);
 
       expect(result.titles, isEmpty);
-      expect(result.toSort, ['band/album']);
+      expect(result.issues.items, {
+        ReportKind.outsideLayout: [
+          const ReportItem.misplaced('band/album', level: LayoutLevel('album')),
+        ],
+      });
       expect(result.corrupted, isEmpty);
     });
 
@@ -236,7 +264,7 @@ void main() {
       final result = await scan(storage, lib);
 
       expect(result.titles.single.versions.map((v) => v.fileName), ['v1.rpp']);
-      expect(result.toSort, isEmpty);
+      expect(issuePaths(result), isEmpty);
       expect(result.corrupted, [
         'band/album/song/bad.rpp',
         'other/broken/.node.json',
@@ -264,7 +292,7 @@ void main() {
         'band/album/song',
         'proj',
       });
-      expect(result.toSort, ['proj/proj.rpp']);
+      expect(issuePaths(result), ['proj/proj.rpp']);
       for (final dir in [
         'band/audio-files',
         'band/render',
@@ -448,7 +476,7 @@ void main() {
       expect(demo.versions.every((v) => !v.isAdopted), isTrue);
       expect(result.freeTree, isTrue);
       expect(result.toAdopt, isEmpty);
-      expect(result.toSort, isEmpty);
+      expect(issuePaths(result), isEmpty);
       expect(counting.reads.where(isProjectFile), isEmpty);
       expect(exists('band/2024/demo/.node.json'), isTrue);
       expect(exists('band/2024/demo/drums/v2/.node.json'), isFalse);
@@ -994,7 +1022,7 @@ void main() {
       expect(moved.recordPath, 'Media');
 
       final result = await scan(storage, library(Layout.classic()));
-      expect(result.toSort, isEmpty);
+      expect(issuePaths(result), isEmpty);
       expect(result.titles.single.path, 'band/_Unassigned/loose');
     });
 
@@ -1078,7 +1106,7 @@ void main() {
       final result = await scan(storage, lib);
 
       // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.tags, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v.rpp');      expect(result.titles[1].tags['artist'], 'Band');
-      expect(result.levelIssues.items, {
+      expect(result.issues.items, {
         ReportKind.misplacedLevel: [
           const ReportItem.misplaced(
             'First album',
@@ -1088,32 +1116,33 @@ void main() {
         ],
         ReportKind.titleTooHigh: [
           const ReportItem.misplaced(
-            'Loose',
-            level: LayoutLevel('title'),
-            target: '_Unassigned/_Unassigned/Loose',
-          ),
-          const ReportItem.misplaced(
             'Band/Loose2',
             level: LayoutLevel('title'),
             target: 'Band/_Unassigned/Loose2',
+          ),
+          const ReportItem.misplaced(
+            'Loose',
+            level: LayoutLevel('title'),
+            target: '_Unassigned/_Unassigned/Loose',
           ),
         ],
         ReportKind.unknownValue: [
           const ReportItem.misplaced('Stranger', level: LayoutLevel('artist')),
         ],
       });
-      expect(result.toSort, [
-        'Band/Loose2',
-        'First album',
-        'Loose',
-        'Stranger',
-      ]);
       expect(exists('Stranger/$nodeFileName'), isFalse);
       expect(exists('Stranger/Album/Song/$nodeFileName'), isFalse);
 
       // Without known values, levels are recognized by depth only.
       final byDepth = await scan(storage, library(Layout.classic()));
-      expect(byDepth.levelIssues.isEmpty, isTrue);
+      expect(
+        byDepth.issues.items.keys,
+        isNot(contains(ReportKind.unknownValue)),
+      );
+      expect(
+        byDepth.issues.items.keys,
+        isNot(contains(ReportKind.titleTooHigh)),
+      );
       expect(
         byDepth.titles.map((t) => t.path),
         contains('Stranger/Album/Song'),
@@ -1130,7 +1159,7 @@ void main() {
 
       final result = await scan(storage, lib);
       expect(result.titles.map((t) => t.path), ['Band/Song']);
-      expect(result.levelIssues.items[ReportKind.titleTooHigh], [
+      expect(result.issues.items[ReportKind.titleTooHigh], [
         const ReportItem.misplaced(
           'Old',
           level: LayoutLevel('title'),

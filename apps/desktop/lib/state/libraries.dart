@@ -529,21 +529,12 @@ class LibraryService {
     );
     index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();
-    // Misplaced levels are reported with their target, not again as to sort.
-    final misplaced = {
-      for (final (_, items) in result.levelIssues.sections)
-        for (final item in items) item.path,
-    };
     return Report({
           ReportKind.libraryScanned: [ReportItem(root)],
           ReportKind.corrupted: _items(root, result.corrupted),
           ReportKind.orphanNode: _items(root, result.orphanNodes),
-          ReportKind.toSort: _items(root, [
-            for (final path in result.toSort)
-              if (!misplaced.contains(path)) path,
-          ]),
         }) +
-        _rooted(root, result.levelIssues);
+        _rooted(root, result.issues);
   }
 }
 

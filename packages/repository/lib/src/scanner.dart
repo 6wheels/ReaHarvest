@@ -19,12 +19,11 @@ final class ScanResult {
   const ScanResult({
     this.titles = const [],
     this.nodes = const {},
-    this.toSort = const [],
+    this.issues = const Report(),
     this.corrupted = const [],
     this.orphanNodes = const [],
     this.stamps = const {},
     this.freeTree = false,
-    this.levelIssues = const Report(),
   });
 
   /// Titles found, sorted by path.
@@ -33,9 +32,14 @@ final class ScanResult {
   /// Node files by folder path (`''` for the root).
   final Map<String, NodeFile> nodes;
 
-  /// Paths of `.RPP` files and folders outside the layout ("To sort",
-  /// SPEC §5.2).
-  final List<String> toSort;
+  /// `.RPP` files and folders outside the layout, and duplicated version
+  /// identifiers, by kind ("To sort", SPEC §5.2, §5.8 step 3), each sorted
+  /// by path. Misplaced items name their expected level and, when known,
+  /// their target: the title of a project too deep, the proposed position
+  /// of a folder recognized through the known values. Unknown intermediate
+  /// folders are not scanned further, except titles placed too high,
+  /// indexed where they are with the tags of their target.
+  final Report issues;
 
   /// Paths of unreadable or corrupted `.RPP` and node files. A folder whose
   /// node file is corrupted is not scanned further.
@@ -51,13 +55,6 @@ final class ScanResult {
 
   /// Whether the library is a free tree (SPEC §3.3).
   final bool freeTree;
-
-  /// Unknown intermediate folders, recognized through the known values of
-  /// the library (SPEC §5.8), each with its expected level and proposed
-  /// target. They are also listed in [toSort] and not scanned further,
-  /// except titles placed too high, indexed where they are with the tags of
-  /// their target. Recomputed on every scan, not stored in the index.
-  final Report levelIssues;
 
   /// Versions without metadata ("To adopt", SPEC §4.2); always empty in a
   /// free tree, whose versions are identified by their path.
@@ -109,10 +106,9 @@ final class _Scanner {
   final files = <String, List<StorageEntry>>{};
   final titles = <Title>[];
   final nodes = <String, NodeFile>{};
-  final toSort = <String>[];
+  final issues = <ReportKind, List<ReportItem>>{};
   final corrupted = <String>[];
   final stamps = <String, FileStamp>{};
-  var levelIssues = const Report();
 
   /// Folders whose trash or history holds a project.
   final traces = <String>{};
@@ -158,17 +154,19 @@ final class _Scanner {
               e.path,
     ]..sort();
     titles.sort((a, b) => a.path.compareTo(b.path));
-    toSort.sort();
+    _findDuplicates();
     corrupted.sort();
+    for (final list in issues.values) {
+      list.sort((a, b) => a.path.compareTo(b.path));
+    }
     return ScanResult(
       titles: titles,
       nodes: nodes,
-      toSort: toSort,
+      issues: Report(issues),
       corrupted: corrupted,
       orphanNodes: orphanNodes,
       stamps: stamps,
       freeTree: layout == null,
-      levelIssues: levelIssues,
     );
   }
 
@@ -224,19 +222,26 @@ final class _Scanner {
         continue;
       }
       if (d > depth) {
-        // Inside a title: only out-of-place versions matter.
+        // Inside a title (member or status subfolder…): its projects belong
+        // to the title.
         if (reservedTitleFolders.contains(segments[depth].toLowerCase())) {
           continue;
         }
-        toSort.addAll(_projects(dir).map((e) => e.path));
+        for (final e in _projects(dir)) {
+          _issue(
+            ReportKind.projectTooDeep,
+            ReportItem.misplaced(
+              e.path,
+              level: layout.leaf,
+              target: segments.take(depth).join('/'),
+            ),
+          );
+        }
         continue;
       }
       if (d > 0 && d < depth && !_isKnown(segments)) {
         final (kind, item) = _levelIssue(segments, layout);
-        levelIssues += Report({
-          kind: [item],
-        });
-        toSort.add(dir);
+        _issue(kind, item);
         skipped.add(dir);
         // A title placed too high stays visible where it is, tagged as at
         // its target (missing levels unassigned), until it is moved.
@@ -250,7 +255,12 @@ final class _Scanner {
         continue;
       }
       if (d < depth) {
-        toSort.addAll(_projects(dir).map((e) => e.path));
+        for (final e in _projects(dir)) {
+          _issue(
+            ReportKind.projectTooShallow,
+            ReportItem.misplaced(e.path, level: layout.leaf),
+          );
+        }
         if (d == 0) continue;
       }
       final level = layout.levels[d - 1].key;
@@ -260,7 +270,10 @@ final class _Scanner {
         continue;
       }
       if (node.level != level) {
-        toSort.add(dir);
+        _issue(
+          ReportKind.outsideLayout,
+          ReportItem.misplaced(dir, level: layout.levels[d - 1]),
+        );
         skipped.add(dir);
         continue;
       }
@@ -270,6 +283,24 @@ final class _Scanner {
           node,
           layout.tagsOf(segments)!,
           await _readVersions(dir),
+        );
+      }
+    }
+  }
+
+  void _issue(ReportKind kind, ReportItem item) =>
+      issues.putIfAbsent(kind, () => []).add(item);
+
+  /// Reports the versions sharing a version identifier with another one
+  /// (manual duplication, SPEC §4.2), the identifier as detail.
+  void _findDuplicates() {
+    for (final MapEntry(key: id, value: versions) in duplicateVersions(
+      titles,
+    ).entries) {
+      for (final (t, v) in versions) {
+        _issue(
+          ReportKind.duplicateVersionId,
+          ReportItem(_join(t.path, v.fileName), id),
         );
       }
     }

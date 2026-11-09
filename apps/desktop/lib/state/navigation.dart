@@ -236,25 +236,14 @@ final visibleTitlesProvider = Provider<List<Title>>((ref) {
   ];
 });
 
-/// `.RPP` files and folders outside the layout ("To sort", SPEC §5.2).
-final toSortProvider = Provider<List<({LibraryId library, String path})>>((
-  ref,
-) {
+/// Issues of all libraries ("To sort", SPEC §5.2, §5.8 step 3): `.RPP`
+/// files and folders outside the layout, duplicated version identifiers,
+/// unreadable files and orphan node files (#54); sorted by library, kind
+/// then path.
+final issuesProvider = Provider<List<LibraryIssue>>((ref) {
   ref.watch(indexRevisionProvider);
-  return ref.watch(localIndexProvider).toSort();
+  return ref.watch(localIndexProvider).issues();
 });
-
-/// Files the scan could not use, of kind `corrupted` (unreadable) or
-/// `orphanNode` (`.node.json` of a folder without project, #54), shown with
-/// "To sort".
-final scanIssuesProvider =
-    Provider.family<List<({LibraryId library, String path})>, String>((
-      ref,
-      kind,
-    ) {
-      ref.watch(indexRevisionProvider);
-      return ref.watch(localIndexProvider).issues(kind);
-    });
 
 /// Versions without metadata in layout libraries ("To adopt", SPEC §4.2).
 final toAdoptProvider = Provider<List<(Title, Version)>>((ref) {

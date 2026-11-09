@@ -19,6 +19,7 @@ import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_detail.dart';
 import 'package:reaharvest/ui/title_card.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
@@ -66,6 +67,7 @@ class FakeLibraryService extends LibraryService {
   final trashed = <String>[];
   final orphansDeleted = <String>[];
   final restored = <String>[];
+  final moved = <(String, List<String>)>[];
 
   /// Known values given to addLocal or setKnownValues.
   List<KnownValue>? knownValues;
@@ -81,8 +83,20 @@ class FakeLibraryService extends LibraryService {
       restored.add(version.fileName);
 
   @override
-  Future<void> deleteOrphanNode(LibraryId library, String path) async =>
-      orphansDeleted.add(path);
+  Future<void> deleteOrphanNode(LibraryId library, String path) async {
+    if (path.startsWith('locked/')) throw StateError('locked');
+    orphansDeleted.add(path);
+  }
+
+  @override
+  Future<Report?> moveToTitle(
+    LibraryId library,
+    String path,
+    List<String> folders,
+  ) async {
+    moved.add((path, folders));
+    return const Report();
+  }
 
   @override
   Future<String> addVersion(
@@ -209,7 +223,7 @@ void main() {
     bool reaperRunning = false,
     NavigationSettings navigation = const NavigationSettings(),
     String language = 'en',
-    List<String> orphanNodes = const [],
+    List<LibraryIssue> issues = const [],
     List<LibraryEntry> configured = const [band],
     Map<LibraryId, Library>? indexed,
     Map<VersionId, List<Backup>> history = const {},
@@ -242,12 +256,7 @@ void main() {
           indexedLibrariesProvider.overrideWithValue(
             indexed ?? {demoLibrary.id: demoLibrary},
           ),
-          toSortProvider.overrideWithValue(const []),
-          scanIssuesProvider.overrideWith(
-            (ref, kind) => kind == 'orphanNode'
-                ? [for (final o in orphanNodes) (library: band.id, path: o)]
-                : const [],
-          ),
+          issuesProvider.overrideWithValue(issues),
           historyProvider.overrideWith((ref, id) async => history),
           trashProvider.overrideWith(
             (ref, id) async => [
@@ -576,7 +585,16 @@ void main() {
   testWidgets('a library without titles still leads to its items to sort', (
     tester,
   ) async {
-    await pumpApp(tester, orphanNodes: ['Band/Old/.node.json']);
+    await pumpApp(
+      tester,
+      issues: [
+        (
+          library: band.id,
+          kind: ReportKind.orphanNode,
+          item: const ReportItem('Band/Old/.node.json'),
+        ),
+      ],
+    );
     expect(find.text('To sort · 1'), findsOneWidget);
   });
 
@@ -1201,23 +1219,142 @@ void main() {
     expect(find.textContaining('2.0 KB'), findsWidgets);
   });
 
-  testWidgets('lists and deletes node files without project', (tester) async {
+  testWidgets('groups the issues by kind and moves misplaced projects', (
+    tester,
+  ) async {
+    const other = LibraryId('L2');
+    const title = LayoutLevel('title');
+    LibraryIssue issue(LibraryId library, ReportKind kind, ReportItem item) =>
+        (library: library, kind: kind, item: item);
     await pumpApp(
       tester,
       titles: demoTitles(),
-      orphanNodes: ['Artist/render/.node.json'],
+      indexed: {
+        band.id: demoLibrary,
+        other: demoLibrary,
+        demoLibrary.id: demoLibrary,
+      },
+      issues: [
+        issue(
+          band.id,
+          ReportKind.projectTooDeep,
+          const ReportItem.misplaced(
+            'Artist/Album/Song/Alice/mix/a.rpp',
+            level: title,
+            target: 'Artist/Album/Song',
+          ),
+        ),
+        // In the library of the demo titles, for the autocompletion.
+        issue(
+          demoLibrary.id,
+          ReportKind.projectTooShallow,
+          const ReportItem.misplaced('loose.rpp', level: title),
+        ),
+        issue(
+          band.id,
+          ReportKind.titleTooHigh,
+          const ReportItem.misplaced(
+            'Old',
+            level: title,
+            target: '_Unassigned/_Unassigned/Old',
+          ),
+        ),
+        issue(
+          other,
+          ReportKind.duplicateVersionId,
+          const ReportItem('A/B/C/x.rpp', 'id'),
+        ),
+        issue(band.id, ReportKind.corrupted, const ReportItem('A/bad.rpp')),
+      ],
     );
-    await tester.tap(find.text('To sort · 1'));
+    await tester.tap(find.text('To sort · 5'));
     await tester.pumpAndSettle();
-    expect(find.text('REAHARVEST FILES WITHOUT PROJECT'), findsOne);
-    expect(find.text('Artist/render'), findsOne);
 
-    await tester.tap(find.text('Delete this file'));
+    expect(
+      find.text('PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 1'),
+      findsOne,
+    );
+    expect(find.text('UNREADABLE FILES · 1'), findsOne);
+    expect(find.text('Band · Artist/Album/Song/Alice/mix'), findsOne);
+    expect(find.text('Expected: Title'), findsNWidgets(3));
+    expect(find.text('Proposed place: Artist/Album/Song'), findsOne);
+    expect(find.text('Old'), findsOne);
+
+    // Too deep: prefilled with its title.
+    await tester.tap(find.text('Move…').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Move “a.rpp”'), findsOne);
+    expect(find.widgetWithText(TextField, 'Song'), findsOne);
+    await tester.tap(find.text('Move').last);
+    await tester.pumpAndSettle();
+    final (movedPath, folders) = libraries.moved.single;
+    expect(movedPath, 'Artist/Album/Song/Alice/mix/a.rpp');
+    expect(folders, ['Artist', 'Album', 'Song']);
+
+    // Too shallow: prefilled from its folders and file name.
+    await tester.ensureVisible(find.text('Move…').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move…').last);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'loose'), findsOne);
+    final artist = find.widgetWithText(TextField, 'Artist');
+    await tester.enterText(artist, 'a/b');
+    await tester.pumpAndSettle();
+    expect(find.text('Invalid folder name'), findsOne);
+    await tester.enterText(artist, 'Sample');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sample Artist').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Invalid folder name'), findsNothing);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(libraries.moved, hasLength(1));
+
+    final hint = find.text('Open the title to make each copy a new version.');
+    await tester.scrollUntilVisible(hint, 200);
+    // The second library has no configured name.
+    expect(find.text('A/B/C'), findsOne);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('Old'), findsNothing);
+  });
+
+  testWidgets('lists and deletes node files without project', (tester) async {
+    LibraryIssue orphan(String path) =>
+        (library: band.id, kind: ReportKind.orphanNode, item: ReportItem(path));
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      issues: [
+        orphan('Artist/render/.node.json'),
+        orphan('locked/sub/.node.json'),
+      ],
+    );
+    await tester.tap(find.text('To sort · 2'));
+    await tester.pumpAndSettle();
+    expect(find.text('REAHARVEST FILES WITHOUT PROJECT · 2'), findsOne);
+    expect(find.text('render'), findsOne);
+    expect(find.text('Artist'), findsWidgets);
+
+    await tester.tap(find.text('Delete this file').first);
     await tester.pumpAndSettle();
     expect(find.text('Delete this ReaHarvest file?'), findsOne);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(libraries.orphansDeleted, isEmpty);
+
+    await tester.tap(find.text('Delete this file').first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Delete this file').last);
     await tester.pumpAndSettle();
     expect(libraries.orphansDeleted, ['Artist/render/.node.json']);
+
+    await tester.tap(find.text('Delete this file').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete this file').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('The operation failed'), findsOne);
   });
 
   testWidgets('uses French when chosen', (tester) async {

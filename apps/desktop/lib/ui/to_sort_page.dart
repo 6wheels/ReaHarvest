@@ -1,11 +1,8 @@
-// coverage:ignore-file
-// Temporary: this page is rewritten by #67 (typed migration issues) and
-// covered then. Remove this exclusion with that rewrite.
-
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
@@ -14,6 +11,7 @@ import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'layout_labels.dart';
+import 'report_dialog.dart';
 import 'title_detail.dart';
 import 'widgets.dart';
 
@@ -21,8 +19,8 @@ import 'widgets.dart';
 Future<void> openToSort(BuildContext context) =>
     Navigator.of(context).push(overLibraryRoute((_) => const ToSortPage()));
 
-/// `.RPP` files and folders outside the organization of their library,
-/// with a guided move (SPEC §5.2). Back with the back button, Escape or
+/// Issues of the libraries grouped by kind, with a counter per kind
+/// (SPEC §5.2, §5.8 step 3), and a guided move for misplaced projects. Back with the back button, Escape or
 /// the mouse back button.
 class ToSortPage extends StatelessWidget {
   const ToSortPage({super.key});
@@ -77,106 +75,118 @@ class ToSortPage extends StatelessWidget {
 class _ToSortList extends ConsumerWidget {
   const _ToSortList();
 
+  /// Hint shown under the section of [kind], if any.
+  static String? _hint(AppLocalizations l10n, ReportKind kind) =>
+      switch (kind) {
+        ReportKind.corrupted => l10n.corruptedHint,
+        ReportKind.orphanNode => l10n.orphanNodesHint,
+        ReportKind.duplicateVersionId => l10n.duplicateVersionIdHint,
+        ReportKind.titleTooHigh ||
+        ReportKind.misplacedLevel ||
+        ReportKind.unknownValue ||
+        ReportKind.outsideLayout => l10n.toSortFolderHint,
+        _ => null,
+      };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final items = ref.watch(toSortProvider);
-    final orphans = ref.watch(scanIssuesProvider('orphanNode'));
-    final corrupted = ref.watch(scanIssuesProvider('corrupted'));
+    final issues = ref.watch(issuesProvider);
     final names = {
       for (final l in ref.watch(settingsProvider.select((s) => s.libraries)))
         l.id: l.displayName,
     };
-    final multiple =
-        {
-          for (final i in [...items, ...orphans, ...corrupted]) i.library,
-        }.length >
-        1;
-    String subtitle(({LibraryId library, String path}) item, String path) => [
-      if (multiple) ?names[item.library],
-      path,
-    ].where((s) => s != '.' && s.isNotEmpty).join(' · ');
-    Widget hint(String value) => Padding(
-      padding: const EdgeInsets.only(top: Space.l),
-      child: Text(value, style: text.bodyMedium?.copyWith(color: c.muted)),
-    );
+    final multiple = {for (final i in issues) i.library}.length > 1;
+    // Sorted by kind within each library: grouped across libraries here.
+    final byKind = <ReportKind, List<LibraryIssue>>{};
+    for (final i in issues) {
+      byKind.putIfAbsent(i.kind, () => []).add(i);
+    }
+    final kinds = byKind.keys.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+    Widget muted(String value, TextStyle? style) =>
+        Text(value, style: style?.copyWith(color: c.muted));
     return ListView(
       padding: const EdgeInsets.all(Space.l),
       children: [
-        if (items.isNotEmpty) ...[
-          Text(
-            l10n.toSortHint,
-            style: text.bodyMedium?.copyWith(color: c.muted),
+        if (issues.isNotEmpty) muted(l10n.toSortHint, text.bodyMedium),
+        for (final kind in kinds) ...[
+          const SizedBox(height: Space.l),
+          SectionLabel(
+            '${reportKindLabel(l10n, kind)} · ${byKind[kind]!.length}',
           ),
-          const SizedBox(height: Space.s),
-        ],
-        for (final item in items)
-          _Item(
-            title: p.posix.basename(item.path),
-            subtitle: subtitle(item, p.posix.dirname(item.path)),
-            child: isProjectFile(item.path)
-                ? Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton(
-                      onPressed: () => showSortDialog(
-                        context,
-                        library: item.library,
-                        path: item.path,
-                      ),
-                      child: Text(l10n.sortAction),
-                    ),
-                  )
-                : Text(
-                    l10n.toSortFolderHint,
-                    style: text.bodySmall?.copyWith(color: c.muted),
-                  ),
-          ),
-        if (orphans.isNotEmpty) ...[
-          const SizedBox(height: Space.m),
-          SectionLabel(l10n.orphanNodesTitle),
-          hint(l10n.orphanNodesHint),
-          for (final item in orphans)
-            _Item(
-              title: p.posix.dirname(item.path),
-              subtitle: subtitle(item, p.posix.basename(item.path)),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton(
-                  onPressed: () => _deleteOrphan(context, ref, item),
-                  child: Text(l10n.deleteOrphanNode),
-                ),
-              ),
-            ),
-        ],
-        if (corrupted.isNotEmpty) ...[
-          const SizedBox(height: Space.m),
-          SectionLabel(l10n.corruptedTitle),
-          hint(l10n.corruptedHint),
-          for (final item in corrupted)
-            _Item(
-              title: p.posix.basename(item.path),
-              subtitle: subtitle(item, p.posix.dirname(item.path)),
-              child: const SizedBox.shrink(),
-            ),
+          if (_hint(l10n, kind) case final hint?) ...[
+            const SizedBox(height: Space.xs),
+            muted(hint, text.bodySmall),
+          ],
+          for (final issue in byKind[kind]!)
+            _issueItem(context, ref, issue, multiple ? names : null),
         ],
       ],
+    );
+  }
+
+  /// Card of [issue]; its library is named when [names] is set (several
+  /// libraries have issues).
+  Widget _issueItem(
+    BuildContext context,
+    WidgetRef ref,
+    LibraryIssue issue,
+    Map<LibraryId, String>? names,
+  ) {
+    final l10n = AppLocalizations.of(context);
+    final ReportItem(:path, :level, :target) = issue.item;
+    // An orphan node file stands for its folder.
+    final shown = issue.kind == ReportKind.orphanNode
+        ? p.posix.dirname(path)
+        : path;
+    final folder = p.posix.dirname(shown);
+    return _Item(
+      title: p.posix.basename(shown),
+      subtitle: [
+        if (names != null) ?names[issue.library],
+        if (folder != '.') folder,
+      ].join(' · '),
+      details: [
+        if (level != null)
+          l10n.issueExpectedLevel(layoutLevelLabel(l10n, level)),
+        if (target != null) l10n.issueTarget(target),
+      ],
+      action: switch (issue.kind) {
+        ReportKind.projectTooDeep ||
+        ReportKind.projectTooShallow => OutlinedButton(
+          onPressed: () => showSortDialog(
+            context,
+            library: issue.library,
+            path: path,
+            target: target,
+          ),
+          child: Text(l10n.sortAction),
+        ),
+        ReportKind.orphanNode => OutlinedButton(
+          onPressed: () => _deleteOrphan(context, ref, issue),
+          child: Text(l10n.deleteOrphanNode),
+        ),
+        _ => null,
+      },
     );
   }
 
   Future<void> _deleteOrphan(
     BuildContext context,
     WidgetRef ref,
-    ({LibraryId library, String path}) item,
+    LibraryIssue issue,
   ) async {
+    final path = issue.item.path;
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.deleteOrphanNodeTitle),
-        content: Text(l10n.deleteOrphanNodeHint(p.posix.dirname(item.path))),
+        content: Text(l10n.deleteOrphanNodeHint(p.posix.dirname(path))),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -193,7 +203,7 @@ class _ToSortList extends ConsumerWidget {
     try {
       await ref
           .read(libraryServiceProvider)
-          .deleteOrphanNode(item.library, item.path);
+          .deleteOrphanNode(issue.library, path);
     } on Object catch (error) {
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.actionFailed('$error'))),
@@ -206,12 +216,16 @@ class _Item extends StatelessWidget {
   const _Item({
     required this.title,
     required this.subtitle,
-    required this.child,
+    this.details = const [],
+    this.action,
   });
 
   final String title;
   final String subtitle;
-  final Widget child;
+
+  /// Lines under the subtitle (expected level, proposed place).
+  final List<String> details;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -234,8 +248,11 @@ class _Item extends StatelessWidget {
           ),
           if (subtitle.isNotEmpty)
             Text(subtitle, style: text.bodySmall?.copyWith(color: c.muted)),
-          const SizedBox(height: Space.s),
-          child,
+          for (final line in details) Text(line, style: text.bodySmall),
+          if (action case final action?) ...[
+            const SizedBox(height: Space.s),
+            Align(alignment: Alignment.centerRight, child: action),
+          ],
         ],
       ),
     );
@@ -243,21 +260,24 @@ class _Item extends StatelessWidget {
 }
 
 /// Guided move of the misplaced project [path] into a title of [library]
-/// ("To sort", SPEC §5.2).
+/// ("To sort", SPEC §5.2), prefilled with the title folder [target] if
+/// known.
 Future<void> showSortDialog(
   BuildContext context, {
   required LibraryId library,
   required String path,
+  String? target,
 }) => showDialog<void>(
   context: context,
-  builder: (_) => _SortDialog(library: library, path: path),
+  builder: (_) => _SortDialog(library: library, path: path, target: target),
 );
 
 class _SortDialog extends ConsumerStatefulWidget {
-  const _SortDialog({required this.library, required this.path});
+  const _SortDialog({required this.library, required this.path, this.target});
 
   final LibraryId library;
   final String path;
+  final String? target;
 
   @override
   ConsumerState<_SortDialog> createState() => _SortDialogState();
@@ -271,14 +291,18 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
   void initState() {
     super.initState();
     _layout = ref.read(indexedLibrariesProvider)[widget.library]!.layout!;
-    // Prefilled from the current folders, and the file name for the title.
+    // Prefilled from the target title, else from the current folders and
+    // the file name for the title.
+    final levels = _layout.levels.length;
+    final target = widget.target?.split('/');
     final folders = p.posix.dirname(widget.path).split('/')
       ..removeWhere((s) => s == '.');
-    final levels = _layout.levels.length;
     _values = [
       for (var i = 0; i < levels; i++)
         TextEditingController(
-          text: i == levels - 1
+          text: target != null && target.length == levels
+              ? target[i]
+              : i == levels - 1
               ? p.posix.basenameWithoutExtension(widget.path)
               : (i < folders.length ? folders[i] : Layout.unassigned),
         ),

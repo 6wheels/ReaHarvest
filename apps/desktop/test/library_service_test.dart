@@ -359,8 +359,12 @@ void main() {
       layout: Layout.classic(),
     );
     final id = container.read(settingsProvider).libraries.single.id;
-    expect(index.issues('orphanNode'), [
-      (library: id, path: 'Artist/render/.node.json'),
+    expect(index.issues(kind: ReportKind.orphanNode), [
+      (
+        library: id,
+        kind: ReportKind.orphanNode,
+        item: const ReportItem('Artist/render/.node.json'),
+      ),
     ]);
 
     await expectLater(
@@ -374,7 +378,7 @@ void main() {
     await service().deleteOrphanNode(id, 'Artist/render/.node.json');
 
     expect(orphan.existsSync(), isFalse);
-    expect(index.issues('orphanNode'), isEmpty);
+    expect(index.issues(kind: ReportKind.orphanNode), isEmpty);
     expect(File(p.join(song, '.node.json')).existsSync(), isTrue);
   });
 
@@ -567,7 +571,7 @@ void main() {
         target: 'Artist/Album',
       ),
     ]);
-    expect(report.items[ReportKind.toSort], isEmpty);
+    expect(report.items.keys, isNot(contains(ReportKind.unknownValue)));
   });
 
   test('declares, edits and extends the known values', () async {

@@ -26,7 +26,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [ ] #59 integration tests (moves with the milestones; M0 steps and #77 covered, regression net of the existing features still open)
 - [x] #77 known level values (artists, albums) for layout recognition
 - [x] #66 inventory and no-loss check (logic in `repository`; started as a background task by the M1 fix flows)
-- [ ] #67 typed migration issues in To sort
+- [x] #67 typed migration issues in To sort (layout, levels, duplicated `versionId`; media, Assets and conflict-copy detectors come with #69, #70, #23)
 - [ ] #68 layout moves and member subfolders
 - [ ] #80 number of versions to adopt on the card, overview and detail
 - [ ] #69 media normalization and pool merge

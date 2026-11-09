@@ -24,10 +24,7 @@ class FilterBar extends ConsumerWidget {
     final notifier = ref.read(navigationProvider.notifier);
     final identity = ref.watch(settingsProvider.select((s) => s.identity));
     final configured = ref.watch(settingsProvider.select((s) => s.libraries));
-    final toSort =
-        ref.watch(toSortProvider).length +
-        ref.watch(scanIssuesProvider('orphanNode')).length +
-        ref.watch(scanIssuesProvider('corrupted')).length;
+    final toSort = ref.watch(issuesProvider).length;
     // Titles with a version to adopt, as shown once filtered.
     final toAdopt = {for (final (t, _) in ref.watch(toAdoptProvider)) t.id}
         .length;
