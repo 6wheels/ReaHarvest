@@ -88,7 +88,7 @@ Future<MoveReport> moveProjectToTitle(
   final newRefs = <String, String>{};
 
   for (final ref in RppProject.parse(text).mediaFiles) {
-    final source = _resolve(sourceDir, ref);
+    final source = resolveReference(sourceDir, ref);
     if (source == null) {
       external.add(ref);
       continue;
@@ -145,7 +145,7 @@ String separatorOf(String ref) {
 
 /// Library path of the media [ref] of a project in [dir]; null if absolute
 /// or outside the library.
-String? _resolve(String dir, String ref) {
+String? resolveReference(String dir, String ref) {
   final slashed = ref.replaceAll(r'\', '/');
   if (slashed.startsWith('/') || RegExp(r'^[A-Za-z]:').hasMatch(slashed)) {
     return null;
@@ -221,7 +221,9 @@ Future<Set<String>> _mediaOfOtherProjects(
     try {
       final text = await _readText(storage, e.path);
       for (final ref in RppProject.parse(text).mediaFiles) {
-        if (_resolve(_parent(e.path), ref) case final path?) media.add(path);
+        if (resolveReference(_parent(e.path), ref) case final path?) {
+          media.add(path);
+        }
       }
     } on FormatException {
       // Unreadable project: its media cannot be known.

@@ -5,6 +5,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'adoption.dart';
+import 'conventions.dart';
+import 'migration.dart';
 import 'node_file.dart';
 
 /// A migration fix of a "To sort" issue (SPEC §5.8 step 4). Plain data,
@@ -16,7 +18,8 @@ sealed class MigrationFix {
   final String path;
 }
 
-/// Moves the folder [path] to [target] (its layout position).
+/// Moves the folder [path] to [target] (its layout position). An existing
+/// [target] folder is merged with it ([mergeFolder]).
 final class MoveFolder extends MigrationFix {
   const MoveFolder(super.path, this.target);
 
@@ -54,23 +57,24 @@ final class LiftProject extends MigrationFix {
   final String? statusFolder;
 }
 
-/// Applies [fixes] through [storage] (a [Migration.storage], so that no
-/// file is lost), one by one: a failed fix is reported and the others go
-/// on.
-Future<Report> applyFixes(
-  RepositoryStorage storage,
-  List<MigrationFix> fixes,
-) async {
+/// Applies [fixes] through the storage of [migration] (so that no file is
+/// lost), one by one: a failed fix is reported and the others go on.
+Future<Report> applyFixes(Migration migration, List<MigrationFix> fixes) async {
+  final storage = migration.storage;
   var report = const Report();
   for (final fix in fixes) {
     try {
       report += switch (fix) {
-        MoveFolder(:final path, :final target) =>
-          await storage.stat(target) == null
-              ? await _moveFolder(storage, path, target)
-              : Report({
-                  ReportKind.targetExists: [ReportItem(path, target)],
-                }),
+        MoveFolder(:final path, :final target) => switch (await storage.stat(
+          target,
+        )) {
+          null => await _moveFolder(storage, path, target),
+          StorageEntry(isDirectory: true) when _mergeable(path, target) =>
+            await mergeFolder(migration, path, target),
+          _ => Report({
+            ReportKind.targetExists: [ReportItem(path, target)],
+          }),
+        },
         MoveProject(:final path, :final titleDir) => (await moveProjectToTitle(
           storage,
           path,
@@ -87,6 +91,15 @@ Future<Report> applyFixes(
   return report;
 }
 
+/// Whether the folder [path] can be merged into the existing [target]:
+/// neither is inside the other, and they differ by more than the case
+/// (the same folder on Windows).
+bool _mergeable(String path, String target) {
+  final a = path.toLowerCase();
+  final b = target.toLowerCase();
+  return a != b && !a.startsWith('$b/') && !b.startsWith('$a/');
+}
+
 Future<Report> _moveFolder(
   RepositoryStorage storage,
   String path,
@@ -96,6 +109,148 @@ Future<Report> _moveFolder(
   return Report({
     ReportKind.folderMoved: [ReportItem(target)],
   });
+}
+
+/// Merges the folder [source] into the existing folder [target] (SPEC §5.8
+/// step 4, #81), through the storage of [migration]: each entry is moved to
+/// the same place in [target]; subfolders present on both sides are merged
+/// recursively (an artist, an album, a title's `Media/`); any other name
+/// collision gets a free name (`name (2).ext`) and the references of the
+/// moved projects are rewritten to follow it. The projects of two titles
+/// thus become versions of one title. Node files are merged: the target's
+/// title status wins (the dropped one is reported), version statuses are
+/// added. What is left of [source] (its node files, empty folders) is
+/// moved into the migration folder. Only moves and targeted rewrites: no
+/// file is read except projects and node files.
+Future<Report> mergeFolder(
+  Migration migration,
+  String source,
+  String target,
+) async {
+  final storage = migration.storage;
+  final projects = [
+    for (final e in await storage.list(source, recursive: true))
+      if (!e.isDirectory &&
+          isProjectFile(e.path) &&
+          !e.path.split('/').any(isExcludedFolder))
+        e.path,
+  ];
+  final merge = _Merge(storage);
+  await merge.into(source, target);
+  for (final old in projects) {
+    await merge.rewriteReferences(source, old);
+  }
+  final rest = await freePath(storage, '${migration.folder}/merged/$source');
+  await storage.move(source, rest);
+  return Report({
+    ReportKind.folderMerged: [ReportItem(target, source)],
+    ReportKind.fileRenamed: merge.renamed,
+    ReportKind.titleStatusDropped: merge.dropped,
+  });
+}
+
+/// State of one [mergeFolder]: moves made, in order, and report items.
+final class _Merge {
+  _Merge(this.storage);
+
+  final RepositoryStorage storage;
+  final moves = <(String, String)>[];
+  final renamed = <ReportItem>[];
+  final dropped = <ReportItem>[];
+
+  /// Moves the entries of [source] into [target], recursively.
+  Future<void> into(String source, String target) async {
+    for (final e in await storage.list(source)) {
+      final name = p.posix.basename(e.path);
+      final to = '$target/$name';
+      final existing = await storage.stat(to);
+      if (existing == null) {
+        await _move(e.path, to);
+      } else if (e.isDirectory && existing.isDirectory) {
+        await into(e.path, to);
+      } else if (name == nodeFileName && !e.isDirectory) {
+        await _mergeNodes(source, target);
+      } else {
+        final free = await freePath(storage, to);
+        await _move(e.path, free);
+        renamed.add(ReportItem(free, e.path));
+      }
+    }
+  }
+
+  Future<void> _move(String from, String to) async {
+    await storage.move(from, to);
+    moves.add((from, to));
+  }
+
+  /// Merges the node file of [source] into the one of [target]; the source
+  /// file stays in place. Unreadable node files are left as they are.
+  Future<void> _mergeNodes(String source, String target) async {
+    final NodeFile from;
+    final NodeFile into;
+    try {
+      from = (await readNodeFile(storage, source))!;
+      into = (await readNodeFile(storage, target))!;
+    } on FormatException {
+      return;
+    }
+    var merged = into.status == null ? into.withStatus(from.status) : into;
+    if (into.status != null &&
+        from.status != null &&
+        from.status != into.status) {
+      dropped.add(ReportItem(target, from.status));
+    }
+    for (final MapEntry(:key, :value) in from.versionStatuses.entries) {
+      if (!merged.versionStatuses.containsKey(key)) {
+        merged = merged.withVersionStatus(key, value);
+      }
+    }
+    if (merged.status != into.status ||
+        merged.versionStatuses.length != into.versionStatuses.length) {
+      await writeNodeFile(storage, target, merged);
+    }
+  }
+
+  /// Current path of [path], below the merged source, following the moves.
+  String _locate(String path) {
+    var current = path;
+    for (final (from, to) in moves) {
+      if (current == from) {
+        current = to;
+      } else if (current.startsWith('$from/')) {
+        current = '$to${current.substring(from.length)}';
+      }
+    }
+    return current;
+  }
+
+  /// Rewrites the references of the project found at [old], below
+  /// [source], to the files of [source] that did not keep their relative
+  /// position (renamed on a collision). Unreadable projects are left as
+  /// they are.
+  Future<void> rewriteReferences(String source, String old) async {
+    final now = _locate(old);
+    final oldDir = p.posix.dirname(old);
+    final newDir = p.posix.dirname(now);
+    final String text;
+    try {
+      text = await utf8.decodeStream(storage.read(now));
+    } on FormatException {
+      return;
+    }
+    final patched = rewriteMediaPaths(text, (ref) {
+      final file = resolveReference(oldDir, ref);
+      if (file == null || !file.startsWith('$source/')) return ref;
+      final before = p.posix.relative(file, from: oldDir);
+      final after = p.posix.relative(_locate(file), from: newDir);
+      if (after == before) return ref;
+      final separator = separatorOf(ref);
+      return separator == '/' ? after : after.replaceAll('/', separator);
+    });
+    if (patched != text) {
+      await storage.write(now, Stream.value(utf8.encode(patched)));
+    }
+  }
 }
 
 Future<Report> _lift(RepositoryStorage storage, LiftProject fix) async {

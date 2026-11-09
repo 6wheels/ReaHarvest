@@ -1643,8 +1643,11 @@ void main() {
     expect(find.text('Move “Stranger”'), findsOne);
     expect(find.text('This folder is at the level'), findsOne);
     expect(find.byType(TextField), findsOne);
+    expect(find.textContaining('both are merged'), findsNothing);
     await tester.enterText(find.byType(TextField), 'Sample Artist');
     await tester.pumpAndSettle();
+    // An existing folder: both are merged.
+    expect(find.textContaining('both are merged'), findsOne);
     await tester.tap(find.text('Move').last);
     await tester.pumpAndSettle();
     final moved = libraries.fixed.last.$2.single as MoveFolder;
@@ -1667,6 +1670,17 @@ void main() {
       (title.path, title.target),
       ('Stranger', '_Unassigned/_Unassigned/Stranger'),
     );
+  });
+
+  test('a move onto a folder holding titles merges them', () {
+    final titles = demoTitles();
+    final library = titles.first.libraryId;
+    final song = titles.first.path;
+    expect(mergesInto(titles, library, 'X', 'sample artist'), isTrue);
+    expect(mergesInto(titles, library, 'X', song), isTrue);
+    expect(mergesInto(titles, library, song, song), isFalse);
+    expect(mergesInto(titles, library, 'X', 'Sample'), isFalse);
+    expect(mergesInto(titles, const LibraryId('other'), 'X', song), isFalse);
   });
 
   test('statuses are proposed from status folder names', () {

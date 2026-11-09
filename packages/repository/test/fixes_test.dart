@@ -43,7 +43,8 @@ void main() {
     f.writeAsStringSync(content);
   }
 
-  Future<String> hash(String path) => utf8.decodeStream(storage.read(path));
+  Future<String> hash(String path) async =>
+      base64.encode([...await storage.read(path).expand((c) => c).toList()]);
 
   Future<Migration> migration() async {
     final m = Migration.start(storage);
@@ -150,12 +151,12 @@ void main() {
     put('Song/.node.json', '{"nodeId":"${newUlid()}","level":"title"}');
     put('Old/v.rpp', '<REAPER_PROJECT\n>\n');
     put('Taken/v.rpp', '<REAPER_PROJECT\n>\n');
-    put('Band/Taken/x.txt');
+    put('Band/Taken');
     put('loose.rpp', '<REAPER_PROJECT\n>\n');
     put('Song/demo/d.rpp', '<REAPER_PROJECT\n>\n');
     final m = await migration();
 
-    final report = await applyFixes(m.storage, const [
+    final report = await applyFixes(m, const [
       MoveFolder('Old', 'Band/_Unassigned/Old'),
       MoveFolder('Taken', 'Band/Taken'),
       MoveProject('loose.rpp', 'Song'),
@@ -184,5 +185,101 @@ void main() {
     expect(report.items[ReportKind.fixFailed]!.single.path, 'Gone');
     expect(file('Band/_Unassigned/Old/v.rpp').existsSync(), isTrue);
     expect((await m.check(hash)).isEmpty, isTrue);
+  });
+
+  test('merges a title moved onto an existing title', () async {
+    const media =
+        '<REAPER_PROJECT\n  <SOURCE WAVE\n    FILE "Media\\kick.wav"\n  >\n>\n';
+    final a = newUlid();
+    final b = newUlid();
+    put(
+      'Song/.node.json',
+      '{"nodeId":"${newUlid()}","level":"title",'
+          '"status":"mixing","versionStatuses":{"$a":"demo","$b":"demo"}}',
+    );
+    put('Song/Song.rpp', media);
+    put('Song/Media/kick.wav', 'mine');
+    put('Song/Media/snare.wav', 'snare');
+    put('Song/Assets/tab.txt');
+    put(
+      'Band/_Unassigned/Song/.node.json',
+      '{"nodeId":"${newUlid()}","level":"title",'
+          '"status":"final","versionStatuses":{"$b":"mixing"}}',
+    );
+    put('Band/_Unassigned/Song/Song.rpp', media);
+    put('Band/_Unassigned/Song/Media/kick.wav', 'theirs');
+    final m = await migration();
+
+    final report = await applyFixes(m, const [
+      MoveFolder('Song', 'Band/_Unassigned/Song'),
+    ]);
+
+    const title = 'Band/_Unassigned/Song';
+    expect(report.items[ReportKind.folderMerged], [
+      const ReportItem(title, 'Song'),
+    ]);
+    expect(report.items[ReportKind.fileRenamed], [
+      const ReportItem('$title/Media/kick (2).wav', 'Song/Media/kick.wav'),
+      const ReportItem('$title/Song (2).rpp', 'Song/Song.rpp'),
+    ]);
+    expect(report.items[ReportKind.titleStatusDropped], [
+      const ReportItem(title, 'mixing'),
+    ]);
+    // The moved project follows its renamed media; the other is untouched.
+    expect(
+      RppProject.parse(file('$title/Song (2).rpp').readAsStringSync())
+          .mediaFiles,
+      [r'Media\kick (2).wav'],
+    );
+    expect(file('$title/Song.rpp').readAsStringSync(), media);
+    expect(file('$title/Media/kick.wav').readAsStringSync(), 'theirs');
+    expect(file('$title/Media/kick (2).wav').readAsStringSync(), 'mine');
+    expect(file('$title/Media/snare.wav').existsSync(), isTrue);
+    expect(file('$title/Assets/tab.txt').existsSync(), isTrue);
+    final node = (await readNodeFile(storage, title))!;
+    expect(node.status, 'final');
+    expect(node.versionStatuses, {a: 'demo', b: 'mixing'});
+    // What is left of the source is kept in the migration folder.
+    expect(await storage.stat('Song'), isNull);
+    expect(file('${m.folder}/merged/Song/.node.json').existsSync(), isTrue);
+    expect((await m.check(hash)).isEmpty, isTrue);
+  });
+
+  test('merges intermediate folders recursively', () async {
+    // Unreadable node files and projects are moved as they are.
+    put('Band 2/.node.json', '{');
+    put('Band 2/Album/Two/bad.rpp');
+    file('Band 2/Album/Two/bad.rpp').writeAsBytesSync([0xff, 0xfe]);
+    put('Band 2/Album/One/one.rpp', '<REAPER_PROJECT\n>\n');
+    put('Band 2/Album/Two/two.rpp', '<REAPER_PROJECT\n>\n');
+    put('Band/.node.json', '{"nodeId":"${newUlid()}","level":"artist"}');
+    put('Band/Album/One/one.rpp', '<REAPER_PROJECT\n>\n');
+    final m = await migration();
+
+    final report = await applyFixes(m, const [MoveFolder('Band 2', 'Band')]);
+
+    expect(report.items[ReportKind.fileRenamed], [
+      const ReportItem(
+        'Band/Album/One/one (2).rpp',
+        'Band 2/Album/One/one.rpp',
+      ),
+    ]);
+    expect(report.items[ReportKind.titleStatusDropped], isEmpty);
+    expect(file('Band/Album/Two/two.rpp').existsSync(), isTrue);
+    expect(file('${m.folder}/merged/Band 2/.node.json').existsSync(), isTrue);
+    expect((await m.check(hash)).isEmpty, isTrue);
+  });
+
+  test('does not merge a folder into itself or its parent', () async {
+    put('Band/Song/s.rpp', '<REAPER_PROJECT\n>\n');
+    final m = await migration();
+
+    final report = await applyFixes(m, const [
+      MoveFolder('Band/Song', 'Band'),
+      MoveFolder('Band', 'band'),
+    ]);
+
+    expect(report.items[ReportKind.targetExists], hasLength(2));
+    expect(file('Band/Song/s.rpp').existsSync(), isTrue);
   });
 }

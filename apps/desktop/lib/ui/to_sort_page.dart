@@ -458,6 +458,20 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
                 onChanged: () => setState(() {}),
               ),
             ],
+            if (widget.folderLevel != null &&
+                mergesInto(
+                  ref.read(titlesProvider),
+                  widget.library,
+                  widget.path,
+                  [for (final c in _values) c.text.trim()].join('/'),
+                )) ...[
+              const SizedBox(height: Space.m),
+              Text(
+                l10n.sortMergeHint,
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: c.muted),
+              ),
+            ],
           ],
         ),
       ),

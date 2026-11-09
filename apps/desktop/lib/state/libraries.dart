@@ -601,7 +601,7 @@ Future<Report> _applyFixes(String root, List<MigrationFix> fixes) =>
     Isolate.run(() async {
       final storage = MountedFolderStorage(root);
       final migration = (await Migration.latest(storage))!;
-      return _rooted(root, await applyFixes(migration.storage, fixes));
+      return _rooted(root, await applyFixes(migration, fixes));
     });
 
 /// Absolute path of [path], relative to the library at [root].

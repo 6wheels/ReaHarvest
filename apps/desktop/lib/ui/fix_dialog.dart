@@ -70,6 +70,24 @@ List<String> levelValues(
   }.toList()..sort();
 }
 
+/// Whether moving the folder [path] of [library] to [target] merges it
+/// with an existing folder (#81): [target] holds titles of [library].
+/// Compared case-insensitively, like Windows paths.
+bool mergesInto(
+  Iterable<Title> titles,
+  LibraryId library,
+  String path,
+  String target,
+) {
+  final folder = target.toLowerCase();
+  if (folder == path.toLowerCase()) return false;
+  return titles.any((t) {
+    final title = t.path.toLowerCase();
+    return t.libraryId == library &&
+        (title == folder || title.startsWith('$folder/'));
+  });
+}
+
 class _FixDialog extends ConsumerStatefulWidget {
   const _FixDialog(this.kind, this.issues);
 
@@ -252,7 +270,17 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   /// Target, and for a project its owner and status, joined.
   String _details(AppLocalizations l10n, int i) {
-    if (!_lifting) return '→ ${_target(i)}';
+    if (!_lifting) {
+      final issue = widget.issues[i];
+      final target = _target(i);
+      final merges = mergesInto(
+        ref.read(titlesProvider),
+        issue.library,
+        issue.item.path,
+        target,
+      );
+      return ['→ $target', if (merges) l10n.fixMerged].join(' · ');
+    }
     final (:member, :statusFolder) = _lifts[i];
     final owner = member ?? _owners.firstWhere((m) => m.id == _owner);
     final status = statusFolder == null ? null : _statuses[statusFolder];

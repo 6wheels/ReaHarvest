@@ -21,10 +21,13 @@ enum ReportKind {
   orphanNode(ReportLevel.warning),
   missingMedia(ReportLevel.warning),
   externalMedia(ReportLevel.warning),
+  titleStatusDropped(ReportLevel.warning),
   libraryUnavailable(ReportLevel.skipped),
   targetExists(ReportLevel.skipped),
   libraryScanned(ReportLevel.done),
   folderMoved(ReportLevel.done),
+  folderMerged(ReportLevel.done),
+  fileRenamed(ReportLevel.done),
   projectMoved(ReportLevel.done),
   mediaMoved(ReportLevel.done),
   mediaCopied(ReportLevel.done);
