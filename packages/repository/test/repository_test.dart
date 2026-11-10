@@ -72,7 +72,7 @@ void main() {
   late Directory root;
   late MountedFolderStorage storage;
 
-  final unknown = File('$fixtures/project-1.rpp').readAsStringSync();
+  final unknown = File('$fixtures/tracks.rpp').readAsStringSync();
   final adoptedId = VersionId.generate();
   final adopted = setExtState(
     unknown,
@@ -658,12 +658,12 @@ void main() {
       put('band/album/song/v1.rpp', unknown);
       final result = await scan(storage, library(Layout.classic()));
       final v = result.titles.single.versions.single;
-      expect(v.tempo, 120);
-      expect((v.trackCount, v.itemCount), (32, 223));
+      expect(v.tempo, 128);
+      expect((v.trackCount, v.itemCount), (13, 6));
       expect(v.length, greaterThan(0));
       expect(
         v.plugins.map((p) => p.identifier),
-        containsAll(['TDR Kotelnikov.vst3', 'reaeq.dll']),
+        containsAll(['reasynth.dll', 'reaeq.dll']),
       );
     });
 

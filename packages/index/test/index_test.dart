@@ -353,7 +353,7 @@ void main() {
       addTearDown(() => root.deleteSync(recursive: true));
       final song = Directory(p.join(root.path, 'Band', 'Album', 'Song'))
         ..createSync(recursive: true);
-      File('$fixtures/project-1.rpp').copySync(p.join(song.path, 'v1.rpp'));
+      File('$fixtures/tracks.rpp').copySync(p.join(song.path, 'v1.rpp'));
       File(p.join(song.path, 'Media', 'kick.wav'))
         ..createSync(recursive: true)
         ..writeAsStringSync('audio');
@@ -386,7 +386,7 @@ void main() {
       addTearDown(() => root.deleteSync(recursive: true));
       Directory(p.join(root.path, 'Band', 'Album', 'Song'))
           .createSync(recursive: true);
-      File('$fixtures/project-1.rpp')
+      File('$fixtures/tracks.rpp')
           .copySync(p.join(root.path, 'Band', 'Album', 'Song', 'v1.rpp'));
       final lib = library();
       final storage = MountedFolderStorage(root.path);

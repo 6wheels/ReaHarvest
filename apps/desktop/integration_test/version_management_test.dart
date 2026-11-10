@@ -50,7 +50,7 @@ void main() {
     final band = p.join(root.path, 'Band');
     song = p.join(band, 'Artist', 'Album', 'Song');
     Directory(song).createSync(recursive: true);
-    File(fixture('project-1.rpp')).copySync(p.join(song, 'v1.rpp'));
+    File(fixture('tracks.rpp')).copySync(p.join(song, 'v1.rpp'));
     File(p.join(song, 'Media', 'unused.wav'))
       ..createSync(recursive: true)
       ..writeAsStringSync('unused');
@@ -283,7 +283,7 @@ void main() {
     for (final dir in ['Artist/Album/Song', 'Album/Song2', 'Loose']) {
       final folder = p.joinAll([mess, ...dir.split('/')]);
       Directory(folder).createSync(recursive: true);
-      File(fixture('project-1.rpp')).copySync(p.join(folder, 'v.rpp'));
+      File(fixture('tracks.rpp')).copySync(p.join(folder, 'v.rpp'));
     }
     final service = container.read(libraryServiceProvider);
     final values = await tester.runAsync(
@@ -350,7 +350,7 @@ void main() {
     // A second library, to cancel the scan between two libraries (#62).
     final other = p.join(root.path, 'Other', 'Artist', 'Album', 'Song');
     Directory(other).createSync(recursive: true);
-    File(fixture('project-2.rpp')).copySync(p.join(other, 'v.rpp'));
+    File(fixture('render-file.rpp')).copySync(p.join(other, 'v.rpp'));
     final service = container.read(libraryServiceProvider);
     final adding = service.addLocal(
       folder: p.join(root.path, 'Other'),

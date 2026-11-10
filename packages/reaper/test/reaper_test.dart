@@ -164,14 +164,14 @@ void main() {
 
     test('missing plugins of a real project', () {
       final rpp = RppProject.parse(
-        File('$fixtures/project-1.rpp').readAsStringSync(),
+        File('$fixtures/tracks.rpp').readAsStringSync(),
       );
       final missing = cache.missing(rpp.allPlugins);
-      expect(missing, isNotEmpty);
+      expect(missing.map((pl) => pl.identifier), contains('reacomp.dll'));
       expect(missing.map((pl) => pl.identifier), isNot(contains('reaeq.dll')));
       expect(
         missing.map((pl) => pl.identifier),
-        isNot(contains('TDR Kotelnikov.vst3')),
+        isNot(contains('reasynth.dll')),
       );
     });
 

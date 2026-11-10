@@ -64,7 +64,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 #12, #14, #22, #25, #27, #28, #31, #32, #38, #40, #43, #46, #47, #48, #52, #53, #58, #60, #78, #83. Phases 2 and 3 unchanged.
 
 ## Pending outside the plan
-- New fixture corpus parked in a git stash (`fixtures: new anonymized corpus in progress`), TODO in `test/fixtures/README.md`.
+- New fixture corpus (REAPER 7.85, one case per file: tracks, render, media path forms, subproject, CLAP, Linux, track templates) replaces `project-1` to `project-5.rpp` and `track-template-2`.
 
 ## Next step
 Continue M1: validate the #69 normalization in REAPER on the sample copy (projects open with no missing media), then #84 (issues in the detail view, render target fix) and #70.

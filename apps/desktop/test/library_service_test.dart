@@ -66,7 +66,7 @@ void main() {
     final band = folder('Band');
     final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
       ..createSync(recursive: true);
-    File('../../test/fixtures/project-1.rpp')
+    File('../../test/fixtures/tracks.rpp')
         .copySync(p.join(song.path, 'v1.rpp'));
     final revision = container.read(indexRevisionProvider);
 
@@ -96,7 +96,7 @@ void main() {
   test('a free tree feeds the filters and labels', () async {
     final songs = folder('Songs');
     final demo = Directory(p.join(songs, 'Demo'))..createSync();
-    File('../../test/fixtures/project-1.rpp')
+    File('../../test/fixtures/tracks.rpp')
       ..copySync(p.join(songs, 'root.rpp'))
       ..copySync(p.join(demo.path, 'v1.rpp'));
 
@@ -163,7 +163,7 @@ void main() {
     final band = folder('Band');
     final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
       ..createSync(recursive: true);
-    File('../../test/fixtures/project-1.rpp')
+    File('../../test/fixtures/tracks.rpp')
         .copySync(p.join(song.path, 'v1.rpp'));
     await service().addLocal(
       folder: band,
@@ -280,7 +280,7 @@ void main() {
     final band = folder('Band');
     final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
       ..createSync(recursive: true);
-    File('../../test/fixtures/project-1.rpp')
+    File('../../test/fixtures/tracks.rpp')
         .copySync(p.join(song.path, 'v1.rpp'));
     File(p.join(song.path, 'Media', 'unused.wav'))
       ..createSync(recursive: true)
@@ -350,7 +350,7 @@ void main() {
     final band = folder('Band');
     final song = p.join(band, 'Artist', 'Album', 'Song');
     Directory(song).createSync(recursive: true);
-    File('../../test/fixtures/project-1.rpp').copySync(p.join(song, 'v1.rpp'));
+    File('../../test/fixtures/tracks.rpp').copySync(p.join(song, 'v1.rpp'));
     final orphan = File(p.join(band, 'Artist', 'render', '.node.json'))
       ..createSync(recursive: true)
       ..writeAsStringSync('{"nodeId": "01X", "level": "album"}');
@@ -401,7 +401,7 @@ void main() {
     final band = folder('Band');
     final song = p.join(band, 'Artist', 'Album', 'Song');
     Directory(song).createSync(recursive: true);
-    File('../../test/fixtures/project-1.rpp').copySync(p.join(song, 'v1.rpp'));
+    File('../../test/fixtures/tracks.rpp').copySync(p.join(song, 'v1.rpp'));
     await service().addLocal(
       folder: band,
       displayName: '',
@@ -492,7 +492,7 @@ void main() {
   test('moves a misplaced project into a title', () async {
     final song = await bandWithSong();
     final band = p.dirname(p.dirname(p.dirname(song)));
-    File('../../test/fixtures/project-2.rpp')
+    File('../../test/fixtures/render-file.rpp')
         .copySync(p.join(band, 'Artist', 'loose.rpp'));
     await service().scanAll();
     final id = container.read(settingsProvider).libraries.single.id;
@@ -539,10 +539,10 @@ void main() {
     final band = p.dirname(p.dirname(p.dirname(song)));
     final member = Directory(p.join(song, 'Bob', 'mix'))
       ..createSync(recursive: true);
-    File('../../test/fixtures/project-2.rpp')
+    File('../../test/fixtures/render-file.rpp')
         .copySync(p.join(member.path, 'take.rpp'));
     final old = Directory(p.join(band, 'Old'))..createSync();
-    File('../../test/fixtures/project-1.rpp')
+    File('../../test/fixtures/tracks.rpp')
         .copySync(p.join(old.path, 'old.rpp'));
     // With known values, Old is recognized as a title placed too high.
     final entry = container.read(settingsProvider).libraries.single;
@@ -590,12 +590,12 @@ void main() {
     final band = p.dirname(p.dirname(p.dirname(song)));
     for (final name in ['One', 'Two']) {
       final dir = Directory(p.join(band, 'Artist', name))..createSync();
-      File('../../test/fixtures/project-1.rpp')
+      File('../../test/fixtures/tracks.rpp')
           .copySync(p.join(dir.path, '$name.rpp'));
     }
     Directory(p.join(band, 'Artist', 'Live', 'Three'))
         .createSync(recursive: true);
-    File('../../test/fixtures/project-1.rpp')
+    File('../../test/fixtures/tracks.rpp')
         .copySync(p.join(band, 'Artist', 'Live', 'Three', 'three.rpp'));
     final entry = container.read(settingsProvider).libraries.single;
     await service().setKnownValues(entry, const [
@@ -673,7 +673,7 @@ void main() {
     final band = p.dirname(p.dirname(p.dirname(song)));
     for (final name in ['One', 'Two']) {
       final dir = Directory(p.join(band, 'Artist', name))..createSync();
-      File('../../test/fixtures/project-1.rpp')
+      File('../../test/fixtures/tracks.rpp')
           .copySync(p.join(dir.path, '$name.rpp'));
     }
     final entry = container.read(settingsProvider).libraries.single;
@@ -761,7 +761,7 @@ void main() {
       ]),
     );
     Directory(p.join(band, 'Album')).createSync();
-    File('../../test/fixtures/project-2.rpp')
+    File('../../test/fixtures/render-file.rpp')
         .copySync(p.join(band, 'Album', 'loose.rpp'));
     container.read(tasksProvider.notifier).clearFinished();
 
@@ -781,7 +781,7 @@ void main() {
     final band = folder('Declared');
     final song = p.join(band, 'Artist', 'Album', 'Song');
     Directory(song).createSync(recursive: true);
-    File('../../test/fixtures/project-1.rpp').copySync(p.join(song, 'v1.rpp'));
+    File('../../test/fixtures/tracks.rpp').copySync(p.join(song, 'v1.rpp'));
     expect(await service().hasProjects(band), isTrue);
     final prefilled = await service().prefillKnownValues(
       band,
@@ -812,7 +812,7 @@ void main() {
     expect(known.used, {'Artist', 'Artist/Album'});
 
     // A title moved under a new artist adds it to the known values.
-    File('../../test/fixtures/project-2.rpp')
+    File('../../test/fixtures/render-file.rpp')
         .copySync(p.join(band, 'loose.rpp'));
     await service().scanAll();
     await service().moveToTitle(entry.id, 'loose.rpp', ['Solo', 'Demo', 'X']);
@@ -821,7 +821,7 @@ void main() {
       const KnownValue('Solo', [KnownValue('Demo')]),
     ]);
     // Already known: unchanged.
-    File('../../test/fixtures/project-2.rpp')
+    File('../../test/fixtures/render-file.rpp')
         .copySync(p.join(band, 'other.rpp'));
     await service().scanAll();
     await service().moveToTitle(entry.id, 'other.rpp', ['Solo', 'Demo', 'Y']);

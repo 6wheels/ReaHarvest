@@ -64,10 +64,20 @@ void main() {
       expect(p.extState('ReaHarvest'), {'VERSIONID': 'test'});
     });
 
-    test('reads quoted title and tempo', () {
-      final p = RppProject.parse(fixture('project-4.rpp'));
+    test('reads quoted title, notes with accents and tempo', () {
+      final p = RppProject.parse(fixture('tracks.rpp'));
+      expect(p.reaperVersion, '7.85/win64');
       expect(p.title, 'Sample song');
-      expect(p.tempo, 109);
+      expect(p.author, 'Band');
+      expect(p.notes, 'line 1\n   line 2\nPrise de voix à refaire');
+      expect(p.tempo, 128);
+      expect(p.timeSignature, (3, 4));
+      expect(p.sampleRate, 48000);
+    });
+
+    test('reads the platform of a project saved on Linux', () {
+      final p = RppProject.parse(fixture('linux.RPP'));
+      expect(p.reaperVersion, '7.84/linux-x86_64');
     });
 
     test('reads tracks, depth, plugins and media on all fixtures', () {
@@ -79,12 +89,24 @@ void main() {
         expect(p.mediaFiles, everyElement(isNotEmpty), reason: f.path);
       }
 
-      final p = RppProject.parse(fixture('project-1.rpp'));
-      expect(p.tracks, isNotEmpty);
-      expect(p.tracks.first.name, 'Track 1');
-      expect(p.tracks.first.depth, 0);
-      expect(p.tracks.any((t) => t.depth > 0), isTrue);
-      expect(p.mediaFiles, everyElement(startsWith(r'.\audio-files\media-')));
+      final p = RppProject.parse(fixture('tracks.rpp'));
+      expect(p.tracks.map((t) => (t.name, t.depth)), [
+        ('Drums', 0),
+        ('Kick', 1),
+        ('Snare', 1),
+        ('Overheads', 1),
+        ('OH L', 2),
+        ('OH R', 2),
+        ('Bass', 0),
+        ('Guitare élec', 0),
+        ('Voix "lead"', 0),
+        ('', 0),
+        ('FX Bus', 0),
+        ('Reverb', 1),
+        ('Synth', 0),
+      ]);
+      expect(p.mediaFiles, hasLength(5));
+      expect(p.mediaFiles, everyElement(startsWith(r'.\Media\')));
       expect(p.length, greaterThan(0));
 
       final plugins = allProjects()
@@ -94,9 +116,9 @@ void main() {
         plugins,
         contains(
           const RppPlugin(
-            kind: 'VST3',
-            name: 'TDR Kotelnikov (Tokyo Dawn Labs)',
-            identifier: 'TDR Kotelnikov.vst3',
+            kind: 'VST3i',
+            name: 'Surge XT (Surge Synth Team) (2->6ch)',
+            identifier: 'Surge XT.vst3',
           ),
         ),
       );
@@ -137,7 +159,7 @@ void main() {
     });
 
     test('setExtState inserts EXTSTATE when missing, rest unchanged', () {
-      final text = fixture('project-1.rpp');
+      final text = fixture('tracks.rpp');
       final out = setExtState(text, 'ReaHarvest', {'versionId': 'X'});
       expect(RppProject.parse(out).extState('ReaHarvest'), {'VERSIONID': 'X'});
       final a = text.split('\n'), b = out.split('\n');
@@ -172,7 +194,10 @@ void main() {
     });
 
     test('setNotes inserts the chunk after TITLE/AUTHOR when missing', () {
-      final text = fixture('project-1.rpp');
+      // REAPER always writes the chunk: removed to test the insertion.
+      final text = fixture(
+        'tracks.rpp',
+      ).replaceFirst(RegExp(r'  <NOTES 0 2\r?\n(    \|[^\n]*\n)*  >\r?\n'), '');
       expect(RppProject.parse(text).notes, isNull);
       final out = setNotes(text, 'hello');
       expect(RppProject.parse(out).notes, 'hello');
@@ -223,7 +248,7 @@ void main() {
     });
 
     test('record path and render settings', () {
-      final text = fixture('project-3.rpp');
+      final text = fixture('render-file.rpp');
       var out = setRootAttribute(text, 'RECORD_PATH', ['Media', '']);
       out = setRootAttribute(out, 'RENDER_FILE', ['Renders']);
       out = setRootAttribute(out, 'RENDER_PATTERN', [r'$title - $author']);
@@ -236,7 +261,7 @@ void main() {
     });
 
     test('rewriteMediaPaths rewrites FILE references only', () {
-      final text = fixture('project-2.rpp');
+      final text = fixture('media-paths.rpp');
       String toMedia(String path) =>
           'Media\\${path.split(RegExp(r'[\\/]')).last}';
       final out = rewriteMediaPaths(text, toMedia);

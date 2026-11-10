@@ -452,15 +452,18 @@ void main() {
     });
 
     test('non-regression: every fixture keeps its media', () async {
+      final empty = File('$fixtures/empty.rpp').readAsStringSync();
       final sources = {
         for (final f in Directory(fixtures).listSync().whereType<File>())
           if (isProjectFile(f.path)) p.basename(f.path): f.readAsStringSync(),
-      };
+      }..remove('media-paths.rpp'); // Blocked: tested on its own.
       for (final MapEntry(key: name, value: text) in sources.entries) {
         put('$song/$name', text);
         for (final ref in RppProject.parse(text).mediaFiles) {
           final path = resolveMedia(song, ref);
-          if (!file(path).existsSync()) put(path, p.posix.basename(path));
+          if (file(path).existsSync()) continue;
+          // A subproject must be readable.
+          put(path, isProjectFile(path) ? empty : p.posix.basename(path));
         }
       }
       final m = await migration();
@@ -479,7 +482,7 @@ void main() {
           expect(b[i].trim(), matches(RegExp(r'^(FILE|RECORD_PATH) ')));
         }
         final project = RppProject.parse(after);
-        expect(project.recordPath, 'Media');
+        expect(resolveMedia(song, project.recordPath!), '$song/Media');
         for (final ref in project.mediaFiles) {
           final path = resolveMedia(song, ref);
           expect(path, startsWith('$song/Media/'));
@@ -487,6 +490,32 @@ void main() {
         }
       }
       expect((await m.check(hash)).isEmpty, isTrue);
+    });
+
+    test('leaves the media-paths fixture intact and reports it', () async {
+      final text = File('$fixtures/media-paths.rpp').readAsStringSync();
+      put('$song/media-paths.rpp', text);
+      for (final name in ['a.wav', 'Loops/loop.wav', 'b.flac', 'c.mp3']) {
+        put('$song/$name', name);
+      }
+      put('$song/d.mid', 'midi');
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(report.items[ReportKind.missingMedia], [
+        const ReportItem('$song/media-paths.rpp', 'gone.wav'),
+      ]);
+      expect(report.items[ReportKind.externalMedia], [
+        const ReportItem(
+          '$song/media-paths.rpp',
+          r'D:\ReaHarvestTests\Samples\kick.wav',
+        ),
+      ]);
+      expect(file('$song/media-paths.rpp').readAsStringSync(), text);
+      // Its media are left for it.
+      expect(file('$song/Loops/loop.wav').existsSync(), isTrue);
+      expect(file('$song/d.mid').existsSync(), isTrue);
     });
 
     test('leaves a pool record path written .\\Media as is', () async {
