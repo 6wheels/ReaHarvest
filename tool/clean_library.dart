@@ -11,7 +11,7 @@ import 'dart:io';
 const _files = {'.library.json', '.node.json'};
 
 /// Folders owned by ReaHarvest (collab journal).
-const _folders = {'.collab'};
+const _folders = {'.collab', '.migration'};
 
 /// Suffix of temporary files left by an interrupted atomic write.
 const _tempSuffix = '.reaharvest-tmp';
