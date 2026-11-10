@@ -34,6 +34,7 @@ void main() {
   tearDown(() => root.deleteSync(recursive: true));
 
   test('inventory covers every file outside .migration', () async {
+    put('.library.json', '{}');
     put('a/v.rpp', 'project');
     put('a/Media/x.wav', 'audio');
     put('.collab/m/member.json', '{}');
@@ -45,7 +46,7 @@ void main() {
       storage,
       now: DateTime(2026, 11, 9, 8, 5, 3),
     );
-    expect(migration.folder, '.migration/2026-11-09_080503');
+    expect(migration.folder, '.migration/2026-11-09_080503_000');
     expect(migration.inventoryComplete, isFalse);
     await migration.takeInventory(hash, onProgress: progress.add);
 
@@ -97,6 +98,29 @@ void main() {
     expect(resumed.files.containsKey('t/f0.wav'), isFalse);
     expect(progress.last, 1);
     expect((await Migration.latest(storage))!.inventoryComplete, isTrue);
+  });
+
+  test('a new migration reuses the hashes of the previous one', () async {
+    put('a.wav', 'aaaa');
+    put('b.wav', 'bbbb');
+    final first = Migration.start(storage, now: DateTime(2026, 11, 9));
+    await first.takeInventory(hash);
+    await first.move('a.wav', 'x/a.wav');
+    put('b.wav', 'BB');
+    hashed.clear();
+
+    final next = Migration.start(
+      storage,
+      now: DateTime(2026, 11, 10),
+      previous: first,
+    );
+    await next.takeInventory(hash);
+
+    expect(hashed, ['b.wav'], reason: 'moved but unchanged: not hashed');
+    expect(next.files.keys, unorderedEquals(['x/a.wav', 'b.wav']));
+    expect(next.files['b.wav']!.hash, 'BB');
+    expect((await next.check(hash)).isEmpty, isTrue);
+    expect((await Migration.latest(storage))!.folder, next.folder);
   });
 
   test('latest skips folders without an inventory', () async {
@@ -191,6 +215,30 @@ void main() {
       ),
       throwsFormatException,
     );
+  });
+
+  test('check ignores the library description, rewritten by the app', () async {
+    put('a.wav', 'aaaa');
+    put('.library.json', '{}');
+    // An inventory taken before the description was left out.
+    put(
+      '.migration/s/inventory.json',
+      jsonEncode({
+        'complete': true,
+        'files': {
+          for (final path in ['a.wav', '.library.json'])
+            path: {
+              'size': file(path).lengthSync(),
+              'modified': file(path).lastModifiedSync().microsecondsSinceEpoch,
+              'hash': await hash(path),
+            },
+        },
+      }),
+    );
+    final migration = (await Migration.latest(storage))!;
+    put('.library.json', '{"knownValues": []}');
+
+    expect((await migration.check(hash)).isEmpty, isTrue);
   });
 
   test('the scan ignores .migration', () async {

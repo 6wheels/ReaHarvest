@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/logs.dart';
@@ -529,8 +530,8 @@ void main() {
     );
     expect(failed.items[ReportKind.fileLost], isNull);
     expect(container.read(tasksProvider).last.state, TaskState.failed);
-    // The inventory was taken once, before the first move.
-    expect(Directory(p.join(root, '.migration')).listSync(), hasLength(1));
+    // A fresh inventory for each task.
+    expect(Directory(p.join(root, '.migration')).listSync(), hasLength(2));
   });
 
   test('fixes misplaced folders and projects without losing a file', () async {
@@ -582,6 +583,128 @@ void main() {
       index.titles().map((t) => t.path),
       contains('Artist/_Unassigned/Old'),
     );
+  });
+
+  test('moved or declared folders join the known values, steps told', () async {
+    final song = await bandWithSong();
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    for (final name in ['One', 'Two']) {
+      final dir = Directory(p.join(band, 'Artist', name))..createSync();
+      File('../../test/fixtures/project-1.rpp')
+          .copySync(p.join(dir.path, '$name.rpp'));
+    }
+    Directory(p.join(band, 'Artist', 'Live', 'Three'))
+        .createSync(recursive: true);
+    File('../../test/fixtures/project-1.rpp')
+        .copySync(p.join(band, 'Artist', 'Live', 'Three', 'three.rpp'));
+    final entry = container.read(settingsProvider).libraries.single;
+    await service().setKnownValues(entry, const [
+      KnownValue('Artist', [KnownValue('Album')]),
+    ]);
+    List<String> unknown() => [
+      for (final i in container.read(issuesProvider)) i.item.path,
+    ];
+    expect(
+      unknown(),
+      unorderedEquals(['Artist/Live', 'Artist/One', 'Artist/Two']),
+    );
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final steps = <String>{};
+    container.listen(tasksProvider, (_, tasks) {
+      if (tasks.lastOrNull?.step case final step?) steps.add(step(l10n));
+    });
+    final logs = <String>[];
+    final sub = Logger.root.onRecord.listen(
+      (r) => logs.add('${r.loggerName} ${r.message}'),
+    );
+    addTearDown(sub.cancel);
+
+    // Titles moved under a new album, an album declared in place.
+    final report = await service().fix(entry.id, const [
+      MoveFolder('Artist/One', 'Artist/New/One'),
+      MoveFolder('Artist/Two', 'Artist/New/Two'),
+      MoveFolder('Artist/Live', 'Artist/Live'),
+    ]);
+
+    expect(report!.hasErrors, isFalse);
+    expect(report.items[ReportKind.valueDeclared], [
+      ReportItem(p.join(band, 'Artist', 'Live')),
+    ]);
+    expect(unknown(), isEmpty);
+    expect(
+      container.read(titlesProvider).map((t) => t.path),
+      containsAll(['Artist/New/One', 'Artist/New/Two', 'Artist/Live/Three']),
+    );
+    final known = (await readLibrary(MountedFolderStorage(band)))!.knownValues;
+    expect(known.knows(['Artist', 'New']), isTrue);
+    expect(known.knows(['Artist', 'Live']), isTrue);
+    expect(steps, [
+      'Inventory of the files',
+      'Fix 1 of 2',
+      'Fix 2 of 2',
+      'Checking that no file is lost',
+      'Updating the library',
+    ]);
+    // Every step and every change of the library is logged.
+    final name = entry.displayName;
+    expect(
+      logs,
+      containsAllInOrder([
+        'tasks Fix 3 items: started',
+        'library $name: folder Artist/Live kept in place',
+        'tasks Fix 3 items: Inventory of the files',
+        'tasks Fix 3 items: Fix 1 of 2',
+        startsWith('library $name: Move folder Artist/One to Artist/New/One'),
+        'tasks Fix 3 items: Fix 2 of 2',
+        startsWith('library $name: Move folder Artist/Two to Artist/New/Two'),
+        'tasks Fix 3 items: Checking that no file is lost',
+        'library $name: inventory checked, no file lost',
+        'tasks Fix 3 items: Updating the library',
+        'library Known values of $name added: Artist/Live, Artist/New',
+        startsWith('library Scanned $name: '),
+        startsWith('tasks Fix 3 items: done'),
+      ]),
+    );
+  });
+
+  test('a cancelled fix stops before the next one, library updated', () async {
+    final song = await bandWithSong();
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    for (final name in ['One', 'Two']) {
+      final dir = Directory(p.join(band, 'Artist', name))..createSync();
+      File('../../test/fixtures/project-1.rpp')
+          .copySync(p.join(dir.path, '$name.rpp'));
+    }
+    final entry = container.read(settingsProvider).libraries.single;
+    await service().setKnownValues(entry, const [
+      KnownValue('Artist', [KnownValue('Album')]),
+    ]);
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    container.listen(tasksProvider, (_, tasks) {
+      final task = tasks.last;
+      if (task.step?.call(l10n) == 'Fix 1 of 2' && !task.cancelling) {
+        container.read(tasksProvider.notifier).cancel(task.id);
+      }
+    });
+
+    final report = await service().fix(entry.id, const [
+      MoveFolder('Artist/One', 'Artist/New/One'),
+      MoveFolder('Artist/Two', 'Artist/New/Two'),
+    ]);
+
+    expect(report, isNull);
+    expect(container.read(tasksProvider).last.state, TaskState.cancelled);
+    expect(
+      Directory(p.join(band, 'Artist', 'New', 'One')).existsSync(),
+      isTrue,
+    );
+    expect(Directory(p.join(band, 'Artist', 'Two')).existsSync(), isTrue);
+    expect(
+      container.read(titlesProvider).map((t) => t.path),
+      contains('Artist/New/One'),
+    );
+    final known = (await readLibrary(MountedFolderStorage(band)))!.knownValues;
+    expect(known.knows(['Artist', 'New']), isTrue);
   });
 
   test('reports unreadable library files and survives failed scans', () async {

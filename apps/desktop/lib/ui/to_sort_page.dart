@@ -492,19 +492,22 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
     [for (final c in _values.take(i)) c.text.trim()],
   );
 
-  /// Moves the project; its report opens at the end of the task.
+  /// Closes the dialog and moves the project or folder, as a task whose
+  /// report opens at the end.
   Future<void> _move() async {
     final navigator = Navigator.of(context);
-    final done = await runProjectChange(context, ref, () {
-      final values = [for (final c in _values) c.text.trim()];
-      final service = ref.read(libraryServiceProvider);
-      return widget.folderLevel == null
-          ? service.moveToTitle(widget.library, widget.path, values)
-          : service.fix(widget.library, [
-              MoveFolder(widget.path, values.join('/')),
-            ]);
+    final values = [for (final c in _values) c.text.trim()];
+    final service = ref.read(libraryServiceProvider);
+    final library = widget.library;
+    final path = widget.path;
+    final folder = widget.folderLevel != null;
+    await runProjectChange(context, ref, () {
+      // Closed first: the report opens over the page, not over the dialog.
+      navigator.pop();
+      return folder
+          ? service.fix(library, [MoveFolder(path, values.join('/'))])
+          : service.moveToTitle(library, path, values);
     });
-    if (done) navigator.pop();
   }
 
   @override

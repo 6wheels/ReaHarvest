@@ -122,6 +122,12 @@ class LibraryService {
       await writeLibrary(MountedFolderStorage(folder), library);
     }
     await ref.read(settingsProvider.notifier).change((_) => updated);
+    _log.info(
+      '${found == null ? 'Created' : 'Attached'} library '
+      '${entry.displayName} at $folder'
+      '${changed && found != null ? ', layout replaced' : ''}'
+      '${knownValues.isEmpty ? '' : ', ${knownValues.paths.length} known values'}',
+    );
     await ref
         .read(tasksProvider.notifier)
         .run(
@@ -158,6 +164,10 @@ class LibraryService {
     final library = await readLibrary(storage);
     if (library == null) return;
     await writeLibrary(storage, library.withKnownValues(values));
+    _log.info(
+      'Known values of ${entry.displayName} set: '
+      '${values.paths.map((v) => v.join('/')).join(', ')}',
+    );
     await ref
         .read(tasksProvider.notifier)
         .run(
@@ -179,20 +189,37 @@ class LibraryService {
     final library = await readLibrary(storage);
     if (library == null) return;
     await writeLibrary(storage, library.withMembers(members));
+    _log.info(
+      'Members of ${entry.displayName} set: '
+      '${members.map((m) => m.name).join(', ')}',
+    );
     await scan(entry);
   }
 
-  /// Adds the intermediate [folders] of a title created in the library
-  /// [entry] to its known values, when it declares some (SPEC §3.1).
-  Future<void> _rememberValues(LibraryEntry entry, List<String> folders) async {
+  /// Adds the intermediate folders of the existing [paths] of the library
+  /// [entry] (folders or titles, moved or created there) to its known
+  /// values, when it declares some (SPEC §3.1): a value created by a move
+  /// is no longer reported as unknown.
+  Future<void> _rememberPaths(LibraryEntry entry, List<String> paths) async {
     final storage = MountedFolderStorage(entry.libraryRoot);
     final library = await readLibrary(storage);
-    if (library == null || library.knownValues.isEmpty) return;
-    final path = folders.take(folders.length - 1).toList();
-    if (library.knownValues.knows(path)) return;
-    await writeLibrary(
-      storage,
-      library.withKnownValues(library.knownValues.withPath(path)),
+    final layout = library?.layout;
+    if (library == null || layout == null || library.knownValues.isEmpty) {
+      return;
+    }
+    var known = library.knownValues;
+    final added = <String>[];
+    for (final path in paths) {
+      final values = path.split('/').take(layout.levels.length - 1).toList();
+      if (!known.knows(values) && await storage.stat(path) != null) {
+        known = known.withPath(values);
+        added.add(values.join('/'));
+      }
+    }
+    if (added.isEmpty) return;
+    await writeLibrary(storage, library.withKnownValues(known));
+    _log.info(
+      'Known values of ${entry.displayName} added: ${added.join(', ')}',
     );
   }
 
@@ -205,6 +232,7 @@ class LibraryService {
     ref.invalidate(navigationProvider);
     ref.read(localIndexProvider).removeLibrary(id);
     ref.read(indexRevisionProvider.notifier).bump();
+    _log.info('Removed library $id (files left untouched)');
   }
 
   /// Adopts [version] of [title] ("To adopt", SPEC §4.2): writes a new
@@ -251,6 +279,10 @@ class LibraryService {
     await Isolate.run(
       () => writeVersionMetadata(MountedFolderStorage(root), path, metadata),
     );
+    _log.info(
+      'Version $path of ${entry.displayName} adopted: id ${metadata.id}, '
+      'owner ${metadata.owner}, label "${metadata.label}"',
+    );
     await scan(entry);
   }
 
@@ -263,13 +295,9 @@ class LibraryService {
     String path,
     List<String> folders,
   ) {
-    final entry = _entry(library);
-    return _fix(
-      entry,
-      [MoveProject(path, folders.join('/'))],
-      (l10n) => l10n.taskMove(p.posix.basename(path)),
-      then: () => _rememberValues(entry, folders),
-    );
+    return _fix(_entry(library), [
+      MoveProject(path, folders.join('/')),
+    ], (l10n) => l10n.taskMove(p.posix.basename(path)));
   }
 
   /// Applies the migration [fixes] to [library] (SPEC §5.8 step 4), as a
@@ -277,38 +305,95 @@ class LibraryService {
   Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) =>
       _fix(_entry(library), fixes, (l10n) => l10n.taskFix(fixes.length));
 
-  /// Runs [fixes] on [entry] so that no file is lost (SPEC §5.8 step 5):
-  /// first the inventory, taken or resumed (cancellable); then the fixes,
-  /// in an isolate; then the inventory check, whose gaps are reported as
-  /// errors; then [then] and a rescan.
+  /// Runs [fixes] on [entry] so that no file is lost (SPEC §5.8 step 5),
+  /// telling each step: first a new inventory (or the interrupted one
+  /// resumed), reusing the hashes of the previous one; then the
+  /// fixes one by one, each in an isolate; then the inventory check, whose
+  /// gaps are reported as errors. A folder "moved" to its own place is only
+  /// declared. Cancellable at every step, between two files or two fixes.
+  /// In any case, the values of the folders moved or declared join the
+  /// known values, then the library is rescanned.
   Future<Report?> _fix(
     LibraryEntry entry,
     List<MigrationFix> fixes,
-    String Function(AppLocalizations l10n) label, {
-    Future<void> Function()? then,
-  }) {
+    String Function(AppLocalizations l10n) label,
+  ) {
     final root = entry.libraryRoot;
+    bool inPlace(MigrationFix fix) =>
+        fix is MoveFolder && fix.target == fix.path;
+    final moves = [
+      for (final f in fixes)
+        if (!inPlace(f)) f,
+    ];
     return ref.read(tasksProvider.notifier).run(label, (task) async {
-      final storage = MountedFolderStorage(root);
-      final hash = xxh3Hasher(storage);
-      final migration =
-          await Migration.latest(storage) ?? Migration.start(storage);
-      if (!migration.inventoryComplete) {
-        await migration.takeInventory(
-          hash,
-          checkCancelled: task.checkCancelled,
-          onProgress: task.progress,
-        );
+      final declared = [for (final f in fixes.where(inPlace)) f.path];
+      var report = Report({ReportKind.valueDeclared: _items(root, declared)});
+      for (final path in declared) {
+        _log.info('${entry.displayName}: folder $path kept in place');
       }
-      task.checkCancelled();
-      var report = await _applyFixes(root, fixes);
-      final latest = (await Migration.latest(storage))!;
-      report += _rooted(
-        root,
-        await latest.check(hash, onProgress: task.progress),
-      );
-      await then?.call();
-      await scan(entry);
+      final applied = [...fixes.where(inPlace)];
+      try {
+        if (moves.isNotEmpty) {
+          final storage = MountedFolderStorage(root);
+          final hash = xxh3Hasher(storage);
+          // A fresh inventory for each task, unless one was interrupted:
+          // files changed or added since the previous one are covered.
+          final previous = await Migration.latest(storage);
+          final migration = previous != null && !previous.inventoryComplete
+              ? previous
+              : Migration.start(storage, previous: previous);
+          task.step((l10n) => l10n.taskStepInventory);
+          await migration.takeInventory(
+            hash,
+            checkCancelled: task.checkCancelled,
+            onProgress: task.progress,
+          );
+          for (final (i, fix) in moves.indexed) {
+            task.checkCancelled();
+            task.step((l10n) => l10n.taskStepFix(i + 1, moves.length));
+            task.progress(i / moves.length);
+            final done = await _applyFixes(root, [fix]);
+            applied.add(fix);
+            _log.log(
+              done.hasErrors ? Level.WARNING : Level.INFO,
+              '${entry.displayName}: $fix\n$done',
+            );
+            report += done;
+          }
+          task.checkCancelled();
+          task.step((l10n) => l10n.taskStepCheck);
+          final latest = (await Migration.latest(storage))!;
+          final check = await latest.check(
+            hash,
+            checkCancelled: task.checkCancelled,
+            onProgress: task.progress,
+          );
+          _log.log(
+            check.hasErrors ? Level.WARNING : Level.INFO,
+            '${entry.displayName}: inventory checked'
+            '${check.isEmpty ? ', no file lost' : '\n$check'}',
+          );
+          report += _rooted(root, check);
+        }
+      } on TaskCancelled {
+        _log.warning(
+          '${entry.displayName}: cancelled after '
+          '${applied.length - declared.length} of ${moves.length} fixes',
+        );
+        rethrow;
+      } finally {
+        // Also after a cancellation: the library shows what was moved.
+        task.step((l10n) => l10n.taskStepScan);
+        await _rememberPaths(entry, [
+          for (final f in applied)
+            switch (f) {
+              MoveFolder(:final target) => target,
+              MoveProject(:final titleDir) ||
+              LiftProject(:final titleDir) => titleDir,
+            },
+        ]);
+        await scan(entry);
+      }
       return report;
     }, openReport: true);
   }
@@ -327,6 +412,7 @@ class LibraryService {
       throw ArgumentError.value(path, 'path', 'Not an orphan node file');
     }
     await MountedFolderStorage(root).delete(path);
+    _log.info('Orphan node file $path of ${entry.displayName} deleted');
     await scan(entry);
   }
 
@@ -341,6 +427,7 @@ class LibraryService {
         version.fileName,
       ),
     );
+    _log.info('Version ${_at(title, version)} backed up');
     ref.invalidate(historyProvider(title.id));
   }
 
@@ -358,6 +445,7 @@ class LibraryService {
         path,
       ),
     );
+    _log.info('Version ${_at(title, version)} restored from $path');
     ref.invalidate(historyProvider(title.id));
     await scan(entry);
   }
@@ -439,6 +527,12 @@ class LibraryService {
         ),
       );
     }
+    _log.info(
+      'Version $path of ${entry.displayName} created'
+      '${source != null ? ' from ${source.fileName}' : ''}'
+      '${template != null ? ' from template $template' : ''}'
+      ', label "${metadata.label}"',
+    );
     await scan(entry);
     return p.posix.basename(path);
   }
@@ -469,6 +563,11 @@ class LibraryService {
       if (fileName == old) return old;
       return p.posix.basename(await renameVersion(storage, dir, old, fileName));
     });
+    _log.info(
+      'Version ${_at(title, version)} edited'
+      '${relabel ? ', label "${label.trim()}"' : ''}'
+      '${name != old ? ', renamed to $name' : ''}',
+    );
     await scan(entry);
     return name;
   }
@@ -483,6 +582,7 @@ class LibraryService {
     await Isolate.run(
       () => setVersionStatus(MountedFolderStorage(root), dir, key, status),
     );
+    _log.info('Status of version ${_at(title, version)} set to $status');
     await scan(entry);
   }
 
@@ -495,6 +595,7 @@ class LibraryService {
     await Isolate.run(
       () => deleteVersion(MountedFolderStorage(root), dir, name),
     );
+    _log.info('Version ${_at(title, version)} moved to the trash');
     ref.invalidate(trashProvider(title.id));
     await scan(entry);
   }
@@ -508,6 +609,7 @@ class LibraryService {
     final dir = title.path;
     final freeTree = _isFreeTree(title);
     await Isolate.run(() => purgeTrash(MountedFolderStorage(root), dir, paths));
+    _log.info('Trash of $dir in $root purged: ${paths.join(', ')}');
     ref.invalidate(trashProvider(title.id));
     if (freeTree) return const [];
     return Isolate.run(
@@ -522,8 +624,14 @@ class LibraryService {
     final root = entry.libraryRoot;
     final dir = title.path;
     await Isolate.run(() => purgeMedia(MountedFolderStorage(root), dir, paths));
+    _log.info('Unused media of $dir in $root purged: ${paths.join(', ')}');
     await scan(entry);
   }
+
+  /// [version] of [title], with its library, for the logs.
+  String _at(Title title, Version version) =>
+      '${title.path}/${version.fileName} of '
+      '${_entry(title.libraryId).displayName}';
 
   bool _isFreeTree(Title title) =>
       ref.read(indexedLibrariesProvider)[title.libraryId]?.isFreeTree ?? true;
@@ -574,6 +682,7 @@ class LibraryService {
     final storage = MountedFolderStorage(root);
     final library = await readLibrary(storage);
     if (library == null) {
+      _log.warning('Library ${entry.displayName} unavailable at $root');
       return Report({
         ReportKind.libraryUnavailable: [ReportItem(root)],
       });
@@ -586,6 +695,11 @@ class LibraryService {
     );
     index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();
+    _log.info(
+      'Scanned ${entry.displayName}: ${result.titles.length} titles, '
+      '${result.issues.items.values.fold(0, (n, i) => n + i.length)} '
+      'to sort, ${result.corrupted.length} corrupted',
+    );
     return Report({
           ReportKind.libraryScanned: [ReportItem(root)],
           ReportKind.corrupted: _items(root, result.corrupted),

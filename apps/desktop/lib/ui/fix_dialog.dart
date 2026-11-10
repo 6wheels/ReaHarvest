@@ -295,8 +295,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     final fixes = <LibraryId, List<MigrationFix>>{};
     for (final i in _checked.toList()..sort()) {
       final fix = _fix(i);
-      // A folder already at its place has nothing to fix.
-      if (fix is MoveFolder && fix.target == fix.path) continue;
+      // A folder already at its place is declared as a known value.
       fixes.putIfAbsent(widget.issues[i].library, () => []).add(fix);
     }
     Navigator.of(context).pop(fixes);

@@ -5,6 +5,11 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'conventions.dart';
 import 'mounted_folder_storage.dart';
 
+/// Library description (`libraryFileName` of the library package), left out
+/// of the inventory: the application rewrites it during a migration (known
+/// values), it is not a file of the user.
+const _libraryFile = '.library.json';
+
 /// A file of the inventory: its state before the first change.
 typedef InventoryEntry = ({int size, DateTime modified, String hash});
 
@@ -52,15 +57,24 @@ final class Migration {
   String _originalPath(String path) => '$folder/originals/$path';
 
   /// A new migration, stamped with [now]; nothing is written before
-  /// [takeInventory].
-  static Migration start(RepositoryStorage storage, {DateTime? now}) =>
-      Migration._(
-        storage,
-        '$migrationFolderName/${_stamp(now ?? DateTime.now())}',
-        {},
-        [],
-        false,
-      );
+  /// [takeInventory]. The inventory of a [previous] migration seeds it, at
+  /// the current paths of its files: those unchanged since are not hashed
+  /// again.
+  static Migration start(
+    RepositoryStorage storage, {
+    DateTime? now,
+    Migration? previous,
+  }) => Migration._(
+    storage,
+    '$migrationFolderName/${_stamp(now ?? DateTime.now())}',
+    {
+      if (previous != null)
+        for (final MapEntry(:key, :value) in previous._files.entries)
+          previous.locate(key): value,
+    },
+    [],
+    false,
+  );
 
   /// The latest migration of [storage], with its inventory complete or not,
   /// or null if there is none.
@@ -218,6 +232,8 @@ final class Migration {
     var done = 0;
     for (final MapEntry(key: path, value: entry) in _files.entries) {
       checkCancelled?.call();
+      // Inventories taken before the library description was left out.
+      if (path == _libraryFile) continue;
       final copy = _originalPath(path);
       final found =
           await _storage.stat(copy) ?? await _storage.stat(locate(path));
@@ -242,6 +258,7 @@ final class Migration {
     for (final e in await _storage.list('', recursive: true))
       if (!e.isDirectory &&
           e.path.split('/').first != migrationFolderName &&
+          e.path != _libraryFile &&
           !e.path.endsWith(MountedFolderStorage.tempSuffix))
         e.path: e,
   };
@@ -272,11 +289,13 @@ final class Migration {
     return jsonDecode(text) as Map<String, dynamic>;
   }
 
-  /// `yyyy-MM-dd_HHmmss`, sortable.
+  /// `yyyy-MM-dd_HHmmss_SSS`, sortable; the milliseconds keep apart two
+  /// migrations started in the same second.
   static String _stamp(DateTime t) {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${t.year}-${two(t.month)}-${two(t.day)}_'
-        '${two(t.hour)}${two(t.minute)}${two(t.second)}';
+        '${two(t.hour)}${two(t.minute)}${two(t.second)}_'
+        '${t.millisecond.toString().padLeft(3, '0')}';
   }
 }
 

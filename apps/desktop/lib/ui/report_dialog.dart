@@ -22,6 +22,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.statusFolderUnmatched => l10n.reportStatusFolderUnmatched,
       ReportKind.targetExists => l10n.reportTargetExists,
       ReportKind.folderMoved => l10n.reportFolderMoved,
+      ReportKind.valueDeclared => l10n.reportValueDeclared,
       ReportKind.folderMerged => l10n.reportFolderMerged,
       ReportKind.fileRenamed => l10n.reportFileRenamed,
       ReportKind.titleStatusDropped => l10n.reportTitleStatusDropped,

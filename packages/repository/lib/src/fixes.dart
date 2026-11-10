@@ -24,6 +24,9 @@ final class MoveFolder extends MigrationFix {
   const MoveFolder(super.path, this.target);
 
   final String target;
+
+  @override
+  String toString() => 'Move folder $path to $target';
 }
 
 /// Moves the project [path] into the title folder [titleDir], with its
@@ -32,6 +35,9 @@ final class MoveProject extends MigrationFix {
   const MoveProject(super.path, this.titleDir);
 
   final String titleDir;
+
+  @override
+  String toString() => 'Move project $path to $titleDir';
 }
 
 /// Moves the project [path], found in a member or status subfolder of the
@@ -55,6 +61,12 @@ final class LiftProject extends MigrationFix {
 
   /// Status subfolder whose name matched no status: kept in the report.
   final String? statusFolder;
+
+  @override
+  String toString() => [
+    'Lift project $path to $titleDir',
+    if (status != null) 'status $status',
+  ].join(', ');
 }
 
 /// Applies [fixes] through the storage of [migration] (so that no file is

@@ -26,6 +26,7 @@ enum ReportKind {
   targetExists(ReportLevel.skipped),
   libraryScanned(ReportLevel.done),
   folderMoved(ReportLevel.done),
+  valueDeclared(ReportLevel.done),
   folderMerged(ReportLevel.done),
   fileRenamed(ReportLevel.done),
   projectMoved(ReportLevel.done),

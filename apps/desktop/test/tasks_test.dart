@@ -107,6 +107,7 @@ void main() {
     });
     final step = Completer<void>();
     final running = tasks().run((l10n) => 'Scan', (task) async {
+      task.step((l10n) => 'Reading the folders');
       task.progress(0.25);
       await step.future;
       task.checkCancelled();
@@ -114,21 +115,25 @@ void main() {
     await tester.pump();
     await tester.pump(Motion.medium);
 
-    // Collapsed: the running task.
-    expect(find.text('Scan'), findsOneWidget);
+    // Collapsed: the running task, its sub-step on the same line.
+    expect(find.text('Scan  ·  Reading the folders'), findsOneWidget);
     expect(find.text('Broken'), findsNothing);
     expect(find.text('Tasks · 3'), findsOneWidget);
+
+    // Expanded: every task, the sub-step under the label, the error of the
+    // failed one.
+    await tester.tap(find.text('Tasks · 3'));
+    await tester.pump();
+    await tester.pump(Motion.medium);
+    expect(find.text('Scan'), findsOneWidget);
+    expect(find.text('Reading the folders'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pump();
     expect(find.text('Cancelling…'), findsOneWidget);
     step.complete();
     await running;
-    await tester.pump();
-    expect(find.text('Cancelled'), findsOneWidget);
-
-    // Expanded: every task, with the error of the failed one.
-    await tester.tap(find.text('Tasks · 3'));
     await tester.pumpAndSettle();
+    expect(find.text('Reading the folders'), findsNothing);
     expect(find.text('Broken'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
     expect(find.text('boom'), findsOneWidget);
@@ -222,23 +227,34 @@ void main() {
     expect(labels, hasLength(ReportKind.values.length));
   });
 
-  test('tasks log their outcome and report, in English', () async {
-    final records = <String>[];
-    final sub = Logger.root.onRecord.listen(
-      (r) => records.add('${r.level.name} ${r.message} ${r.error ?? ''}'),
-    );
-    addTearDown(sub.cancel);
-    await tasks().run(
-      (l10n) => l10n.taskScanAll,
-      (_) async => const Report({
-        ReportKind.projectTooShallow: [ReportItem('/x')],
-      }),
-    );
-    await tasks().run((l10n) => 'B', (_) async => throw 'boom');
-    expect(records, [
-      'INFO Scan of the libraries: done\nprojectTooShallow (1)\n  /x ',
-      'SEVERE B boom',
-      'WARNING B: failed ',
-    ]);
-  });
+  test(
+    'tasks log their start, steps, outcome and report, in English',
+    () async {
+      final records = <String>[];
+      final sub = Logger.root.onRecord.listen(
+        (r) => records.add('${r.level.name} ${r.message} ${r.error ?? ''}'),
+      );
+      addTearDown(sub.cancel);
+      await tasks().run(
+        (l10n) => l10n.taskScanAll,
+        (_) async => const Report({
+          ReportKind.projectTooShallow: [ReportItem('/x')],
+        }),
+      );
+      await tasks().run((l10n) => 'B', (_) async => throw 'boom');
+      await tasks().run((l10n) => 'C', (task) async {
+        task.step((l10n) => l10n.taskStepCheck);
+      });
+      expect(records, [
+        'INFO Scan of the libraries: started ',
+        'INFO Scan of the libraries: done\nprojectTooShallow (1)\n  /x ',
+        'INFO B: started ',
+        'SEVERE B boom',
+        'WARNING B: failed ',
+        'INFO C: started ',
+        'INFO C: Checking that no file is lost ',
+        'INFO C: done ',
+      ]);
+    },
+  );
 }

@@ -30,6 +30,14 @@ final class TaskControl {
   /// Sets the progress, from 0 to 1.
   void progress(double value) =>
       _notifier._update(_id, (t) => t._with(progress: value));
+
+  /// Starts the sub-step [label], shown under the task; its progress is
+  /// unknown until [progress] is called.
+  void step(String Function(AppLocalizations l10n) label) {
+    _notifier._update(_id, (t) => t._atStep(label));
+    final task = _notifier._task(_id);
+    _log.info('${task.label(_english)}: ${label(_english)}');
+  }
 }
 
 /// A long action shown in the background tasks zone (SPEC §5.2).
@@ -44,6 +52,7 @@ final class BackgroundTask {
     this.error,
     this.report,
     this.openReport = false,
+    this.step,
   });
 
   final int id;
@@ -65,6 +74,9 @@ final class BackgroundTask {
   /// Whether the report is shown as soon as the task ends.
   final bool openReport;
 
+  /// Current sub-step of a running task, if it tells it.
+  final String Function(AppLocalizations l10n)? step;
+
   bool get isRunning => state == TaskState.running;
 
   BackgroundTask _with({
@@ -82,7 +94,19 @@ final class BackgroundTask {
     error: error ?? this.error,
     report: report ?? this.report,
     openReport: openReport,
+    step: step,
   );
+
+  /// This task at the sub-step [step], with an unknown progress.
+  BackgroundTask _atStep(String Function(AppLocalizations l10n) step) =>
+      BackgroundTask(
+        id: id,
+        label: label,
+        state: state,
+        cancelling: cancelling,
+        openReport: openReport,
+        step: step,
+      );
 }
 
 final _log = Logger('tasks');
@@ -112,6 +136,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       ...state,
       BackgroundTask(id: id, label: label, openReport: openReport),
     ];
+    _log.info('${label(_english)}: started');
     try {
       final result = await body(TaskControl._(this, id));
       final report = result is Report ? result : null;

@@ -128,7 +128,8 @@ class _TaskRow extends ConsumerWidget {
 
   final BackgroundTask task;
 
-  /// Shows the error of a failed task.
+  /// Unfolded list: the sub-step under the label, and the error of a failed
+  /// task.
   final bool detailed;
 
   @override
@@ -138,6 +139,7 @@ class _TaskRow extends ConsumerWidget {
     final text = Theme.of(context).textTheme;
     final muted = text.bodySmall?.copyWith(color: c.muted);
     final error = Theme.of(context).colorScheme.error;
+    final step = task.isRunning ? task.step?.call(l10n) : null;
     final icon = switch (task.state) {
       TaskState.running => SizedBox.square(
         dimension: 14,
@@ -186,12 +188,27 @@ class _TaskRow extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  task.label(l10n),
+                // The sub-step follows the label on one line, folded; under
+                // it, unfolded.
+                Text.rich(
+                  TextSpan(
+                    text: task.label(l10n),
+                    children: [
+                      if (step != null && !detailed)
+                        TextSpan(text: '  ·  $step', style: muted),
+                    ],
+                  ),
                   style: text.bodyMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (step != null && detailed)
+                  Text(
+                    step,
+                    style: muted,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 if (detailed && task.error != null)
                   Text(task.error!, style: muted, maxLines: 3),
               ],

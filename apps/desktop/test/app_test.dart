@@ -11,6 +11,7 @@ import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
+import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
 import 'package:reaharvest/ui/fix_dialog.dart';
@@ -94,10 +95,23 @@ class FakeLibraryService extends LibraryService {
     orphansDeleted.add(path);
   }
 
+  /// Whether [fix] runs as a task whose report opens at the end, like the
+  /// real one.
+  bool fixAsTask = false;
+
   @override
   Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) async {
     fixed.add((library, fixes));
-    return const Report();
+    if (!fixAsTask) return const Report();
+    return ref
+        .read(tasksProvider.notifier)
+        .run(
+          (l10n) => l10n.taskFix(fixes.length),
+          (_) async => Report({
+            ReportKind.folderMoved: [ReportItem(fixes.first.path)],
+          }),
+          openReport: true,
+        );
   }
 
   @override
@@ -1602,7 +1616,7 @@ void main() {
     expect((batch.path, batch.target), ('Old', 'Sample Artist/Live/Old'));
 
     // Unknown folders: their level is chosen; at their own level, an
-    // artist folder has nothing to fix.
+    // artist folder is only declared.
     await tester.tap(find.text('Fix…').last);
     await tester.pumpAndSettle();
     expect(find.text('These folders are at the level'), findsOne);
@@ -1611,7 +1625,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix 1 item'));
     await tester.pumpAndSettle();
-    expect(libraries.fixed, hasLength(1));
+    final declared = libraries.fixed.last.$2.single as MoveFolder;
+    expect((declared.path, declared.target), ('Stranger', 'Stranger'));
 
     await tester.tap(find.text('Fix…').last);
     await tester.pumpAndSettle();
@@ -1635,7 +1650,9 @@ void main() {
       ],
     );
 
-    // One unknown folder anywhere: one level to type.
+    // One unknown folder anywhere: one level to type. The dialog closes
+    // when the move starts; its report opens over the page.
+    libraries.fixAsTask = true;
     await tester.ensureVisible(find.text('Move…').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move…').at(2));
@@ -1652,6 +1669,11 @@ void main() {
     await tester.pumpAndSettle();
     final moved = libraries.fixed.last.$2.single as MoveFolder;
     expect((moved.path, moved.target), ('Stranger', 'Sample Artist'));
+    expect(find.text('Move “Stranger”'), findsNothing);
+    expect(find.text('Folders moved · 1'), findsOne);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    libraries.fixAsTask = false;
 
     // Or at another level: the levels above it are proposed.
     await tester.ensureVisible(find.text('Move…').at(2));
