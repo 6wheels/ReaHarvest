@@ -40,13 +40,103 @@ const _proxySuffix = '-PROX';
 Future<Report> normalizeMedia(RepositoryStorage storage, String titleDir) =>
     _Normalization(storage, titleDir).run();
 
+/// Moves the misplaced project [project] into the title folder [titleDir]
+/// ("To sort", SPEC §5.2), under a free name, its relative references and
+/// record path rewritten to keep pointing at the same files, then
+/// normalizes the media of the title ([normalizeMedia]). The media of the
+/// project are moved into the pool, or copied when another project of the
+/// source folder references them too; a project with a missing or external
+/// media is moved but its media are left where they are.
+///
+/// Throws [FormatException] if the project cannot be read (left in place).
+Future<Report> moveProjectToTitle(
+  RepositoryStorage storage,
+  String project,
+  String titleDir,
+) async {
+  final text = await utf8.decodeStream(storage.read(project));
+  final sourceDir = _parent(project);
+  final shared = await _mediaOfOtherProjects(storage, sourceDir, project);
+  final movable = {
+    for (final ref in RppProject.parse(text).mediaFiles)
+      if (resolveReference(sourceDir, ref) case final file?
+          when !shared.contains(file.toLowerCase()))
+        file.toLowerCase(),
+  };
+  String relocated(String ref) {
+    final file = resolveReference(sourceDir, ref);
+    if (file == null || sourceDir == titleDir) return ref;
+    final relative = p.posix.relative(
+      file,
+      from: titleDir.isEmpty ? '.' : titleDir,
+    );
+    final separator = separatorOf(ref);
+    return separator == '/' ? relative : relative.replaceAll('/', separator);
+  }
+
+  var patched = rewriteMediaPaths(text, relocated);
+  final record = RppProject.parse(patched).document.root.line('RECORD_PATH');
+  if (record != null && record.params.any((s) => s.isNotEmpty)) {
+    final params = [for (final s in record.params) relocated(s)];
+    if (params.join('\n') != record.params.join('\n')) {
+      patched = setRootAttribute(patched, 'RECORD_PATH', params);
+    }
+  }
+  final target = await freePath(
+    storage,
+    _join(titleDir, p.posix.basename(project)),
+  );
+  await storage.move(project, target);
+  if (patched != text) {
+    await storage.write(target, Stream.value(utf8.encode(patched)));
+  }
+  return Report({
+        ReportKind.projectMoved: [ReportItem(target)],
+      }) +
+      await _Normalization(storage, titleDir, movable: movable).run();
+}
+
+/// Lowercase paths of the media referenced by the projects of [dir] other
+/// than [except] (below [dir] too, unless [dir] is the library root).
+Future<Set<String>> _mediaOfOtherProjects(
+  RepositoryStorage storage,
+  String dir,
+  String except,
+) async {
+  final media = <String>{};
+  for (final e in await storage.list(dir, recursive: dir.isNotEmpty)) {
+    final segments = e.path.split('/');
+    if (e.isDirectory ||
+        e.path == except ||
+        !isProjectFile(segments.last) ||
+        segments.any(isExcludedFolder)) {
+      continue;
+    }
+    try {
+      final text = await utf8.decodeStream(storage.read(e.path));
+      for (final ref in RppProject.parse(text).mediaFiles) {
+        if (resolveReference(_parent(e.path), ref) case final path?) {
+          media.add(path.toLowerCase());
+        }
+      }
+    } on FormatException {
+      // Unreadable project: its media cannot be known.
+    }
+  }
+  return media;
+}
+
 final class _Normalization {
-  _Normalization(this.storage, this.titleDir)
+  _Normalization(this.storage, this.titleDir, {this.movable = const {}})
     : pool = _join(titleDir, mediaFolderName);
 
   final RepositoryStorage storage;
   final String titleDir;
   final String pool;
+
+  /// Lowercase paths of files outside the title that may be moved rather
+  /// than copied (media of a project moved into the title).
+  final Set<String> movable;
 
   /// Text of the projects of the title and of the subprojects of its pool,
   /// by path: rewritten.
@@ -164,13 +254,15 @@ final class _Normalization {
     }
   }
 
-  /// Brings [file] into the pool: moved if it belongs to the title and is
-  /// not [keep]t for a blocked project, copied otherwise; not brought if
-  /// the pool has it already (the title's duplicate goes to the trash).
+  /// Brings [file] into the pool: moved if it belongs to the title (or is
+  /// [movable]) and is not [keep]t for a blocked project, copied otherwise;
+  /// not brought if the pool has it already (the duplicate goes to the
+  /// title's trash).
   Future<void> _bring(String file, {required bool keep}) async {
     final (target, exists) = await poolTarget(storage, pool, file);
     targets[file.toLowerCase()] = target;
-    final move = _inTitle(file) && !keep;
+    final move =
+        (_inTitle(file) || movable.contains(file.toLowerCase())) && !keep;
     if (exists) {
       if (!move) return;
       final trashed = await freePath(

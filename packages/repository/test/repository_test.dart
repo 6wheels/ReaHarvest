@@ -1121,11 +1121,10 @@ void main() {
     );
 
     test('moves the project and its media into the title pool', () async {
-      put(
-        'band/loose.rpp',
-        project([r'audio-files\kick.wav', r'C:\elsewhere\x.wav', 'gone.wav']),
-      );
+      put('band/loose.rpp', project([r'audio-files\kick.wav', 'sub.rpp']));
       put('band/audio-files/kick.wav', 'kick');
+      put('band/sub.rpp', project([r'audio-files\kick.wav']));
+      put('band/sub.rpp-PROX', 'proxy');
 
       final report = await moveProjectToTitle(
         storage,
@@ -1133,36 +1132,31 @@ void main() {
         'band/_Unassigned/loose',
       );
 
-      expect(report.project, 'band/_Unassigned/loose/loose.rpp');
-      expect(report.moved, ['band/_Unassigned/loose/Media/kick.wav']);
-      expect(report.missing, ['gone.wav']);
-      expect(report.external, [r'C:\elsewhere\x.wav']);
-      expect(report.toReport().items, {
-        ReportKind.projectMoved: [ReportItem(report.project)],
-        ReportKind.mediaMoved: [ReportItem(report.moved.single)],
-        ReportKind.mediaCopied: isEmpty,
-        ReportKind.missingMedia: [ReportItem(report.project, 'gone.wav')],
-        ReportKind.externalMedia: [
-          ReportItem(report.project, r'C:\elsewhere\x.wav'),
-        ],
-      });
-      expect(exists('band/loose.rpp'), isFalse);
-      expect(exists('band/audio-files/kick.wav'), isFalse);
-      final moved = read(report.project);
-      expect(moved.mediaFiles, [
-        r'Media\kick.wav',
-        r'C:\elsewhere\x.wav',
-        'gone.wav',
+      const title = 'band/_Unassigned/loose';
+      expect(report.items[ReportKind.projectMoved], [
+        const ReportItem('$title/loose.rpp'),
       ]);
+      // The media shared with the subproject is copied (the subproject is
+      // another project of the source folder); the subproject, used by
+      // this project only, is moved with its proxy.
+      expect(report.items[ReportKind.mediaCopied], [
+        const ReportItem('$title/Media/kick.wav', 'band/audio-files/kick.wav'),
+      ]);
+      expect(report.items[ReportKind.mediaMoved], [
+        const ReportItem('$title/Media/sub.rpp', 'band/sub.rpp'),
+      ]);
+      expect(exists('band/loose.rpp'), isFalse);
+      expect(exists('band/sub.rpp'), isFalse);
+      expect(exists('band/audio-files/kick.wav'), isTrue);
+      expect(exists('$title/Media/sub.rpp-PROX'), isTrue);
+      final moved = read('$title/loose.rpp');
+      expect(moved.mediaFiles, [r'Media\kick.wav', r'Media\sub.rpp']);
       expect(moved.recordPath, 'Media');
-
-      final result = await scan(storage, library(Layout.classic()));
-      expect(issuePaths(result), isEmpty);
-      expect(result.titles.single.path, 'band/_Unassigned/loose');
+      expect(read('$title/Media/sub.rpp').mediaFiles, ['kick.wav']);
     });
 
     test(
-      'copies shared media, reuses identical ones, renames others',
+      'moves unshared media, trashes identical ones, renames others',
       () async {
         put(
           'band/a.rpp',
@@ -1174,7 +1168,7 @@ void main() {
         put('band/audio/hat.wav', 'hat');
         put('band/album/song/Media/snare.wav', 'snare');
         put('band/album/song/Media/hat.wav', 'other hat');
-        put('band/album/song/a.rpp', unknown);
+        put('band/album/song/a.rpp', project([]));
 
         final report = await moveProjectToTitle(
           storage,
@@ -1182,18 +1176,66 @@ void main() {
           'band/album/song',
         );
 
-        expect(report.project, 'band/album/song/a (2).rpp');
-        expect(report.copied, ['band/album/song/Media/kick.wav']);
-        expect(report.moved, ['band/album/song/Media/hat (2).wav']);
+        const song = 'band/album/song';
+        expect(report.items[ReportKind.projectMoved], [
+          const ReportItem('$song/a (2).rpp'),
+        ]);
+        expect(report.items[ReportKind.mediaCopied], [
+          const ReportItem('$song/Media/kick.wav', 'band/audio/kick.wav'),
+        ]);
+        expect(report.items[ReportKind.mediaTrashed], [
+          const ReportItem('$song/.trash/snare.wav', '$song/Media/snare.wav'),
+        ]);
+        expect(report.items[ReportKind.mediaMoved], [
+          const ReportItem('$song/Media/hat (2).wav', 'band/audio/hat.wav'),
+        ]);
         expect(exists('band/audio/kick.wav'), isTrue);
-        expect(exists('band/audio/snare.wav'), isTrue);
-        expect(read(report.project).mediaFiles, [
+        expect(exists('band/audio/snare.wav'), isFalse);
+        expect(read('$song/a (2).rpp').mediaFiles, [
           'Media/kick.wav',
           'Media/snare.wav',
           'Media/hat (2).wav',
         ]);
+        // The whole title is normalized.
+        expect(read('$song/a.rpp').recordPath, 'Media');
       },
     );
+
+    test('moves a blocked project, leaving its media in place', () async {
+      put(
+        'band/loose.rpp',
+        project([
+          r'audio-files\kick.wav',
+          r'C:\elsewhere\x.wav',
+          r'audio-files\gone.wav',
+        ]),
+      );
+      put('band/audio-files/kick.wav', 'kick');
+
+      final report = await moveProjectToTitle(
+        storage,
+        'band/loose.rpp',
+        'band/_Unassigned/loose',
+      );
+
+      const moved = 'band/_Unassigned/loose/loose.rpp';
+      expect(report.items[ReportKind.projectMoved], [const ReportItem(moved)]);
+      expect(report.items[ReportKind.missingMedia], [
+        const ReportItem(moved, r'..\..\audio-files\gone.wav'),
+      ]);
+      expect(report.items[ReportKind.externalMedia], [
+        const ReportItem(moved, r'C:\elsewhere\x.wav'),
+      ]);
+      expect(exists('band/audio-files/kick.wav'), isTrue);
+      final after = read(moved);
+      // References still pointing at the same files.
+      expect(after.mediaFiles, [
+        r'..\..\audio-files\kick.wav',
+        r'C:\elsewhere\x.wav',
+        r'..\..\audio-files\gone.wav',
+      ]);
+      expect(after.recordPath!.replaceAll(r'\', '/'), '../../audio-files');
+    });
   });
 
   group('known values', () {

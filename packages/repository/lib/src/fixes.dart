@@ -30,8 +30,8 @@ final class MoveFolder extends MigrationFix {
   String toString() => 'Move folder $path to $target';
 }
 
-/// Moves the project [path] into the title folder [titleDir], with its
-/// media ([moveProjectToTitle]).
+/// Moves the project [path] into the title folder [titleDir], then
+/// normalizes the media of the title ([moveProjectToTitle]).
 final class MoveProject extends MigrationFix {
   const MoveProject(super.path, this.titleDir);
 
@@ -97,11 +97,11 @@ Future<Report> applyFixes(Migration migration, List<MigrationFix> fixes) async {
             ReportKind.targetExists: [ReportItem(path, target)],
           }),
         },
-        MoveProject(:final path, :final titleDir) => (await moveProjectToTitle(
+        MoveProject(:final path, :final titleDir) => await moveProjectToTitle(
           storage,
           path,
           titleDir,
-        )).toReport(),
+        ),
         final LiftProject lift => await _lift(storage, lift),
         NormalizeMedia(:final path) => await normalizeMedia(storage, path),
       };
