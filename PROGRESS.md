@@ -20,10 +20,11 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #63 structured reports popup
 - [x] #64 file logging
 - [x] #65 coverage gate in CI (measure first, then raise the existing MVP-path code to the target)
+- [x] #85 integration tests of M0
 
 ## M1 — Migration (umbrella #30)
 - [x] #79 center the main window at launch (priority 1)
-- [ ] #59 integration tests (moves with the milestones; M0 steps and #77 covered, regression net of the existing features still open; the version management test follows the label display again; CI skipped on push while the repository is private, run it on demand)
+- [ ] #59 integration tests of M1 and of the existing features (regression net; one integration test ticket per milestone: M0 #85, M2 #86, M3 #87; the version management test follows the label display again; CI skipped on push while the repository is private, run it on demand)
 - [x] #77 known level values (artists, albums) for layout recognition
 - [x] #66 inventory and no-loss check (logic in `repository`; started as a background task by the M1 fix flows)
 - [x] #67 typed migration issues in To sort (layout, levels, duplicated `versionId`; media, Assets and conflict-copy detectors come with #69, #70, #23)
@@ -41,6 +42,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [ ] Validation: full preparation on the sample copy, zero issues left, inventory check passes, every project opens in REAPER with no missing media
 
 ## M2 — Join and sync
+- [ ] #86 integration tests of M2
 - [ ] #73 first-run wizard: join / organize / create
 - [ ] #17 RepositoryStorage / MountedFolderStorage (mostly done)
 - [ ] #74 repository view of titles not checked out
@@ -53,6 +55,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [ ] Validation: two portable copies on one machine sharing `H:\My Drive\test_sync`
 
 ## M3 — Shared statuses and activity
+- [ ] #87 integration tests of M3
 - [ ] #24 JournalStore (reduced to statuses and activity)
 - [ ] #76 statuses through the JournalStore
 - [ ] #29 activity feed
