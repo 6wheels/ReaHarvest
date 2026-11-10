@@ -63,3 +63,11 @@ final reaperLauncherProvider =
     Provider<Future<void> Function(String executable, String projectFile)>(
       (ref) => openInReaper,
     );
+
+/// Shows a file selected in its folder, in the Windows file explorer; null
+/// on other systems (Windows only for now). Replaced by a fake in tests.
+final fileRevealerProvider = Provider<Future<void> Function(String file)?>(
+  (ref) => Platform.isWindows
+      ? (file) => Process.run('explorer.exe', ['/select,', file])
+      : null,
+);

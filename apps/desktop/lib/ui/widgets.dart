@@ -31,6 +31,28 @@ class Pill extends StatelessWidget {
   );
 }
 
+/// Button label hidden behind a small spinner while [busy], keeping the
+/// button size.
+class BusyLabel extends StatelessWidget {
+  const BusyLabel(this.label, {super.key, required this.busy});
+
+  final String label;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    alignment: Alignment.center,
+    children: [
+      Opacity(opacity: busy ? 0 : 1, child: Text(label)),
+      if (busy)
+        const SizedBox.square(
+          dimension: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+    ],
+  );
+}
+
 /// Upper-case heading of a section.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.label, {super.key});

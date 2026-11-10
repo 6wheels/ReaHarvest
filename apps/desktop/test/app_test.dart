@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter/gestures.dart';
@@ -54,6 +56,10 @@ Object backupOpening = true;
 
 /// Folders opened in the file manager.
 final openedFolders = <String>[];
+final revealed = <String>[];
+
+/// When set, adopt and addVersion of the fake service wait for it (spinners).
+Completer<void>? pending;
 
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
@@ -133,6 +139,7 @@ class FakeLibraryService extends LibraryService {
     Version? source,
     String? template,
   }) async {
+    await pending?.future;
     created.add((fileName, label, source?.fileName));
     return fileName;
   }
@@ -172,6 +179,7 @@ class FakeLibraryService extends LibraryService {
     String label, {
     MemberId? owner,
   }) async {
+    await pending?.future;
     adopted.add((version.fileName, label));
     adoptedOwners.add(owner);
   }
@@ -278,6 +286,8 @@ void main() {
     addTearDown(tester.view.reset);
     settings = MemorySettings();
     existingLibrary = null;
+    revealed.clear();
+    pending = null;
     existingLocked = false;
     existingProjects = false;
     backupOpening = true;
@@ -315,6 +325,9 @@ void main() {
           logFolderProvider.overrideWithValue('/data/logs'),
           openFolderProvider.overrideWithValue(
             (folder) async => openedFolders.add(folder),
+          ),
+          fileRevealerProvider.overrideWithValue(
+            (file) async => revealed.add(file),
           ),
           libraryServiceProvider.overrideWith(
             (ref) => libraries = FakeLibraryService(ref),
@@ -1097,13 +1110,14 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(TitleDetailPage), findsOneWidget);
-    expect(find.text('Midnight Ferry v5'), findsOneWidget);
+    // The versions list shows the labels, not the file names.
+    expect(find.text('take 5'), findsOneWidget);
     expect(find.text('Create a backup point'), findsOneWidget);
     expect(find.text('No backup point yet.'), findsOneWidget);
     expect(find.text('BPM'), findsOneWidget);
     expect(find.text('TRACKS'), findsOneWidget);
 
-    await tester.tap(find.text('Midnight Ferry v5'));
+    await tester.tap(find.text('take 5'));
     await tester.pumpAndSettle();
     expect(find.textContaining(RegExp('^take 5 · ')), findsOneWidget);
 
@@ -1205,11 +1219,18 @@ void main() {
     );
 
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'intro');
+    final slow = pending = Completer<void>();
     await tester.tap(find.text('Adopt'));
     await tester.pumpAndSettle();
     expect(find.text('REAPER is open'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
     await tester.tap(find.text('Continue anyway'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    slow.complete();
     await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(libraries.adopted, [('Glass Garden v1.rpp', 'intro')]);
   });
 
@@ -1248,6 +1269,73 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.tap(find.byTooltip('Show in file explorer'));
+    expect(revealed, [
+      p.joinAll([
+        '/music/Demo',
+        'Sample Artist',
+        'Album 1',
+        'Glass Garden',
+        'Glass Garden v1.rpp',
+      ]),
+    ]);
+  });
+
+  testWidgets('lists the versions by label, adoption and status', (
+    tester,
+  ) async {
+    Version version(String file, {String? label}) => Version(
+      fileName: file,
+      modified: DateTime(2026, 11, 2),
+      size: 1,
+      metadata: label == null
+          ? null
+          : VersionMetadata(
+              id: VersionId('id-$file'),
+              owner: const MemberId('M'),
+              label: label,
+            ),
+    );
+    final title = Title(
+      id: const NodeId('t'),
+      libraryId: demoLibrary.id,
+      path: 'Band/First album/Opening',
+      tags: const {
+        'artist': 'Band',
+        'album': 'First album',
+        'title': 'Opening',
+      },
+      versions: [
+        version('Opening mix.rpp', label: 'mix'),
+        version('Opening raw.rpp', label: ''),
+        version('Opening old.rpp'),
+      ],
+      versionStatuses: const {'id-Opening mix.rpp': 'mixing'},
+    );
+    await pumpApp(tester, titles: [title]);
+    await tester.tap(find.text('Opening'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Labels only; generic labels followed by the file name.
+    expect(find.text('mix'), findsOneWidget);
+    expect(find.text('No label'), findsOneWidget);
+    expect(find.textContaining('Opening raw'), findsOneWidget);
+    expect(find.textContaining('· Opening old'), findsOneWidget);
+    expect(find.text('Opening mix'), findsOneWidget); // pane only
+    expect(find.byIcon(Icons.check_circle_outline_rounded), findsNWidgets(2));
+    expect(find.text('Mixing'), findsWidgets);
+
+    // Not adopted: list label and badge next to the version name.
+    await tester.tap(find.textContaining('· Opening old'));
+    await tester.pumpAndSettle();
+    expect(find.text('Not adopted'), findsNWidgets(2));
   });
 
   testWidgets('adopts a version for a declared member', (tester) async {
@@ -1345,7 +1433,11 @@ void main() {
       findsOne,
     );
     await tester.tap(find.text('Copy of “Midnight Ferry v1”'));
+    final slow = pending = Completer<void>();
     await tester.tap(find.text('Create'));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    slow.complete();
     await tester.pumpAndSettle();
     expect(libraries.created, [
       ('Midnight Ferry - bridge.RPP', 'bridge', 'Midnight Ferry v1.rpp'),

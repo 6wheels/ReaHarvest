@@ -270,7 +270,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
         ),
         FilledButton(
           onPressed: ready ? _create : null,
-          child: Text(l10n.create),
+          child: BusyLabel(l10n.create, busy: _busy),
         ),
       ],
     );

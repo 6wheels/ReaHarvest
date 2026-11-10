@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../state/libraries.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
+import '../state/reaper.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
@@ -474,6 +475,13 @@ class _VersionItem extends ConsumerWidget {
     final owners = ref.watch(ownerNamesProvider);
     final m = version.metadata;
     final status = title.statusOf(version);
+    final label = m == null
+        ? l10n.notAdopted
+        : m.label.isEmpty
+        ? l10n.noLabel
+        : m.label;
+    // Generic labels: muted, the file name tells the versions apart.
+    final generic = m == null || m.label.isEmpty;
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
@@ -489,24 +497,33 @@ class _VersionItem extends ConsumerWidget {
             ),
             child: Row(
               children: [
+                Icon(
+                  m == null
+                      ? Icons.help_outline_rounded
+                      : Icons.check_circle_outline_rounded,
+                  size: 18,
+                  color: m == null ? c.muted : c.accent,
+                ),
+                const SizedBox(width: Space.s),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        p.posix.withoutExtension(version.fileName),
+                        label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: text.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
+                          color: generic ? c.muted : null,
                         ),
                       ),
                       Text(
                         [
                           shortDate(l10n, version.modified),
-                          if (m != null && m.label.isNotEmpty) m.label,
                           if (m != null) ownerName(owners, m.owner),
-                          if (status != null) statusLabel(l10n, status),
+                          if (generic)
+                            p.posix.withoutExtension(version.fileName),
                         ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -515,12 +532,19 @@ class _VersionItem extends ConsumerWidget {
                     ],
                   ),
                 ),
-                if (alerts.missing.isNotEmpty || alerts.duplicates.isNotEmpty)
+                if (status != null) ...[
+                  const SizedBox(width: Space.s),
+                  Pill(statusLabel(l10n, status), color: c.accent),
+                ],
+                if (alerts.missing.isNotEmpty ||
+                    alerts.duplicates.isNotEmpty) ...[
+                  const SizedBox(width: Space.s),
                   const Icon(
                     Icons.warning_amber_rounded,
                     size: 18,
                     color: warningColor,
                   ),
+                ],
               ],
             ),
           ),
@@ -549,6 +573,8 @@ class _AdoptState extends ConsumerState<_Adopt> {
   /// Owner picked among the declared members; null for the default.
   MemberId? _picked;
 
+  var _busy = false;
+
   List<Member> get _members =>
       ref.watch(indexedLibrariesProvider)[widget.title.libraryId]?.members ??
       const [];
@@ -572,13 +598,21 @@ class _AdoptState extends ConsumerState<_Adopt> {
     super.dispose();
   }
 
-  void _adopt() => runProjectChange(
-    context,
-    ref,
-    () => ref
-        .read(libraryServiceProvider)
-        .adopt(widget.title, widget.version, _label.text, owner: _owner),
-  );
+  Future<void> _adopt() async {
+    if (_busy) return;
+    final owner = _owner;
+    try {
+      // Spinner once confirmed, while the project is rewritten.
+      await runProjectChange(context, ref, () {
+        setState(() => _busy = true);
+        return ref
+            .read(libraryServiceProvider)
+            .adopt(widget.title, widget.version, _label.text, owner: owner);
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -604,12 +638,6 @@ class _AdoptState extends ConsumerState<_Adopt> {
                   onSubmitted: (_) => _adopt(),
                   decoration: InputDecoration(
                     labelText: l10n.versionLabel,
-                    helperText: members.isEmpty
-                        ? l10n.filterValue(
-                            l10n.filterOwner,
-                            ownerName(ref.watch(ownerNamesProvider), owner),
-                          )
-                        : null,
                     isDense: true,
                   ),
                 ),
@@ -634,10 +662,24 @@ class _AdoptState extends ConsumerState<_Adopt> {
                 ),
               ],
               const SizedBox(width: Space.s),
-              FilledButton(onPressed: _adopt, child: Text(l10n.adopt)),
+              FilledButton(
+                onPressed: _busy ? null : _adopt,
+                child: BusyLabel(l10n.adopt, busy: _busy),
+              ),
             ],
           ),
         ),
+        if (members.isEmpty) ...[
+          const SizedBox(height: Space.xs),
+          Text(
+            l10n.filterValue(
+              l10n.filterOwner,
+              ownerName(ref.watch(ownerNamesProvider), owner),
+            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: context.colors.muted),
+          ),
+        ],
       ],
     );
   }
@@ -697,12 +739,23 @@ class _VersionPane extends ConsumerWidget {
         .watch(settingsProvider.select((s) => s.libraries))
         .where((l) => l.id == title.libraryId)
         .firstOrNull;
+    final reveal = ref.watch(fileRevealerProvider);
     return ListView(
       padding: const EdgeInsets.all(Space.xl),
       children: [
-        Text(
-          p.posix.withoutExtension(version.fileName),
-          style: text.titleLarge,
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                p.posix.withoutExtension(version.fileName),
+                style: text.titleLarge,
+              ),
+            ),
+            if (alerts.notAdopted) ...[
+              const SizedBox(width: Space.s),
+              Pill(l10n.notAdopted, color: c.muted),
+            ],
+          ],
         ),
         const SizedBox(height: 2),
         Text(
@@ -710,13 +763,30 @@ class _VersionPane extends ConsumerWidget {
           style: text.bodyMedium?.copyWith(color: c.muted),
         ),
         if (entry != null)
-          SelectableText(
-            versionPath(entry, title, version),
-            style: text.bodySmall?.copyWith(color: c.muted),
+          Row(
+            children: [
+              Flexible(
+                child: SelectableText(
+                  versionPath(entry, title, version),
+                  style: text.bodySmall?.copyWith(color: c.muted),
+                ),
+              ),
+              if (reveal != null) ...[
+                const SizedBox(width: Space.xs),
+                IconButton(
+                  tooltip: l10n.showInExplorer,
+                  iconSize: 16,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(Space.xs),
+                  color: c.muted,
+                  onPressed: () => reveal(versionPath(entry, title, version)),
+                  icon: const Icon(Icons.folder_open_outlined),
+                ),
+              ],
+            ],
           ),
-        if (status != null ||
-            alerts.notAdopted ||
-            alerts.missing.isNotEmpty) ...[
+        if (status != null || alerts.missing.isNotEmpty) ...[
           const SizedBox(height: Space.s),
           Wrap(
             spacing: Space.xs,
@@ -724,7 +794,6 @@ class _VersionPane extends ConsumerWidget {
             children: [
               if (status != null)
                 Pill(statusLabel(l10n, status), color: c.accent),
-              if (alerts.notAdopted) Pill(l10n.notAdopted, color: c.muted),
               if (alerts.missing.isNotEmpty)
                 Pill(
                   l10n.missingPluginCount(alerts.missing.length),
@@ -741,6 +810,7 @@ class _VersionPane extends ConsumerWidget {
         Wrap(
           spacing: Space.s,
           runSpacing: Space.s,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             FilledButton.icon(
               icon: const Icon(Icons.play_arrow_rounded, size: 18),
