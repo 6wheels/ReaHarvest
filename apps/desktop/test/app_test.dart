@@ -1438,6 +1438,13 @@ void main() {
     await tester.tap(find.text('New version'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, 'Midnight Ferry.RPP'), findsOne);
+    // The label is required.
+    Finder createButton() => find.widgetWithText(FilledButton, 'Create');
+    expect(tester.widget<FilledButton>(createButton()).onPressed, isNull);
+    await tester.enterText(find.widgetWithText(TextField, 'Label'), ' ');
+    await tester.pump();
+    expect(find.text('A label is required'), findsOne);
+    expect(tester.widget<FilledButton>(createButton()).onPressed, isNull);
 
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'bridge');
     await tester.pumpAndSettle();

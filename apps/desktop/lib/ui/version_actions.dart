@@ -117,6 +117,9 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
 
   /// The file name follows the label until edited by hand.
   var _nameEdited = false;
+
+  /// The label is required: its error shows once it has been typed in.
+  var _labelEdited = false;
   var _busy = false;
 
   String get _suggested =>
@@ -165,9 +168,11 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
     );
     final selected = widget.selected;
     final error = versionNameError(l10n, widget.title, _name.text);
+    final labelMissing = _label.text.trim().isEmpty;
     final ready =
         !_busy &&
         error == null &&
+        !labelMissing &&
         (_source != _Source.template || _template != null);
     Widget source(_Source value, String label, {String? hint, bool? enabled}) =>
         RadioListTile<_Source>(
@@ -237,10 +242,14 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
               controller: _label,
               autofocus: true,
               onChanged: (_) => setState(() {
+                _labelEdited = true;
                 if (!_nameEdited) _name.text = _suggested;
               }),
               decoration: InputDecoration(
                 labelText: l10n.versionLabel,
+                errorText: _labelEdited && labelMissing
+                    ? l10n.labelRequired
+                    : null,
                 isDense: true,
               ),
             ),
