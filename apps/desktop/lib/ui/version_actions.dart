@@ -336,8 +336,12 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
     current: widget.version.fileName,
   );
 
+  /// An adopted version keeps a label (SPEC §4.2).
+  bool get _labelMissing =>
+      widget.version.isAdopted && _label.text.trim().isEmpty;
+
   void _save() {
-    if (_error(AppLocalizations.of(context)) != null) return;
+    if (_error(AppLocalizations.of(context)) != null || _labelMissing) return;
     Navigator.of(context)
         .pop((withProjectExtension(_name.text), _label.text.trim()));
   }
@@ -369,10 +373,12 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
             TextField(
               controller: _label,
               enabled: adopted,
+              onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _save(),
               decoration: InputDecoration(
                 labelText: l10n.versionLabel,
                 helperText: adopted ? null : l10n.labelNeedsAdoption,
+                errorText: _labelMissing ? l10n.labelRequired : null,
                 isDense: true,
               ),
             ),
@@ -385,7 +391,7 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
           child: Text(l10n.cancel),
         ),
         FilledButton(
-          onPressed: error == null ? _save : null,
+          onPressed: error == null && !_labelMissing ? _save : null,
           child: Text(l10n.save),
         ),
       ],

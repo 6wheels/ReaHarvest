@@ -185,6 +185,7 @@
     "placeholders": { "count": { "type": "int" } }
   },
   "noLabel": "No label",
+  "labelRequired": "A label is required",
   "history": "History",
   "noBackups": "No backup point yet.",
   "statLength": "Length",

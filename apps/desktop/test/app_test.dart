@@ -1342,7 +1342,11 @@ void main() {
     await tester.tap(find.textContaining('· Opening old.rpp'));
     await tester.pumpAndSettle();
     expect(find.text('Not adopted'), findsNWidgets(2));
-    expect(find.text('Opening old'), findsOneWidget); // pane heading
+    // Pane heading: the file name with its extension, in italic.
+    expect(
+      tester.widget<Text>(find.text('Opening old.rpp')).style?.fontStyle,
+      FontStyle.italic,
+    );
   });
 
   testWidgets('adopts a version for a declared member', (tester) async {
@@ -1471,7 +1475,18 @@ void main() {
       find.widgetWithText(TextField, 'File name'),
       'intro',
     );
+    // An adopted version keeps a label.
+    await tester.enterText(find.widgetWithText(TextField, 'Label'), ' ');
+    await tester.pump();
+    expect(find.text('A label is required'), findsOne);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Save'))
+          .onPressed,
+      isNull,
+    );
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'first');
+    await tester.pump();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(libraries.edited, [('Midnight Ferry v1.rpp', 'intro.RPP', 'first')]);

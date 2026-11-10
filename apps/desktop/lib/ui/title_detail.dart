@@ -771,12 +771,16 @@ class _VersionPane extends ConsumerWidget {
           children: [
             Flexible(
               child: Text(
-                m == null
+                alerts.notAdopted
+                    ? version.fileName
+                    : m == null
                     ? p.posix.withoutExtension(version.fileName)
                     : m.label.isEmpty
                     ? l10n.noLabel
                     : m.label,
-                style: text.titleLarge,
+                style: text.titleLarge?.copyWith(
+                  fontStyle: alerts.notAdopted ? FontStyle.italic : null,
+                ),
               ),
             ),
             if (alerts.notAdopted) ...[
