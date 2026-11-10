@@ -1117,9 +1117,11 @@ void main() {
     expect(find.text('BPM'), findsOneWidget);
     expect(find.text('TRACKS'), findsOneWidget);
 
+    // The pane shows the label as heading, not the file name.
     await tester.tap(find.text('take 5'));
     await tester.pumpAndSettle();
-    expect(find.textContaining(RegExp('^take 5 · ')), findsOneWidget);
+    expect(find.text('take 5'), findsNWidgets(2));
+    expect(find.text('Midnight Ferry v5'), findsNothing);
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
@@ -1218,7 +1220,11 @@ void main() {
       findsOneWidget,
     );
 
+    // The label is required.
+    Finder adoptButton() => find.widgetWithText(FilledButton, 'Adopt');
+    expect(tester.widget<FilledButton>(adoptButton()).onPressed, isNull);
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'intro');
+    await tester.pump();
     final slow = pending = Completer<void>();
     await tester.tap(find.text('Adopt'));
     await tester.pumpAndSettle();
@@ -1323,19 +1329,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Labels only; generic labels followed by the file name.
-    expect(find.text('mix'), findsOneWidget);
+    // Labels only; generic labels followed by the file name, in italic.
+    expect(find.text('mix'), findsNWidgets(2)); // list and pane heading
+    expect(find.textContaining('Opening mix'), findsNothing);
     expect(find.text('No label'), findsOneWidget);
-    expect(find.textContaining('Opening raw'), findsOneWidget);
-    expect(find.textContaining('· Opening old'), findsOneWidget);
-    expect(find.text('Opening mix'), findsOneWidget); // pane only
+    expect(find.textContaining('· Opening raw.rpp'), findsOneWidget);
+    expect(find.textContaining('· Opening old.rpp'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_outline_rounded), findsNWidgets(2));
     expect(find.text('Mixing'), findsWidgets);
 
     // Not adopted: list label and badge next to the version name.
-    await tester.tap(find.textContaining('· Opening old'));
+    await tester.tap(find.textContaining('· Opening old.rpp'));
     await tester.pumpAndSettle();
     expect(find.text('Not adopted'), findsNWidgets(2));
+    expect(find.text('Opening old'), findsOneWidget); // pane heading
   });
 
   testWidgets('adopts a version for a declared member', (tester) async {
@@ -1367,6 +1374,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Carol').last);
     await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Label'), 'intro');
+    await tester.pump();
     await tester.tap(find.text('Adopt'));
     await tester.pumpAndSettle();
     expect(libraries.adoptedOwners, [const MemberId('demo-member')]);

@@ -114,12 +114,18 @@ String titleSubtitle(WidgetRef ref, AppLocalizations l10n, Title title) => [
   ?libraryName(ref, title),
 ].join(' · ');
 
-/// Label, owner, date and tempo of [version], joined.
-String versionDetails(WidgetRef ref, AppLocalizations l10n, Version version) {
+/// Label (unless not [withLabel]), owner, date and tempo of [version],
+/// joined.
+String versionDetails(
+  WidgetRef ref,
+  AppLocalizations l10n,
+  Version version, {
+  bool withLabel = true,
+}) {
   final owners = ref.watch(ownerNamesProvider);
   final m = version.metadata;
   return [
-    if (m != null && m.label.isNotEmpty) m.label,
+    if (withLabel && m != null && m.label.isNotEmpty) m.label,
     if (m != null) ownerName(owners, m.owner),
     shortDate(l10n, version.modified),
     if (version.tempo case final bpm?) l10n.bpm(bpm.round()),
@@ -475,13 +481,20 @@ class _VersionItem extends ConsumerWidget {
     final owners = ref.watch(ownerNamesProvider);
     final m = version.metadata;
     final status = title.statusOf(version);
+    // Free tree versions have no metadata: their file name is their label.
     final label = m == null
-        ? l10n.notAdopted
+        ? alerts.notAdopted
+              ? l10n.notAdopted
+              : p.posix.withoutExtension(version.fileName)
         : m.label.isEmpty
         ? l10n.noLabel
         : m.label;
     // Generic labels: muted, the file name tells the versions apart.
-    final generic = m == null || m.label.isEmpty;
+    final generic = alerts.notAdopted || (m != null && m.label.isEmpty);
+    final details = [
+      shortDate(l10n, version.modified),
+      if (m != null) ownerName(owners, m.owner),
+    ].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
@@ -497,14 +510,16 @@ class _VersionItem extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  m == null
-                      ? Icons.help_outline_rounded
-                      : Icons.check_circle_outline_rounded,
-                  size: 18,
-                  color: m == null ? c.muted : c.accent,
-                ),
-                const SizedBox(width: Space.s),
+                if (m != null || alerts.notAdopted) ...[
+                  Icon(
+                    m == null
+                        ? Icons.help_outline_rounded
+                        : Icons.check_circle_outline_rounded,
+                    size: 18,
+                    color: m == null ? c.muted : c.accent,
+                  ),
+                  const SizedBox(width: Space.s),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,13 +533,19 @@ class _VersionItem extends ConsumerWidget {
                           color: generic ? c.muted : null,
                         ),
                       ),
-                      Text(
-                        [
-                          shortDate(l10n, version.modified),
-                          if (m != null) ownerName(owners, m.owner),
-                          if (generic)
-                            p.posix.withoutExtension(version.fileName),
-                        ].join(' · '),
+                      Text.rich(
+                        TextSpan(
+                          text: details,
+                          children: [
+                            if (generic)
+                              TextSpan(
+                                text: ' · ${version.fileName}',
+                                style: const TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                          ],
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: text.bodySmall?.copyWith(color: c.muted),
@@ -598,8 +619,10 @@ class _AdoptState extends ConsumerState<_Adopt> {
     super.dispose();
   }
 
+  bool get _ready => !_busy && _label.text.trim().isNotEmpty;
+
   Future<void> _adopt() async {
-    if (_busy) return;
+    if (!_ready) return;
     final owner = _owner;
     try {
       // Spinner once confirmed, while the project is rewritten.
@@ -635,6 +658,7 @@ class _AdoptState extends ConsumerState<_Adopt> {
               Expanded(
                 child: TextField(
                   controller: _label,
+                  onChanged: (_) => setState(() {}),
                   onSubmitted: (_) => _adopt(),
                   decoration: InputDecoration(
                     labelText: l10n.versionLabel,
@@ -663,7 +687,7 @@ class _AdoptState extends ConsumerState<_Adopt> {
               ],
               const SizedBox(width: Space.s),
               FilledButton(
-                onPressed: _busy ? null : _adopt,
+                onPressed: _ready ? _adopt : null,
                 child: BusyLabel(l10n.adopt, busy: _busy),
               ),
             ],
@@ -747,7 +771,11 @@ class _VersionPane extends ConsumerWidget {
           children: [
             Flexible(
               child: Text(
-                p.posix.withoutExtension(version.fileName),
+                m == null
+                    ? p.posix.withoutExtension(version.fileName)
+                    : m.label.isEmpty
+                    ? l10n.noLabel
+                    : m.label,
                 style: text.titleLarge,
               ),
             ),
@@ -759,7 +787,7 @@ class _VersionPane extends ConsumerWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          versionDetails(ref, l10n, version),
+          versionDetails(ref, l10n, version, withLabel: false),
           style: text.bodyMedium?.copyWith(color: c.muted),
         ),
         if (entry != null)
