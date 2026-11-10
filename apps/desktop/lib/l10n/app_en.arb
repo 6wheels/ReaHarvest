@@ -180,6 +180,10 @@
   "@notAdoptedCount": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "toAdoptCount": "{count} to adopt",
+  "@toAdoptCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "history": "History",
   "noBackups": "No backup point yet.",
   "statLength": "Length",

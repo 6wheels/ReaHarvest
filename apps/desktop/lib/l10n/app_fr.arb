@@ -135,6 +135,7 @@
   "allVersions": "Les {count} versions",
   "duplicateCount": "{count, plural, =1{1 version dupliquée} other{{count} versions dupliquées}}",
   "notAdoptedCount": "{count, plural, =1{1 version non adoptée} other{{count} versions non adoptées}}",
+  "toAdoptCount": "{count} à adopter",
   "history": "Historique",
   "noBackups": "Aucun point de sauvegarde pour l'instant.",
   "statLength": "Durée",

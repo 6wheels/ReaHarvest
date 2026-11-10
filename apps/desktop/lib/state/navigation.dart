@@ -265,6 +265,16 @@ final toAdoptProvider = Provider<List<(Title, Version)>>((ref) {
   ];
 });
 
+/// Number of versions to adopt per title id, titles without any left out
+/// (SPEC §5.2).
+final toAdoptCountsProvider = Provider<Map<NodeId, int>>((ref) {
+  final counts = <NodeId, int>{};
+  for (final (t, _) in ref.watch(toAdoptProvider)) {
+    counts[t.id] = (counts[t.id] ?? 0) + 1;
+  }
+  return counts;
+});
+
 /// Versions sharing a version id (Save As duplicates, SPEC §4.2).
 final duplicatesProvider = Provider<Map<VersionId, List<(Title, Version)>>>(
   (ref) => duplicateVersions(ref.watch(titlesProvider)),

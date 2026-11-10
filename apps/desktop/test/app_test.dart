@@ -617,6 +617,14 @@ void main() {
     );
     expect(find.text('Artist'), findsNothing);
     expect(find.text('To adopt · 2'), findsOneWidget);
+    // The card counts the versions to adopt of its title.
+    expect(
+      find.descendant(
+        of: find.widgetWithText(TitleCard, 'Pandemia'),
+        matching: find.textContaining('2 to adopt'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Album'));
     await tester.pumpAndSettle();
     expect(find.text('Unassigned'), findsOneWidget);
@@ -1159,11 +1167,27 @@ void main() {
 
   testWidgets('adopts a version after the REAPER warning', (tester) async {
     await pumpApp(tester, titles: demoTitles(), reaperRunning: true);
+    // Hidden on the cards of titles without versions to adopt.
+    expect(find.textContaining('to adopt'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.widgetWithText(TitleCard, 'Glass Garden'),
+        matching: find.textContaining('1 to adopt'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('To adopt · 1'));
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsOneWidget);
     await tester.tap(find.text('Glass Garden'));
     await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.text('1 version not adopted'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(
       find.descendant(
         of: find.byType(Overview),
@@ -1171,6 +1195,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(TitleDetailPage),
+        matching: find.text('1 version not adopted'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'intro');
     await tester.tap(find.text('Adopt'));

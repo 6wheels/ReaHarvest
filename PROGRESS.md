@@ -31,7 +31,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #68 layout moves and member subfolders (batch fix with preview and optional level values, unknown folders included with a chosen level, free move per item (level chosen for unknown folders), fresh inventory (hashes of the previous one reused) and check around every batch, cancellable at every step; values of moved folders added to the known values; every step and library change logged; batch adoption of the versions already in place: see #80)
 - [x] #81 merge folders moved to the same title (recursive merge of a folder moved onto an existing one; name collisions suffixed and references of the moved projects rewritten; node files merged, the target's title status wins and the dropped one is reported; what is left of the source kept in `.migration/<stamp>/merged/`; merge shown in the fix previews; identical media dedup left to #69)
 - [x] #82 select the To sort items to fix in bulk (checkbox on the cards of the batch-fixable kinds, select all and counter per section; "Fix…" previews the selection, or the whole section when none; selection kept through a rescan)
-- [ ] #80 number of versions to adopt on the card, overview and detail
+- [x] #80 number of versions to adopt on the card ("N to adopt" in its figures), overview and detail header (hidden when none); the To adopt double filter and the batch adoption stay ideas on the issue
 - [ ] #69 media normalization and pool merge
 - [ ] #70 other files to Assets with reference check
 - [ ] #72 convert to a collab repository
@@ -63,4 +63,4 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - New fixture corpus parked in a git stash (`fixtures: new anonymized corpus in progress`), TODO in `test/fixtures/README.md`.
 
 ## Next step
-Continue M1 with #80 (number of versions to adopt on the card, overview and detail).
+Continue M1 with #69 (media normalization and pool merge).

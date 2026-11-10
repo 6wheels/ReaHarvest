@@ -353,6 +353,7 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
   @override
   Widget build(BuildContext context) {
     final overview = ref.watch(overviewProvider);
+    final toAdopt = ref.watch(toAdoptCountsProvider);
     final titles = _shown;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -390,6 +391,7 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
               child: TitleCard(
                 titles[i],
                 selected: overview == titles[i].id,
+                toAdopt: toAdopt[titles[i].id] ?? 0,
                 onTap: () =>
                     ref.read(overviewProvider.notifier).toggle(titles[i].id),
               ),

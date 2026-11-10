@@ -317,6 +317,7 @@ class _Header extends ConsumerWidget {
         ? ''
         : [...tags.skip(1), ?libraryName(ref, t)].join(' · ');
     final v = version;
+    final toAdopt = t == null ? 0 : ref.watch(toAdoptCountsProvider)[t.id] ?? 0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.m, Space.m, Space.xl, Space.l),
       child: Column(
@@ -372,6 +373,21 @@ class _Header extends ConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: text.bodyMedium?.copyWith(color: c.muted),
+                        ),
+                      if (toAdopt > 0)
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.help_outline_rounded,
+                              size: 16,
+                              color: c.muted,
+                            ),
+                            const SizedBox(width: Space.xs),
+                            Text(
+                              l10n.notAdoptedCount(toAdopt),
+                              style: text.bodySmall?.copyWith(color: c.muted),
+                            ),
+                          ],
                         ),
                     ],
                   ),

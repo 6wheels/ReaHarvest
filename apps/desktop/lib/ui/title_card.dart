@@ -11,9 +11,18 @@ import 'title_actions.dart';
 
 /// Square title card, like a record sleeve (SPEC §5.2).
 class TitleCard extends StatefulWidget {
-  const TitleCard(this.title, {super.key, this.selected = false, this.onTap});
+  const TitleCard(
+    this.title, {
+    super.key,
+    this.selected = false,
+    this.toAdopt = 0,
+    this.onTap,
+  });
 
   final domain.Title title;
+
+  /// Number of versions to adopt, hidden when none.
+  final int toAdopt;
 
   /// Whether the title is shown in the overview.
   final bool selected;
@@ -40,6 +49,7 @@ class _TitleCardState extends State<TitleCard> {
         .join(' · ');
     final meta = [
       l10n.versionCount(t.versions.length),
+      if (widget.toAdopt > 0) l10n.toAdoptCount(widget.toAdopt),
       if (tempoOf(t) case final bpm?) l10n.bpm(bpm),
     ].join(' · ');
     final date = shortDate(l10n, lastModified(t));
