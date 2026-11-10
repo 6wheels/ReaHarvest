@@ -23,14 +23,17 @@ with a band).
 
 ## Status
 
-Early development, not usable yet. Work follows the milestones of the
-specification:
+Early development, not usable yet. The first goal is an MVP that moves a band
+onto a structured shared cloud folder, delivered in four milestones:
 
-- **A — Local mode** (in progress): RPP parser and patch writer done.
-- **B — Cloud mode**
-- **C — Collab mode**
+- **M0 — Foundations** (done): portable mode, background tasks, reports, logs.
+- **M1 — Migration** (in progress): organize an existing folder in place,
+  without losing any file.
+- **M2 — Join and sync**: join a library, checkout, publish, release.
+- **M3 — Shared statuses and activity**
 
-Progress is tracked in [GitHub issues](https://github.com/6wheels/ReaHarvest/issues).
+Progress is tracked in [PROGRESS.md](PROGRESS.md) and in
+[GitHub issues](https://github.com/6wheels/ReaHarvest/issues).
 
 ## Platforms
 
@@ -68,3 +71,8 @@ The full specification is in [SPEC.md](SPEC.md).
 ## License
 
 [GPL-3.0](LICENSE)
+
+## Disclaimer
+
+ReaHarvest is an independent project, not affiliated with or endorsed by
+Cockos Incorporated. REAPER is a trademark of Cockos Incorporated.

@@ -49,3 +49,7 @@ app.*.map.json
 
 # Generated localizations (flutter gen-l10n)
 /lib/l10n/app_localizations*.dart
+
+# Portable mode data written by the demo run configuration
+/settings.json
+/index.sqlite*

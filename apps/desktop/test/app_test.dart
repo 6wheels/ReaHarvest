@@ -617,8 +617,8 @@ void main() {
     Title title(String album, String name) => Title(
       id: NodeId.generate(),
       libraryId: demoLibrary.id,
-      path: '1980/$album/$name',
-      tags: {'artist': '1980', 'album': album, 'title': name},
+      path: 'Band/$album/$name',
+      tags: {'artist': 'Band', 'album': album, 'title': name},
       // Two versions to adopt: the counter still counts one title.
       versions: [
         for (final file in ['$name.rpp', '$name 2.rpp'])
@@ -627,14 +627,17 @@ void main() {
     );
     await pumpApp(
       tester,
-      titles: [title(Layout.unassigned, 'Pandemia'), title('Live', 'Reunite')],
+      titles: [
+        title(Layout.unassigned, 'First song'),
+        title('Live', 'Other song'),
+      ],
     );
     expect(find.text('Artist'), findsNothing);
     expect(find.text('To adopt · 2'), findsOneWidget);
     // The card counts the versions to adopt of its title.
     expect(
       find.descendant(
-        of: find.widgetWithText(TitleCard, 'Pandemia'),
+        of: find.widgetWithText(TitleCard, 'First song'),
         matching: find.textContaining('2 to adopt'),
       ),
       findsOneWidget,
