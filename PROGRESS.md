@@ -21,7 +21,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - Progress is written in this file only; SPEC.md refers to it.
 - M1 validation checks the quality of the product, not a folder left without any issue.
 - Assets: a link opening the `Assets/` folder is enough until M3 (#106); the assets view comes in M3, right after the statuses and before the activity (#52, #28).
-- Distribution: the members are not technical, so M2 delivers a Windows installer with auto-update (#31); the zip shared by hand is dropped (#75 closed), a portable zip stays attached to each release. The SignPath application is to be submitted by the repository owner at the start of M2.
+- Distribution: the members are not technical, so M2 delivers a Windows installer with auto-update (#31); the zip shared by hand is dropped (#75 closed), a portable zip stays attached to each release. #31 starts with a study of the Microsoft Store as another route. Code signing (SignPath Foundation) is out of M2: Backlog, #113; the M2 installer is unsigned, with a guide for the SmartScreen warning.
 - Recovery: a failed fix is undone at once, an interrupted one is offered to be undone, a cancelled batch leaves only complete fixes (#94); a checkout or publish started again copies only what is missing (#18, #19).
 - The scan creates no folder and never writes in a repository (#97); a version adopted in batch takes its file name as label (#98); a file named by a plugin state is never moved nor purged (#96); purge is for `local` mode only in the MVP (#111).
 - Identity: the installation keeps its own; a `collab` library stores the member it acts as, and each installation writes in its own client folder, so a member can join again from another computer (#108).
@@ -92,7 +92,7 @@ Remaining features:
 - [ ] #26 members, ownership and forced publish
 - [ ] #83 repair of corrupted application files
 - [ ] #109 history of a title without parsing every backup again
-- [ ] #31 Windows installer, GitHub Releases and auto-update (replaces #75; SignPath application submitted at the start of M2)
+- [ ] #31 Windows installer, GitHub Releases and auto-update (replaces #75; Microsoft Store study first, at the start of M2; unsigned)
 - [ ] #110 design direction (DAW, mixing console), typeface and own components
 - [ ] Validation: two portable copies on one machine sharing `H:\My Drive\test_sync`
 
@@ -107,7 +107,7 @@ Remaining features:
 - [ ] #27 tasks, notes and lyrics in the interface (collab mode)
 
 ## Parked (Backlog)
-#12, #14, #22, #32, #40, #43, #46, #47, #48, #53, #58, #78, #111, #112.
+#12, #14, #22, #32, #40, #43, #46, #47, #48, #53, #58, #78, #111, #112, #113.
 Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## Pending outside the plan
