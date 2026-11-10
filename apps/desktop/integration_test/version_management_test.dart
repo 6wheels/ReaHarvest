@@ -141,7 +141,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('v1'), findsWidgets);
+    // A version not adopted is headed by its file name.
+    expect(find.text('v1.rpp'), findsOne);
 
     // New version from a template, with the suggested file name.
     await tapText(tester, 'New version');
@@ -155,7 +156,8 @@ void main() {
     await tapText(tester, 'Create');
     await waitFor(
       tester,
-      () => find.text('Song - bridge').evaluate().isNotEmpty,
+      // Adopted versions are shown by their label.
+      () => find.text('bridge').evaluate().isNotEmpty,
       reason: 'version created',
     );
     expect(metadataOf('Song - bridge.RPP')?.label, 'bridge');
@@ -175,7 +177,7 @@ void main() {
       tester,
       () =>
           file('Song - solo.RPP').existsSync() &&
-          find.text('Song - solo').evaluate().isNotEmpty,
+          find.text('solo').evaluate().isNotEmpty,
       reason: 'version duplicated',
     );
     final copy = metadataOf('Song - solo.RPP')!;
@@ -195,7 +197,7 @@ void main() {
       tester,
       () =>
           file('Song - guitar solo.RPP').existsSync() &&
-          find.text('Song - guitar solo').evaluate().isNotEmpty,
+          find.text('guitar').evaluate().isNotEmpty,
       reason: 'version renamed',
     );
     expect(file('Song - solo.RPP').existsSync(), isFalse);
@@ -233,7 +235,7 @@ void main() {
       tester,
       () =>
           file('.trash/Song - guitar solo.RPP').existsSync() &&
-          find.text('Song - guitar solo').evaluate().isEmpty,
+          find.text('guitar').evaluate().isEmpty,
       reason: 'version trashed',
     );
 
