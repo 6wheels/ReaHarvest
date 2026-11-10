@@ -402,4 +402,125 @@ void main() {
     expect(log, contains('INFO tasks: Scan of the libraries: done'));
     expect(log, contains('libraryScanned (2)'));
   });
+
+  testWidgets('normalizes media and moves a loose project (#69)', (
+    tester,
+  ) async {
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    final source = File(fixture('tracks.rpp')).readAsStringSync();
+    final names = {
+      for (final ref in RppProject.parse(source).mediaFiles)
+        ref.split(r'\').last,
+    };
+    // Media of the title in place: no issue for it.
+    for (final name in names) {
+      file('Media/$name').writeAsStringSync(name);
+    }
+    // A second title whose media are in a member subfolder, and a loose
+    // project above the title level using identical media.
+    final members = rewriteMediaPaths(
+      source,
+      (ref) => 'Alice\\audio\\${ref.split(r'\').last}',
+    );
+    final loose = rewriteMediaPaths(
+      source,
+      (ref) => 'audio-files\\${ref.split(r'\').last}',
+    );
+    final other = p.join(band, 'Artist', 'Album', 'Other');
+    Directory(p.join(other, 'Alice', 'audio')).createSync(recursive: true);
+    File(p.join(other, 'v.rpp')).writeAsStringSync(members);
+    Directory(p.join(band, 'Artist', 'audio-files')).createSync();
+    File(p.join(band, 'Artist', 'loose.rpp')).writeAsStringSync(loose);
+    for (final name in names) {
+      File(p.join(other, 'Alice', 'audio', name)).writeAsStringSync(name);
+      File(p.join(band, 'Artist', 'audio-files', name)).writeAsStringSync(name);
+    }
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const ReaHarvestApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    List<BackgroundTask> tasks() => container.read(tasksProvider);
+    final service = container.read(libraryServiceProvider);
+    final scanning = service.scanAll();
+    await waitFor(tester, () => !tasks().last.isRunning, reason: 'scan done');
+    await scanning;
+
+    // Render targets are only reported here (#84).
+    await tester.tap(find.textContaining('To sort ·'));
+    await tester.pumpAndSettle();
+    expect(find.text("MEDIA OUTSIDE THE TITLE'S MEDIA FOLDER · 1"), findsOne);
+    expect(find.text(r'Alice\audio\02-Kick-261108_1909.wav'), findsOne);
+
+    // Normalization of the title, from its section.
+    await tapText(tester, 'Fix…');
+    expect(
+      find.text(
+        'whole title Artist/Album/Other: media into Media, record path Media',
+      ),
+      findsOne,
+    );
+    await tapText(tester, 'Fix 1 item');
+    await waitFor(
+      tester,
+      () => find.text('Media moved · ${names.length}').evaluate().isNotEmpty,
+      reason: 'normalization report',
+    );
+    expect(find.text('Projects normalized · 1'), findsOne);
+    expect(find.textContaining('Files missing or changed'), findsNothing);
+    await tapText(tester, 'Close');
+    final normalized = RppProject.parse(
+      File(p.join(other, 'v.rpp')).readAsStringSync(),
+    );
+    expect(normalized.recordPath, r'.\Media');
+    expect(normalized.mediaFiles, everyElement(startsWith(r'Media\')));
+    for (final name in names) {
+      expect(File(p.join(other, 'Media', name)).existsSync(), isTrue);
+      expect(File(p.join(other, 'Alice', 'audio', name)).existsSync(), isFalse);
+    }
+
+    // Guided move of the loose project into that title: its media are
+    // identical to the pool ones, which it uses.
+    expect(find.text('PROJECTS ABOVE THE TITLE LEVEL · 1'), findsOne);
+    await tapText(tester, 'Move…');
+    await tester.enterText(field('Album'), 'Album');
+    await tester.enterText(field('Title'), 'Other');
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Move');
+    await waitFor(
+      tester,
+      () => find.text('Project moved · 1').evaluate().isNotEmpty,
+      reason: 'move report',
+    );
+    expect(
+      find.text('Duplicate media moved to the trash · ${names.length}'),
+      findsOne,
+    );
+    expect(find.textContaining('Files missing or changed'), findsNothing);
+    await tapText(tester, 'Close');
+    final moved = RppProject.parse(
+      File(p.join(other, 'loose.rpp')).readAsStringSync(),
+    );
+    expect(moved.recordPath, 'Media');
+    expect(moved.mediaFiles, everyElement(startsWith(r'Media\')));
+    for (final name in names) {
+      expect(File(p.join(other, '.trash', name)).existsSync(), isTrue);
+    }
+    expect(File(p.join(band, 'Artist', 'loose.rpp')).existsSync(), isFalse);
+    await waitFor(
+      tester,
+      () => find
+          .textContaining('PROJECTS ABOVE THE TITLE LEVEL')
+          .evaluate()
+          .isEmpty,
+      reason: 'rescanned',
+    );
+    expect(
+      find.textContaining("MEDIA OUTSIDE THE TITLE'S MEDIA"),
+      findsNothing,
+    );
+  });
 }
