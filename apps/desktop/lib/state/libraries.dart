@@ -472,14 +472,9 @@ class LibraryService {
   Future<bool> openVersion(Title title, Version version) async {
     final executable = await ref.read(reaperExecutableProvider.future);
     if (executable == null) return false;
-    final root = _entry(title.libraryId).libraryRoot;
     await ref.read(reaperLauncherProvider)(
       executable,
-      p.joinAll([
-        root,
-        ...title.path.split('/'),
-        ...version.fileName.split('/'),
-      ]),
+      versionPath(_entry(title.libraryId), title, version),
     );
     return true;
   }
@@ -718,6 +713,15 @@ Future<Report> _applyFixes(String root, List<MigrationFix> fixes) =>
       final migration = (await Migration.latest(storage))!;
       return _rooted(root, await applyFixes(migration, fixes));
     });
+
+/// Absolute path of the project file of [version] of [title], in the
+/// library [entry].
+String versionPath(LibraryEntry entry, Title title, Version version) =>
+    p.joinAll([
+      entry.libraryRoot,
+      ...title.path.split('/'),
+      ...version.fileName.split('/'),
+    ]);
 
 /// Absolute path of [path], relative to the library at [root].
 String _absolute(String root, String path) =>

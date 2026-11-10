@@ -1,3 +1,4 @@
+import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -1210,6 +1211,43 @@ void main() {
     await tester.tap(find.text('Continue anyway'));
     await tester.pumpAndSettle();
     expect(libraries.adopted, [('Glass Garden v1.rpp', 'intro')]);
+  });
+
+  testWidgets('shows the absolute path of the selected version', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      configured: const [
+        LibraryEntry(
+          id: LibraryId('demo'),
+          displayName: 'Demo',
+          workspaceRoot: '/music/Demo',
+        ),
+      ],
+    );
+    await tester.tap(find.text('Glass Garden'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        p.joinAll([
+          '/music/Demo',
+          'Sample Artist',
+          'Album 1',
+          'Glass Garden',
+          'Glass Garden v1.rpp',
+        ]),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('adopts a version for a declared member', (tester) async {

@@ -693,6 +693,10 @@ class _VersionPane extends ConsumerWidget {
         ref.watch(indexedLibrariesProvider)[title.libraryId]?.isFreeTree ??
         true;
     final hasHistory = !freeTree && m != null;
+    final entry = ref
+        .watch(settingsProvider.select((s) => s.libraries))
+        .where((l) => l.id == title.libraryId)
+        .firstOrNull;
     return ListView(
       padding: const EdgeInsets.all(Space.xl),
       children: [
@@ -705,6 +709,11 @@ class _VersionPane extends ConsumerWidget {
           versionDetails(ref, l10n, version),
           style: text.bodyMedium?.copyWith(color: c.muted),
         ),
+        if (entry != null)
+          SelectableText(
+            versionPath(entry, title, version),
+            style: text.bodySmall?.copyWith(color: c.muted),
+          ),
         if (status != null ||
             alerts.notAdopted ||
             alerts.missing.isNotEmpty) ...[
