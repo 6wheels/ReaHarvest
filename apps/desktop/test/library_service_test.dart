@@ -492,8 +492,18 @@ void main() {
   test('moves a misplaced project into a title', () async {
     final song = await bandWithSong();
     final band = p.dirname(p.dirname(p.dirname(song)));
-    File('../../test/fixtures/render-file.rpp')
-        .copySync(p.join(band, 'Artist', 'loose.rpp'));
+    // An item with a media next to the project, in its track.
+    File(p.join(band, 'Artist', 'loose.rpp')).writeAsStringSync(
+      File('../../test/fixtures/render-file.rpp')
+          .readAsStringSync()
+          .replaceFirstMapped(
+            RegExp(r'  <TRACK[^\n]*\n'),
+            (m) =>
+                '${m[0]}    <ITEM\n      <SOURCE WAVE\n'
+                '        FILE "a.wav"\n      >\n    >\n',
+          ),
+    );
+    File(p.join(band, 'Artist', 'a.wav')).writeAsStringSync('a');
     await service().scanAll();
     final id = container.read(settingsProvider).libraries.single.id;
 
@@ -505,8 +515,16 @@ void main() {
 
     final root = container.read(settingsProvider).libraries.single.libraryRoot;
     expect(container.read(tasksProvider).last.error, isNull);
+    final title = p.join(root, 'Artist', 'Album', 'Loose');
     expect(report!.items[ReportKind.projectMoved], [
-      ReportItem(p.join(root, 'Artist', 'Album', 'Loose', 'loose.rpp')),
+      ReportItem(p.join(title, 'loose.rpp')),
+    ]);
+    // Paths in details are absolute too.
+    expect(report.items[ReportKind.mediaMoved], [
+      ReportItem(
+        p.join(title, 'Media', 'a.wav'),
+        p.join(root, 'Artist', 'a.wav'),
+      ),
     ]);
     expect(
       index.titles().map((t) => t.tags['title']),

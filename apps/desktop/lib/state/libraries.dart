@@ -745,10 +745,32 @@ List<ReportItem> _items(String root, List<String> paths) => [
   for (final path in paths) ReportItem(_absolute(root, path)),
 ];
 
-/// [report] of the library at [root], with absolute paths.
+/// Kinds whose detail is a path of the library, one per line.
+const _pathDetails = {
+  ReportKind.targetExists,
+  ReportKind.folderMerged,
+  ReportKind.fileRenamed,
+  ReportKind.mediaMoved,
+  ReportKind.mediaCopied,
+  ReportKind.mediaTrashed,
+  ReportKind.mediaUsedElsewhere,
+};
+
+/// [report] of the library at [root], with absolute paths, details
+/// included.
 Report _rooted(String root, Report report) => Report({
   for (final MapEntry(key: kind, value: items) in report.items.entries)
-    kind: [for (final item in items) item.withPath(_absolute(root, item.path))],
+    kind: [
+      for (final item in items)
+        switch (item.detail) {
+          final detail? when _pathDetails.contains(kind) => ReportItem(
+            _absolute(root, item.path),
+            [for (final line in detail.split('\n')) _absolute(root, line)]
+                .join('\n'),
+          ),
+          _ => item.withPath(_absolute(root, item.path)),
+        },
+    ],
 });
 
 /// Whether [folder] holds a REAPER project (backups, history and trash left
