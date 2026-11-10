@@ -65,6 +65,22 @@ final class ScanResult {
   /// Whether the library is a free tree (SPEC §3.3).
   final bool freeTree;
 
+  /// This result without the stamps of [paths]: the next incremental scan
+  /// reads these files again.
+  ScanResult withoutStamps(Set<String> paths) => ScanResult(
+    titles: titles,
+    nodes: nodes,
+    issues: issues,
+    corrupted: corrupted,
+    orphanNodes: orphanNodes,
+    stamps: {
+      for (final MapEntry(:key, :value) in stamps.entries)
+        if (!paths.contains(key)) key: value,
+    },
+    subprojects: subprojects,
+    freeTree: freeTree,
+  );
+
   /// Versions without metadata ("To adopt", SPEC §4.2); always empty in a
   /// free tree, whose versions are identified by their path.
   Iterable<(Title, Version)> get toAdopt => [

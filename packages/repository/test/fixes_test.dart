@@ -68,6 +68,9 @@ void main() {
   test('the migration storage keeps originals and refuses deletion', () async {
     put('a.rpp', 'original');
     put('notes.txt');
+    final date = DateTime(2020, 1, 2, 3, 4, 5);
+    file('a.rpp').setLastModifiedSync(date);
+    file('notes.txt').setLastModifiedSync(date);
     final m = Migration.start(storage);
     expect(() => m.storage, throwsStateError);
     await m.takeInventory(hash);
@@ -76,11 +79,16 @@ void main() {
     await guarded.move('a.rpp', 'song/a.rpp');
     await guarded.write('song/a.rpp', Stream.value(utf8.encode('rewritten')));
     await guarded.write('new.txt', Stream.value(utf8.encode('new')));
+    await guarded.write('notes.txt', Stream.value(utf8.encode('notes')));
     await guarded.createDirectory('empty');
     await expectLater(guarded.delete('notes.txt'), throwsUnsupportedError);
 
     expect(file('${m.folder}/originals/a.rpp').readAsStringSync(), 'original');
     expect(file('${m.folder}/originals/new.txt').existsSync(), isFalse);
+    // A rewritten project keeps its date (version date); other files not.
+    expect(file('song/a.rpp').lastModifiedSync(), date);
+    expect(file('notes.txt').lastModifiedSync(), isNot(date));
+    expect(m.rewritten, {'song/a.rpp', 'notes.txt'});
     expect(await guarded.stat('empty'), isNotNull);
     expect(await guarded.list(''), isNotEmpty);
     expect((await m.check(hash)).isEmpty, isTrue);

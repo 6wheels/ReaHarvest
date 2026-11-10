@@ -180,6 +180,12 @@ final class Migration {
     await _storage.write(copy, _storage.read(path));
   }
 
+  /// Paths of the files rewritten through [storage] by this instance. A
+  /// rewritten project keeps its modification date (its version date, SPEC
+  /// §4.2): the next scan must read these files again, their size and date
+  /// may be unchanged.
+  final rewritten = <String>{};
+
   /// [RepositoryStorage] for the fixes of this migration: moves are
   /// recorded ([move]), an existing file is kept ([keepOriginal]) before
   /// it is overwritten, and deletion is refused (SPEC §5.8 step 5).
@@ -318,9 +324,17 @@ final class _GuardedStorage implements RepositoryStorage {
 
   @override
   Future<void> write(String path, Stream<List<int>> content) async {
-    if (await _inner.stat(path) != null) await _migration.keepOriginal(path);
+    final existing = await _inner.stat(path);
+    if (existing != null) await _migration.keepOriginal(path);
     await _inner.write(path, content);
+    if (existing == null) return;
+    _migration.rewritten.add(path);
+    if (isProjectFile(path)) await _inner.setModified(path, existing.modified);
   }
+
+  @override
+  Future<void> setModified(String path, DateTime modified) =>
+      _inner.setModified(path, modified);
 
   @override
   Future<void> move(String from, String to) => _migration.move(from, to);

@@ -40,6 +40,10 @@ final class CountingStorage implements RepositoryStorage {
 
   @override
   Future<void> delete(String path) => inner.delete(path);
+
+  @override
+  Future<void> setModified(String path, DateTime modified) =>
+      inner.setModified(path, modified);
 }
 
 void main() {

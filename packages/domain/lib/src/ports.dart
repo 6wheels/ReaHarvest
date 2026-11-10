@@ -40,6 +40,10 @@ abstract interface class RepositoryStorage {
 
   /// Permanently deletes the file [path] (explicit purge only, SPEC §5.4).
   Future<void> delete(String path);
+
+  /// Sets the modification date of the file [path] (a project rewritten by
+  /// the migration keeps its version date, SPEC §4.2).
+  Future<void> setModified(String path, DateTime modified);
 }
 
 /// Entity types of the canonical collab model (SPEC §6.2).

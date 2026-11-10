@@ -328,6 +328,8 @@ class LibraryService {
     return ref.read(tasksProvider.notifier).run(label, (task) async {
       final declared = [for (final f in fixes.where(inPlace)) f.path];
       var report = Report({ReportKind.valueDeclared: _items(root, declared)});
+      // Rewritten files, read again by the rescan.
+      final rewritten = <String>{};
       for (final path in declared) {
         _log.info('${entry.displayName}: folder $path kept in place');
       }
@@ -358,7 +360,8 @@ class LibraryService {
             task.checkCancelled();
             task.step((l10n) => l10n.taskStepFix(i + 1, moves.length));
             task.progress(i / moves.length);
-            final done = await _applyFixes(root, [fix], usage);
+            final (done, written) = await _applyFixes(root, [fix], usage);
+            rewritten.addAll(written);
             applied.add(fix);
             _log.log(
               done.hasErrors ? Level.WARNING : Level.INFO,
@@ -401,7 +404,7 @@ class LibraryService {
               NormalizeMedia() => null,
             },
         ]);
-        await scan(entry);
+        await scan(entry, changed: rewritten);
       }
       return report;
     }, openReport: true);
@@ -671,19 +674,28 @@ class LibraryService {
   }
 
   /// Scans [entry]; failures are only logged, the library stays configured
-  /// and is scanned again on next start.
-  Future<void> scan(LibraryEntry entry) async {
+  /// and is scanned again on next start. The files [changed] are read
+  /// again, whatever their size and date.
+  Future<void> scan(
+    LibraryEntry entry, {
+    Set<String> changed = const {},
+  }) async {
     try {
-      await _scan(entry);
+      await _scan(entry, changed: changed);
     } on Object catch (error) {
       _log.warning('Scan of ${entry.displayName} failed', error);
     }
   }
 
   /// Scans [entry] in an isolate, incrementally from the stored scan unless
-  /// [full], and updates the index. Unavailable libraries are skipped. Reports the
-  /// problems found (SPEC §5.2).
-  Future<Report> _scan(LibraryEntry entry, {bool full = false}) async {
+  /// [full] (the files [changed] read again), and updates the index.
+  /// Unavailable libraries are skipped. Reports the problems found (SPEC
+  /// §5.2).
+  Future<Report> _scan(
+    LibraryEntry entry, {
+    bool full = false,
+    Set<String> changed = const {},
+  }) async {
     final root = entry.libraryRoot;
     final storage = MountedFolderStorage(root);
     final library = await readLibrary(storage);
@@ -697,7 +709,9 @@ class LibraryService {
     final result = await scanFolder(
       root,
       library,
-      previous: full ? null : index.scanResult(library.id),
+      previous: full
+          ? null
+          : index.scanResult(library.id)?.withoutStamps(changed),
     );
     index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();
@@ -716,15 +730,17 @@ class LibraryService {
 }
 
 /// Applies [fixes] to the library at [root] through its migration, in an
-/// isolate (top-level: the closure must not capture the service).
-Future<Report> _applyFixes(
+/// isolate (top-level: the closure must not capture the service). Returns
+/// the report and the library paths of the files rewritten.
+Future<(Report, Set<String>)> _applyFixes(
   String root,
   List<MigrationFix> fixes,
   Map<String, List<String>> usage,
 ) => Isolate.run(() async {
   final storage = MountedFolderStorage(root);
   final migration = (await Migration.latest(storage))!;
-  return _rooted(root, await applyFixes(migration, fixes, usage: usage));
+  final report = await applyFixes(migration, fixes, usage: usage);
+  return (_rooted(root, report), migration.rewritten);
 });
 
 /// Absolute path of the project file of [version] of [title], in the

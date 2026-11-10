@@ -66,6 +66,10 @@ final class CountingStorage implements RepositoryStorage {
 
   @override
   Future<void> delete(String path) => inner.delete(path);
+
+  @override
+  Future<void> setModified(String path, DateTime modified) =>
+      inner.setModified(path, modified);
 }
 
 void main() {
@@ -665,6 +669,28 @@ void main() {
         v.plugins.map((p) => p.identifier),
         containsAll(['reasynth.dll', 'reaeq.dll']),
       );
+    });
+
+    test('rescan reads again the files without their stamp', () async {
+      put('band/album/song/v1.rpp', unknown);
+      final lib = library(Layout.classic());
+      final first = await scan(storage, lib);
+      final path = p.joinAll([root.path, 'band', 'album', 'song', 'v1.rpp']);
+      final date = File(path).lastModifiedSync();
+      // Same size and date, other content: a migration rewrite.
+      File(path)
+        ..writeAsStringSync(unknown.replaceFirst('TEMPO 128', 'TEMPO 129'))
+        ..setLastModifiedSync(date);
+
+      final stale = await scan(storage, lib, previous: first);
+      final fresh = await scan(
+        storage,
+        lib,
+        previous: first.withoutStamps({'band/album/song/v1.rpp'}),
+      );
+
+      expect(stale.titles.single.versions.single.tempo, 128);
+      expect(fresh.titles.single.versions.single.tempo, 129);
     });
 
     test('duplicates share a version id across titles', () async {

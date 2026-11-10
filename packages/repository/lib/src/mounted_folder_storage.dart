@@ -104,4 +104,8 @@ final class MountedFolderStorage implements RepositoryStorage {
 
   @override
   Future<void> delete(String path) => File(_abs(path)).delete();
+
+  @override
+  Future<void> setModified(String path, DateTime modified) =>
+      File(_abs(path)).setLastModified(modified);
 }

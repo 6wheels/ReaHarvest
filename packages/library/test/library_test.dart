@@ -42,6 +42,9 @@ final class MemoryStorage implements RepositoryStorage {
 
   @override
   Future<void> delete(String path) async => files.remove(path);
+
+  @override
+  Future<void> setModified(String path, DateTime modified) async {}
 }
 
 void main() {

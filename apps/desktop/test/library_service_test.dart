@@ -489,6 +489,46 @@ void main() {
     ]);
   });
 
+  test('normalizes a title, keeping the date of its projects', () async {
+    final song = await bandWithSong();
+    final other = p.join(p.dirname(song), 'Other');
+    // Same size once normalized (audio -> Media): read again anyway.
+    File(p.join(other, 'v.rpp'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        '<REAPER_PROJECT 0.1 "7.85/win64" 0\n'
+        '  RECORD_PATH Media ""\n'
+        '  RENDER_FILE Renders\n'
+        '  <TRACK\n    <ITEM\n      <SOURCE WAVE\n'
+        '        FILE "audio\\a.wav"\n      >\n    >\n  >\n>\n',
+      )
+      ..setLastModifiedSync(DateTime(2020, 1, 2));
+    File(p.join(other, 'audio', 'a.wav'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('a');
+    await service().scanAll();
+    final id = container.read(settingsProvider).libraries.single.id;
+    expect(index.issues(kind: ReportKind.mediaOutsidePool), hasLength(1));
+
+    await service().fix(id, const [NormalizeMedia('Artist/Album/Other')]);
+
+    expect(
+      File(p.join(other, 'v.rpp')).readAsStringSync(),
+      contains(r'FILE "Media\a.wav"'),
+    );
+    expect(index.issues(kind: ReportKind.mediaOutsidePool), isEmpty);
+    final title = index.titles().firstWhere((t) => t.tags['title'] == 'Other');
+    expect(title.versions.single.modified, DateTime(2020, 1, 2));
+    // Read again despite the same size and date.
+    expect(title.versions.single.media, [r'Media\a.wav']);
+    expect(
+      index
+          .issues(kind: ReportKind.missingMedia)
+          .where((i) => i.item.path.startsWith('Artist/Album/Other/')),
+      isEmpty,
+    );
+  });
+
   test('moves a misplaced project into a title', () async {
     final song = await bandWithSong();
     final band = p.dirname(p.dirname(p.dirname(song)));
