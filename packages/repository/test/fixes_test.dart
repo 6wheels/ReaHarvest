@@ -489,6 +489,79 @@ void main() {
       expect((await m.check(hash)).isEmpty, isTrue);
     });
 
+    test('leaves a pool record path written .\\Media as is', () async {
+      final text = rpp([r'Media\a.wav'], record: r'.\Media');
+      put('$song/Media/a.wav', 'a');
+      put('$song/a.rpp', text);
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(report.isEmpty, isTrue);
+      expect(file('$song/a.rpp').readAsStringSync(), text);
+    });
+
+    test('merges the media used by no project into the pool', () async {
+      for (final member in ['Alice', 'Bob']) {
+        put('$song/$member/Media/take.wav', 'take');
+        put('$song/$member/notes.txt', 'notes');
+      }
+      put('$song/loose.mid', 'midi');
+      put('$song/Renders/mix.wav', 'mix');
+      put('$song/a.rpp', rpp([], record: 'Media'));
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(report.items[ReportKind.mediaMoved], [
+        const ReportItem('$song/Media/take.wav', '$song/Alice/Media/take.wav'),
+        const ReportItem('$song/Media/loose.mid', '$song/loose.mid'),
+      ]);
+      expect(report.items[ReportKind.mediaTrashed], [
+        const ReportItem('$song/.trash/take.wav', '$song/Media/take.wav'),
+      ]);
+      // Other files (Assets, #70) and renders stay.
+      expect(file('$song/Bob/notes.txt').existsSync(), isTrue);
+      expect(file('$song/Renders/mix.wav').existsSync(), isTrue);
+      expect((await m.check(hash)).isEmpty, isTrue);
+    });
+
+    test('keeps the media of the projects not lifted yet', () async {
+      put('$song/Alice/Media/take.wav', 'take');
+      put('$song/Alice/a.rpp', rpp([r'Media\take.wav']));
+      put('$song/b.rpp', rpp([r'Alice\Media\take.wav']));
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(report.items[ReportKind.mediaCopied], [
+        const ReportItem('$song/Media/take.wav', '$song/Alice/Media/take.wav'),
+      ]);
+      expect(file('$song/Alice/Media/take.wav').existsSync(), isTrue);
+      expect(media('$song/b.rpp'), r'Media\take.wav');
+    });
+
+    test('normalizes the subprojects of the pool', () async {
+      put('$song/audio/v.wav', 'voice');
+      put('$song/Media/sub.rpp', rpp([r'..\audio\v.wav'], record: 'Media'));
+      put('$song/Media/abs.rpp', rpp([r'C:\Users\someone\x.wav']));
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(media('$song/Media/sub.rpp'), 'v.wav');
+      expect(file('$song/Media/v.wav').readAsStringSync(), 'voice');
+      expect(report.items[ReportKind.externalMedia], [
+        const ReportItem('$song/Media/abs.rpp', r'C:\Users\someone\x.wav'),
+      ]);
+      // Its record path is the one of a project in the pool: left as is.
+      expect(
+        RppProject.parse(file('$song/Media/sub.rpp').readAsStringSync())
+            .recordPath,
+        'Media',
+      );
+    });
+
     test('leaves a title intact if a project cannot be read', () async {
       put('$song/audio/v.wav', 'voice');
       put('$song/a.rpp', rpp([r'audio\v.wav']));

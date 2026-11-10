@@ -1753,12 +1753,14 @@ void main() {
         outside('Artist/Album/Song/a.rpp'),
         outside('Artist/Album/Song/b.rpp'),
         outside('Artist/Album/Other/c.rpp'),
+        // A subproject of the pool stands for its title.
+        outside('Artist/Album/Other/Media/sub.rpp'),
       ],
     );
-    await tester.tap(find.text('To sort · 3'));
+    await tester.tap(find.text('To sort · 4'));
     await tester.pumpAndSettle();
     // The references are listed on the card.
-    expect(find.text('audio-files\\snare.wav'), findsNWidgets(3));
+    expect(find.text('audio-files\\snare.wav'), findsNWidgets(4));
 
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
@@ -1768,7 +1770,7 @@ void main() {
       ),
       findsNWidgets(2),
     );
-    await tester.tap(find.text('Fix 3 items'));
+    await tester.tap(find.text('Fix 4 items'));
     await tester.pumpAndSettle();
 
     final (library, fixes) = libraries.fixed.single;

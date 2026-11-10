@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 7;
+const _schemaVersion = 8;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -65,6 +65,12 @@ CREATE TABLE files (
   hash TEXT,
   PRIMARY KEY (library_id, path)
 );
+CREATE TABLE subprojects (
+  library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+  path TEXT NOT NULL,
+  media TEXT NOT NULL,
+  PRIMARY KEY (library_id, path)
+);
 CREATE TABLE issues (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
   kind TEXT NOT NULL,
@@ -76,7 +82,15 @@ CREATE TABLE issues (
 );
 ''';
 
-const _tables = ['issues', 'files', 'versions', 'titles', 'nodes', 'libraries'];
+const _tables = [
+  'issues',
+  'subprojects',
+  'files',
+  'versions',
+  'titles',
+  'nodes',
+  'libraries',
+];
 
 /// Local SQLite index of libraries, titles, versions and file hashes
 /// (SPEC §7.1, §8). It is a cache of the file system: it is rebuilt from
@@ -118,7 +132,13 @@ final class LocalIndex {
         'ON CONFLICT (id) DO UPDATE SET json = excluded.json',
         [id, jsonEncode(library.toJson())],
       );
-      for (final t in ['nodes', 'titles', 'versions', 'issues']) {
+      for (final t in [
+        'nodes',
+        'titles',
+        'versions',
+        'subprojects',
+        'issues',
+      ]) {
         _db.execute('DELETE FROM $t WHERE library_id = ?', [id]);
       }
       _insertAll(
@@ -170,6 +190,13 @@ final class LocalIndex {
                 v.recordPath,
                 v.renderFile,
               ],
+        ],
+      );
+      _insertAll(
+        'INSERT INTO subprojects (library_id, path, media) VALUES (?, ?, ?)',
+        [
+          for (final MapEntry(:key, :value) in scan.subprojects.entries)
+            [id, key, jsonEncode(value)],
         ],
       );
       _insertAll(
@@ -302,6 +329,14 @@ final class LocalIndex {
       corrupted: paths(ReportKind.corrupted),
       orphanNodes: paths(ReportKind.orphanNode),
       stamps: {for (final f in files(id)) f.path: f.stamp},
+      subprojects: {
+        for (final r in _db.select(
+          'SELECT path, media FROM subprojects WHERE library_id = ?',
+          [id],
+        ))
+          r['path'] as String: (jsonDecode(r['media'] as String) as List)
+              .cast(),
+      },
       freeTree: library.isFreeTree,
     );
   }

@@ -461,6 +461,48 @@ void main() {
       ]);
     });
 
+    test('reports the media issues of the subprojects of a pool', () async {
+      final lib = library(Layout.classic());
+      String project(List<String> media) => [
+        '<REAPER_PROJECT 0.1 "7.84/win64" 0',
+        '  <TRACK',
+        for (final m in media) ...[
+          '    <ITEM',
+          '      <SOURCE WAVE',
+          '        FILE "$m"',
+          '      >',
+          '    >',
+        ],
+        '  >',
+        '>',
+      ].join('\n');
+      const sub = 'band/album/song/Media/sub.rpp';
+      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/Media/v.wav', 'v');
+      put('band/album/song/audio/w.wav', 'w');
+      put(sub, project([r'v.wav', r'..\audio\w.wav', r'C:\Users\x.wav']));
+
+      final counting = CountingStorage(storage);
+      final first = await scan(counting, lib);
+
+      expect(first.subprojects.keys, [sub]);
+      expect(first.issues.items[ReportKind.mediaOutsidePool], [
+        const ReportItem(sub, r'..\audio\w.wav'),
+      ]);
+      expect(first.issues.items[ReportKind.externalMedia], [
+        const ReportItem(sub, r'C:\Users\x.wav'),
+      ]);
+      expect(
+        first.issues.items[ReportKind.missingMedia]?.map((i) => i.path),
+        isNot(contains(sub)),
+      );
+
+      counting.reads.clear();
+      final second = await scan(counting, lib, previous: first);
+      expect(counting.reads, isEmpty);
+      expect(second.subprojects, first.subprojects);
+    });
+
     test('runs in an isolate', () async {
       put('band/album/song/v1.rpp', adopted);
       final result = await scanFolder(root.path, library(Layout.classic()));

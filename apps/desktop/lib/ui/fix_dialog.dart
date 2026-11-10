@@ -28,6 +28,15 @@ const normalizeKinds = {
   ReportKind.recordPathNotMedia,
 };
 
+/// Title folder of the project [path] whose media are to normalize: its
+/// folder, or the title of the pool holding it (a subproject).
+String mediaTitleOf(String path) {
+  final dir = p.posix.dirname(path);
+  return p.posix.basename(dir).toLowerCase() == 'media'
+      ? p.posix.dirname(dir)
+      : dir;
+}
+
 /// Previews the batch fix of [issues], all of [kind] (dry run): each item
 /// with its target, checked by default. Folders get optional values for
 /// the levels above them, applied to every item (prefilled when the
@@ -268,7 +277,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   MigrationFix _fix(int i) {
     final item = widget.issues[i].item;
-    if (_normalizing) return NormalizeMedia(p.posix.dirname(item.path));
+    if (_normalizing) return NormalizeMedia(mediaTitleOf(item.path));
     if (!_lifting) return MoveFolder(item.path, _target(i));
     final (:member, :statusFolder) = _lifts[i];
     final status = statusFolder == null ? null : _statuses[statusFolder];
@@ -284,7 +293,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   /// Target, and for a project its owner and status, joined.
   String _details(AppLocalizations l10n, int i) {
     if (_normalizing) {
-      return l10n.fixNormalize(p.posix.dirname(widget.issues[i].item.path));
+      return l10n.fixNormalize(mediaTitleOf(widget.issues[i].item.path));
     }
     if (!_lifting) {
       final issue = widget.issues[i];

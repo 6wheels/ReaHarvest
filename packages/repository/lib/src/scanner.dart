@@ -24,6 +24,7 @@ final class ScanResult {
     this.corrupted = const [],
     this.orphanNodes = const [],
     this.stamps = const {},
+    this.subprojects = const {},
     this.freeTree = false,
   });
 
@@ -55,6 +56,11 @@ final class ScanResult {
   /// Stamps of all scanned files (excluded files and folders left out), by
   /// path; used to skip unchanged files on the next scan.
   final Map<String, FileStamp> stamps;
+
+  /// Media references of the projects found in the pool of a title
+  /// (subprojects, `<SOURCE RPP_PROJECT`), by path; used to check them
+  /// without reading them again when unchanged.
+  final Map<String, List<String>> subprojects;
 
   /// Whether the library is a free tree (SPEC §3.3).
   final bool freeTree;
@@ -112,6 +118,7 @@ final class _Scanner {
   final issues = <ReportKind, List<ReportItem>>{};
   final corrupted = <String>[];
   final stamps = <String, FileStamp>{};
+  final subprojects = <String, List<String>>{};
 
   /// Lowercase paths of every file, excluded ones too, to find missing
   /// media (case-insensitive like Windows and macOS).
@@ -163,7 +170,12 @@ final class _Scanner {
     ]..sort();
     titles.sort((a, b) => a.path.compareTo(b.path));
     _findDuplicates();
-    if (layout != null) titles.forEach(_checkMedia);
+    if (layout != null) {
+      for (final t in titles) {
+        await _readSubprojects(t.path);
+      }
+      titles.forEach(_checkMedia);
+    }
     corrupted.sort();
     for (final list in issues.values) {
       list.sort((a, b) => a.path.compareTo(b.path));
@@ -175,6 +187,7 @@ final class _Scanner {
       corrupted: corrupted,
       orphanNodes: orphanNodes,
       stamps: stamps,
+      subprojects: subprojects,
       freeTree: layout == null,
     );
   }
@@ -315,6 +328,34 @@ final class _Scanner {
     }
   }
 
+  /// Reads the media references of the projects in the pool of the title
+  /// [dir] (subprojects), unless unchanged since the previous scan;
+  /// unreadable ones are reported as corrupted.
+  Future<void> _readSubprojects(String dir) async {
+    final pool = _join(dir, mediaFolderName).toLowerCase();
+    for (final MapEntry(key: folder, value: entries) in files.entries) {
+      if (folder.toLowerCase() != pool) continue;
+      for (final e in entries.where(_isProject)) {
+        if (previous.stamps[e.path] == stamps[e.path]) {
+          if (previous.subprojects[e.path] case final refs?) {
+            subprojects[e.path] = refs;
+            continue;
+          }
+        }
+        try {
+          final text = await storage
+              .read(e.path)
+              .transform(const Utf8Decoder(allowMalformed: true))
+              .join();
+          subprojects[e.path] = RppProject.parse(text).mediaFiles;
+        } on Object catch (error) {
+          if (!_isCorruption(error)) rethrow;
+          corrupted.add(e.path);
+        }
+      }
+    }
+  }
+
   /// Reports the versions of [title] whose media are not all present in its
   /// pool (outside `Media/`, missing, absolute or outside the library),
   /// whose record path is not `Media` or whose render target is not in
@@ -323,28 +364,14 @@ final class _Scanner {
     final dir = title.path;
     final pool = '${_join(dir, mediaFolderName)}/'.toLowerCase();
     final renders = _join(dir, rendersFolderName).toLowerCase();
+    for (final MapEntry(key: path, value: refs) in subprojects.entries) {
+      if ('${_parent(path)}/'.toLowerCase() == pool) {
+        _checkReferences(path, refs, pool);
+      }
+    }
     for (final v in title.versions) {
       final path = _join(dir, v.fileName);
-      final outside = <String>[];
-      final missing = <String>[];
-      final external = <String>[];
-      for (final ref in v.media) {
-        final file = resolveReference(dir, ref)?.toLowerCase();
-        if (file == null) {
-          external.add(ref);
-        } else if (!existing.contains(file)) {
-          missing.add(ref);
-        } else if (!file.startsWith(pool)) {
-          outside.add(ref);
-        }
-      }
-      void report(ReportKind kind, List<String> refs) {
-        if (refs.isNotEmpty) _issue(kind, ReportItem(path, refs.join('\n')));
-      }
-
-      report(ReportKind.mediaOutsidePool, outside);
-      report(ReportKind.missingMedia, missing);
-      report(ReportKind.externalMedia, external);
+      _checkReferences(path, v.media, pool);
       final record = resolveReference(dir, v.recordPath ?? '');
       if (record?.toLowerCase() != pool.substring(0, pool.length - 1)) {
         _issue(
@@ -358,6 +385,32 @@ final class _Scanner {
         _issue(ReportKind.renderFileForm, ReportItem(path, v.renderFile ?? ''));
       }
     }
+  }
+
+  /// Reports the media [refs] of the project [path] that are outside the
+  /// [pool] (lowercase, with a trailing `/`), missing, absolute or outside
+  /// the library.
+  void _checkReferences(String path, List<String> refs, String pool) {
+    final outside = <String>[];
+    final missing = <String>[];
+    final external = <String>[];
+    for (final ref in refs) {
+      final file = resolveReference(_parent(path), ref)?.toLowerCase();
+      if (file == null) {
+        external.add(ref);
+      } else if (!existing.contains(file)) {
+        missing.add(ref);
+      } else if (!file.startsWith(pool)) {
+        outside.add(ref);
+      }
+    }
+    void report(ReportKind kind, List<String> refs) {
+      if (refs.isNotEmpty) _issue(kind, ReportItem(path, refs.join('\n')));
+    }
+
+    report(ReportKind.mediaOutsidePool, outside);
+    report(ReportKind.missingMedia, missing);
+    report(ReportKind.externalMedia, external);
   }
 
   /// Versions of the projects in the title [dir]; unreadable ones are

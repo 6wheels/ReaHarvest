@@ -25,9 +25,15 @@ const _proxySuffix = '-PROX';
 ///   name (`name (2).ext`).
 /// - A subproject (`<SOURCE RPP_PROJECT`) brought in takes its proxy file
 ///   along, and its own references are rewritten from its new place.
+/// - Subprojects already in the pool are normalized too, their references
+///   relative to the pool; their record path is left as is.
 /// - A project with a missing media, or an absolute one or outside the
 ///   library, is left intact and reported; the files it references are
-///   copied rather than moved, so that it does not lose them.
+///   copied rather than moved, so that it does not lose them. So are the
+///   files referenced by the projects still in a subfolder of the title
+///   (member or status subfolder, not lifted yet).
+/// - The media found in the title outside its reserved folders and used by
+///   no project (e.g. in a member subfolder) are merged into the pool too.
 ///
 /// The whole title is left intact if one of its projects cannot be read
 /// (its media are unknown): throws [FormatException].
@@ -42,8 +48,13 @@ final class _Normalization {
   final String titleDir;
   final String pool;
 
-  /// Text of the projects of the title, by path.
+  /// Text of the projects of the title and of the subprojects of its pool,
+  /// by path: rewritten.
   final projects = <String, String>{};
+
+  /// Lowercase paths of the files referenced by the projects still in a
+  /// subfolder of the title, or by blocked projects: never moved.
+  final kept = <String>{};
 
   /// Files referenced by each project, keyed by their lowercase path.
   final files = <String, Map<String, String>>{};
@@ -63,15 +74,30 @@ final class _Normalization {
   final items = <ReportKind, List<ReportItem>>{};
 
   Future<Report> run() async {
-    for (final e in await storage.list(titleDir)) {
-      if (!e.isDirectory && isProjectFile(e.path)) {
-        projects[e.path] = await utf8.decodeStream(storage.read(e.path));
+    final entries = await storage.list(titleDir, recursive: true);
+    for (final e in entries) {
+      if (e.isDirectory || !isProjectFile(e.path)) continue;
+      final dir = _parent(e.path);
+      final segments = _relative(e.path).split('/');
+      if (segments.any(isExcludedFolder)) continue;
+      final text = await utf8.decodeStream(storage.read(e.path));
+      if (dir == titleDir || dir.toLowerCase() == pool.toLowerCase()) {
+        projects[e.path] = text;
+      } else if (!_isReserved(segments.first)) {
+        // Not lifted yet: its files stay where it expects them.
+        for (final ref in RppProject.parse(text).mediaFiles) {
+          if (resolveReference(dir, ref) case final file?) {
+            kept.add(file.toLowerCase());
+          }
+        }
       }
     }
     for (final MapEntry(key: project, value: text) in projects.entries) {
       await _resolve(project, text);
     }
-    final kept = {for (final project in blocked) ...files[project]!.keys};
+    for (final project in blocked) {
+      kept.addAll(files[project]!.keys);
+    }
     for (final MapEntry(key: project, value: refs) in files.entries) {
       if (blocked.contains(project)) continue;
       for (final MapEntry(key: key, value: file) in refs.entries) {
@@ -85,7 +111,26 @@ final class _Normalization {
       if (blocked.contains(project) || trashed.contains(key)) continue;
       // A subproject moved into the pool is rewritten there.
       final now = moved.contains(key) ? targets[key]! : project;
-      await _rewrite(project, now, text, recordPath: now == project);
+      await _rewrite(
+        project,
+        now,
+        text,
+        recordPath: now == project && _parent(project) == titleDir,
+      );
+    }
+    // Media used by no project, e.g. left in a member subfolder.
+    for (final e in entries) {
+      final key = e.path.toLowerCase();
+      final segments = _relative(e.path).split('/');
+      if (e.isDirectory ||
+          !isMediaFile(e.path) ||
+          _isReserved(segments.first) ||
+          segments.any(isExcludedFolder) ||
+          targets.containsKey(key) ||
+          kept.contains(key)) {
+        continue;
+      }
+      await _bring(e.path, keep: false);
     }
     return Report(items);
   }
@@ -97,7 +142,7 @@ final class _Normalization {
     final missing = <String>[];
     final external = <String>[];
     for (final ref in RppProject.parse(text).mediaFiles) {
-      final file = resolveReference(titleDir, ref);
+      final file = resolveReference(_parent(project), ref);
       if (file == null) {
         external.add(ref);
       } else if (await storage.stat(file) case StorageEntry(
@@ -190,7 +235,12 @@ final class _Normalization {
     if (recordPath) {
       final record = RppProject.parse(patched).document.root
           .line('RECORD_PATH');
-      if (record?.params.firstOrNull != mediaFolderName) {
+      // `.\Media` is the pool too: left as written.
+      final current = resolveReference(
+        newDir,
+        record?.params.firstOrNull ?? '',
+      );
+      if (current?.toLowerCase() != pool.toLowerCase()) {
         patched = setRootAttribute(patched, 'RECORD_PATH', [
           mediaFolderName,
           record?.params.elementAtOrNull(1) ?? '',
@@ -201,6 +251,13 @@ final class _Normalization {
     await storage.write(now, Stream.value(utf8.encode(patched)));
     if (report) _add(ReportKind.mediaNormalized, ReportItem(now));
   }
+
+  /// [path] relative to the title folder.
+  String _relative(String path) =>
+      titleDir.isEmpty ? path : path.substring(titleDir.length + 1);
+
+  static bool _isReserved(String name) =>
+      reservedTitleFolders.contains(name.toLowerCase());
 
   bool _inPool(String file) =>
       file.toLowerCase().startsWith('${pool.toLowerCase()}/');

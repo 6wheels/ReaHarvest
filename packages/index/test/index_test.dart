@@ -141,6 +141,9 @@ void main() {
           corrupted: ['Band/bad.rpp'],
           orphanNodes: ['Band/render/.node.json'],
           stamps: {'Band/First Album/Song/a.RPP': (size: 10, modified: t0)},
+          subprojects: const {
+            'Band/First Album/Song/Media/sub.rpp': [r'C:\x.wav'],
+          },
         ),
       );
 
@@ -168,6 +171,9 @@ void main() {
       expect(t.versions.last.media, isEmpty);
       expect(t.versions.last.recordPath, isNull);
       expect(restored.nodes['Band']!.id, nodeId);
+      expect(restored.subprojects, {
+        'Band/First Album/Song/Media/sub.rpp': [r'C:\x.wav'],
+      });
       expect(restored.issues.items, {
         ReportKind.projectTooDeep: [
           const ReportItem.misplaced(

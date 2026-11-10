@@ -44,6 +44,18 @@ const _excludedExtensions = {
 /// Whether [name] is a REAPER project file (case-insensitive).
 bool isProjectFile(String name) => p.extension(name).toLowerCase() == '.rpp';
 
+/// Audio, MIDI and video extensions REAPER imports as media, lowercase.
+const _mediaExtensions = {
+  '.wav', '.w64', '.rf64', '.bwf', '.aif', '.aiff', '.aifc', '.caf', //
+  '.flac', '.wv', '.ogg', '.opus', '.mp3', '.m4a', '.aac', '.wma', //
+  '.mid', '.midi', //
+  '.mp4', '.m4v', '.mov', '.avi', '.mkv', '.webm', '.mpg', '.mpeg', '.wmv',
+};
+
+/// Whether [name] is a media file (audio, MIDI or video, case-insensitive).
+bool isMediaFile(String name) =>
+    _mediaExtensions.contains(p.extension(name).toLowerCase());
+
 /// Whether the file [name] is excluded from sync and indexing (SPEC §3.2).
 bool isExcludedFile(String name) {
   final lower = name.toLowerCase();
