@@ -23,7 +23,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 
 ## M1 — Migration (umbrella #30)
 - [x] #79 center the main window at launch (priority 1)
-- [ ] #59 integration tests (moves with the milestones; M0 steps and #77 covered, regression net of the existing features still open)
+- [ ] #59 integration tests (moves with the milestones; M0 steps and #77 covered, regression net of the existing features still open; the version management test follows the label display again; CI skipped on push while the repository is private, run it on demand)
 - [x] #77 known level values (artists, albums) for layout recognition
 - [x] #66 inventory and no-loss check (logic in `repository`; started as a background task by the M1 fix flows)
 - [x] #67 typed migration issues in To sort (layout, levels, duplicated `versionId`; media, Assets and conflict-copy detectors come with #69, #70, #23)
@@ -64,4 +64,4 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - New fixture corpus parked in a git stash (`fixtures: new anonymized corpus in progress`), TODO in `test/fixtures/README.md`.
 
 ## Next step
-Continue M1 with #69 (media normalization and pool merge).
+Continue M1: validate the #69 normalization in REAPER on the sample copy (projects open with no missing media), then #84 (issues in the detail view, render target fix) and #70.
