@@ -31,6 +31,8 @@ const project = '''
 >
 ''';
 
+const fixtures = '../../test/fixtures';
+
 void main() {
   late Directory root;
   late MountedFolderStorage storage;
@@ -51,6 +53,10 @@ void main() {
     await m.takeInventory(hash);
     return m;
   }
+
+  /// Library path of the media [ref] of a project in [dir].
+  String resolveMedia(String dir, String ref) =>
+      p.posix.normalize('$dir/${ref.replaceAll(r'\', '/')}');
 
   setUp(() {
     root = Directory.systemTemp.createTempSync('reaharvest_fixes_');
@@ -281,5 +287,219 @@ void main() {
 
     expect(report.items[ReportKind.targetExists], hasLength(2));
     expect(file('Band/Song/s.rpp').existsSync(), isTrue);
+  });
+
+  group('media normalization', () {
+    const song = 'Band/Album/Song';
+
+    /// Project referencing [media], with the record path [record].
+    String rpp(List<String> media, {String record = 'audio-files'}) => [
+      '<REAPER_PROJECT 0.1 "7.0" 0',
+      '  RECORD_PATH "$record" ""',
+      '  <TRACK',
+      for (final m in media) ...[
+        '    <ITEM',
+        '      <SOURCE WAVE',
+        '        FILE "$m"',
+        '      >',
+        '    >',
+      ],
+      '  >',
+      '>',
+      '',
+    ].join('\n');
+
+    String media(String path) =>
+        RppProject.parse(file(path).readAsStringSync()).mediaFiles.join('|');
+
+    test('brings the media of a title into its pool', () async {
+      put('$song/audio-files/kick.wav', 'kick');
+      put('$song/Alice/audio/snare.wav', 'snare');
+      put('$song/Media/bass.wav', 'bass');
+      put('$song/old/bass.wav', 'bass');
+      put('$song/x/bass.wav', 'other bass');
+      put('$song/audio-files/hat.wav', 'hat');
+      put('Band/Album/Other/Media/pad.wav', 'pad');
+      put(
+        '$song/a.rpp',
+        rpp([
+          r'audio-files\kick.wav',
+          r'Alice\audio\snare.wav',
+          r'Media\bass.wav',
+          r'..\Other\Media\pad.wav',
+        ]),
+      );
+      put(
+        '$song/b.rpp',
+        rpp([
+          r'.\audio-files\kick.wav',
+          r'old\bass.wav',
+          r'x\bass.wav',
+          r'audio-files\hat.wav',
+        ], record: 'Media'),
+      );
+      final blocked = rpp([r'audio-files\hat.wav', r'gone.wav', r'D:\c.wav']);
+      put('$song/c.rpp', blocked);
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(report.items[ReportKind.mediaMoved], [
+        const ReportItem('$song/Media/kick.wav', '$song/audio-files/kick.wav'),
+        const ReportItem(
+          '$song/Media/snare.wav',
+          '$song/Alice/audio/snare.wav',
+        ),
+        const ReportItem('$song/Media/bass (2).wav', '$song/x/bass.wav'),
+      ]);
+      expect(report.items[ReportKind.mediaCopied], [
+        const ReportItem(
+          '$song/Media/pad.wav',
+          'Band/Album/Other/Media/pad.wav',
+        ),
+        const ReportItem('$song/Media/hat.wav', '$song/audio-files/hat.wav'),
+      ]);
+      expect(report.items[ReportKind.mediaTrashed], [
+        const ReportItem('$song/.trash/bass.wav', '$song/Media/bass.wav'),
+      ]);
+      expect(report.items[ReportKind.missingMedia], [
+        const ReportItem('$song/c.rpp', 'gone.wav'),
+      ]);
+      expect(report.items[ReportKind.externalMedia], [
+        const ReportItem('$song/c.rpp', r'D:\c.wav'),
+      ]);
+      expect(report.items[ReportKind.mediaNormalized], [
+        const ReportItem('$song/a.rpp'),
+        const ReportItem('$song/b.rpp'),
+      ]);
+
+      expect(
+        media('$song/a.rpp'),
+        r'Media\kick.wav|Media\snare.wav|Media\bass.wav|Media\pad.wav',
+      );
+      expect(
+        media('$song/b.rpp'),
+        r'Media\kick.wav|Media\bass.wav|Media\bass (2).wav|Media\hat.wav',
+      );
+      expect(
+        RppProject.parse(file('$song/a.rpp').readAsStringSync()).recordPath,
+        'Media',
+      );
+      // The blocked project keeps its files and its text.
+      expect(file('$song/c.rpp').readAsStringSync(), blocked);
+      expect(file('$song/audio-files/hat.wav').existsSync(), isTrue);
+      expect(file('Band/Album/Other/Media/pad.wav').existsSync(), isTrue);
+      expect(file('$song/Media/pad.wav').readAsStringSync(), 'pad');
+      expect(file('$song/.trash/bass.wav').readAsStringSync(), 'bass');
+      expect(file('$song/Media/bass (2).wav').readAsStringSync(), 'other bass');
+      expect(file('${m.folder}/originals/$song/a.rpp').existsSync(), isTrue);
+      expect((await m.check(hash)).isEmpty, isTrue);
+
+      // Normalized: nothing left to do.
+      final again = await applyFixes(m, const [NormalizeMedia(song)]);
+      expect(again.items.keys, {
+        ReportKind.missingMedia,
+        ReportKind.externalMedia,
+      });
+    });
+
+    test('takes a subproject along with its proxy', () async {
+      put('$song/audio/v.wav', 'voice');
+      put('$song/sub.rpp', rpp([r'audio\v.wav'], record: 'Media'));
+      put('$song/sub.rpp-PROX', 'proxy');
+      // A subproject of another title, copied.
+      put('Band/Album/Other/Media/i.wav', 'inner');
+      put('Band/Album/Other/inner.rpp', rpp([r'Media\i.wav'], record: 'Media'));
+      put('Band/Album/Other/inner.rpp-PROX', 'inner proxy');
+      put(
+        '$song/main.rpp',
+        [
+          '<REAPER_PROJECT 0.1 "7.0" 0',
+          '  RECORD_PATH "Media" ""',
+          '  <TRACK',
+          '    <ITEM',
+          '      <SOURCE RPP_PROJECT',
+          '        FILE "sub.rpp"',
+          '      >',
+          '    >',
+          '    <ITEM',
+          '      <SOURCE RPP_PROJECT',
+          r'        FILE "..\Other\inner.rpp"',
+          '      >',
+          '    >',
+          '  >',
+          '>',
+          '',
+        ].join('\n'),
+      );
+      final m = await migration();
+
+      await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(media('$song/main.rpp'), r'Media\sub.rpp|Media\inner.rpp');
+      expect(
+        file('$song/Media/inner.rpp-PROX').readAsStringSync(),
+        'inner proxy',
+      );
+      expect(file('Band/Album/Other/inner.rpp-PROX').existsSync(), isTrue);
+      expect(media('$song/Media/inner.rpp'), r'..\..\Other\Media\i.wav');
+      expect(file('$song/sub.rpp').existsSync(), isFalse);
+      expect(file('$song/Media/sub.rpp-PROX').readAsStringSync(), 'proxy');
+      // Next to its media in the pool.
+      expect(media('$song/Media/sub.rpp'), 'v.wav');
+      expect(file('$song/Media/v.wav').readAsStringSync(), 'voice');
+      expect((await m.check(hash)).isEmpty, isTrue);
+    });
+
+    test('non-regression: every fixture keeps its media', () async {
+      final sources = {
+        for (final f in Directory(fixtures).listSync().whereType<File>())
+          if (isProjectFile(f.path)) p.basename(f.path): f.readAsStringSync(),
+      };
+      for (final MapEntry(key: name, value: text) in sources.entries) {
+        put('$song/$name', text);
+        for (final ref in RppProject.parse(text).mediaFiles) {
+          final path = resolveMedia(song, ref);
+          if (!file(path).existsSync()) put(path, p.posix.basename(path));
+        }
+      }
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(report.hasErrors || report.hasWarnings, isFalse);
+      for (final MapEntry(key: name, value: before) in sources.entries) {
+        final after = file('$song/$name').readAsStringSync();
+        final a = before.split('\n');
+        final b = after.split('\n');
+        expect(b, hasLength(a.length));
+        for (var i = 0; i < a.length; i++) {
+          if (a[i] == b[i]) continue;
+          // Only media references and the record path change.
+          expect(b[i].trim(), matches(RegExp(r'^(FILE|RECORD_PATH) ')));
+        }
+        final project = RppProject.parse(after);
+        expect(project.recordPath, 'Media');
+        for (final ref in project.mediaFiles) {
+          final path = resolveMedia(song, ref);
+          expect(path, startsWith('$song/Media/'));
+          expect(file(path).existsSync(), isTrue, reason: '$name: $ref');
+        }
+      }
+      expect((await m.check(hash)).isEmpty, isTrue);
+    });
+
+    test('leaves a title intact if a project cannot be read', () async {
+      put('$song/audio/v.wav', 'voice');
+      put('$song/a.rpp', rpp([r'audio\v.wav']));
+      file('$song/bad.rpp').writeAsBytesSync([0xC3, 0x28]);
+      final m = await migration();
+
+      final report = await applyFixes(m, const [NormalizeMedia(song)]);
+
+      expect(report.items[ReportKind.fixFailed]!.single.path, song);
+      expect(file('$song/audio/v.wav').existsSync(), isTrue);
+      expect(media('$song/a.rpp'), r'audio\v.wav');
+    });
   });
 }

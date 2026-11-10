@@ -44,6 +44,8 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.projectMoved => l10n.reportProjectMoved,
       ReportKind.mediaMoved => l10n.reportMediaMoved,
       ReportKind.mediaCopied => l10n.reportMediaCopied,
+      ReportKind.mediaTrashed => l10n.reportMediaTrashed,
+      ReportKind.mediaNormalized => l10n.reportMediaNormalized,
     };
 
 /// Warning color, between the accent and the error.

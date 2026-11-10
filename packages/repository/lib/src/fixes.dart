@@ -6,6 +6,7 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'adoption.dart';
 import 'conventions.dart';
+import 'media.dart';
 import 'migration.dart';
 import 'node_file.dart';
 
@@ -69,6 +70,15 @@ final class LiftProject extends MigrationFix {
   ].join(', ');
 }
 
+/// Brings the media of the title [path] into its pool, references
+/// rewritten and record paths set to `Media` ([normalizeMedia]).
+final class NormalizeMedia extends MigrationFix {
+  const NormalizeMedia(super.path);
+
+  @override
+  String toString() => 'Normalize media of $path';
+}
+
 /// Applies [fixes] through the storage of [migration] (so that no file is
 /// lost), one by one: a failed fix is reported and the others go on.
 Future<Report> applyFixes(Migration migration, List<MigrationFix> fixes) async {
@@ -93,6 +103,7 @@ Future<Report> applyFixes(Migration migration, List<MigrationFix> fixes) async {
           titleDir,
         )).toReport(),
         final LiftProject lift => await _lift(storage, lift),
+        NormalizeMedia(:final path) => await normalizeMedia(storage, path),
       };
     } on Object catch (error) {
       report += Report({

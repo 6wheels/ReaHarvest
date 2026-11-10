@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:math';
 
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
@@ -98,7 +100,7 @@ Future<MoveReport> moveProjectToTitle(
       missing.add(ref);
       continue;
     }
-    final (target, exists) = await _poolTarget(storage, pool, source);
+    final (target, exists) = await poolTarget(storage, pool, source);
     if (!exists) {
       if (shared.contains(source)) {
         await storage.write(target, storage.read(source));
@@ -157,7 +159,7 @@ String? resolveReference(String dir, String ref) {
 
 /// Pool path for [source]: its name in [pool], reused when the file there is
 /// identical (second value true), suffixed when another file has the name.
-Future<(String, bool)> _poolTarget(
+Future<(String, bool)> poolTarget(
   RepositoryStorage storage,
   String pool,
   String source,
@@ -186,21 +188,40 @@ Future<String> freePath(RepositoryStorage storage, String path) async {
   }
 }
 
+/// Whether the files [a] and [b] have the same content: same size, then
+/// compared as they are streamed (media can be large).
 Future<bool> _sameContent(RepositoryStorage storage, String a, String b) async {
   final sa = await storage.stat(a);
   final sb = await storage.stat(b);
   if (sa == null || sb == null || sa.size != sb.size) return false;
-  final ba = await _bytes(storage, a);
-  final bb = await _bytes(storage, b);
-  for (var i = 0; i < ba.length; i++) {
-    if (ba[i] != bb[i]) return false;
+  final ia = StreamIterator(storage.read(a));
+  final ib = StreamIterator(storage.read(b));
+  try {
+    var ca = const <int>[];
+    var cb = const <int>[];
+    var oa = 0;
+    var ob = 0;
+    while (true) {
+      if (oa == ca.length) {
+        if (!await ia.moveNext()) return true; // Same size: b ends too.
+        (ca, oa) = (ia.current, 0);
+      } else if (ob == cb.length) {
+        if (!await ib.moveNext()) return false;
+        (cb, ob) = (ib.current, 0);
+      } else {
+        final n = min(ca.length - oa, cb.length - ob);
+        for (var i = 0; i < n; i++) {
+          if (ca[oa + i] != cb[ob + i]) return false;
+        }
+        oa += n;
+        ob += n;
+      }
+    }
+  } finally {
+    await ia.cancel();
+    await ib.cancel();
   }
-  return true;
 }
-
-Future<List<int>> _bytes(RepositoryStorage storage, String path) async => [
-  for (final chunk in await storage.read(path).toList()) ...chunk,
-];
 
 /// Media referenced by the projects of [dir] other than [except] (below
 /// [dir] too, unless [dir] is the library root).

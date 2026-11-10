@@ -34,7 +34,9 @@ enum ReportKind {
   fileRenamed(ReportLevel.done),
   projectMoved(ReportLevel.done),
   mediaMoved(ReportLevel.done),
-  mediaCopied(ReportLevel.done);
+  mediaCopied(ReportLevel.done),
+  mediaTrashed(ReportLevel.done),
+  mediaNormalized(ReportLevel.done);
 
   const ReportKind(this.level);
 

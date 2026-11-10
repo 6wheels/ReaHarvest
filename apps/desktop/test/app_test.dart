@@ -1737,6 +1737,48 @@ void main() {
     );
   });
 
+  testWidgets('normalizes the media of the titles of the projects', (
+    tester,
+  ) async {
+    LibraryIssue outside(String path) => (
+      library: band.id,
+      kind: ReportKind.mediaOutsidePool,
+      item: ReportItem(path, 'audio-files\\kick.wav\naudio-files\\snare.wav'),
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {band.id: demoLibrary},
+      issues: [
+        outside('Artist/Album/Song/a.rpp'),
+        outside('Artist/Album/Song/b.rpp'),
+        outside('Artist/Album/Other/c.rpp'),
+      ],
+    );
+    await tester.tap(find.text('To sort · 3'));
+    await tester.pumpAndSettle();
+    // The references are listed on the card.
+    expect(find.text('audio-files\\snare.wav'), findsNWidgets(3));
+
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'whole title Artist/Album/Song: media into Media, record path Media',
+      ),
+      findsNWidgets(2),
+    );
+    await tester.tap(find.text('Fix 3 items'));
+    await tester.pumpAndSettle();
+
+    final (library, fixes) = libraries.fixed.single;
+    expect(library, band.id);
+    expect(fixes.cast<NormalizeMedia>().map((f) => f.path), [
+      'Artist/Album/Song',
+      'Artist/Album/Other',
+    ]);
+  });
+
   testWidgets('fixes folders in batch or moves one anywhere', (tester) async {
     LibraryIssue folder(
       ReportKind kind,

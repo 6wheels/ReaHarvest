@@ -18,6 +18,14 @@ const batchFixKinds = {
   ReportKind.misplacedLevel,
   ReportKind.unknownValue,
   ReportKind.projectTooDeep,
+  ...normalizeKinds,
+};
+
+/// Issue kinds fixed by normalizing the media of the title of the project
+/// (#69): the whole title is fixed at once, its media being shared.
+const normalizeKinds = {
+  ReportKind.mediaOutsidePool,
+  ReportKind.recordPathNotMedia,
 };
 
 /// Previews the batch fix of [issues], all of [kind] (dry run): each item
@@ -25,7 +33,8 @@ const batchFixKinds = {
 /// the levels above them, applied to every item (prefilled when the
 /// proposals agree); unknown folders also get the level they belong to.
 /// Projects too deep get their owner and the status deduced from their
-/// status subfolder. Returns the checked fixes by library, or null if
+/// status subfolder. Projects whose media are to normalize stand for
+/// their title. Returns the checked fixes by library, or null if
 /// cancelled.
 Future<Map<LibraryId, List<MigrationFix>>?> showFixDialog(
   BuildContext context,
@@ -109,6 +118,8 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   bool get _lifting => widget.kind == ReportKind.projectTooDeep;
 
+  bool get _normalizing => normalizeKinds.contains(widget.kind);
+
   // Projects too deep.
 
   /// Owner of the projects without member subfolder.
@@ -135,6 +146,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   void initState() {
     super.initState();
     final libraries = ref.read(indexedLibrariesProvider);
+    if (_normalizing) return;
     if (_lifting) {
       final identity = ref.read(settingsProvider).identity;
       final members = {
@@ -250,12 +262,13 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   ].join('/');
 
   bool get _valid => _fields
-      .take(_lifting ? 0 : _fieldCount)
+      .take(_lifting || _normalizing ? 0 : _fieldCount)
       .map((f) => f.text.trim())
       .every((v) => v.isEmpty || isValidFolderName(v));
 
   MigrationFix _fix(int i) {
     final item = widget.issues[i].item;
+    if (_normalizing) return NormalizeMedia(p.posix.dirname(item.path));
     if (!_lifting) return MoveFolder(item.path, _target(i));
     final (:member, :statusFolder) = _lifts[i];
     final status = statusFolder == null ? null : _statuses[statusFolder];
@@ -270,6 +283,9 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   /// Target, and for a project its owner and status, joined.
   String _details(AppLocalizations l10n, int i) {
+    if (_normalizing) {
+      return l10n.fixNormalize(p.posix.dirname(widget.issues[i].item.path));
+    }
     if (!_lifting) {
       final issue = widget.issues[i];
       final target = _target(i);
@@ -295,8 +311,12 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     final fixes = <LibraryId, List<MigrationFix>>{};
     for (final i in _checked.toList()..sort()) {
       final fix = _fix(i);
-      // A folder already at its place is declared as a known value.
-      fixes.putIfAbsent(widget.issues[i].library, () => []).add(fix);
+      final list = fixes.putIfAbsent(widget.issues[i].library, () => []);
+      // One normalization per title.
+      if (fix is NormalizeMedia && list.any((f) => f.path == fix.path)) {
+        continue;
+      }
+      list.add(fix);
     }
     Navigator.of(context).pop(fixes);
   }
@@ -376,7 +396,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
             children: [
               Text(l10n.fixHint, style: muted),
               const SizedBox(height: Space.s),
-              ...(_lifting ? _liftChoices(l10n) : _folderChoices(l10n)),
+              if (_lifting)
+                ..._liftChoices(l10n)
+              else if (!_normalizing)
+                ..._folderChoices(l10n),
               const SizedBox(height: Space.s),
               for (final (i, issue) in widget.issues.indexed)
                 CheckboxListTile(

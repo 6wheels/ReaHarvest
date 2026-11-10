@@ -387,10 +387,12 @@ class LibraryService {
         task.step((l10n) => l10n.taskStepScan);
         await _rememberPaths(entry, [
           for (final f in applied)
-            switch (f) {
+            ?switch (f) {
               MoveFolder(:final target) => target,
               MoveProject(:final titleDir) ||
               LiftProject(:final titleDir) => titleDir,
+              // The title stays where it is.
+              NormalizeMedia() => null,
             },
         ]);
         await scan(entry);
