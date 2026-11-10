@@ -492,6 +492,59 @@ void main() {
       expect((await m.check(hash)).isEmpty, isTrue);
     });
 
+    test('blocks a title whose media another title uses', () async {
+      const other = 'Band/Album/Other';
+      final mine = rpp([r'audio\x.wav'], record: 'Media');
+      final theirs = rpp([r'..\Song\audio\x.wav', r'Media\y.wav']);
+      put('$song/a.rpp', mine);
+      put('$song/audio/x.wav', 'x');
+      put('$other/b.rpp', theirs);
+      put('$other/Media/y.wav', 'y');
+      put('$other/Media/sub.rpp', rpp([r'..\..\Song\audio\x.wav']));
+      final library = Library(
+        id: LibraryId.generate(),
+        mode: LibraryMode.local,
+        layout: Layout.classic(),
+      );
+      Future<Map<String, List<String>>> usage() async =>
+          mediaUsage(await scan(storage, library));
+      expect(await usage(), {
+        '$song/audio/x.wav': [
+          '$other/b.rpp',
+          '$song/a.rpp',
+          '$other/Media/sub.rpp',
+        ],
+        '$other/Media/y.wav': ['$other/b.rpp'],
+      });
+      final m = await migration();
+
+      final blocked = await applyFixes(m, const [
+        NormalizeMedia(song),
+      ], usage: await usage());
+
+      expect(blocked.items, {
+        ReportKind.mediaUsedElsewhere: [
+          const ReportItem(
+            '$song/audio/x.wav',
+            '$other/b.rpp\n$other/Media/sub.rpp',
+          ),
+        ],
+      });
+      expect(file('$song/a.rpp').readAsStringSync(), mine);
+      expect(file('$song/audio/x.wav').existsSync(), isTrue);
+
+      // Normalizing the other title first copies the file into its pool.
+      await applyFixes(m, const [NormalizeMedia(other)], usage: await usage());
+      expect(media('$other/b.rpp'), r'Media\x.wav|Media\y.wav');
+      expect(media('$other/Media/sub.rpp'), 'x.wav');
+      final done = await applyFixes(m, const [
+        NormalizeMedia(song),
+      ], usage: await usage());
+      expect(done.items[ReportKind.mediaUsedElsewhere], isNull);
+      expect(media('$song/a.rpp'), r'Media\x.wav');
+      expect((await m.check(hash)).isEmpty, isTrue);
+    });
+
     test('leaves the media-paths fixture intact and reports it', () async {
       final text = File('$fixtures/media-paths.rpp').readAsStringSync();
       put('$song/media-paths.rpp', text);

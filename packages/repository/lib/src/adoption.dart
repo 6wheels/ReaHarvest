@@ -7,7 +7,6 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
-
 /// Writes [metadata] into the EXTSTATE section of the project at [path]
 /// ("To adopt", Save As duplicates, SPEC §4.2): targeted patch, atomic
 /// write. Throws [FormatException] if the file is not valid UTF-8.

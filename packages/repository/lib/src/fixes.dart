@@ -81,7 +81,14 @@ final class NormalizeMedia extends MigrationFix {
 
 /// Applies [fixes] through the storage of [migration] (so that no file is
 /// lost), one by one: a failed fix is reported and the others go on.
-Future<Report> applyFixes(Migration migration, List<MigrationFix> fixes) async {
+/// [usage] tells the projects referencing each media of the library
+/// ([mediaUsage]): a title whose media are used by another title is not
+/// normalized.
+Future<Report> applyFixes(
+  Migration migration,
+  List<MigrationFix> fixes, {
+  Map<String, List<String>> usage = const {},
+}) async {
   final storage = migration.storage;
   var report = const Report();
   for (final fix in fixes) {
@@ -101,9 +108,14 @@ Future<Report> applyFixes(Migration migration, List<MigrationFix> fixes) async {
           storage,
           path,
           titleDir,
+          usage: usage,
         ),
         final LiftProject lift => await _lift(storage, lift),
-        NormalizeMedia(:final path) => await normalizeMedia(storage, path),
+        NormalizeMedia(:final path) => await normalizeMedia(
+          storage,
+          path,
+          usage: usage,
+        ),
       };
     } on Object catch (error) {
       report += Report({

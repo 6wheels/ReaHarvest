@@ -265,6 +265,7 @@
   "reportExternalMedia": "Media outside the library: fix them in REAPER",
   "reportRecordPathNotMedia": "Record path other than Media",
   "reportRenderFileForm": "Render target outside Renders",
+  "reportMediaUsedElsewhere": "Title left as is: media used by another title, fix that title first",
   "reportMediaTrashed": "Duplicate media moved to the trash",
   "reportMediaNormalized": "Projects normalized",
   "issueProjectFolder": "Empty: project folder",

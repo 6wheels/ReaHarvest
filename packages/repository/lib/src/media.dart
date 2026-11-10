@@ -7,6 +7,7 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'adoption.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
+import 'scanner.dart' show ScanResult;
 
 /// Suffix of the proxy file REAPER keeps next to a subproject.
 const _proxySuffix = '-PROX';
@@ -36,9 +37,38 @@ const _proxySuffix = '-PROX';
 ///   no project (e.g. in a member subfolder) are merged into the pool too.
 ///
 /// The whole title is left intact if one of its projects cannot be read
-/// (its media are unknown): throws [FormatException].
-Future<Report> normalizeMedia(RepositoryStorage storage, String titleDir) =>
-    _Normalization(storage, titleDir).run();
+/// (its media are unknown): throws [FormatException]. So is it, reported,
+/// when a project of another title references one of its files outside
+/// `Media/`, which would be moved: [usage] gives the projects referencing
+/// each media of the library ([mediaUsage]). Normalizing that other title
+/// first copies the file into its own pool.
+Future<Report> normalizeMedia(
+  RepositoryStorage storage,
+  String titleDir, {
+  Map<String, List<String>> usage = const {},
+}) => _Normalization(storage, titleDir, usage: usage).run();
+
+/// Projects referencing each media of the library, by file path, from the
+/// versions of the titles of [result] and the subprojects of their pools.
+/// Projects outside the titles are not indexed, hence not listed.
+Map<String, List<String>> mediaUsage(ScanResult result) {
+  final usage = <String, List<String>>{};
+  void add(String project, List<String> refs) {
+    for (final ref in refs) {
+      if (resolveReference(_parent(project), ref) case final file?) {
+        usage.putIfAbsent(file, () => []).add(project);
+      }
+    }
+  }
+
+  for (final title in result.titles) {
+    for (final v in title.versions) {
+      add(_join(title.path, v.fileName), v.media);
+    }
+  }
+  result.subprojects.forEach(add);
+  return usage;
+}
 
 /// Moves the misplaced project [project] into the title folder [titleDir]
 /// ("To sort", SPEC §5.2), under a free name, its relative references and
@@ -46,17 +76,22 @@ Future<Report> normalizeMedia(RepositoryStorage storage, String titleDir) =>
 /// normalizes the media of the title ([normalizeMedia]). The media of the
 /// project are moved into the pool, or copied when another project of the
 /// source folder references them too; a project with a missing or external
-/// media is moved but its media are left where they are.
+/// media is moved but its media are left where they are. A media also used
+/// by another project of [usage] is copied too.
 ///
 /// Throws [FormatException] if the project cannot be read (left in place).
 Future<Report> moveProjectToTitle(
   RepositoryStorage storage,
   String project,
-  String titleDir,
-) async {
+  String titleDir, {
+  Map<String, List<String>> usage = const {},
+}) async {
   final text = await utf8.decodeStream(storage.read(project));
   final sourceDir = _parent(project);
-  final shared = await _mediaOfOtherProjects(storage, sourceDir, project);
+  final shared = {
+    ...await _mediaOfOtherProjects(storage, sourceDir, project),
+    for (final file in usage.keys) file.toLowerCase(),
+  };
   final movable = {
     for (final ref in RppProject.parse(text).mediaFiles)
       if (resolveReference(sourceDir, ref) case final file?
@@ -93,7 +128,12 @@ Future<Report> moveProjectToTitle(
   return Report({
         ReportKind.projectMoved: [ReportItem(target)],
       }) +
-      await _Normalization(storage, titleDir, movable: movable).run();
+      await _Normalization(
+        storage,
+        titleDir,
+        movable: movable,
+        usage: usage,
+      ).run();
 }
 
 /// Lowercase paths of the media referenced by the projects of [dir] other
@@ -127,8 +167,12 @@ Future<Set<String>> _mediaOfOtherProjects(
 }
 
 final class _Normalization {
-  _Normalization(this.storage, this.titleDir, {this.movable = const {}})
-    : pool = _join(titleDir, mediaFolderName);
+  _Normalization(
+    this.storage,
+    this.titleDir, {
+    this.movable = const {},
+    this.usage = const {},
+  }) : pool = _join(titleDir, mediaFolderName);
 
   final RepositoryStorage storage;
   final String titleDir;
@@ -137,6 +181,9 @@ final class _Normalization {
   /// Lowercase paths of files outside the title that may be moved rather
   /// than copied (media of a project moved into the title).
   final Set<String> movable;
+
+  /// Projects referencing each media of the library ([mediaUsage]).
+  final Map<String, List<String>> usage;
 
   /// Text of the projects of the title and of the subprojects of its pool,
   /// by path: rewritten.
@@ -164,6 +211,20 @@ final class _Normalization {
   final items = <ReportKind, List<ReportItem>>{};
 
   Future<Report> run() async {
+    // Files that would move from under the projects of another title.
+    for (final MapEntry(key: file, value: projects) in usage.entries) {
+      final others = projects.where((project) => !_inTitle(project)).toList();
+      if (others.isNotEmpty &&
+          _inTitle(file) &&
+          !_inPool(file) &&
+          !_relative(file).split('/').any(isExcludedFolder)) {
+        _add(
+          ReportKind.mediaUsedElsewhere,
+          ReportItem(file, others.join('\n')),
+        );
+      }
+    }
+    if (items.isNotEmpty) return Report(items);
     final entries = await storage.list(titleDir, recursive: true);
     for (final e in entries) {
       if (e.isDirectory || !isProjectFile(e.path)) continue;

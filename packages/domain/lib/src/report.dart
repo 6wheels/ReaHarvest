@@ -24,6 +24,7 @@ enum ReportKind {
   externalMedia(ReportLevel.warning),
   recordPathNotMedia(ReportLevel.warning),
   renderFileForm(ReportLevel.warning),
+  mediaUsedElsewhere(ReportLevel.warning),
   titleStatusDropped(ReportLevel.warning),
   libraryUnavailable(ReportLevel.skipped),
   targetExists(ReportLevel.skipped),

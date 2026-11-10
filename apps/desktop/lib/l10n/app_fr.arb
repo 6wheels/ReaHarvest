@@ -207,6 +207,7 @@
   "reportExternalMedia": "Médias hors de la bibliothèque : corrigez-les dans REAPER",
   "reportRecordPathNotMedia": "Dossier d'enregistrement autre que Media",
   "reportRenderFileForm": "Cible de rendu hors de Renders",
+  "reportMediaUsedElsewhere": "Titre laissé tel quel : médias utilisés par un autre titre, corrigez d'abord ce titre",
   "reportMediaTrashed": "Médias en double mis à la corbeille",
   "reportMediaNormalized": "Projets normalisés",
   "issueProjectFolder": "Vide : dossier du projet",

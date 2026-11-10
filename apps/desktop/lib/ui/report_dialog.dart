@@ -39,6 +39,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.externalMedia => l10n.reportExternalMedia,
       ReportKind.recordPathNotMedia => l10n.reportRecordPathNotMedia,
       ReportKind.renderFileForm => l10n.reportRenderFileForm,
+      ReportKind.mediaUsedElsewhere => l10n.reportMediaUsedElsewhere,
       ReportKind.libraryUnavailable => l10n.reportLibraryUnavailable,
       ReportKind.libraryScanned => l10n.reportLibraryScanned,
       ReportKind.projectMoved => l10n.reportProjectMoved,

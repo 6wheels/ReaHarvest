@@ -1201,6 +1201,25 @@ void main() {
       },
     );
 
+    test('copies the media another title uses', () async {
+      put('loose.rpp', project([r'audio\x.wav']));
+      put('audio/x.wav', 'x');
+
+      final report = await moveProjectToTitle(
+        storage,
+        'loose.rpp',
+        'band/album/song',
+        usage: {
+          'audio/x.wav': ['band/album/other/v.rpp'],
+        },
+      );
+
+      expect(report.items[ReportKind.mediaCopied], [
+        const ReportItem('band/album/song/Media/x.wav', 'audio/x.wav'),
+      ]);
+      expect(exists('audio/x.wav'), isTrue);
+    });
+
     test('moves a blocked project, leaving its media in place', () async {
       put(
         'band/loose.rpp',

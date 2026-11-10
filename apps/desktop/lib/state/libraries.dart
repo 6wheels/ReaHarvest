@@ -342,6 +342,12 @@ class LibraryService {
           final migration = previous != null && !previous.inventoryComplete
               ? previous
               : Migration.start(storage, previous: previous);
+          // From the index: stale for the titles changed by the previous
+          // fixes of the batch, which can only block more (SPEC §5.8).
+          final usage = mediaUsage(
+            ref.read(localIndexProvider).scanResult(entry.id) ??
+                const ScanResult(),
+          );
           task.step((l10n) => l10n.taskStepInventory);
           await migration.takeInventory(
             hash,
@@ -352,7 +358,7 @@ class LibraryService {
             task.checkCancelled();
             task.step((l10n) => l10n.taskStepFix(i + 1, moves.length));
             task.progress(i / moves.length);
-            final done = await _applyFixes(root, [fix]);
+            final done = await _applyFixes(root, [fix], usage);
             applied.add(fix);
             _log.log(
               done.hasErrors ? Level.WARNING : Level.INFO,
@@ -711,12 +717,15 @@ class LibraryService {
 
 /// Applies [fixes] to the library at [root] through its migration, in an
 /// isolate (top-level: the closure must not capture the service).
-Future<Report> _applyFixes(String root, List<MigrationFix> fixes) =>
-    Isolate.run(() async {
-      final storage = MountedFolderStorage(root);
-      final migration = (await Migration.latest(storage))!;
-      return _rooted(root, await applyFixes(migration, fixes));
-    });
+Future<Report> _applyFixes(
+  String root,
+  List<MigrationFix> fixes,
+  Map<String, List<String>> usage,
+) => Isolate.run(() async {
+  final storage = MountedFolderStorage(root);
+  final migration = (await Migration.latest(storage))!;
+  return _rooted(root, await applyFixes(migration, fixes, usage: usage));
+});
 
 /// Absolute path of the project file of [version] of [title], in the
 /// library [entry].
