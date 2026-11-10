@@ -693,7 +693,11 @@ void main() {
     ]);
 
     expect(report, isNull);
-    expect(container.read(tasksProvider).last.state, TaskState.cancelled);
+    final task = container.read(tasksProvider).last;
+    expect(task.state, TaskState.cancelled);
+    expect(task.report!.items[ReportKind.folderMoved], [
+      ReportItem(p.join(band, 'Artist', 'New', 'One')),
+    ], reason: 'what was done before stopping is reported');
     expect(
       Directory(p.join(band, 'Artist', 'New', 'One')).existsSync(),
       isTrue,

@@ -310,8 +310,8 @@ class LibraryService {
   /// resumed), reusing the hashes of the previous one; then the
   /// fixes one by one, each in an isolate; then the inventory check, whose
   /// gaps are reported as errors. A folder "moved" to its own place is only
-  /// declared. Cancellable at every step, between two files or two fixes.
-  /// In any case, the values of the folders moved or declared join the
+  /// declared. Cancellable at every step, between two files or two fixes:
+  /// the fixes done are kept, and reported. In any case, the values of the folders moved or declared join the
   /// known values, then the library is rescanned.
   Future<Report?> _fix(
     LibraryEntry entry,
@@ -380,7 +380,8 @@ class LibraryService {
           '${entry.displayName}: cancelled after '
           '${applied.length - declared.length} of ${moves.length} fixes',
         );
-        rethrow;
+        // What was done before stopping is kept: the report tells it.
+        throw TaskCancelled(report);
       } finally {
         // Also after a cancellation: the library shows what was moved.
         task.step((l10n) => l10n.taskStepScan);

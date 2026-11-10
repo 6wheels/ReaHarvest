@@ -9,9 +9,12 @@ import '../l10n/app_localizations.dart';
 
 enum TaskState { running, done, failed, cancelled }
 
-/// Thrown by [TaskControl.checkCancelled] to stop a cancelled task.
+/// Thrown by [TaskControl.checkCancelled] to stop a cancelled task; a task
+/// rethrows it with the [report] of what it did before stopping.
 final class TaskCancelled implements Exception {
-  const TaskCancelled();
+  const TaskCancelled([this.report]);
+
+  final Report? report;
 }
 
 /// Handle given to a running task: reports progress and tells whether the
@@ -149,8 +152,8 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
         ),
       );
       return result;
-    } on TaskCancelled {
-      _update(id, (t) => t._with(state: TaskState.cancelled));
+    } on TaskCancelled catch (e) {
+      _update(id, (t) => t._with(state: TaskState.cancelled, report: e.report));
     } on Object catch (error, stack) {
       _update(id, (t) => t._with(state: TaskState.failed, error: '$error'));
       _log.severe(_task(id).label(_english), error, stack);
