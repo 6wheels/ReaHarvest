@@ -6,7 +6,7 @@
 > Reference document for implementation (Claude Code sessions).
 > Code identifiers, technical file names and comments are in English.
 > Items marked **[TO VALIDATE]** must be verified before implementing the related feature.
-> The user interface is in French (i18n-ready): French UI labels are given as (UI: « … »).
+> The user interface is in English (default) and French (§8): French UI labels are given as (UI: « … »).
 
 ---
 
@@ -125,8 +125,9 @@ Example with the classic template:
 ```
 
 Rules:
-- Scaffolding: the library initialization only writes `.library.json`. Creating or adopting a title creates its folders (`Media/`, `Renders/`, `Assets/`, `.history/`, `.trash/`) and its `.node.json`.
-- Nodes: a layout folder is a node (and gets a `.node.json` on scan) only if an `.RPP` lies in it or below it, outside the reserved title folders (`Media/`, `Renders/`, `Assets/`, `Backups/`, `.history/`, `.trash/`), which are never nodes. A title whose versions are all in its `.trash/` or `.history/` stays a title. A `.node.json` found in a folder that is not a node is neither used nor deleted: it is listed in the "To sort" page, where the user can delete it after confirmation (the statuses it stores are lost). Unreadable application files are listed there too.
+- Scaffolding: the library initialization only writes `.library.json`. Creating a title in the application creates its folders (`Media/`, `Renders/`, `Assets/`, `.history/`, `.trash/`) and its `.node.json`. A scan creates no folder: for a title found by the scan, each folder is created by the first operation that needs it.
+- Node files are written by the scan only where the library is worked in (the root of a `local` library, a workspace). The scan of a repository (`cloud`, `collab`) never writes: its node files come from the conversion (§5.8) and from publications (§5.5), and a folder without node file is listed there without identity.
+- Nodes: a layout folder is a node (and gets a `.node.json` on scan, under the rule above) only if an `.RPP` lies in it or below it, outside the reserved title folders (`Media/`, `Renders/`, `Assets/`, `Backups/`, `.history/`, `.trash/`), which are never nodes. A title whose versions are all in its `.trash/` or `.history/` stays a title. A `.node.json` found in a folder that is not a node is neither used nor deleted: it is listed in the "To sort" page, where the user can delete it after confirmation (the statuses it stores are lost). Unreadable application files are listed there too.
 - In `cloud` and `collab` modes, the workspace mirrors the repository tree for checked-out titles. The repository's `.library.json` is authoritative; the workspace keeps a copy of it to work offline.
 - Application files and folders (`.library.json`, `.node.json`, `.collab/`, `.migration/`, `.history/`, `.trash/`) start with a dot, and are also given the hidden attribute on Windows when the application creates them. They stay reachable from the application (title card, detail view). Their subfolders take no prefix (e.g. `.collab/exports/`). Validated (2026-11-07, Google Drive for desktop, streaming mode, Windows): dot-prefixed files and folders, with or without the hidden attribute, and hidden folders without a dot are all synchronized; the hidden attribute is kept locally after synchronization. Other cloud clients **[TO VALIDATE]** (e.g. Box Sync is reported to ignore dot-prefixed files).
 - `.RPP` files in `.history/` and `.trash/` are never listed as versions, nor in the "To sort" or "To adopt" sections, nor treated as duplicates (§4.2). They are not shown in the main library view; they enrich the title card and the detail view (history, trash).
@@ -169,7 +170,7 @@ This data does **not** depend on the collab store: the application must work (na
 ### 4.2 Version
 Metadata stored **in the `.RPP`**, through a dedicated `EXTSTATE` section named `ReaHarvest` (kept by REAPER on every save):
 - `versionId` (ULID)
-- `owner` (memberId) — mandatory in **all modes**, from milestone A (in `local` and `cloud` modes: the local member), to avoid any later change of the model
+- `owner` (memberId) — mandatory in **all modes**, from the start (in `local` and `cloud` modes: the local member), to avoid any later change of the model
 - `label` (free text, e.g. "chorus B")
 
 The date is the file modification date.
@@ -202,6 +203,8 @@ Automatic detection during the scan:
 | Manual duplication (*Save As*) | Two files with the same `versionId` | Offer to make it a new version (new ID, owner = current user) |
 | Unknown file | `.RPP` without `versionId` | "To adopt" section (UI: « À adopter »): choice of owner and label (required, and cannot be emptied afterwards), metadata written |
 
+A version adopted in batch (§5.8) takes its file name without the extension as label, editable afterwards.
+
 Versions form a **flat list** (no tree, no parent version).
 
 ### 4.3 Media
@@ -210,6 +213,7 @@ Versions form a **flat list** (no tree, no parent version).
 - The pool is **append-only**: a published file is never modified or deleted, except on explicit purge (cf. §5.4).
 - Name collision on publish (same name, different content according to the hash): rename with a suffix and rewrite of the references in the `.RPP`.
 - MIDI embedded in the `.RPP` (the drummer's case) does not generate media.
+- References outside `SOURCE` chunks: a file whose name appears elsewhere in a project (plain text, or decoded base64 plugin states, as UTF-8 or UTF-16: sampler files, impulse responses) is used by this project. It is never moved automatically (reported for a manual decision, §5.8) nor offered for purge (§5.4).
 
 ---
 
@@ -225,12 +229,13 @@ Versions form a **flat list** (no tree, no parent version).
   - goal: the folder can be added again later, with any layout, without leftovers from the previous library.
 - First-run wizard: technical settings first (member name, REAPER executable and resource folder, templates folder, peaks preference check), then three choices for the library (also offered later by "Add a library" in the settings):
   - **Join my band's library** (UI: « Rejoindre la bibliothèque de mon groupe »): choice of the repository folder (e.g. the Drive folder), reading of its `.library.json`.
-    - Collab repository: the members declared in `.library.json` (§6.5) and **not yet joined** are listed; the user picks who they are (UI: « Qui suis-je ? »), and the local identity takes that `memberId`. Then choice of the workspace, which must be an **empty** folder (a non-empty folder is refused in the MVP). Joining writes `.collab/<memberId>/member.json` (one writer per folder, no cloud synchronization conflict); a member who has this file is no longer offered to the others. The claim is checked again just before writing. Then offer to check out titles (§5.5).
+    - Collab repository: the members declared in `.library.json` (§6.5) are listed; the user picks who they are (UI: « Qui suis-je ? »). Members who never joined come first; those who did are offered apart ("I already joined from another computer", after a reinstallation or on a second computer), with a confirmation. The settings of the installation store the member it acts as in this library; its own identity is unchanged and still used in `local` and `cloud` libraries. Then choice of the workspace, which must be an **empty** folder (a non-empty folder is refused in the MVP). Joining writes `.collab/<memberId>/<clientId>/client.json` (computer name, date; one writer per folder, no cloud synchronization conflict). The claim is checked again just before writing. Then offer to check out titles (§5.5).
     - Folder without `.library.json`, or not in `collab` mode: clear message (the folder is not set up yet, ask the person who manages it); nothing is written.
   - **Organize my band's folder** (UI: « Organiser le dossier de mon groupe »): migration wizard (§5.8).
   - **Create a new library**.
 - **Portable mode**: a `settings.json` and/or an `index.sqlite` placed next to the executable are used first, instead of the user application data folder. Used by the demo mode and local tests, and to run two members on one machine (two copies of the application folder).
-- Local member identity (`memberId`, display name), created on first run and used in all modes (version owner). In the MVP, one identity per installation. Later (outside the MVP): one identity shared by all the machines of a user, linked through a confirmed email, each machine identified by its own client identifier.
+- Local member identity (`memberId`, display name), created on first run and used as version owner in `local` and `cloud` libraries; in a `collab` library, the installation acts as the declared member picked when joining. Each installation also has a client identifier (`clientId`, ULID), which names its folder in `.collab/` (§6.3). Later (outside the MVP): one identity shared by all the machines of a user, linked through a confirmed email.
+- Unreadable settings: when `settings.json` cannot be read, the application starts on a recovery screen naming the file, and offers to start with new settings (the file is first kept aside; libraries are to add again, their folders are untouched), to open its folder or to quit. A file written by a newer version is never overwritten: message, then open its folder or quit.
 - Path of the REAPER executable and of the REAPER resource folder (defaults per OS). Executable detection: first the location reported by the OS (Windows: default value of `HKLM\SOFTWARE\REAPER` = install folder, validated; macOS: Spotlight `mdfind "kMDItemCFBundleIdentifier == 'com.cockos.reaper'"`; Linux: `which reaper`), then the usual install locations (Windows: `%ProgramFiles%\REAPER (x64)`, `%ProgramFiles%\REAPER`; macOS: `/Applications/REAPER.app`, `/Applications/REAPER64.app`, `~/Applications/REAPER.app`; Linux: `~/opt/REAPER/reaper`, `/opt/REAPER/reaper`). Resource folder: `%APPDATA%\REAPER`, `~/Library/Application Support/REAPER`, `~/.config/REAPER`. macOS and Linux values **[TO VALIDATE]**.
 - Project templates folder (default: `ProjectTemplates` in the REAPER resource folder).
 - Check of a recommended REAPER preference, with a non-blocking warning: peaks centralized outside the project (avoids thousands of `.reapeaks` in the workspace). Validated keys: `altpeaks` bit `0x1` = "Store all peak caches (.reapeaks) in alternate path" (General > Paths), `altpeakspath` = path.
@@ -259,11 +264,11 @@ Main window: the application opens directly on the library. Clean but functional
 - Filters and search are combined and kept between sessions; **saved views** (e.g. "My titles in progress", UI: « Mes titres en cours ») are possible.
 - Access to a title's versions from any display mode, without changing view:
   - **overview** (UI: « Aperçu »), dock at the bottom of the library opened by a click on a card or row (no double click): crucial data only (identity: name, parent tags, library, status, BPM, last modification; alerts: missing plugins, duplicated or not adopted versions, leading to the detail; the 3 most recent versions, each with "Open in REAPER"). It can be **pinned**: opaque, the titles end above it, it stays open and follows the selection; unpinned, it floats over the titles with an acrylic background (blur and slight transparency, a single blur clipped to the dock) and closes on a click outside. The pinned state is kept between sessions;
-  - **title detail**: full page over the library, opened by Enter in the search bar (title of the overview) or the "open detail" icon (same icon on the card and in the overview). Back to the library, with search, filters and scroll kept, through the back button, Escape or the mouse back button. Header: large title name with the first parent tag (e.g. artist) on the same line in a smaller font, the other tags (e.g. album) and the library below; on the right, length, BPM, number of tracks and number of items of the selected version (indexed at scan, like the tempo); below, the status progress trail across the width. Master-detail layout: versions on the left (label only, a generic "Not adopted" or "No label" otherwise, followed by the file name with its extension in italic; icon and color by adoption; status when set), selected version on the right (its label as heading, or its file name with its extension in italic and a "Not adopted" badge on its right when not adopted, details, absolute path of its `.RPP` file, selectable, with a "Show in file explorer" button opening its folder with the file selected (Windows only for now), adoption, actions, missing plugins, duplicates, history; then §5.3 data). Title assets and trash come as title-level tabs.
+  - **title detail**: full page over the library, opened by Enter in the search bar (title of the overview) or the "open detail" icon (same icon on the card and in the overview). Back to the library, with search, filters and scroll kept, through the back button, Escape or the mouse back button. Header: large title name with the first parent tag (e.g. artist) on the same line in a smaller font, the other tags (e.g. album) and the library below; on the right, length, BPM, number of tracks and number of items of the selected version (indexed at scan, like the tempo); below, the status progress trail across the width. Master-detail layout: versions on the left (label only, a generic "Not adopted" or "No label" otherwise, followed by the file name with its extension in italic; icon and color by adoption; status when set), selected version on the right (its label as heading, or its file name with its extension in italic and a "Not adopted" badge on its right when not adopted, details, absolute path of its `.RPP` file, selectable, with a "Show in file explorer" button opening its folder with the file selected (Windows only for now), adoption, actions, missing plugins, duplicates, history; then §5.3 data). Title assets and trash come as title-level tabs; until the assets view exists (§5.9, milestone M3), a button opens the `Assets/` folder of the title in the file explorer.
 - **Status progress trail**: one segment per status, passed ones green, the current one orange, the next ones grey; "done" reached shows the whole trail green. Only the current status shows its label; hovering the trail reveals the other labels, with an animation. A status outside the list is shown as a plain label. Display only (status changes come with the title actions).
 - "To sort" section (UI: « À ranger »): `.RPP` or folders outside the convention, with guided move. Opened from its counter in the filter bar, as a page over the library (same back navigation as the title detail). Issues are grouped by kind, with a counter per kind. The kinds fixed in batch (§5.8 step 4) have a checkbox on each card, a "select all" box and a counter of the selected items per section; "Fix…" previews the selected items of its section, or all of them when none is selected. The selection is kept through a rescan for the items still there.
 - "To adopt" (UI: « À adopter », cf. §4.2): a filter (titles having a version to adopt), with its counter of titles in the filter bar; adoption is done in the title detail, on the selected version. The card, the overview and the title detail show the number of versions to adopt of the title.
-- **Background tasks zone** at the bottom of the application (following the theme; the overview dock sits above it): running tasks with progress and cancellation, finished tasks with their outcome, expandable list.
+- **Background tasks zone** at the bottom of the application (following the theme; the overview dock sits above it): running tasks with progress and cancellation, finished tasks with their outcome, expandable list. Tasks that write in a library (fixes, scans) run one at a time per library: the next ones wait in the zone, queued and cancellable; tasks of different libraries run together.
 - **Reports**: every long action (scan, migration fix, checkout, publish, purge…) produces a report **structured in sections by kind of problem or conflict** (done, skipped, warnings, errors; each item with its path), shown in a popup at the end and reachable from the tasks zone. Reports are also written to the log (§8).
 
 ### 5.3 Version detail view
@@ -298,7 +303,7 @@ Actions performed from the title detail (§5.2).
   - Blank or from a template: version metadata written, record path `Media`, render folder `Renders`; the other §5.6 values are filled in by project creation only. Duplicate: same content, new version metadata.
 - **Rename** the file and/or modify the label (required: it cannot be emptied). A rename made in the application is tracked through the `versionId`, and published as a rename of the remote file, together with any modification of its content (§5.5).
 - **Delete**: move to `.trash/`.
-- **Purge**: permanent deletion from `.trash/`, with confirmation. Then, list of pool media referenced by no version nor backup (`.history/`; the trash does not count), then purge on confirmation. Nothing is listed if a project cannot be read. Purging unreferenced media only applies to `Media/`: `Assets/` is never concerned. Purge acts on the workspace only; the repository follows through the synchronization of the mode (§5.5). Sensitive, destructive feature.
+- **Purge**: permanent deletion from `.trash/`, with confirmation. Then, list of pool media referenced by no version nor backup (`.history/`; the trash does not count), then purge on confirmation. Nothing is listed if a project cannot be read. Purging unreferenced media only applies to `Media/`: `Assets/` is never concerned, and a file named by a plugin state is never listed (§4.3). MVP: purge is available in `local` mode only; in `cloud` and `collab` modes the pool stays append-only, the propagation of a purge being still to define (§10). Sensitive, destructive feature.
 - **Back up a version** (UI: « Créer un point de sauvegarde »): copies the `.RPP` of the version into `.history/` (flat), named `<version name> <yyyy-MM-dd HHmmss>.<ext>` (` (n)` suffix on a name clash). The version itself is unchanged. Backups are linked to their version by the `versionId` of the copy (robust to renames).
 - **Paths of backups**: the copy has its relative paths rebased so that it opens in REAPER from `.history/` (`FILE "Media\x.wav"` → `"..\Media\x.wav"`, `RECORD_PATH "Media"` → `"..\Media"`, empty record path → `".."`, relative `RENDER_FILE` → `..\…`); absolute paths are left as is. Restoring rebases them back to the title folder.
   Validated (REAPER 7.85, Windows): a project in `.history/` with `..\` paths opens without missing media, records into the title's `Media/` and renders into its `Renders/`. But REAPER resolves a relative media path against the record path first and does not normalize it: on each save, an existing media reference grows by one `..\Media\` (`..\Media\kick.wav` → `..\Media\..\Media\kick.wav`), still valid. Hence the application normalizes the paths of a backup before opening it in REAPER (UI: « Ouvrir dans REAPER »), and on restore. Versions in the title folder are not affected (`Media\Media\x` does not exist, so REAPER falls back to the project folder).
@@ -323,6 +328,8 @@ Actions performed from the title detail (§5.2).
 
 **Release**
 - Refused if local modifications are not published, unless explicitly confirmed.
+
+**Cancellation, failure, interruption**: a checkout or a publish that did not reach its end is simply started again and copies only what is missing or incomplete (size and hash checked; each file is written atomically). A title counts as checked out only once complete, and is shown as incomplete meanwhile. A publish copies the media before the projects, so that the repository never holds a project without its media, and updates the base hashes file by file.
 
 **Other members' versions locally**: readable, openable, importable (later phase), but not publishable without forcing.
 
@@ -369,18 +376,24 @@ Flow (wizard "Organize my band's folder", §5.1):
    - media outside `Media/` (relative), media referenced through an absolute path, missing media, `RECORD_PATH` other than `Media` (e.g. `audio-files`), `RENDER_FILE` forms (§5.3);
    - other files to move into `Assets/`, or blocked because a project references them;
    - versions not adopted, duplicated `versionId` (§4.2);
+   - project that is not valid UTF-8: listed like the others, never rewritten by a fix or an action (the user opens and saves it in REAPER **[TO VALIDATE: REAPER 7 then writes it as UTF-8]**);
    - cloud provider conflict copies (e.g. `x (1).rpp`), reported only.
 4. **Fixes in the interface**, each with a preview (dry run) and a report (§5.2):
    - move of a folder or project to its layout position (the target proposed from the known values), `_Unassigned` value for a missing level (e.g. the album);
    - **merge** when the target folder already exists (e.g. the same song found at the root and under its album), announced in the preview: each entry of the moved folder goes to the same place in the target; subfolders present on both sides (artist, album, title, `Media/`…) are merged recursively; any other name collision gets a free name (`name (2).ext`) and the references of the moved projects are rewritten to follow it, so the projects of both titles become versions of one title (identical media are merged with the pool, see below). Node files are merged: version statuses are added, the target's title status wins (the dropped one is reported). What is left of the moved folder (its node files, empty folders) goes into `.migration/<timestamp>/merged/`. No merge of a folder into itself (paths equal ignoring case) or into its parent or child;
    - **member subfolder** (`<title>/<member>/…`): its projects are moved up into the title, owner = that member, names de-duplicated;
    - **status subfolder** (`<title>/<status>/…` or `<title>/<member>/<status>/…`, e.g. `mix`, `demo`): reported as projects too deep; its projects are moved up into the title, with a version status (§5.9) deduced from the folder name through a proposed mapping to the statuses of the library, confirmed by the user (unmatched names: no status, folder name kept in the report); names de-duplicated;
-   - media (audio, video, MIDI, subprojects `<SOURCE RPP_PROJECT` with their `.rpp-PROX`) moved into `Media/`, references rewritten, `RECORD_PATH` set to `Media` (targeted patch, §7.3); per-member media merged into the single pool; identical media (same hash) share one pool file and the duplicate is **moved** into `.trash/`; name collision: suffix and reference rewrite;
+   - media (audio, video, MIDI, subprojects `<SOURCE RPP_PROJECT` with their `.rpp-PROX`) moved into `Media/`, references rewritten, `RECORD_PATH` set to `Media` (targeted patch, §7.3); per-member media merged into the single pool; identical media (same hash) share one pool file and the duplicate is **moved** into `.trash/`; name collision: suffix and reference rewrite; a media named by a plugin state (§4.3) is left where it is and reported. The preview lists the operations planned (moves, copies, duplicates, rewrites, blocked projects);
    - **any other file** (neither a project, nor a media, nor a REAPER file such as `.rpp-bak`, `Backups/`, peaks) is moved into `Assets/`. Before moving it, the application looks for its name in the projects of the title, in plain text and in the decoded base64 plugin states: a referenced file (e.g. impulse response, sampler file) is not moved automatically, it is reported for a manual decision;
    - fix impossible (media not found, absolute path from another machine): reported, `.rpp` left intact;
-   - adoption of the `.RPP` files in batch, owner chosen among the declared members (deduced from the member subfolder when there is one);
+   - adoption of the `.RPP` files in batch, owner chosen among the declared members (deduced from the member subfolder when there is one), label taken from the file name (§4.2);
    - warning before any `.rpp` rewrite when REAPER is running (§5.7).
 5. **No file is ever deleted.** Every change is a move or a targeted rewrite; before rewriting a `.rpp`, its raw original is copied into `.migration/<timestamp>/`. After each batch of fixes and at the end, the inventory is checked: same number of files, every original hash still present, every move accounted for. Any gap is reported and blocks the conversion. A batch is cancellable at every step (inventory, between two fixes, check): a fix already started is completed, the fixes done are kept and shown in the report, then the library is rescanned. The values of the folders moved (or declared in place) join the known values.
+   - **Journal**: every operation of a fix (move, rewrite, file created), with the start and the end of the fix, is appended to `.migration/<timestamp>/journal.jsonl`; the inventory is appended line by line to `inventory.jsonl`. A project rewritten by the migration keeps its modification date (its version date, §4.2); as its size and date may then be unchanged, the next scan reads again every project the journal records as rewritten since the last scan.
+   - **Failed fix** (read or write error in the middle of its operations, drive unmounted): undone at once, then reported as failed with its reason; the other fixes of the batch go on, and its items stay listed in "To sort", ready to be fixed again.
+   - **Interrupted fix** (the application stopped: crash, power cut): detected from the journal when the application starts and before any new batch on the library. The application offers to undo it, and runs no other batch on that library meanwhile.
+   - **Undo** of a fix: operations reversed from the last one, rewritten files restored from their originals, files created by the fix moved to `.migration/<timestamp>/undone/` (nothing is deleted), then inventory check and rescan. The undo is journaled and can itself be resumed.
+   - **Cancelled batch**: as a cancellation only takes effect between two fixes, every fix is complete or not started; the remaining ones stay listed in "To sort" and can be started again.
 6. **Conversion to a collab repository**: final inventory check, then the `collab` block (`groupId`, store `journal`) is written into `.library.json`. The folder is now the repository; the user joins it with an empty workspace, like the other members (§5.1).
 
 ### 5.9 Statuses, assets and collaboration
@@ -422,7 +435,7 @@ hlc        Hybrid Logical Clock timestamp of the last write
 deleted    boolean (tombstone)
 ```
 Entity-specific fields: to be defined in code (shared types generated once).
-Conflict resolution: **last-writer-wins per field**, ordered by `hlc`, then by `author` on ties.
+Conflict resolution: **last-writer-wins per field**, ordered by `hlc`, then by `author`, then by client (§6.3) on ties.
 `activity` is an append-only journal: entries are never modified nor deleted (no tombstone).
 
 Port (pseudo-signature):
@@ -438,11 +451,12 @@ CollabStore
 
 ### 6.3 Journal adapter (`JournalStore`)
 ```
-<repositoryRoot>/.collab/<memberId>/<yyyy-mm>.jsonl     # append-only, one writer per directory
-<repositoryRoot>/.collab/exports/<timestamp>.json       # full exports of the store, optional baselines
+<repositoryRoot>/.collab/<memberId>/<clientId>/client.json        # written when this installation joins (§5.1)
+<repositoryRoot>/.collab/<memberId>/<clientId>/<yyyy-mm>.jsonl    # append-only, one writer per directory
+<repositoryRoot>/.collab/exports/<timestamp>.json                 # full exports of the store, optional baselines
 ```
-- Each member writes **only** in their own folder: no Drive synchronization conflict possible.
-- One line = one operation: `{ v, opId, groupId, author, hlc, entity, uid, op: "upsert"|"delete", fields }`.
+- Each installation (`clientId`) writes **only** in its own folder: no Drive synchronization conflict possible, even when a member uses two computers.
+- One line = one operation: `{ v, opId, groupId, author, client, hlc, entity, uid, op: "upsert"|"delete", fields }`.
 - Reading: merge of all journals, then local projection into SQLite (incremental replay by file offset).
 - Detection of remote changes: file watching, with **fallback to periodic polling of mtimes** (file events on a virtual Drive volume are not reliable) **[TO VALIDATE]**.
 - Known limitation: propagation latency depending on the Drive client.
@@ -487,7 +501,7 @@ CollabStore
   ]
 }
 ```
-Members are declared by the person who prepares the library, before the others install the application, so that versions get their owner during the migration. A member joins by picking their entry (§5.1); `.collab/<memberId>/member.json` marks a joined member.
+Members are declared by the person who prepares the library, before the others install the application, so that versions get their owner during the migration. A member joins by picking their entry (§5.1); a client folder in `.collab/<memberId>/` marks a joined member.
 Switch procedure (single action in the settings):
 1. `exportAll()` from the current adapter.
 2. `importAll()` into the target adapter, then verification by count per entity.
@@ -518,6 +532,7 @@ Switch procedure (single action in the settings):
 - **Hash**: requirements: negligible collision probability outside an adversarial context (no security use), throughput at least the disk's, streamed computation on large files. A 64-bit fingerprint is enough: hashes are only ever compared together with name and size, between a few files (same path, media pool), never across the whole corpus (~3·10⁻⁶ collision probability even for 10 million files compared pairwise). Chosen: **XXH3-64**, pure Dart (`xxh3` package, streaming API), stored as 16 lowercase hex digits. The hash is computed only if size or mtime changed.
   Benchmark (Windows x64, AOT executable, 1 GB file in the OS cache read by 1 MB blocks, read alone ~7.5 GB/s): pure Dart `xxh3` XXH3-64 ~1.9 GB/s; `hashlib` XXH3-128 ~90 MB/s, BLAKE2b/MD5 ~170 MB/s, `crypto` SHA-256 ~160 MB/s; no pure Dart BLAKE3. Native through `dart:ffi`: XXH3-128 ~6.1 GB/s (SSE2) / ~7.0 GB/s (AVX2), BLAKE3 single-threaded ~3.0 GB/s. Pure Dart XXH3-64 is faster than real disk reads (HDD, SATA SSD, most NVMe, streaming cloud folders) and needs no native toolchain; the native path stays available behind the same hasher function if ever needed.
 - **Concurrency**: all long tasks (scan, bulk parsing, hash, copies) run in **isolates**, never on the UI isolate. The hash is computed in the background, in batches (one title and its versions).
+- **Local data**: the index is a cache of the file system, rebuilt from scratch when its schema changes; it is written by the background isolate that scans, the UI isolate only reads it. The sync state (base hash of each checked-out file, §5.5) is not a cache: it lives in its own database, whose schema changes by step-by-step migrations and is never dropped.
 
 ### 7.2 Package layout
 Monorepo of Dart packages (workspace):
@@ -532,14 +547,14 @@ packages/
   library/         # libraries, modes, configuration, mode transitions
   repository/      # repository and workspace scanning, layout conventions, adoption (dart:io)
                    # MountedFolderStorage adapter (RepositoryStorage)
-  index/           # local SQLite index: files, hashes, checkout bases, collab projection
-  sync/            # checkout / publish / release / conflict detection
+  index/           # local SQLite index (rebuildable cache): titles, versions, files, issues, collab projection
+  sync/            # checkout / publish / release / conflict detection, durable sync state (base hashes)
   reaper/          # launching, resource path, plugin cache parsing, prefs checks
 apps/
   desktop/         # Flutter desktop app: UI, state management, wiring of adapters
   mobile/          # (later) Flutter mobile app
 ```
-Packages are created at the milestone that uses them (milestone A: `domain`, `rpp`, `library`, `repository`, `index`, `reaper`; milestone B: `sync`; milestone C: `collab`). Package name: `reaharvest_<folder>`.
+Packages are created at the milestone that uses them (`sync` with M2, `collab` with M3, §9). Package name: `reaharvest_<folder>`.
 
 Decoupling rules:
 - `domain` and `rpp` are **pure Dart** (no Flutter or `dart:io` dependency), hence testable in isolation and reusable on mobile.
@@ -547,6 +562,13 @@ Decoupling rules:
 - No PocketBase- or journal-specific type leaves its adapter.
 - The UI layer knows neither the collaborative mode nor the file system: it consumes services exposed by the state layer.
 - Implementations are injected at the application entry point only.
+
+Responsibilities (one role per class or module, each testable alone):
+- **Business rules live in the packages**, tested without Flutter. The state layer of the app only wires: a service method resolves the library, runs one package operation in an isolate, logs it and asks for the rescan. One service per role: library catalog, scans, version actions, migration actions, REAPER actions.
+- **Long operations** (a batch of migration fixes) are orchestrated in a package, in one isolate, and report their steps, progress and cancellation through a small port of `domain`; the app maps the steps to its labels.
+- **File changes are planned, then applied**: reads gather the facts, a pure function computes the operations (unit-tested on in-memory data, shown as the preview), and the application of the plan goes through the storage.
+- **One module per concern**: library paths and media references; reading and writing project files (one encoding policy, §5.8); in a migration, the inventory, the journal and the guarded storage are three classes.
+- **Interface**: one file per page or component. What the interface proposes (the fixes of an issue, their targets) is computed by a package function; widgets show proposals and collect choices.
 
 ### 7.3 Writing RPP files
 - The writer modifies the **original text through targeted patches**, and never re-emits the complete file from a model, to guarantee fidelity.
@@ -567,24 +589,26 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
   - startup to a usable main view in less than one second, served from the index;
   - no blocking operation in the interface;
   - long tasks in the background with progress and cancellation;
-  - incremental scan (mtime + size, hash only when needed);
+  - incremental scan (mtime + size, hash only when needed); after an action on a title, only this title is scanned again;
   - indicative target: 1,000 `.RPP` and 100 GB of media without perceptible degradation.
 - **Reliability**: no data loss possible without explicit confirmation; all destructive operations go through the trash or the backups.
 - **Usability**: usable by non-technical people; musical rather than technical vocabulary; main actions reachable in one click.
 - **Distribution**: entirely free and open source tooling; build and publication by CI (GitHub Actions), artifacts published as GitHub Releases.
-  - **Windows**: installer (Inno Setup or MSIX) signed for free through **SignPath Foundation** (open source program: public repository, OSI license, signing from CI), to avoid the SmartScreen warning (retained; application to be submitted once the repository is public and the license chosen).
+  - **Windows** (MVP, milestone M2: the members are not technical, they install once and receive the later versions without any manual step): installer (Inno Setup), per-user install without administrator rights; settings, index, sync state and logs stay in the user data folder, kept by an update and by an uninstall unless asked otherwise. Signed for free through **SignPath Foundation** (open source program: public repository, OSI license, signing from CI), to avoid the SmartScreen warning; until the application to the program is granted, the installer is unsigned and the SmartScreen steps are explained to the members. A portable zip (portable mode, §5.1) is attached to each release.
   - **macOS**: **non-notarized** DMG (no paid Apple membership). The Gatekeeper warning on first launch is accepted; the authorization procedure is documented. No test machine available: macOS is built by CI, tested on a "best effort" basis.
-  - **Automatic update** (`auto_updater`, WinSparkle / Sparkle, signed appcast feed): check at startup then periodically → "update available" notification (UI: « mise à jour disponible ») → one click → download, installation → restart if needed.
+  - **Automatic update** (`auto_updater`, WinSparkle / Sparkle, signed appcast feed): check at startup then periodically → "update available" notification (UI: « mise à jour disponible ») → one click → download, installation → restart if needed. Never in portable mode; no update is installed while a background task runs. Windows in the MVP, with the installer.
 - **License**: GPL-3.0 (`LICENSE`).
 - **Application identifier**: `io.github.6wheels.reaharvest` (Windows, macOS); `io.github._6wheels.reaharvest` on Linux (freedesktop rule: a segment cannot start with a digit; format compatible with Flathub verification).
-- **Internationalization**: interface in **English and French** (ARB files, `gen-l10n`); system language on startup, English if it is not supported; language can be changed in the settings.
+- **Internationalization**: interface in **English and French** (ARB files, `gen-l10n`); system language on startup, English (the default language) if it is not supported; language can be changed in the settings. Other translations will come later.
 - **Logging**: `package:logging` with a file sink next to the settings (one file per day, the last ones kept), reachable from the settings; reports (§5.2) are written to it.
 - **Tests**: line coverage measured and enforced in CI (the build fails below the threshold): 95 to 100 % for the core packages, the widget tests and the integration tests. Any uncovered line carries a written justification (`// coverage:ignore-…` with the reason).
 - **Footprint**: stay light, in the spirit of REAPER (16 MB installer for a full DAW). Measured (2026-11-06, Flutter 3.47.9, empty app, Windows x64 release): 24.7 MB on disk (Flutter engine 20.3 MB, compiled Dart 3.3 MB, ICU data 0.8 MB), 10.3 MB zipped. With the app shell (#9: Riverpod, localizations, Inter subset to Latin ~114 KB, SQLite 1.7 MB): 28.9 MB on disk, 12.2 MB zipped.
 
 ---
 
-## 9. Phases
+## 9. Scope and delivery order
+
+Progress, the order of the tickets and the dated decisions are kept in `PROGRESS.md` only; this section gives the scope.
 
 | Phase | Content |
 |---|---|
@@ -592,15 +616,15 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
 | **2 — Backend** | `PocketBaseStore`, one-click switch, authentication, real-time notifications; prerequisite for mobile applications |
 | **3 — Tools** | Renders: built-in player, on-demand render, render publication (repository and export folders); track import between versions; companion Lua scripts (for example audio render of tracks whose plugins are missing) |
 
-**Re-oriented MVP** (decided 2026-11-09). The primary goal is to move the band onto a structured shared Drive folder, Windows only (macOS best effort). Work already done (`local` mode, free tree, layouts, scan and index, navigation, detail view, version management) is kept as is. Internal milestones, delivered and tested in this order, each usable on its own:
+**Re-oriented MVP** (decided 2026-11-09). The primary goal is to move the band onto a structured shared Drive folder, Windows only (macOS best effort). Milestones, delivered and tested in this order, each usable on its own:
 1. **M0 — Foundations**: portable mode (§5.1), background tasks zone and structured reports (§5.2), logging and coverage gate (§8).
-2. **M1 — Migration**: in-place organization of the band folder (§5.8): inventory, typed issues in "To sort", fixes in the interface, members (§6.5), conversion to a collab repository.
-3. **M2 — Join and synchronize**: first-run wizard (§5.1), repository view, Checkout / Publish / Release with conflicts, ownership and forcing (§5.5), versions in `collab` mode, Windows distribution as a zip built by CI.
-4. **M3 — Shared statuses and activity**: `JournalStore` limited to statuses (`titleMeta`, `versionMeta`) and `activity` (§6.3), activity feed (§5.9).
+2. **M1 — Migration**: in-place organization of the band folder (§5.8): "Organize my band's folder" wizard (§5.1), inventory, typed issues in "To sort", fixes in the interface, members (§6.5), conversion to a collab repository. Before the last features, the core is hardened along the responsibilities of §7.2.
+3. **M2 — Join and synchronize**: first-run wizard with "Join my band's library" (§5.1), member identity per library, durable sync state (§7.1), repository view, Checkout / Publish / Release with conflicts, ownership and forcing (§5.5), versions in `collab` mode, Windows installer with auto-update published by CI (§8), design direction of the interface (§7.1).
+4. **M3 — Shared statuses and activity**: `JournalStore` (§6.3), then, in this order: statuses (`titleMeta`, `versionMeta`), assets view with their shared metadata (`asset`), activity feed (`activity`), tasks, notes and lyrics (`task`, `note`, `lyrics`) (§5.9).
 
-Parked until after the re-oriented MVP (milestone "Later"): version detail view beyond what M1 needs, creation from template, mode change wizards, file watching, tasks / notes / lyrics, shared asset metadata, installer and auto-update, macOS / Linux validation, CLAP / AU / LV2 caches, library removal, configurable statuses, custom layout editor, card actions menu, checkout options. Former milestones A (`local`), B (`cloud`) and C (`collab`) are superseded by this order.
+Everything else waits in the **Backlog**, the only milestone besides M0 to M3: phases 2 and 3 of the table above, version detail view beyond what M1 needs, creation from template, mode change wizards, purge in `cloud` and `collab` modes, macOS and Linux packages and validation, CLAP / AU / LV2 caches, library removal, configurable statuses, custom layout editor, checkout options.
 
-Plan from milestone A: local `memberId` and version `owner`, `libraryId`, `.library.json` (including the `collab` block), `groupId`, ULID `uid`, HLC, configurable backend URL, `RepositoryStorage` and `CollabStore` ports.
+Present from the start: local `memberId` and version `owner`, `libraryId`, `.library.json` (including the `collab` block), `groupId`, ULID `uid`, HLC, configurable backend URL, `RepositoryStorage` and `CollabStore` ports.
 
 ---
 
@@ -617,6 +641,9 @@ Plan from milestone A: local `memberId` and version `owner`, `libraryId`, `.libr
 9. ~~`RENDER_FILE` form, command-line render with REAPER open~~ (validated, §5.3).
 10. ~~Choice of the hash algorithm by benchmark~~ (validated: XXH3-64, pure Dart, §7.1).
 11. Relative paths with `\` read by REAPER macOS (§4.3).
+12. Project that is not valid UTF-8: whether REAPER 7 writes it as UTF-8 when saving it (§5.8).
+13. Purge in `cloud` and `collab` modes: who may purge, propagation to the repository and to the other workspaces, protection of the versions not published yet (§5.4).
+14. Collab timestamp far ahead of the local clock (wrong clock on a computer): behavior to decide, so that it does not win every later write (§6.2).
 
 ## 11. Out of scope
 
