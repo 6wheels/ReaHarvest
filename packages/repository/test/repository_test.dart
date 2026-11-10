@@ -10,9 +10,28 @@ import 'package:test/test.dart';
 
 const fixtures = '../../test/fixtures';
 
-/// Paths of the issues of [result], by kind then path.
+/// Issues about the media, record path and render target of the projects
+/// (SPEC §4.3): left out of the layout tests, the fixtures not following
+/// these conventions.
+const mediaKinds = {
+  ReportKind.mediaOutsidePool,
+  ReportKind.missingMedia,
+  ReportKind.externalMedia,
+  ReportKind.recordPathNotMedia,
+  ReportKind.renderFileForm,
+};
+
+/// Issues of [result] other than [mediaKinds].
+Map<ReportKind, List<ReportItem>> layoutIssues(ScanResult result) => {
+  for (final MapEntry(:key, :value) in result.issues.items.entries)
+    if (!mediaKinds.contains(key)) key: value,
+};
+
+/// Paths of the issues of [result] other than [mediaKinds], by kind then
+/// path.
 List<String> issuePaths(ScanResult result) => [
-  for (final (_, items) in result.issues.sections) ...items.map((i) => i.path),
+  for (final (kind, items) in result.issues.sections)
+    if (!mediaKinds.contains(kind)) ...items.map((i) => i.path),
 ];
 
 /// Storage recording the paths read.
@@ -186,7 +205,7 @@ void main() {
       expect(song.versions.map((v) => v.fileName), ['v1.rpp', 'v2.RPP']);
       expect(song.versions[0].isAdopted, isTrue);
       expect(song.versions[1].isAdopted, isFalse);
-      expect(result.issues.items, {
+      expect(layoutIssues(result), {
         ReportKind.projectTooDeep: [
           for (final path in ['Alice/mix/a.rpp', 'old-takes/take.rpp'])
             ReportItem.misplaced(
@@ -244,7 +263,7 @@ void main() {
       final result = await scan(storage, lib);
 
       expect(result.titles, isEmpty);
-      expect(result.issues.items, {
+      expect(layoutIssues(result), {
         ReportKind.outsideLayout: [
           const ReportItem.misplaced('band/album', level: LayoutLevel('album')),
         ],
@@ -366,6 +385,80 @@ void main() {
       final third = await scan(counting, lib, previous: second);
       expect(counting.reads, ['band/album/song/v2.rpp']);
       expect(third.toAdopt, isEmpty);
+    });
+
+    test('reports media, record path and render target issues', () async {
+      final lib = library(Layout.classic());
+      String project(String record, String render, List<String> media) => [
+        '<REAPER_PROJECT 0.1 "7.84/win64" 0',
+        '  RECORD_PATH "$record" ""',
+        '  RENDER_FILE "$render"',
+        '  <TRACK',
+        for (final m in media) ...[
+          '    <ITEM',
+          '      <SOURCE WAVE',
+          '        FILE "$m"',
+          '      >',
+          '    >',
+        ],
+        '  >',
+        '>',
+      ].join('\n');
+      put('band/album/song/Media/a.wav', 'a');
+      put('band/album/song/audio-files/b.wav', 'b');
+      put(
+        'band/album/song/good.rpp',
+        project('Media', r'Renders\mix.wav', [r'Media\a.wav', r'media\A.WAV']),
+      );
+      put(
+        'band/album/song/bad.rpp',
+        project('audio-files', r'.\render', [
+          r'Media\a.wav',
+          r'.\audio-files\b.wav',
+          r'Media\gone.wav',
+          r'C:\Users\someone\c.wav',
+          r'..\..\..\..\d.wav',
+        ]),
+      );
+      put('band/album/song/blank.rpp', project('', '', []));
+
+      final counting = CountingStorage(storage);
+      final first = await scan(counting, lib);
+
+      const bad = 'band/album/song/bad.rpp';
+      const blank = 'band/album/song/blank.rpp';
+      final expected = {
+        ReportKind.mediaOutsidePool: [
+          const ReportItem(bad, r'.\audio-files\b.wav'),
+        ],
+        ReportKind.missingMedia: [const ReportItem(bad, r'Media\gone.wav')],
+        ReportKind.externalMedia: [
+          const ReportItem(
+            bad,
+            'C:\\Users\\someone\\c.wav\n..\\..\\..\\..\\d.wav',
+          ),
+        ],
+        ReportKind.recordPathNotMedia: [
+          const ReportItem(bad, 'audio-files'),
+          const ReportItem(blank, ''),
+        ],
+        ReportKind.renderFileForm: [
+          const ReportItem(bad, r'.\render'),
+          const ReportItem(blank, ''),
+        ],
+      };
+      expect(first.issues.items, expected);
+
+      // Unchanged projects are not read again: their references come from
+      // the previous scan, checked against the files present now.
+      put('band/album/song/Media/gone.wav', 'g');
+      counting.reads.clear();
+      final second = await scan(counting, lib, previous: first);
+      expect(counting.reads, isEmpty);
+      expect(second.issues.items[ReportKind.missingMedia], isNull);
+      expect(second.issues.items[ReportKind.mediaOutsidePool], [
+        const ReportItem(bad, r'.\audio-files\b.wav'),
+      ]);
     });
 
     test('runs in an isolate', () async {
@@ -1106,7 +1199,7 @@ void main() {
       final result = await scan(storage, lib);
 
       // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.tags, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v.rpp');      expect(result.titles[1].tags['artist'], 'Band');
-      expect(result.issues.items, {
+      expect(layoutIssues(result), {
         ReportKind.misplacedLevel: [
           const ReportItem.misplaced(
             'First album',

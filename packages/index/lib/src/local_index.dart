@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 6;
+const _schemaVersion = 7;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -52,6 +52,9 @@ CREATE TABLE versions (
   track_count INTEGER,
   item_count INTEGER,
   plugins TEXT NOT NULL,
+  media TEXT NOT NULL,
+  record_path TEXT,
+  render_file TEXT,
   PRIMARY KEY (library_id, title_path, file_name)
 );
 CREATE TABLE files (
@@ -144,8 +147,8 @@ final class LocalIndex {
       _insertAll(
         'INSERT INTO versions (library_id, title_path, file_name, size, '
         'modified, version_id, owner, label, tempo, length, track_count, '
-        'item_count, plugins) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'item_count, plugins, media, record_path, render_file) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           for (final t in scan.titles)
             for (final v in t.versions)
@@ -163,6 +166,9 @@ final class LocalIndex {
                 v.trackCount,
                 v.itemCount,
                 jsonEncode([for (final p in v.plugins) p.toJson()]),
+                jsonEncode(v.media),
+                v.recordPath,
+                v.renderFile,
               ],
         ],
       );
@@ -285,10 +291,9 @@ final class LocalIndex {
           ),
       },
       issues: Report({
-        for (final kind in {for (final i in stored) i.kind}.difference({
-          ReportKind.corrupted,
-          ReportKind.orphanNode,
-        }))
+        for (final kind in {
+          for (final i in stored) i.kind,
+        }.difference({ReportKind.corrupted, ReportKind.orphanNode}))
           kind: [
             for (final i in stored)
               if (i.kind == kind) i.item,
@@ -419,6 +424,9 @@ final class LocalIndex {
         for (final p in jsonDecode(r['plugins'] as String) as List)
           PluginRef.fromJson((p as Map).cast()),
       ],
+      media: (jsonDecode(r['media'] as String) as List).cast(),
+      recordPath: r['record_path'] as String?,
+      renderFile: r['render_file'] as String?,
     );
   }
 

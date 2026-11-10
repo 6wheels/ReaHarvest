@@ -115,6 +115,9 @@ final class Version {
     this.trackCount,
     this.itemCount,
     this.plugins = const [],
+    this.media = const [],
+    this.recordPath,
+    this.renderFile,
   });
 
   /// File path relative to the title folder, `/`-separated: a plain file
@@ -146,6 +149,16 @@ final class Version {
 
   /// Plugins used by the project, deduplicated; empty when unknown.
   final List<PluginRef> plugins;
+
+  /// Media references (`FILE` lines of `SOURCE` chunks), deduplicated, as
+  /// written in the project (relative or absolute); empty when unknown.
+  final List<String> media;
+
+  /// Record path (`RECORD_PATH`) as written; null when absent or unknown.
+  final String? recordPath;
+
+  /// Render target (`RENDER_FILE`) as written; null when absent or unknown.
+  final String? renderFile;
 
   bool get isAdopted => metadata != null;
 

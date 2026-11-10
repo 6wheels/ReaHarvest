@@ -637,27 +637,29 @@ class LibraryService {
 
   /// Scans every configured library, one after the other, as a background
   /// task cancellable between two libraries (SPEC §5.2). A failed library
-  /// does not stop the others; it is reported.
-  Future<void> scanAll() async {
+  /// does not stop the others; it is reported. A [full] scan reads every
+  /// file again, changed or not.
+  Future<void> scanAll({bool full = false}) async {
     final entries = ref.read(settingsProvider).libraries;
     if (entries.isEmpty) return;
-    await ref.read(tasksProvider.notifier).run((l10n) => l10n.taskScanAll, (
-      task,
-    ) async {
-      var report = const Report();
-      for (final (i, entry) in entries.indexed) {
-        task.checkCancelled();
-        try {
-          report += await _scan(entry);
-        } on Object catch (error) {
-          report += Report({
-            ReportKind.scanFailed: [ReportItem(entry.libraryRoot, '$error')],
-          });
+    await ref.read(tasksProvider.notifier).run(
+      (l10n) => full ? l10n.taskFullScan : l10n.taskScanAll,
+      (task) async {
+        var report = const Report();
+        for (final (i, entry) in entries.indexed) {
+          task.checkCancelled();
+          try {
+            report += await _scan(entry, full: full);
+          } on Object catch (error) {
+            report += Report({
+              ReportKind.scanFailed: [ReportItem(entry.libraryRoot, '$error')],
+            });
+          }
+          task.progress((i + 1) / entries.length);
         }
-        task.progress((i + 1) / entries.length);
-      }
-      return report;
-    });
+        return report;
+      },
+    );
   }
 
   /// Scans [entry]; failures are only logged, the library stays configured
@@ -670,10 +672,10 @@ class LibraryService {
     }
   }
 
-  /// Scans [entry] in an isolate, incrementally from the stored scan, and
-  /// updates the index. Unavailable libraries are skipped. Reports the
+  /// Scans [entry] in an isolate, incrementally from the stored scan unless
+  /// [full], and updates the index. Unavailable libraries are skipped. Reports the
   /// problems found (SPEC §5.2).
-  Future<Report> _scan(LibraryEntry entry) async {
+  Future<Report> _scan(LibraryEntry entry, {bool full = false}) async {
     final root = entry.libraryRoot;
     final storage = MountedFolderStorage(root);
     final library = await readLibrary(storage);
@@ -687,7 +689,7 @@ class LibraryService {
     final result = await scanFolder(
       root,
       library,
-      previous: index.scanResult(library.id),
+      previous: full ? null : index.scanResult(library.id),
     );
     index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
+import 'adoption.dart' show resolveReference;
 import 'conventions.dart';
 import 'mounted_folder_storage.dart';
 import 'node_file.dart';
@@ -32,8 +33,10 @@ final class ScanResult {
   /// Node files by folder path (`''` for the root).
   final Map<String, NodeFile> nodes;
 
-  /// `.RPP` files and folders outside the layout, and duplicated version
-  /// identifiers, by kind ("To sort", SPEC §5.2, §5.8 step 3), each sorted
+  /// `.RPP` files and folders outside the layout, duplicated version
+  /// identifiers, and projects whose media, record path or render target
+  /// do not follow the title conventions (SPEC §4.3, the references or
+  /// value as detail, one per line), by kind ("To sort", SPEC §5.2, §5.8 step 3), each sorted
   /// by path. Misplaced items name their expected level and, when known,
   /// their target: the title of a project too deep, the proposed position
   /// of a folder recognized through the known values. Unknown intermediate
@@ -110,6 +113,10 @@ final class _Scanner {
   final corrupted = <String>[];
   final stamps = <String, FileStamp>{};
 
+  /// Lowercase paths of every file, excluded ones too, to find missing
+  /// media (case-insensitive like Windows and macOS).
+  final existing = <String>{};
+
   /// Folders whose trash or history holds a project.
   final traces = <String>{};
 
@@ -117,6 +124,7 @@ final class _Scanner {
     for (final e in await storage.list('', recursive: true)) {
       final segments = e.path.split('/');
       final parents = segments.sublist(0, segments.length - 1);
+      if (!e.isDirectory) existing.add(e.path.toLowerCase());
       if (segments.first == collabFolderName ||
           segments.first == migrationFolderName) {
         continue;
@@ -155,6 +163,7 @@ final class _Scanner {
     ]..sort();
     titles.sort((a, b) => a.path.compareTo(b.path));
     _findDuplicates();
+    if (layout != null) titles.forEach(_checkMedia);
     corrupted.sort();
     for (final list in issues.values) {
       list.sort((a, b) => a.path.compareTo(b.path));
@@ -306,6 +315,51 @@ final class _Scanner {
     }
   }
 
+  /// Reports the versions of [title] whose media are not all present in its
+  /// pool (outside `Media/`, missing, absolute or outside the library),
+  /// whose record path is not `Media` or whose render target is not in
+  /// `Renders/` (SPEC §4.3, §5.8 step 3).
+  void _checkMedia(Title title) {
+    final dir = title.path;
+    final pool = '${_join(dir, mediaFolderName)}/'.toLowerCase();
+    final renders = _join(dir, rendersFolderName).toLowerCase();
+    for (final v in title.versions) {
+      final path = _join(dir, v.fileName);
+      final outside = <String>[];
+      final missing = <String>[];
+      final external = <String>[];
+      for (final ref in v.media) {
+        final file = resolveReference(dir, ref)?.toLowerCase();
+        if (file == null) {
+          external.add(ref);
+        } else if (!existing.contains(file)) {
+          missing.add(ref);
+        } else if (!file.startsWith(pool)) {
+          outside.add(ref);
+        }
+      }
+      void report(ReportKind kind, List<String> refs) {
+        if (refs.isNotEmpty) _issue(kind, ReportItem(path, refs.join('\n')));
+      }
+
+      report(ReportKind.mediaOutsidePool, outside);
+      report(ReportKind.missingMedia, missing);
+      report(ReportKind.externalMedia, external);
+      final record = resolveReference(dir, v.recordPath ?? '');
+      if (record?.toLowerCase() != pool.substring(0, pool.length - 1)) {
+        _issue(
+          ReportKind.recordPathNotMedia,
+          ReportItem(path, v.recordPath ?? ''),
+        );
+      }
+      final render = resolveReference(dir, v.renderFile ?? '')?.toLowerCase();
+      if (render == null ||
+          (render != renders && !render.startsWith('$renders/'))) {
+        _issue(ReportKind.renderFileForm, ReportItem(path, v.renderFile ?? ''));
+      }
+    }
+  }
+
   /// Versions of the projects in the title [dir]; unreadable ones are
   /// reported as corrupted.
   Future<List<Version>> _readVersions(String dir) async {
@@ -448,6 +502,9 @@ final class _Scanner {
         for (final p in project.allPlugins)
           PluginRef(kind: p.kind, name: p.name, identifier: p.identifier),
       ],
+      media: project.mediaFiles,
+      recordPath: project.recordPath,
+      renderFile: project.renderFile,
     );
   }
 

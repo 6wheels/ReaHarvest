@@ -83,6 +83,9 @@ void main() {
           identifier: 'comp.vst3',
         ),
     ],
+    media: [if (label != null) r'Media\kick.wav'],
+    recordPath: label == null ? null : 'Media',
+    renderFile: label == null ? null : 'Renders',
     metadata: label == null
         ? null
         : VersionMetadata(
@@ -156,10 +159,14 @@ void main() {
       expect(a.tempo, 98.5);
       expect((a.length, a.trackCount, a.itemCount), (184.5, 12, 40));
       expect(a.plugins, song.versions.first.plugins);
+      expect(a.media, [r'Media\kick.wav']);
+      expect((a.recordPath, a.renderFile), ('Media', 'Renders'));
       expect(t.versions.last.isAdopted, isFalse);
       expect(t.versions.last.tempo, isNull);
       expect(t.versions.last.trackCount, isNull);
       expect(t.versions.last.plugins, isEmpty);
+      expect(t.versions.last.media, isEmpty);
+      expect(t.versions.last.recordPath, isNull);
       expect(restored.nodes['Band']!.id, nodeId);
       expect(restored.issues.items, {
         ReportKind.projectTooDeep: [

@@ -602,7 +602,8 @@ void main() {
       KnownValue('Artist', [KnownValue('Album')]),
     ]);
     List<String> unknown() => [
-      for (final i in container.read(issuesProvider)) i.item.path,
+      for (final i in container.read(issuesProvider))
+        if (i.item.level != null) i.item.path,
     ];
     expect(
       unknown(),

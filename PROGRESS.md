@@ -32,7 +32,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #81 merge folders moved to the same title (recursive merge of a folder moved onto an existing one; name collisions suffixed and references of the moved projects rewritten; node files merged, the target's title status wins and the dropped one is reported; what is left of the source kept in `.migration/<stamp>/merged/`; merge shown in the fix previews; identical media dedup left to #69)
 - [x] #82 select the To sort items to fix in bulk (checkbox on the cards of the batch-fixable kinds, select all and counter per section; "Fix…" previews the selection, or the whole section when none; selection kept through a rescan)
 - [x] #80 number of versions to adopt on the card ("N to adopt" in its figures), overview and detail header (hidden when none); the To adopt double filter and the batch adoption stay ideas on the issue
-- [ ] #69 media normalization and pool merge
+- [ ] #69 media normalization and pool merge (scan detectors done: media outside `Media/`, missing, absolute or outside the library, record path other than `Media`, render target outside `Renders/`, one issue per project with the references as detail, recomputed from the indexed references without reading unchanged projects; "Full scan" on the To sort page reads every project again. Next: the normalization fix with pool merge. `RENDER_FILE` fix deferred to a dedicated view in the version detail)
 - [ ] #70 other files to Assets with reference check
 - [ ] #72 convert to a collab repository
 - [ ] #15 REAPER-running warning before `.rpp` rewrites

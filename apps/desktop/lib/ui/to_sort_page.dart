@@ -53,6 +53,19 @@ class ToSortPage extends StatelessWidget {
                     l10n.toSort,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
+                  const Spacer(),
+                  Consumer(
+                    builder: (context, ref, _) => Tooltip(
+                      message: l10n.fullScanTooltip,
+                      child: TextButton.icon(
+                        onPressed: () => ref
+                            .read(libraryServiceProvider)
+                            .scanAll(full: true),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(l10n.fullScan),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -78,6 +91,16 @@ class ToSortPage extends StatelessWidget {
 typedef _Key = (LibraryId, ReportKind, String);
 
 _Key _keyOf(LibraryIssue issue) => (issue.library, issue.kind, issue.item.path);
+
+/// Issues on the media, record path or render target of a project, whose
+/// detail lists the references or the value (one per line).
+const _mediaKinds = {
+  ReportKind.mediaOutsidePool,
+  ReportKind.missingMedia,
+  ReportKind.externalMedia,
+  ReportKind.recordPathNotMedia,
+  ReportKind.renderFileForm,
+};
 
 class _ToSortList extends ConsumerStatefulWidget {
   const _ToSortList();
@@ -209,7 +232,7 @@ class _ToSortListState extends ConsumerState<_ToSortList> {
     Map<LibraryId, String>? names,
   ) {
     final l10n = AppLocalizations.of(context);
-    final ReportItem(:path, :level, :target) = issue.item;
+    final ReportItem(:path, :detail, :level, :target) = issue.item;
     // An orphan node file stands for its folder.
     final shown = issue.kind == ReportKind.orphanNode
         ? p.posix.dirname(path)
@@ -231,6 +254,11 @@ class _ToSortListState extends ConsumerState<_ToSortList> {
         if (level != null)
           l10n.issueExpectedLevel(layoutLevelLabel(l10n, level)),
         if (target != null) l10n.issueTarget(target),
+        if (_mediaKinds.contains(issue.kind) && detail != null)
+          if (detail.isEmpty)
+            l10n.issueProjectFolder
+          else
+            ...detail.split('\n'),
       ],
       action: switch (issue.kind) {
         ReportKind.projectTooDeep ||
