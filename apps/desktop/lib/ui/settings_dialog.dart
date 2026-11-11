@@ -398,7 +398,11 @@ class _Libraries extends ConsumerWidget {
           child: SingleChildScrollView(
             child: LibraryForm(
               submitLabel: l10n.addLibrary,
-              onAdded: () => Navigator.of(context).pop(),
+              // The report of the scan is already open over this dialog:
+              // close this dialog, not the top route.
+              onAdded: () => Navigator.of(
+                context,
+              ).removeRoute(ModalRoute.of(context)!),
             ),
           ),
         ),
