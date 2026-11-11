@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
-import 'adoption.dart' show resolveReference;
+import 'library_path.dart';
 import 'conventions.dart';
 import 'mounted_folder_storage.dart';
 import 'node_file.dart';
@@ -119,7 +119,7 @@ final class _Scanner {
   _Scanner(this.storage, this.library, this.previous)
     : previousVersions = {
         for (final t in previous.titles)
-          for (final v in t.versions) _join(t.path, v.fileName): v,
+          for (final v in t.versions) joinPath(t.path, v.fileName): v,
       };
 
   final RepositoryStorage storage;
@@ -157,14 +157,14 @@ final class _Scanner {
         if (!e.isDirectory &&
             (last == trashFolderName || last == historyFolderName) &&
             isProjectFile(e.path)) {
-          traces.add(_parent(_parent(e.path)));
+          traces.add(parentOf(parentOf(e.path)));
         }
         continue;
       }
       if (e.isDirectory) {
         if (!isExcludedFolder(segments.last)) dirs.add(e.path);
       } else if (!isExcludedFile(segments.last)) {
-        files.putIfAbsent(_parent(e.path), () => []).add(e);
+        files.putIfAbsent(parentOf(e.path), () => []).add(e);
         stamps[e.path] = _stamp(e);
       }
     }
@@ -240,7 +240,7 @@ final class _Scanner {
 
   /// Folder of [dir] or its closest parent that is a key of [titles].
   static String? _titleOf(String dir, Map<String, Object?> titles) {
-    for (var d = dir; ; d = _parent(d)) {
+    for (var d = dir; ; d = parentOf(d)) {
       if (titles.containsKey(d)) return d;
       if (d.isEmpty) return null;
     }
@@ -251,7 +251,11 @@ final class _Scanner {
     final qualified = _qualified(depth);
     final skipped = <String>{};
     for (final dir in ordered) {
-      if (skipped.any((s) => _isWithin(dir, s))) continue;
+      if (skipped.any(
+        (s) => dir == s || isWithin(dir, s, caseSensitive: true),
+      )) {
+        continue;
+      }
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
       final d = segments.length;
       if (d > 0 && d <= depth && !qualified.contains(dir)) {
@@ -338,7 +342,7 @@ final class _Scanner {
       for (final (t, v) in versions) {
         _issue(
           ReportKind.duplicateVersionId,
-          ReportItem(_join(t.path, v.fileName), id),
+          ReportItem(joinPath(t.path, v.fileName), id),
         );
       }
     }
@@ -348,7 +352,7 @@ final class _Scanner {
   /// [dir] (subprojects), unless unchanged since the previous scan;
   /// unreadable ones are reported as corrupted.
   Future<void> _readSubprojects(String dir) async {
-    final pool = _join(dir, mediaFolderName).toLowerCase();
+    final pool = joinPath(dir, mediaFolderName).toLowerCase();
     for (final MapEntry(key: folder, value: entries) in files.entries) {
       if (folder.toLowerCase() != pool) continue;
       for (final e in entries.where(_isProject)) {
@@ -378,15 +382,15 @@ final class _Scanner {
   /// `Renders/` (SPEC §4.3, §5.8 step 3).
   void _checkMedia(Title title) {
     final dir = title.path;
-    final pool = '${_join(dir, mediaFolderName)}/'.toLowerCase();
-    final renders = _join(dir, rendersFolderName).toLowerCase();
+    final pool = '${joinPath(dir, mediaFolderName)}/'.toLowerCase();
+    final renders = joinPath(dir, rendersFolderName).toLowerCase();
     for (final MapEntry(key: path, value: refs) in subprojects.entries) {
-      if ('${_parent(path)}/'.toLowerCase() == pool) {
+      if ('${parentOf(path)}/'.toLowerCase() == pool) {
         _checkReferences(path, refs, pool);
       }
     }
     for (final v in title.versions) {
-      final path = _join(dir, v.fileName);
+      final path = joinPath(dir, v.fileName);
       _checkReferences(path, v.media, pool);
       final record = resolveReference(dir, v.recordPath ?? '');
       if (record?.toLowerCase() != pool.substring(0, pool.length - 1)) {
@@ -411,7 +415,7 @@ final class _Scanner {
     final missing = <String>[];
     final external = <String>[];
     for (final ref in refs) {
-      final file = resolveReference(_parent(path), ref)?.toLowerCase();
+      final file = resolveReference(parentOf(path), ref)?.toLowerCase();
       if (file == null) {
         external.add(ref);
       } else if (!existing.contains(file)) {
@@ -494,7 +498,7 @@ final class _Scanner {
   Set<String> _qualified(int depth) {
     final qualified = <String>{};
     void addWithParents(String dir) {
-      for (var d = dir; qualified.add(d) && d.isNotEmpty; d = _parent(d)) {}
+      for (var d = dir; qualified.add(d) && d.isNotEmpty; d = parentOf(d)) {}
     }
 
     for (final MapEntry(key: dir, value: entries) in files.entries) {
@@ -585,7 +589,7 @@ final class _Scanner {
     String level, {
     bool scaffold = false,
   }) async {
-    final path = _join(dir, nodeFileName);
+    final path = joinPath(dir, nodeFileName);
     final entry = files[dir]?.where((e) => e.path == path).firstOrNull;
     NodeFile? node;
     if (entry != null) {
@@ -626,17 +630,6 @@ final class _Scanner {
   static FileStamp _stamp(StorageEntry e) =>
       (size: e.size, modified: e.modified);
 
-  static String _join(String dir, String name) =>
-      dir.isEmpty ? name : '$dir/$name';
-
-  static String _parent(String path) {
-    final i = path.lastIndexOf('/');
-    return i < 0 ? '' : path.substring(0, i);
-  }
-
   static int _depth(String dir) =>
       dir.isEmpty ? 0 : '/'.allMatches(dir).length + 1;
-
-  static bool _isWithin(String dir, String parent) =>
-      dir == parent || dir.startsWith('$parent/');
 }
