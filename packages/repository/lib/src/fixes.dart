@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'free_names.dart';
 import 'library_path.dart';
+import 'project_file.dart';
 import 'conventions.dart';
 import 'media.dart';
 import 'migration.dart';
@@ -268,24 +267,24 @@ final class _Merge {
     final now = _locate(old);
     final oldDir = p.posix.dirname(old);
     final newDir = p.posix.dirname(now);
-    final String text;
+    final (:text, :encoding) = await readProject(storage, now);
+    final String patched;
     try {
-      text = await utf8.decodeStream(storage.read(now));
+      patched = rewriteMediaPaths(text, (ref) {
+        final file = resolveReference(oldDir, ref);
+        if (file == null || !file.startsWith('$source/')) return ref;
+        final target = _locate(file);
+        if (relativeReference(newDir, target, like: '/') ==
+            relativeReference(oldDir, file, like: '/')) {
+          return ref;
+        }
+        return relativeReference(newDir, target, like: ref);
+      });
     } on FormatException {
       return;
     }
-    final patched = rewriteMediaPaths(text, (ref) {
-      final file = resolveReference(oldDir, ref);
-      if (file == null || !file.startsWith('$source/')) return ref;
-      final target = _locate(file);
-      if (relativeReference(newDir, target, like: '/') ==
-          relativeReference(oldDir, file, like: '/')) {
-        return ref;
-      }
-      return relativeReference(newDir, target, like: ref);
-    });
     if (patched != text) {
-      await storage.write(now, Stream.value(utf8.encode(patched)));
+      await writeProject(storage, now, patched, encoding);
     }
   }
 }
@@ -320,7 +319,7 @@ Future<String> liftProject(
 }) async {
   final folder = p.posix.dirname(path);
   final sub = folder.substring(titleDir.isEmpty ? 0 : titleDir.length + 1);
-  var text = await utf8.decodeStream(storage.read(path));
+  var (:text, :encoding) = await readProject(storage, path);
   text = rewriteMediaPaths(text, (ref) => _prefixed(sub, ref));
   final recordPath = RppProject.parse(text).document.root.line('RECORD_PATH');
   if (recordPath != null && recordPath.params.any((s) => s.isNotEmpty)) {
@@ -342,7 +341,7 @@ Future<String> liftProject(
         : '$titleDir/${p.posix.basename(path)}',
   );
   await storage.move(path, target);
-  await storage.write(target, Stream.value(utf8.encode(text)));
+  await writeProject(storage, target, text, encoding);
   if (status != null) {
     await setVersionStatus(storage, titleDir, metadata.id, status);
   }

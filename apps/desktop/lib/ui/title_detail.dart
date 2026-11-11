@@ -742,7 +742,7 @@ class _VersionPane extends ConsumerWidget {
       messenger.showSnackBar(SnackBar(content: Text(l10n.backupCreated)));
     } on Object catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text(l10n.actionFailed('$error'))),
+        SnackBar(content: Text(failureMessage(l10n, error))),
       );
     }
   }
@@ -1033,7 +1033,7 @@ class _History extends ConsumerWidget {
       }
     } on Object catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text(l10n.actionFailed('$error'))),
+        SnackBar(content: Text(failureMessage(l10n, error))),
       );
     }
   }

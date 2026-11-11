@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'free_names.dart';
 import 'library_path.dart';
+import 'project_file.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
 
@@ -45,11 +44,15 @@ Future<String> backupVersion(
     storage,
     joinPath(history, '$name ${_stamp(now ?? DateTime.now())}$ext'),
   );
-  final text = await _readText(storage, joinPath(titleDir, fileName));
-  await _writeText(
+  final (:text, :encoding) = await readProject(
+    storage,
+    joinPath(titleDir, fileName),
+  );
+  await writeProject(
     storage,
     target,
     rebaseProjectPaths(text, parentOf(joinPath(titleDir, fileName)), history),
+    encoding,
   );
   return target;
 }
@@ -65,10 +68,7 @@ Future<Map<VersionId, List<Backup>>> readHistory(
   final history = <VersionId, List<Backup>>{};
   for (final e in await storage.list(folder)) {
     if (e.isDirectory || !isProjectFile(e.path)) continue;
-    final text = await storage
-        .read(e.path)
-        .transform(const Utf8Decoder(allowMalformed: true))
-        .join();
+    final (:text, encoding: _) = await readProject(storage, e.path);
     final metadata = VersionMetadata.fromExtState(
       RppProject.parse(text).extState(VersionMetadata.section),
     );
@@ -102,11 +102,12 @@ Future<String> restoreBackup(
 }) async {
   final saved = await backupVersion(storage, titleDir, fileName, now: now);
   final version = joinPath(titleDir, fileName);
-  final text = await _readText(storage, backup);
-  await _writeText(
+  final (:text, :encoding) = await readProject(storage, backup);
+  await writeProject(
     storage,
     version,
     rebaseProjectPaths(text, parentOf(backup), parentOf(version)),
+    encoding,
   );
   return saved;
 }
@@ -115,10 +116,10 @@ Future<String> restoreBackup(
 /// in REAPER, which lengthens them on every save of a backup (SPEC §5.4).
 /// The file is written only if a path changed.
 Future<void> cleanBackupPaths(RepositoryStorage storage, String backup) async {
-  final text = await _readText(storage, backup);
+  final (:text, :encoding) = await readProject(storage, backup);
   final dir = parentOf(backup);
   final cleaned = rebaseProjectPaths(text, dir, dir);
-  if (cleaned != text) await _writeText(storage, backup, cleaned);
+  if (cleaned != text) await writeProject(storage, backup, cleaned, encoding);
 }
 
 /// Rewrites the relative paths of a project written for the folder [from]
@@ -171,12 +172,6 @@ String rebaseProjectPaths(String text, String from, String to) {
 
 /// Root under which library paths are resolved by [rebaseProjectPaths].
 final _virtualRoot = '/${List.filled(64, 'r').join('/')}';
-
-Future<String> _readText(RepositoryStorage storage, String path) =>
-    storage.read(path).transform(utf8.decoder).join();
-
-Future<void> _writeText(RepositoryStorage storage, String path, String text) =>
-    storage.write(path, Stream.value(utf8.encode(text)));
 
 String _stamp(DateTime d) {
   String two(int n) => n.toString().padLeft(2, '0');

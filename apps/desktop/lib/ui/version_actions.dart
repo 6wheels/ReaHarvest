@@ -83,7 +83,7 @@ Future<bool?> _confirm(
 }
 
 void _fail(ScaffoldMessengerState messenger, AppLocalizations l10n, Object e) =>
-    messenger.showSnackBar(SnackBar(content: Text(l10n.actionFailed('$e'))));
+    messenger.showSnackBar(SnackBar(content: Text(failureMessage(l10n, e))));
 
 /// Source of a new version.
 enum _Source { blank, template, duplicate }

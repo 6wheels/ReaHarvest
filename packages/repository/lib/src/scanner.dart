@@ -7,6 +7,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'library_path.dart';
+import 'project_file.dart';
 import 'conventions.dart';
 import 'mounted_folder_storage.dart';
 import 'node_file.dart';
@@ -363,10 +364,7 @@ final class _Scanner {
           }
         }
         try {
-          final text = await storage
-              .read(e.path)
-              .transform(const Utf8Decoder(allowMalformed: true))
-              .join();
+          final (:text, encoding: _) = await readProject(storage, e.path);
           subprojects[e.path] = RppProject.parse(text).mediaFiles;
         } on Object catch (error) {
           if (!_isCorruption(error)) rethrow;
@@ -554,10 +552,7 @@ final class _Scanner {
     if (previous.stamps[e.path] == stamps[e.path]) {
       if (previousVersions[e.path] case final v?) return v;
     }
-    final text = await storage
-        .read(e.path)
-        .transform(const Utf8Decoder(allowMalformed: true))
-        .join();
+    final (:text, encoding: _) = await readProject(storage, e.path);
     final project = RppProject.parse(text);
     final base = _version(dir, e);
     return Version(
