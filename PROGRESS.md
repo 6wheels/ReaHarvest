@@ -57,6 +57,7 @@ Core hardening, in this order, before the remaining features:
 - [ ] #95 media normalization as gather, pure plan, then apply (the plan is the preview)
 - [ ] #96 files named by a plugin state never moved nor purged
 - [ ] #97 scan creating no folder, never writing in a repository
+- [ ] #114 only `versionId` in the `.RPP`; label and owner in `.node.json` (collab store in `collab` mode), no migration of existing data
 - [ ] #98 default label for versions adopted in batch
 - [ ] #99 fix proposals computed outside the interface
 - [ ] #100 LibraryService split into one service per role
