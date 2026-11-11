@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
@@ -7,6 +5,7 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'adoption.dart';
 import 'free_names.dart';
 import 'library_path.dart';
+import 'project_file.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
 
@@ -40,7 +39,7 @@ Future<String> createVersion(
   ]);
   text = setRootAttribute(text, 'RENDER_FILE', [rendersFolderName]);
   text = setExtState(text, VersionMetadata.section, metadata.toExtState());
-  await _writeText(storage, path, text);
+  await writeProject(storage, path, text, ProjectEncoding.utf8);
   return path;
 }
 
@@ -54,11 +53,15 @@ Future<String> duplicateVersion(
   VersionMetadata metadata,
 ) async {
   final path = await _newVersionPath(storage, titleDir, fileName);
-  final text = await _readText(storage, joinPath(titleDir, source));
-  await _writeText(
+  final (:text, :encoding) = await readProject(
+    storage,
+    joinPath(titleDir, source),
+  );
+  await writeProject(
     storage,
     path,
     setExtState(text, VersionMetadata.section, metadata.toExtState()),
+    encoding,
   );
   return path;
 }
@@ -88,7 +91,7 @@ Future<void> setVersionLabel(
 ) async {
   final path = joinPath(titleDir, fileName);
   final metadata = VersionMetadata.fromExtState(
-    RppProject.parse(await _readText(storage, path))
+    RppProject.parse((await readProject(storage, path)).text)
         .extState(VersionMetadata.section),
   );
   if (metadata == null) throw StateError('Version not adopted: $path');
@@ -160,7 +163,7 @@ Future<List<StorageEntry>> unreferencedMedia(
     if (e.isDirectory || !isProjectFile(e.path) || _isInTrash(e.path)) {
       continue;
     }
-    final project = RppProject.parse(await _readText(storage, e.path));
+    final project = RppProject.parse((await readProject(storage, e.path)).text);
     final dir = parentOf(e.path);
     final record = project.document.root.line('RECORD_PATH')?.params;
     final dirs = {
@@ -235,9 +238,3 @@ bool _isInTrash(String path) {
 String _slash(String ref) => ref.replaceAll(r'\', '/');
 
 String _normalize(String path) => p.posix.normalize(path);
-
-Future<String> _readText(RepositoryStorage storage, String path) =>
-    storage.read(path).transform(utf8.decoder).join();
-
-Future<void> _writeText(RepositoryStorage storage, String path, String text) =>
-    storage.write(path, Stream.value(utf8.encode(text)));

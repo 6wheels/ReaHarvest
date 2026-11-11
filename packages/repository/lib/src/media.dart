@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'free_names.dart';
 import 'library_path.dart';
+import 'project_file.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
 import 'scanner.dart' show ScanResult;
@@ -87,7 +86,7 @@ Future<Report> moveProjectToTitle(
   String titleDir, {
   Map<String, List<String>> usage = const {},
 }) async {
-  final text = await utf8.decodeStream(storage.read(project));
+  final (:text, :encoding) = await readProject(storage, project);
   final sourceDir = parentOf(project);
   final shared = {
     ...await _mediaOfOtherProjects(storage, sourceDir, project),
@@ -119,7 +118,7 @@ Future<Report> moveProjectToTitle(
   );
   await storage.move(project, target);
   if (patched != text) {
-    await storage.write(target, Stream.value(utf8.encode(patched)));
+    await writeProject(storage, target, patched, encoding);
   }
   return Report({
         ReportKind.projectMoved: [ReportItem(target)],
@@ -149,7 +148,7 @@ Future<Set<String>> _mediaOfOtherProjects(
       continue;
     }
     try {
-      final text = await utf8.decodeStream(storage.read(e.path));
+      final (:text, encoding: _) = await readProject(storage, e.path);
       for (final ref in RppProject.parse(text).mediaFiles) {
         if (resolveReference(parentOf(e.path), ref) case final path?) {
           media.add(path.toLowerCase());
@@ -184,6 +183,9 @@ final class _Normalization {
   /// Text of the projects of the title and of the subprojects of its pool,
   /// by path: rewritten.
   final projects = <String, String>{};
+
+  /// Encoding of each project of [projects].
+  final encodings = <String, ProjectEncoding>{};
 
   /// Lowercase paths of the files referenced by the projects still in a
   /// subfolder of the title, or by blocked projects: never moved.
@@ -229,9 +231,10 @@ final class _Normalization {
       final dir = parentOf(e.path);
       final segments = _relative(e.path).split('/');
       if (segments.any(isExcludedFolder)) continue;
-      final text = await utf8.decodeStream(storage.read(e.path));
+      final (:text, :encoding) = await readProject(storage, e.path);
       if (dir == titleDir || dir.toLowerCase() == pool.toLowerCase()) {
         projects[e.path] = text;
+        encodings[e.path] = encoding;
       } else if (!_isReserved(segments.first)) {
         // Not lifted yet: its files stay where it expects them.
         for (final ref in RppProject.parse(text).mediaFiles) {
@@ -264,6 +267,7 @@ final class _Normalization {
         project,
         now,
         text,
+        encodings[project]!,
         recordPath: now == project && parentOf(project) == titleDir,
       );
     }
@@ -355,8 +359,15 @@ final class _Normalization {
     // References of a subproject copied, or moved from a subfolder (the
     // projects of the title are rewritten afterwards), follow it.
     if (!move || !projects.containsKey(file)) {
-      final text = await utf8.decodeStream(storage.read(target));
-      await _rewrite(file, target, text, recordPath: false, report: false);
+      final (:text, :encoding) = await readProject(storage, target);
+      await _rewrite(
+        file,
+        target,
+        text,
+        encoding,
+        recordPath: false,
+        report: false,
+      );
     }
   }
 
@@ -366,7 +377,8 @@ final class _Normalization {
   Future<void> _rewrite(
     String old,
     String now,
-    String text, {
+    String text,
+    ProjectEncoding encoding, {
     required bool recordPath,
     bool report = true,
   }) async {
@@ -395,7 +407,7 @@ final class _Normalization {
       }
     }
     if (patched == text) return;
-    await storage.write(now, Stream.value(utf8.encode(patched)));
+    await writeProject(storage, now, patched, encoding);
     if (report) _add(ReportKind.mediaNormalized, ReportItem(now));
   }
 

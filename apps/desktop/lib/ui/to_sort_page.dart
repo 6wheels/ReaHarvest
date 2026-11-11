@@ -343,7 +343,7 @@ class _ToSortListState extends ConsumerState<_ToSortList> {
           .deleteOrphanNode(issue.library, path);
     } on Object catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text(l10n.actionFailed('$error'))),
+        SnackBar(content: Text(failureMessage(l10n, error))),
       );
     }
   }

@@ -116,6 +116,7 @@
   "columnName": "Nom",
   "columnModified": "Modifié",
   "actionFailed": "L'opération a échoué : {error}",
+  "projectEncodingFailed": "Ce projet utilise un ancien encodage de texte qui ne peut pas contenir ce nom. Renommez le dossier ou le fichier sans caractères spéciaux, puis réessayez.",
   "noFilterResults": "Aucun titre ne correspond à ces filtres",
   "filterValue": "{label} : {value}",
   "createBackup": "Créer un point de sauvegarde",

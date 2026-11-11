@@ -461,10 +461,14 @@ void main() {
 
     test('non-regression: every fixture keeps its media', () async {
       final empty = File('$fixtures/empty.rpp').readAsStringSync();
+      // Not tested here: media-paths.rpp is blocked (tested on its own),
+      // windows-1252.rpp is not UTF-8 (see project_file_test.dart).
+      const skipped = {'media-paths.rpp', 'windows-1252.rpp'};
       final sources = {
         for (final f in Directory(fixtures).listSync().whereType<File>())
-          if (isProjectFile(f.path)) p.basename(f.path): f.readAsStringSync(),
-      }..remove('media-paths.rpp'); // Blocked: tested on its own.
+          if (isProjectFile(f.path) && !skipped.contains(p.basename(f.path)))
+            p.basename(f.path): f.readAsStringSync(),
+      };
       for (final MapEntry(key: name, value: text) in sources.entries) {
         put('$song/$name', text);
         for (final ref in RppProject.parse(text).mediaFiles) {
