@@ -56,7 +56,9 @@ class BackNavigation extends StatelessWidget {
       },
       child: CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.escape): back},
-        child: Focus(autofocus: true, child: child),
+        // A scope: when a focused field leaves (an adoption form), the
+        // focus falls back here and Escape still goes back.
+        child: FocusScope(autofocus: true, child: child),
       ),
     );
   }
