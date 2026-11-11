@@ -126,7 +126,7 @@ Example with the classic template:
 
 Rules:
 - Scaffolding: the library initialization only writes `.library.json`. Creating a title in the application creates its folders (`Media/`, `Renders/`, `Assets/`, `.history/`, `.trash/`) and its `.node.json`. A scan creates no folder: for a title found by the scan, each folder is created by the first operation that needs it.
-- Node files are written by the scan only where the library is worked in (the root of a `local` library, a workspace). The scan of a repository (`cloud`, `collab`) never writes: its node files come from the conversion (§5.8) and from publications (§5.5), and a folder without node file is listed there without identity.
+- Node files are written by the scan only where the library is worked in (the root of a `local` library, a workspace). The scan of a repository (`cloud`, `collab`) never writes: its node files come from the conversion (§5.8) and from publications (§5.5), and a folder without node file is not a title there: it is reported in "To sort" (added by hand in the shared folder).
 - Nodes: a layout folder is a node (and gets a `.node.json` on scan, under the rule above) only if an `.RPP` lies in it or below it, outside the reserved title folders (`Media/`, `Renders/`, `Assets/`, `Backups/`, `.history/`, `.trash/`), which are never nodes. A title whose versions are all in its `.trash/` or `.history/` stays a title. A `.node.json` found in a folder that is not a node is neither used nor deleted: it is listed in the "To sort" page, where the user can delete it after confirmation (the statuses, version labels and owners it stores are lost). Unreadable application files are listed there too.
 - In `cloud` and `collab` modes, the workspace mirrors the repository tree for checked-out titles. The repository's `.library.json` is authoritative; the workspace keeps a copy of it to work offline.
 - Application files and folders (`.library.json`, `.node.json`, `.collab/`, `.migration/`, `.history/`, `.trash/`) start with a dot, and are also given the hidden attribute on Windows when the application creates them. They stay reachable from the application (title card, detail view). Their subfolders take no prefix (e.g. `.collab/exports/`). Validated (2026-11-07, Google Drive for desktop, streaming mode, Windows): dot-prefixed files and folders, with or without the hidden attribute, and hidden folders without a dot are all synchronized; the hidden attribute is kept locally after synchronization. Other cloud clients **[TO VALIDATE]** (e.g. Box Sync is reported to ignore dot-prefixed files).
@@ -333,6 +333,8 @@ Actions performed from the title detail (§5.2).
 
 **Cancellation, failure, interruption**: a checkout or a publish that did not reach its end is simply started again and copies only what is missing or incomplete (size and hash checked; each file is written atomically). A title counts as checked out only once complete, and is shown as incomplete meanwhile. A publish copies the media before the projects, so that the repository never holds a project without its media, and updates the base hashes file by file.
 
+**Node files**: a `.node.json` (statuses, version labels and owners, §4.2, §5.9) is never in conflict. Checkout and publish merge it key by key against its last common content, kept in the sync state (§7.1): an entry changed on one side takes that side; changed on both sides, the local value wins and the report says so. `nodeId` and `level` are never merged.
+
 **Other members' versions locally**: readable, openable, importable (later phase), but not publishable without forcing.
 
 ### 5.6 Project creation
@@ -361,10 +363,10 @@ Actions performed from the title detail (§5.2).
 
 ### 5.7 Opening in REAPER
 - Opening in the existing instance (`-nonewinst` on Windows, validated: `reaper.exe -nonewinst <file>.rpp` opens the project in a new tab of the already open instance, without launching a second one; if REAPER is closed, it starts it) **[TO VALIDATE: macOS equivalent]**. Implemented without validation: macOS `open -a <REAPER.app> <file>.rpp`, Linux `reaper -nonewinst <file>.rpp`.
-- Any modification of a `.RPP` by the application (adoption, path rewrite, track import) requires the project to be closed in REAPER: warning and confirmation in the MVP.
+- Any modification of a `.RPP` by the application (adoption, path rewrite, track import) requires the project to be closed in REAPER: in the MVP, it is refused while REAPER runs.
   - `REAPER.ini` (`projecttabs`, `projecttab1..n`) is not reliable: it is only rewritten occasionally and keeps stale entries (observed: `projecttabs=1` with `projecttab2..9` still present).
-  - MVP: if a REAPER process is running, warning and confirmation. Detection: Windows `tasklist /FI "IMAGENAME eq reaper.exe"`, macOS and Linux `pgrep -ix reaper` **[TO VALIDATE on macOS and Linux]**. Later: REAPER companion script publishing the list of open projects.
-  - Validated: REAPER **does not lock** the open `.rpp` (exclusive write open and rename succeeded while the project was open). No lock-based detection is possible, and REAPER will overwrite the modification on the next save of the project: the warning must say so clearly.
+  - MVP: the application cannot tell which projects are open. If a REAPER process is running, the modification waits: a dialog asks to quit REAPER, with "Retry" (detects again) and "Cancel"; nothing lets the user go on anyway. Detection: Windows `tasklist /FI "IMAGENAME eq reaper.exe"`, macOS and Linux `pgrep -ix reaper` **[TO VALIDATE on macOS and Linux]**. Later: REAPER companion script publishing the list of open projects.
+  - Validated: REAPER **does not lock** the open `.rpp` (exclusive write open and rename succeeded while the project was open). No lock-based detection is possible, and REAPER will overwrite the modification on the next save of the project: the dialog must say so clearly.
 
 ### 5.8 Adoption of existing projects (migration)
 MVP milestone M1 (§9). The migration organizes a folder **in place**, through the `RepositoryStorage` port: for the band, directly the shared Drive folder (first a copy holding a sample, then the real folder, e.g. `proaudio/reaper/projects/<group>/<title>[/<member>]`); later, for `local` libraries, a local folder first (then published, `local` → `cloud`). A folder that is not migrated can be kept as a free tree (§3.3, `local` only).
@@ -378,7 +380,6 @@ Flow (wizard "Organize my band's folder", §5.1):
    - media outside `Media/` (relative), media referenced through an absolute path, missing media, `RECORD_PATH` other than `Media` (e.g. `audio-files`), `RENDER_FILE` forms (§5.3);
    - other files to move into `Assets/`, or blocked because a project references them;
    - versions not adopted, duplicated `versionId` (§4.2);
-   - project that is not valid UTF-8: listed like the others, never rewritten by a fix or an action, nor backed up or restored, a backup rewriting its paths (the user opens and saves it in REAPER **[TO VALIDATE: REAPER 7 then writes it as UTF-8]**);
    - cloud provider conflict copies (e.g. `x (1).rpp`), reported only.
 4. **Fixes in the interface**, each with a preview (dry run) and a report (§5.2):
    - move of a folder or project to its layout position (the target proposed from the known values), `_Unassigned` value for a missing level (e.g. the album);
@@ -389,7 +390,7 @@ Flow (wizard "Organize my band's folder", §5.1):
    - **any other file** (neither a project, nor a media, nor a REAPER file such as `.rpp-bak`, `Backups/`, peaks) is moved into `Assets/`. Before moving it, the application looks for its name in the projects of the title, in plain text and in the decoded base64 plugin states: a referenced file (e.g. impulse response, sampler file) is not moved automatically, it is reported for a manual decision;
    - fix impossible (media not found, absolute path from another machine): reported, `.rpp` left intact;
    - adoption of the `.RPP` files in batch, owner chosen among the declared members (deduced from the member subfolder when there is one), label taken from the file name (§4.2);
-   - warning before any `.rpp` rewrite when REAPER is running (§5.7).
+   - no `.rpp` rewrite while REAPER is running (§5.7).
 5. **No file is ever deleted.** Every change is a move or a targeted rewrite; before rewriting a `.rpp`, its raw original is copied into `.migration/<timestamp>/`. After each batch of fixes and at the end, the inventory is checked: same number of files, every original hash still present, every move accounted for. Any gap is reported and blocks the conversion. A batch is cancellable at every step (inventory, between two fixes, check): a fix already started is completed, the fixes done are kept and shown in the report, then the library is rescanned. The values of the folders moved (or declared in place) join the known values.
    - **Journal**: every operation of a fix (move, rewrite, file created), with the start and the end of the fix, is appended to `.migration/<timestamp>/journal.jsonl`, before the operation it describes; the inventory is appended line by line to `inventory.jsonl` (append operation of the `RepositoryStorage` port). A last line cut by a crash is ignored. A project rewritten by the migration keeps its modification date (its version date, §4.2); as its size and date may then be unchanged, the next scan reads again every project the journal records as rewritten since the last scan.
    - **Failed fix** (read or write error in the middle of its operations, drive unmounted): undone at once, then reported as failed with its reason; the other fixes of the batch go on, and its items stay listed in "To sort", ready to be fixed again. If the undo fails too (drive still unmounted), the batch stops and the fix is offered to be undone like an interrupted one.
@@ -534,7 +535,7 @@ Switch procedure (single action in the settings):
 - **Hash**: requirements: negligible collision probability outside an adversarial context (no security use), throughput at least the disk's, streamed computation on large files. A 64-bit fingerprint is enough: hashes are only ever compared together with name and size, between a few files (same path, media pool), never across the whole corpus (~3·10⁻⁶ collision probability even for 10 million files compared pairwise). Chosen: **XXH3-64**, pure Dart (`xxh3` package, streaming API), stored as 16 lowercase hex digits. The hash is computed only if size or mtime changed.
   Benchmark (Windows x64, AOT executable, 1 GB file in the OS cache read by 1 MB blocks, read alone ~7.5 GB/s): pure Dart `xxh3` XXH3-64 ~1.9 GB/s; `hashlib` XXH3-128 ~90 MB/s, BLAKE2b/MD5 ~170 MB/s, `crypto` SHA-256 ~160 MB/s; no pure Dart BLAKE3. Native through `dart:ffi`: XXH3-128 ~6.1 GB/s (SSE2) / ~7.0 GB/s (AVX2), BLAKE3 single-threaded ~3.0 GB/s. Pure Dart XXH3-64 is faster than real disk reads (HDD, SATA SSD, most NVMe, streaming cloud folders) and needs no native toolchain; the native path stays available behind the same hasher function if ever needed.
 - **Concurrency**: all long tasks (scan, bulk parsing, hash, copies) run in **isolates**, never on the UI isolate. The hash is computed in the background, in batches (one title and its versions).
-- **Local data**: the index is a cache of the file system, rebuilt from scratch when its schema changes; it is written by the background isolate that scans, the UI isolate only reads it (read-only connection). The sync state (base hash of each checked-out file, §5.5) is not a cache: it lives in its own database, whose schema changes by step-by-step migrations and is never dropped.
+- **Local data**: the index is a cache of the file system, rebuilt from scratch when its schema changes; it is written by the background isolate that scans, the UI isolate only reads it (read-only connection). The sync state (base hash of each checked-out file and last common content of the node files, §5.5) is not a cache: it lives in its own database, whose schema changes by step-by-step migrations and is never dropped.
 
 ### 7.2 Package layout
 Monorepo of Dart packages (workspace):
@@ -569,12 +570,13 @@ Responsibilities (one role per class or module, each testable alone):
 - **Business rules live in the packages**, tested without Flutter. The state layer of the app only wires: a service method resolves the library, runs one package operation in an isolate, logs it and asks for the rescan. One service per role: library catalog, scans, version actions, migration actions, REAPER actions.
 - **Long operations** (a batch of migration fixes) are orchestrated in a package, in one isolate, and report their steps, progress and cancellation through a small port of `domain`; the app maps the steps to its labels.
 - **File changes are planned, then applied**: reads gather the facts, a pure function computes the operations (unit-tested on in-memory data, shown as the preview), and the application of the plan goes through the storage.
-- **One module per concern**: library paths and media references; reading and writing project files (one encoding policy, §5.8); in a migration, the inventory, the journal and the guarded storage are three classes.
+- **One module per concern**: library paths and media references; reading and writing project files (one encoding policy, §7.3); in a migration, the inventory, the journal and the guarded storage are three classes.
 - **Interface**: one file per page or component. What the interface proposes (the fixes of an issue, their targets) is computed by a package function; widgets show proposals and collect choices.
 
 ### 7.3 Writing RPP files
 - The writer modifies the **original text through targeted patches**, and never re-emits the complete file from a model, to guarantee fidelity.
 - Atomic write: temporary file, then rename.
+- Encoding: a project is read as UTF-8 when its bytes are valid UTF-8, as Windows-1252 otherwise (older projects), and written back in the encoding it was read in, so that the bytes outside a patch never change. Such a project is a project like the others: nothing is reported. A value the application cannot write in Windows-1252 leaves the project untouched, with a message. Validated (REAPER 7.85, Windows, `test/fixtures/windows-1252.rpp`): REAPER opens a project written in Windows-1252 and saves it without converting it.
 - Non-regression tests on a corpus of real `.RPP` files (write then read back without loss, opening in REAPER).
 
 ### 7.4 Mobile applications (later)
@@ -643,7 +645,7 @@ Present from the start: local `memberId` and version `owner`, `libraryId`, `.lib
 9. ~~`RENDER_FILE` form, command-line render with REAPER open~~ (validated, §5.3).
 10. ~~Choice of the hash algorithm by benchmark~~ (validated: XXH3-64, pure Dart, §7.1).
 11. Relative paths with `\` read by REAPER macOS (§4.3).
-12. Project that is not valid UTF-8: whether REAPER 7 writes it as UTF-8 when saving it (§5.8).
+12. ~~Project that is not valid UTF-8~~ (validated: REAPER 7.85 keeps its bytes when saving it; read as Windows-1252 and written back as read, §7.3).
 13. Purge in `cloud` and `collab` modes: who may purge, propagation to the repository and to the other workspaces, protection of the versions not published yet (§5.4).
 14. Collab timestamp far ahead of the local clock (wrong clock on a computer): behavior to decide, so that it does not win every later write (§6.2).
 

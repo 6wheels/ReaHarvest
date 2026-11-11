@@ -32,8 +32,18 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - #97 only adds the `writeNodes` flag: a repository folder without node file gives no title; how it is shown is decided in #74.
 - Until the collab store exists (M3), label and owner are in `.node.json` in every mode; an owner is written only when the library declares members (#114). SPEC.md is updated with it and with the other decisions of this review.
 - The migration journal and inventory are appended line by line: `RepositoryStorage` gets an `append` operation (#92).
-- Files needed by the tests of #91 and #96 are built by the tests, not added to the fixtures.
+- The file needed by the tests of #96 is built by the tests, not added to the fixtures.
 - Version actions take the turn of their library like the tasks, without being shown in the tasks zone (#101); the UI isolate opens the index read-only (#103).
+
+## Decisions (2026-11-11, review of every open ticket)
+- Encoding (#91, validated in REAPER 7.85 with `test/fixtures/windows-1252.rpp`): REAPER saves a project that is not valid UTF-8 without converting it. Such a project is read as Windows-1252 and written back as read; nothing is reported and no fix refuses it. This replaces "reported, never rewritten".
+- REAPER running (#88): a project change is refused while a REAPER process runs, with "Retry" and "Cancel" only; "Continue anyway" disappears.
+- Node files in the synchronization (#18, #19, #107): never in conflict, merged key by key against their last common content kept in the sync state; the local value wins on an entry changed on both sides, and the report says so.
+- Integration tests (#59, #86, #87): each feature ticket writes the test of its feature; #59 itself covers the features already delivered and runs now, as the regression net of the hardening.
+- Other files (#70): one issue per file; a file named by a project stays listed, the report of the fix tells why.
+- Conversion (#72): the converted folder leaves the application; it is joined again in M2 (#73).
+- Repository folder without node file (#74): not a title, reported in "To sort".
+- Every open ticket of M1, M2 and M3 now holds its implementation details, order and advised model. The Backlog is not detailed: only #46 and #53 got a note about #114.
 
 ## M0 — Foundations (closed)
 - [x] #61 portable mode
@@ -59,7 +69,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 
 Core hardening, before the remaining features (listed in the order of the steps below; #98 is folded into #114 and closed):
 - [ ] #90 one module for library paths and media references
-- [ ] #91 one reader and writer for project files, one encoding policy (not valid UTF-8: reported, never rewritten)
+- [ ] #91 one reader and writer for project files, one encoding policy (not valid UTF-8: read as Windows-1252, written back as read)
 - [ ] #104 recovery screen when `settings.json` is unreadable or newer (independent)
 - [ ] #92 Migration split into inventory, append-only journal and guarded storage
 - [ ] #93 batch of fixes run outside the app, in one isolate
@@ -84,6 +94,7 @@ Steps. A ticket starts when the tickets named before it are merged; at most 3 ag
 | Step | Tickets | Run | Starts when merged |
 |---|---|---|---|
 | 1 | #90 | alone | now |
+| 1–2 | #59, lots A and B (integration tests of the delivered features) | two agents, beside #90 and #91 | now; merged before step 3 |
 | 2 | #91 | alone | #90 |
 | 3 | #92, then #93 | lane "migration" | #91 |
 | 3 | #114 | lane "version metadata", beside the two others | #91 |
@@ -108,7 +119,7 @@ Smallest model advised per ticket (a judgment from the tickets and the code, not
 | Model | Tickets | Why |
 |---|---|---|
 | Sonnet | #90, #91, #96, #97, #99, #100, #101, #104, #105 | Moves, splits and bounded rules, fully specified, with the existing tests as a net |
-| Opus | #92, #93, #95, #102, #103, #114 | Formats and crash safety, isolates, rewrite of subtle rules, consistency of the index, change across every package |
+| Opus | #59, #92, #93, #95, #102, #103, #114 | Tests driving the real application, formats and crash safety, isolates, rewrite of subtle rules, consistency of the index, change across every package |
 | Opus, then a review by the largest model before merge | #94 | Undo after a failure or a crash: data safety |
 
 Haiku is not advised for any of these tickets: the only one small enough was #98.
@@ -116,9 +127,9 @@ Haiku is not advised for any of these tickets: the only one small enough was #98
 Brief common to every ticket:
 - Read the ticket in full (its "Implementation details" win over the older text above them when they differ), the SPEC sections it names and this plan. Counts given in a ticket ("six files", "eleven places") are indicative: search the code.
 - Done means: `flutter analyze` clean, `dart tool/coverage.dart <suite>` passing for every suite named in the ticket, texts in both ARB files, the box ticked here. SPEC.md already states the target of every ticket (updated on 2026-11-11): it changes only when a ticket finds a gap in it.
-- Fixtures are saved by REAPER, never edited by hand, and hold no plugin storing a path (`test/fixtures/README.md`): the special files of #91 (Latin-1) and #96 (plugin state naming a file) are built by the tests.
+- Fixtures are saved by REAPER, never edited by hand, and hold no plugin storing a path (`test/fixtures/README.md`): #91 uses `windows-1252.rpp`; the special file of #96 (plugin state naming a file) is built by the tests.
 - No in-memory `RepositoryStorage` is shared today: #92 adds one to the tests of `packages/repository`, with injected failures; #93, #94 and #95 reuse it.
-- Not for an agent: the REAPER validation of #91 (**[TO VALIDATE]**, SPEC §5.8, see "Pending outside the plan"), the hand validation of M1.
+- Not for an agent: the steps listed in "For the maintainer", the hand validation of each milestone.
 
 Remaining features:
 - [ ] #84 issues in the detail view, render target fix
@@ -127,8 +138,19 @@ Remaining features:
 - [ ] #23 Google Drive conflict copies (reported only)
 - [ ] #89 "Organize my band's folder" wizard (split from #73: folder, layout, known values, members, then To sort)
 - [ ] #60 title card actions menu
-- [ ] #88 Retry instead of Continue anyway in the REAPER running warning
+- [ ] #88 Retry and Cancel only in the REAPER running dialog (a change is refused while REAPER runs)
 - [ ] #72 convert to a collab repository
+
+Plan of the remaining features (after the core hardening; at most 3 agents at once):
+
+| Step | Tickets | Model | Starts when merged |
+|---|---|---|---|
+| 9 | #84 beside #70 beside #23 | Sonnet | #105 (and #96, #99 for #70) |
+| 10 | #60 beside #88 beside #106 | Sonnet for #60; Haiku for #88 and #106 | #105 |
+| 11 | #89 beside #72 | Sonnet | #100 (and #94 for #72) |
+| 12 | Validation of M1 | maintainer | everything above |
+
+Steps 9 to 11 only depend on the hardening: with more agents they can overlap. Shared files: `ReportKind`, both ARB files, `scanner.dart` (#70, #23), the title detail files (#84, #60, #106).
 - [ ] Validation (quality of the product, not the state of the migrated folder): full preparation on the sample copy with no product defect (every fix behaves as specified, nothing lost, no crash); issues without an automatic fix (missing or external media, conflict copies…) stay listed in To sort for a manual decision; inventory check passes; every fixed project opens in REAPER with no new missing media
 
 ## M2 — Join and sync
@@ -148,6 +170,25 @@ Remaining features:
 - [ ] #109 history of a title without parsing every backup again
 - [ ] #31 Windows installer, GitHub Releases and auto-update (replaces #75; Microsoft Store study first, at the start of M2; unsigned)
 - [ ] #110 design direction (DAW, mixing console), typeface and own components
+
+Plan of M2 (ticket details written on 2026-11-11; the names of existing code they give are to check after the hardening):
+
+| Step | Tickets | Model | Starts when merged |
+|---|---|---|---|
+| 1 | #107 beside #108 beside #83 | Sonnet | M1 |
+| 1 | #109 | Sonnet | #103 |
+| 1 | #31, Store study | maintainer (an agent prepares the MSIX build) | M1 |
+| 1 | #17 | none: closed when #92 is merged | #92 |
+| 2 | #74 | Opus | #107, #97, #103 |
+| 3 | #73 beside #18 | Sonnet for #73, Opus for #18 | #74 (and #108, #89 for #73) |
+| 4 | #19 beside #20 | Opus; #19 reviewed by the largest model before merge | #18 |
+| 5 | #21 | Sonnet | #18, #19, #20 |
+| 6 | #26 beside #38 | Sonnet for #26, Opus for #38 | #21 (and #108 for #26); #38 once its proposal is confirmed |
+| 7 | #31, delivery | Sonnet | step 6 |
+| 8 | #110 | largest model with the maintainer for the proposal, then Sonnet, alone | every interface ticket of M2 |
+| 9 | Validation of M2 | maintainer | everything above |
+
+#86 has no agent of its own: each ticket ticks its line.
 - [ ] Validation: two portable copies on one machine sharing `H:\My Drive\test_sync`
 
 ## M3 — Shared statuses and activity
@@ -160,12 +201,30 @@ Remaining features:
 - [ ] #29 activity feed
 - [ ] #27 tasks, notes and lyrics in the interface (collab mode)
 
+Plan of M3:
+
+| Step | Tickets | Model | Starts when merged |
+|---|---|---|---|
+| 1 | #25 | maintainer (an agent writes the probe tool, Sonnet) | M2 |
+| 2 | #24 beside #52 | Opus for #24, Sonnet for #52 | #25, #108 for #24; nothing for #52 |
+| 3 | #76 beside #28 | Opus for #76, Sonnet for #28 | #24 (and #52 for #28) |
+| 4 | #29 | Sonnet | #76 |
+| 5 | #27 | Sonnet | #29 |
+| 6 | Validation of M3 | maintainer | everything above |
+
+#87 has no agent of its own: each ticket ticks its line.
+
 ## Parked (Backlog)
 #12, #14, #22, #32, #40, #43, #46, #47, #48, #53, #58, #78, #111, #112, #113.
 Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
-## Pending outside the plan
-- REAPER validation of #91 (SPEC §5.8, §10 point 12): open a project holding a byte that is not valid UTF-8 (e.g. a track name in Windows-1252) in REAPER 7, save it, and check whether the saved file is UTF-8. The file tried on 2026-11-11 (`test/fixtures/non-utf8.rpp`, not committed) is plain ASCII: it holds no such byte and proves nothing.
+## For the maintainer (not for an agent)
+- #38: confirm the proposed behavior of the two edge-case conflicts (in the ticket) before an agent starts.
+- #24: confirm the proposed rule for a timestamp far ahead of the local clock (in the ticket; SPEC §10 point 14).
+- #52: confirm that the built-in PDF preview is left out of the MVP (in the ticket; SPEC §5.9 asks for it).
+- #23: produce a real conflict on Google Drive for desktop to confirm its naming pattern (SPEC §3.0).
+- #31: the Microsoft Store study, at the start of M2. #25: the watching spike on the real Drive, at the start of M3. #110: the design proposal.
+- `test/fixtures/non-utf8.rpp` (not tracked) is plain ASCII and is not used: `windows-1252.rpp` replaces it. To delete.
 
 ## Next step
-Core hardening of M1, along the steps of the hardening plan: start #90, with #104 beside it; then #91, then the three lanes. Then #84 and #70.
+Now: #90, with the two lots of #59 beside it (and #104 if a fourth agent is available). Then #91, then the three lanes of step 3, along the hardening plan. After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.

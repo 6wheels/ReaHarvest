@@ -37,6 +37,7 @@ Saved with REAPER 7.85 on Windows, unless stated otherwise.
 | `reference-metadata.rpp` | metadata written by REAPER 7.84 (`EXTSTATE`, render metadata) |
 | `project-template.rpp` | template used to create versions |
 | `track-template-1.RTrackTemplate` | older track template |
+| `windows-1252.rpp` | project that is not valid UTF-8: one track named `Café tête` written in Windows-1252 (bytes `E9`, `EA`), record path `.\audio-files`. Built by hand, opened and saved again by REAPER 7.85, which kept these bytes as they were |
 
 `media-paths.rpp` (all items on one track, media not copied into the project
 folder, recording path `D:\Export\Media`, render folder `D:\Export\Renders`):
