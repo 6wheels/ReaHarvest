@@ -71,21 +71,34 @@ Future<List<String>> _runApp() async {
     stdout.writeln('Integration tests skipped (Windows only).');
     return [widget];
   }
-  final integration = '$_out${Platform.pathSeparator}integration.lcov';
-  await _run(
-    'flutter',
-    [
-      'test',
-      'integration_test',
-      '-d',
-      'windows',
-      '--coverage',
-      '--coverage-path=$integration',
-    ],
-    'apps/desktop',
-    integration,
-  );
-  return [widget, integration];
+  // One `flutter test` per file: a second app launch in the same run does
+  // not connect ("Unable to start the app on the device").
+  final files = Directory('$_root/apps/desktop/integration_test')
+      .listSync()
+      .whereType<File>()
+      .map((file) => file.uri.pathSegments.last)
+      .where((name) => name.endsWith('_test.dart'))
+      .toList()
+    ..sort();
+  final lcovs = [widget];
+  for (final name in files) {
+    final integration = '$_out${Platform.pathSeparator}integration-$name.lcov';
+    await _run(
+      'flutter',
+      [
+        'test',
+        'integration_test/$name',
+        '-d',
+        'windows',
+        '--coverage',
+        '--coverage-path=$integration',
+      ],
+      'apps/desktop',
+      integration,
+    );
+    lcovs.add(integration);
+  }
+  return lcovs;
 }
 
 /// Runs [executable] in [directory], writing the lcov report [lcov].
