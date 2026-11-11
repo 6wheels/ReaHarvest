@@ -4,7 +4,8 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
-import 'adoption.dart';
+import 'free_names.dart';
+import 'library_path.dart';
 import 'conventions.dart';
 import 'media.dart';
 import 'migration.dart';
@@ -130,9 +131,9 @@ Future<Report> applyFixes(
 /// neither is inside the other, and they differ by more than the case
 /// (the same folder on Windows).
 bool _mergeable(String path, String target) {
-  final a = path.toLowerCase();
-  final b = target.toLowerCase();
-  return a != b && !a.startsWith('$b/') && !b.startsWith('$a/');
+  return path.toLowerCase() != target.toLowerCase() &&
+      !isWithin(path, target) &&
+      !isWithin(target, path);
 }
 
 Future<Report> _moveFolder(
@@ -276,11 +277,12 @@ final class _Merge {
     final patched = rewriteMediaPaths(text, (ref) {
       final file = resolveReference(oldDir, ref);
       if (file == null || !file.startsWith('$source/')) return ref;
-      final before = p.posix.relative(file, from: oldDir);
-      final after = p.posix.relative(_locate(file), from: newDir);
-      if (after == before) return ref;
-      final separator = separatorOf(ref);
-      return separator == '/' ? after : after.replaceAll('/', separator);
+      final target = _locate(file);
+      if (relativeReference(newDir, target, like: '/') ==
+          relativeReference(oldDir, file, like: '/')) {
+        return ref;
+      }
+      return relativeReference(newDir, target, like: ref);
     });
     if (patched != text) {
       await storage.write(now, Stream.value(utf8.encode(patched)));
@@ -350,10 +352,8 @@ Future<String> liftProject(
 /// [ref], relative to a project in the subfolder [sub] of its title, made
 /// relative to the title; absolute references are kept.
 String _prefixed(String sub, String ref) {
+  if (isAbsoluteReference(ref)) return ref;
   final slashed = ref.replaceAll(r'\', '/');
-  if (slashed.startsWith('/') || RegExp(r'^[A-Za-z]:').hasMatch(slashed)) {
-    return ref;
-  }
   final joined = p.posix.normalize('$sub/$slashed');
   final separator = separatorOf(ref);
   return separator == '/' ? joined : joined.replaceAll('/', separator);

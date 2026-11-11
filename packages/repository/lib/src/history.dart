@@ -4,7 +4,8 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
-import 'adoption.dart';
+import 'free_names.dart';
+import 'library_path.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
 
@@ -39,16 +40,16 @@ Future<String> backupVersion(
 }) async {
   final name = p.posix.basenameWithoutExtension(fileName);
   final ext = p.posix.extension(fileName);
-  final history = _join(titleDir, historyFolderName);
+  final history = joinPath(titleDir, historyFolderName);
   final target = await freePath(
     storage,
-    _join(history, '$name ${_stamp(now ?? DateTime.now())}$ext'),
+    joinPath(history, '$name ${_stamp(now ?? DateTime.now())}$ext'),
   );
-  final text = await _readText(storage, _join(titleDir, fileName));
+  final text = await _readText(storage, joinPath(titleDir, fileName));
   await _writeText(
     storage,
     target,
-    rebaseProjectPaths(text, _parent(_join(titleDir, fileName)), history),
+    rebaseProjectPaths(text, parentOf(joinPath(titleDir, fileName)), history),
   );
   return target;
 }
@@ -59,7 +60,7 @@ Future<Map<VersionId, List<Backup>>> readHistory(
   RepositoryStorage storage,
   String titleDir,
 ) async {
-  final folder = _join(titleDir, historyFolderName);
+  final folder = joinPath(titleDir, historyFolderName);
   if (await storage.stat(folder) == null) return const {};
   final history = <VersionId, List<Backup>>{};
   for (final e in await storage.list(folder)) {
@@ -100,12 +101,12 @@ Future<String> restoreBackup(
   DateTime? now,
 }) async {
   final saved = await backupVersion(storage, titleDir, fileName, now: now);
-  final version = _join(titleDir, fileName);
+  final version = joinPath(titleDir, fileName);
   final text = await _readText(storage, backup);
   await _writeText(
     storage,
     version,
-    rebaseProjectPaths(text, _parent(backup), _parent(version)),
+    rebaseProjectPaths(text, parentOf(backup), parentOf(version)),
   );
   return saved;
 }
@@ -115,7 +116,7 @@ Future<String> restoreBackup(
 /// The file is written only if a path changed.
 Future<void> cleanBackupPaths(RepositoryStorage storage, String backup) async {
   final text = await _readText(storage, backup);
-  final dir = _parent(backup);
+  final dir = parentOf(backup);
   final cleaned = rebaseProjectPaths(text, dir, dir);
   if (cleaned != text) await _writeText(storage, backup, cleaned);
 }
@@ -128,10 +129,8 @@ Future<void> cleanBackupPaths(RepositoryStorage storage, String backup) async {
 /// changes.
 String rebaseProjectPaths(String text, String from, String to) {
   String? rebase(String ref) {
+    if (isAbsoluteReference(ref)) return null;
     final slashed = ref.replaceAll(r'\', '/');
-    if (slashed.startsWith('/') || RegExp(r'^[A-Za-z]:').hasMatch(slashed)) {
-      return null;
-    }
     // Resolved under a deep virtual root, so that paths leading outside the
     // library keep their meaning.
     final target = p.posix.join(_virtualRoot, from, slashed);
@@ -179,11 +178,6 @@ Future<String> _readText(RepositoryStorage storage, String path) =>
 Future<void> _writeText(RepositoryStorage storage, String path, String text) =>
     storage.write(path, Stream.value(utf8.encode(text)));
 
-String _parent(String path) {
-  final i = path.lastIndexOf('/');
-  return i < 0 ? '' : path.substring(0, i);
-}
-
 String _stamp(DateTime d) {
   String two(int n) => n.toString().padLeft(2, '0');
   return '${d.year}-${two(d.month)}-${two(d.day)} '
@@ -201,5 +195,3 @@ DateTime? _dateOf(String path) {
   final n = [for (var i = 1; i <= 6; i++) int.parse(m.group(i)!)];
   return DateTime(n[0], n[1], n[2], n[3], n[4], n[5]);
 }
-
-String _join(String dir, String name) => dir.isEmpty ? name : '$dir/$name';
