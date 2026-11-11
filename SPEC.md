@@ -64,7 +64,7 @@ The user configures **one or more libraries**. Each has its own mode, layout and
 
 | Mode | Folders | Features | Use case |
 |---|---|---|---|
-| **`local`** | Workspace only | Organization (layout), navigation, versions (with owner = local member), statuses, assets (files only), detail view, creation, opening in REAPER. No synchronization, no collaboration | Personal projects on a single machine |
+| **`local`** | Workspace only | Organization (layout), navigation, versions, statuses, assets (files only), detail view, creation, opening in REAPER. No synchronization, no collaboration | Personal projects on a single machine |
 | **`cloud`** (local + cloud) | Workspace + cloud repository | `local` + Checkout / Publish / Release, conflict detection (useful between several machines of the same user), cloud copy. Single user: no ownership check; forcing only to resolve a conflict (§5.5) | Personal projects copied to the cloud and accessible from several machines |
 | **`collab`** (collaboration) | Workspace + shared cloud repository | `cloud` + members, version ownership and forcing, collab store (statuses, tasks, notes, lyrics, shared asset metadata, activity) | Group projects |
 
@@ -72,8 +72,8 @@ Rules:
 - Work always happens **in the local workspace**; the repository is never a place to work in.
 - **Mode change** possible at any time, through a wizard:
   - `local` → `cloud`: choice of the repository, initial publish;
-  - `cloud` → `collab`: group creation, member invitation, adoption of versions (owner assignment), import of the statuses from the `.node.json` files into the collab store, then removal of the statuses from the `.node.json` files, with a message to the user (§5.9);
-  - downgrades: `collab` → `cloud` (full export of the collab store kept in the repository, statuses written back into the `.node.json` files), `cloud` → `local` (the repository is left intact, simply detached).
+  - `cloud` → `collab`: group creation, member invitation, adoption of versions (owner assignment), import of the statuses, version labels and owners from the `.node.json` files into the collab store, then their removal from the `.node.json` files, with a message to the user (§5.9);
+  - downgrades: `collab` → `cloud` (full export of the collab store kept in the repository, statuses, version labels and owners written back into the `.node.json` files), `cloud` → `local` (the repository is left intact, simply detached).
 - A given folder can belong to only one library (checked at configuration).
 
 **Cloud providers.** The MVP relies on a **folder mounted or synchronized by the provider's client**: the application only sees a file system path. The following are therefore covered, with no specific code: Google Drive for desktop, Dropbox, OneDrive, iCloud Drive, Nextcloud, Syncthing, network share (NAS/SMB), rclone mount (Linux). Common constraints to handle:
@@ -115,7 +115,7 @@ Example with the classic template:
     <album>/
       .node.json                  # { nodeId, level: "album" }
       <title>/                    # leaf node
-        .node.json                # { nodeId, level: "title", status, versionStatuses } (cf. §5.9)
+        .node.json                # { nodeId, level: "title", status, versionStatuses, versionLabels, versionOwners } (cf. §4.2, §5.9)
         Media/                    # shared, append-only pool
         Renders/                  # default render folder; published in phase 3 (cf. §5.3)
         Assets/                   # attached files: scores, tabs, images, docs (cf. §5.9)
@@ -127,7 +127,7 @@ Example with the classic template:
 Rules:
 - Scaffolding: the library initialization only writes `.library.json`. Creating a title in the application creates its folders (`Media/`, `Renders/`, `Assets/`, `.history/`, `.trash/`) and its `.node.json`. A scan creates no folder: for a title found by the scan, each folder is created by the first operation that needs it.
 - Node files are written by the scan only where the library is worked in (the root of a `local` library, a workspace). The scan of a repository (`cloud`, `collab`) never writes: its node files come from the conversion (§5.8) and from publications (§5.5), and a folder without node file is listed there without identity.
-- Nodes: a layout folder is a node (and gets a `.node.json` on scan, under the rule above) only if an `.RPP` lies in it or below it, outside the reserved title folders (`Media/`, `Renders/`, `Assets/`, `Backups/`, `.history/`, `.trash/`), which are never nodes. A title whose versions are all in its `.trash/` or `.history/` stays a title. A `.node.json` found in a folder that is not a node is neither used nor deleted: it is listed in the "To sort" page, where the user can delete it after confirmation (the statuses it stores are lost). Unreadable application files are listed there too.
+- Nodes: a layout folder is a node (and gets a `.node.json` on scan, under the rule above) only if an `.RPP` lies in it or below it, outside the reserved title folders (`Media/`, `Renders/`, `Assets/`, `Backups/`, `.history/`, `.trash/`), which are never nodes. A title whose versions are all in its `.trash/` or `.history/` stays a title. A `.node.json` found in a folder that is not a node is neither used nor deleted: it is listed in the "To sort" page, where the user can delete it after confirmation (the statuses, version labels and owners it stores are lost). Unreadable application files are listed there too.
 - In `cloud` and `collab` modes, the workspace mirrors the repository tree for checked-out titles. The repository's `.library.json` is authoritative; the workspace keeps a copy of it to work offline.
 - Application files and folders (`.library.json`, `.node.json`, `.collab/`, `.migration/`, `.history/`, `.trash/`) start with a dot, and are also given the hidden attribute on Windows when the application creates them. They stay reachable from the application (title card, detail view). Their subfolders take no prefix (e.g. `.collab/exports/`). Validated (2026-11-07, Google Drive for desktop, streaming mode, Windows): dot-prefixed files and folders, with or without the hidden attribute, and hidden folders without a dot are all synchronized; the hidden attribute is kept locally after synchronization. Other cloud clients **[TO VALIDATE]** (e.g. Box Sync is reported to ignore dot-prefixed files).
 - `.RPP` files in `.history/` and `.trash/` are never listed as versions, nor in the "To sort" or "To adopt" sections, nor treated as duplicates (§4.2). They are not shown in the main library view; they enrich the title card and the detail view (history, trash).
@@ -149,7 +149,7 @@ Principle: the library watches **one or more root folders** and behaves like a l
 Rules:
 1. **Tags**: derived from the names of the parent folders, relative to the root; usable in search, without per-level filters.
 2. **Title identity**: a `.node.json` is written in each title folder (stable identity, eases a later migration to a layout). This is the application's only write in the tree outside explicit actions.
-3. **Project files untouched**: `.rpp` files are never modified nor moved, except an explicit deletion (rule 5). No `EXTSTATE`, hence no `versionId` nor owner: a version is identified by its path relative to the title folder (a rename outside the application loses its status). No "To adopt" section.
+3. **Project files untouched**: `.rpp` files are never modified nor moved, except an explicit deletion (rule 5). No `EXTSTATE`, hence no `versionId`, label nor owner: a version is identified by its path relative to the title folder (a rename outside the application loses its status). No "To adopt" section.
 4. **Media pool**: no `Media/` constraint, no path normalization, no "To sort" section. Only missing media are reported.
 5. **Creation, deletion**: new titles created in a folder chosen by the user. Deletion (explicit, confirmed) moves the `.rpp` to a `.trash/` placed in its folder, created on first use. No backups (`.history/`).
 6. **Nested folders** containing `.rpp` files, on one or several levels (real case: `title/member/v2/…`): they belong to the title of the topmost folder, and their `.rpp` files are its versions.
@@ -168,10 +168,14 @@ This data does **not** depend on the collab store: the application must work (na
 - The tags of a title (e.g. `artist=X`, `album=Y`, `title=Z`) are derived from its path and indexed.
 
 ### 4.2 Version
-Metadata stored **in the `.RPP`**, through a dedicated `EXTSTATE` section named `ReaHarvest` (kept by REAPER on every save):
-- `versionId` (ULID)
-- `owner` (memberId) — mandatory in **all modes**, from the start (in `local` and `cloud` modes: the local member), to avoid any later change of the model
-- `label` (free text, e.g. "chorus B")
+Identity stored **in the `.RPP`**, through a dedicated `EXTSTATE` section named `ReaHarvest` (kept by REAPER on every save):
+- `versionId` (ULID), written once, on adoption. It travels with the file: renames outside the application, backups (§5.4), trash, publication (§5.5). A version is adopted when its file holds one.
+
+Label and owner are stored **outside the `.RPP`**, in the title's `.node.json`, keyed by `versionId` (`versionLabels`, `versionOwners`, next to `versionStatuses`, §5.9). Like the statuses, they would be overwritten by REAPER on the next save of an open project (§5.7), and changing them must not rewrite a project nor change its date. In `collab` mode the collab store takes them over together with the statuses (milestone M3); until then they stay in `.node.json` in every mode. Entries of versions that no longer exist are kept.
+- `label` (free text, e.g. "chorus B"), required. A version without entry shows its file name without the extension.
+- `owner` (memberId), stored only when the library declares members (§6.5): the member chosen at adoption, at creation or in a migration fix. A library without declared members stores no owner, and a version is never required to have one.
+
+`OWNER` and `LABEL` keys found in a `.RPP` are neither read nor removed.
 
 The date is the file modification date.
 
@@ -180,12 +184,10 @@ Observed format (REAPER 7.84, `test/fixtures/reference-metadata.rpp`): `<EXTSTAT
   <EXTSTATE
     <REAHARVEST
       VERSIONID 01JC...
-      OWNER 01JC...
-      LABEL "chorus B"
     >
   >
 ```
-Rules validated by test (`SetProjExtState` then save, REAPER 7.84):
+Rules validated by test (`SetProjExtState` then save, REAPER 7.84, with test keys such as `OWNER` and `LABEL`; the application itself only writes `VERSIONID`):
 - REAPER puts section and keys **in uppercase** and **sorts them alphabetically**;
 - an empty value is not written (absent key = deleted key);
 - simple value: raw (`VERSIONID 01JC…`); with spaces: between `"` (`LABEL "chorus B"`); Unicode written as is in UTF-8;
@@ -200,8 +202,8 @@ Automatic detection during the scan:
 | Case | Detection | Behavior |
 |---|---|---|
 | Rename | Same `versionId`, new name | Transparent tracking; warning when the rename was made outside the application |
-| Manual duplication (*Save As*) | Two files with the same `versionId` | Offer to make it a new version (new ID, owner = current user) |
-| Unknown file | `.RPP` without `versionId` | "To adopt" section (UI: « À adopter »): choice of owner and label (required, and cannot be emptied afterwards), metadata written |
+| Manual duplication (*Save As*) | Two files with the same `versionId` | Offer to make it a new version (new ID in the file; the label is copied to the new ID) |
+| Unknown file | `.RPP` without `versionId` | "To adopt" section (UI: « À adopter »): choice of the label (required, and cannot be emptied afterwards) and, when the library declares members, of the owner; `versionId` written in the file, label and owner in `.node.json` |
 
 A version adopted in batch (§5.8) takes its file name without the extension as label, editable afterwards.
 
@@ -223,7 +225,7 @@ Versions form a **flat list** (no tree, no parent version).
 - **Libraries** (0..n), each with: display name, mode (§3.0), workspace root, repository root (`cloud` and `collab` modes), layout, optional templates folder specific to the library.
 - Adding a library: creation of a new one (choice of mode and layout) or attachment to an existing repository (reading its `.library.json`, case of a member joining a group). When the folder already holds projects and the layout has intermediate levels, the form asks their **known values** (§3.1), pre-filled with the folders found at each depth, before the first scan; an attached library keeps the values of its `.library.json` (asked once if it has none).
 - **Removing a library** from the application, whatever its mode, after confirmation:
-  - removed: the library from the application configuration and from the index; in the local folder (workspace, or free tree roots), the application files `.library.json`, `.node.json` and `.collab/`. The confirmation states that the statuses stored in the `.node.json` files are lost;
+  - removed: the library from the application configuration and from the index; in the local folder (workspace, or free tree roots), the application files `.library.json`, `.node.json` and `.collab/`. The confirmation states that the statuses, version labels and owners stored in the `.node.json` files are lost;
   - kept: all REAPER and audio content (`.RPP`, `Media/`, `Renders/`, `Assets/`, REAPER backups, peaks…), `.history/` and `.trash/` (project data), and the `ReaHarvest` `EXTSTATE` section of the `.RPP` files (version identity, reused if the folder is added again);
   - in `cloud` and `collab` modes, the repository is never touched. Deleting the application data from the repository is a separate critical action (outside the MVP);
   - goal: the folder can be added again later, with any layout, without leftovers from the previous library.
@@ -234,7 +236,7 @@ Versions form a **flat list** (no tree, no parent version).
   - **Organize my band's folder** (UI: « Organiser le dossier de mon groupe »): migration wizard (§5.8).
   - **Create a new library**.
 - **Portable mode**: a `settings.json` and/or an `index.sqlite` placed next to the executable are used first, instead of the user application data folder. Used by the demo mode and local tests, and to run two members on one machine (two copies of the application folder).
-- Local member identity (`memberId`, display name), created on first run and used as version owner in `local` and `cloud` libraries; in a `collab` library, the installation acts as the declared member picked when joining. Each installation also has a client identifier (`clientId`, ULID), which names its folder in `.collab/` (§6.3). Later (outside the MVP): one identity shared by all the machines of a user, linked through a confirmed email.
+- Local member identity (`memberId`, display name), created on first run: it is the current member in `local` and `cloud` libraries (a version owner is stored only when the library declares members, §4.2); in a `collab` library, the installation acts as the declared member picked when joining. Each installation also has a client identifier (`clientId`, ULID), which names its folder in `.collab/` (§6.3). Later (outside the MVP): one identity shared by all the machines of a user, linked through a confirmed email.
 - Unreadable settings: when `settings.json` cannot be read, the application starts on a recovery screen naming the file, and offers to start with new settings (the file is first kept aside; libraries are to add again, their folders are untouched), to open its folder or to quit. A file written by a newer version is never overwritten: message, then open its folder or quit.
 - Path of the REAPER executable and of the REAPER resource folder (defaults per OS). Executable detection: first the location reported by the OS (Windows: default value of `HKLM\SOFTWARE\REAPER` = install folder, validated; macOS: Spotlight `mdfind "kMDItemCFBundleIdentifier == 'com.cockos.reaper'"`; Linux: `which reaper`), then the usual install locations (Windows: `%ProgramFiles%\REAPER (x64)`, `%ProgramFiles%\REAPER`; macOS: `/Applications/REAPER.app`, `/Applications/REAPER64.app`, `~/Applications/REAPER.app`; Linux: `~/opt/REAPER/reaper`, `/opt/REAPER/reaper`). Resource folder: `%APPDATA%\REAPER`, `~/Library/Application Support/REAPER`, `~/.config/REAPER`. macOS and Linux values **[TO VALIDATE]**.
 - Project templates folder (default: `ProjectTemplates` in the REAPER resource folder).
@@ -268,7 +270,7 @@ Main window: the application opens directly on the library. Clean but functional
 - **Status progress trail**: one segment per status, passed ones green, the current one orange, the next ones grey; "done" reached shows the whole trail green. Only the current status shows its label; hovering the trail reveals the other labels, with an animation. A status outside the list is shown as a plain label. Display only (status changes come with the title actions).
 - "To sort" section (UI: « À ranger »): `.RPP` or folders outside the convention, with guided move. Opened from its counter in the filter bar, as a page over the library (same back navigation as the title detail). Issues are grouped by kind, with a counter per kind. The kinds fixed in batch (§5.8 step 4) have a checkbox on each card, a "select all" box and a counter of the selected items per section; "Fix…" previews the selected items of its section, or all of them when none is selected. The selection is kept through a rescan for the items still there.
 - "To adopt" (UI: « À adopter », cf. §4.2): a filter (titles having a version to adopt), with its counter of titles in the filter bar; adoption is done in the title detail, on the selected version. The card, the overview and the title detail show the number of versions to adopt of the title.
-- **Background tasks zone** at the bottom of the application (following the theme; the overview dock sits above it): running tasks with progress and cancellation, finished tasks with their outcome, expandable list. Tasks that write in a library (fixes, scans) run one at a time per library: the next ones wait in the zone, queued and cancellable; tasks of different libraries run together.
+- **Background tasks zone** at the bottom of the application (following the theme; the overview dock sits above it): running tasks with progress and cancellation, finished tasks with their outcome, expandable list. Tasks that write in a library (fixes, scans) run one at a time per library: the next ones wait in the zone, queued and cancellable; tasks of different libraries run together. Version actions (adoption, label, status, trash, backup…) take the same turn, without being shown in the zone.
 - **Reports**: every long action (scan, migration fix, checkout, publish, purge…) produces a report **structured in sections by kind of problem or conflict** (done, skipped, warnings, errors; each item with its path), shown in a popup at the end and reachable from the tasks zone. Reports are also written to the log (§8).
 
 ### 5.3 Version detail view
@@ -298,10 +300,10 @@ Parsing of the `.RPP`, without REAPER:
 
 ### 5.4 Version management
 Actions performed from the title detail (§5.2).
-- **Create a version** (a new, distinct `.RPP`): blank, from a template or by duplicating an existing version. New ID and a required label; the owner is the current user by default. In `collab` mode, the owner can be chosen at creation (e.g. a version prepared for another member) or changed afterwards by its current owner only. The file name matters (it identifies the version for the members): pre-filled as `<title> - <label>.RPP`, followed by the owner's name when the owner is not the current user, and editable.
+- **Create a version** (a new, distinct `.RPP`): blank, from a template or by duplicating an existing version. New ID and a required label; when the library declares members, the owner is the current user by default (§4.2). In `collab` mode, the owner can be chosen at creation (e.g. a version prepared for another member) or changed afterwards by its current owner only. The file name matters (it identifies the version for the members): pre-filled as `<title> - <label>.RPP`, followed by the owner's name when the owner is not the current user, and editable.
   - Blank: REAPER's default template for new projects when one is set, otherwise a minimal project (`<REAPER_PROJECT` chunk only, REAPER fills in its defaults on save). Validated (REAPER 7.85, Windows): the minimal project (root header, `RECORD_PATH`, `RENDER_FILE`, `EXTSTATE`) opens without error, records into `Media/` (relative `FILE "Media\…"`), and keeps the render folder and the version metadata when saved. Validated (REAPER 7.84, Windows): Preferences > Project > "Default template for new projects" is stored in `REAPER.ini` as `newprojtmpl=<path>`, empty when unset, relative to the resource folder when the template is inside it (`newprojtmpl=ProjectTemplates\default.rpp`). macOS and Linux **[TO VALIDATE]**.
   - Blank or from a template: version metadata written, record path `Media`, render folder `Renders`; the other §5.6 values are filled in by project creation only. Duplicate: same content, new version metadata.
-- **Rename** the file and/or modify the label (required: it cannot be emptied). A rename made in the application is tracked through the `versionId`, and published as a rename of the remote file, together with any modification of its content (§5.5).
+- **Rename** the file and/or modify the label (required: it cannot be emptied). Modifying the label never rewrites the project (§4.2). A rename made in the application is tracked through the `versionId`, and published as a rename of the remote file, together with any modification of its content (§5.5).
 - **Delete**: move to `.trash/`.
 - **Purge**: permanent deletion from `.trash/`, with confirmation. Then, list of pool media referenced by no version nor backup (`.history/`; the trash does not count), then purge on confirmation. Nothing is listed if a project cannot be read. Purging unreferenced media only applies to `Media/`: `Assets/` is never concerned, and a file named by a plugin state is never listed (§4.3). MVP: purge is available in `local` mode only; in `cloud` and `collab` modes the pool stays append-only, the propagation of a purge being still to define (§10). Sensitive, destructive feature.
 - **Back up a version** (UI: « Créer un point de sauvegarde »): copies the `.RPP` of the version into `.history/` (flat), named `<version name> <yyyy-MM-dd HHmmss>.<ext>` (` (n)` suffix on a name clash). The version itself is unchanged. Backups are linked to their version by the `versionId` of the copy (robust to renames).
@@ -376,11 +378,11 @@ Flow (wizard "Organize my band's folder", §5.1):
    - media outside `Media/` (relative), media referenced through an absolute path, missing media, `RECORD_PATH` other than `Media` (e.g. `audio-files`), `RENDER_FILE` forms (§5.3);
    - other files to move into `Assets/`, or blocked because a project references them;
    - versions not adopted, duplicated `versionId` (§4.2);
-   - project that is not valid UTF-8: listed like the others, never rewritten by a fix or an action (the user opens and saves it in REAPER **[TO VALIDATE: REAPER 7 then writes it as UTF-8]**);
+   - project that is not valid UTF-8: listed like the others, never rewritten by a fix or an action, nor backed up or restored, a backup rewriting its paths (the user opens and saves it in REAPER **[TO VALIDATE: REAPER 7 then writes it as UTF-8]**);
    - cloud provider conflict copies (e.g. `x (1).rpp`), reported only.
 4. **Fixes in the interface**, each with a preview (dry run) and a report (§5.2):
    - move of a folder or project to its layout position (the target proposed from the known values), `_Unassigned` value for a missing level (e.g. the album);
-   - **merge** when the target folder already exists (e.g. the same song found at the root and under its album), announced in the preview: each entry of the moved folder goes to the same place in the target; subfolders present on both sides (artist, album, title, `Media/`…) are merged recursively; any other name collision gets a free name (`name (2).ext`) and the references of the moved projects are rewritten to follow it, so the projects of both titles become versions of one title (identical media are merged with the pool, see below). Node files are merged: version statuses are added, the target's title status wins (the dropped one is reported). What is left of the moved folder (its node files, empty folders) goes into `.migration/<timestamp>/merged/`. No merge of a folder into itself (paths equal ignoring case) or into its parent or child;
+   - **merge** when the target folder already exists (e.g. the same song found at the root and under its album), announced in the preview: each entry of the moved folder goes to the same place in the target; subfolders present on both sides (artist, album, title, `Media/`…) are merged recursively; any other name collision gets a free name (`name (2).ext`) and the references of the moved projects are rewritten to follow it, so the projects of both titles become versions of one title (identical media are merged with the pool, see below). Node files are merged: version statuses, labels and owners are added, the target's title status wins (the dropped one is reported). What is left of the moved folder (its node files, empty folders) goes into `.migration/<timestamp>/merged/`. No merge of a folder into itself (paths equal ignoring case) or into its parent or child;
    - **member subfolder** (`<title>/<member>/…`): its projects are moved up into the title, owner = that member, names de-duplicated;
    - **status subfolder** (`<title>/<status>/…` or `<title>/<member>/<status>/…`, e.g. `mix`, `demo`): reported as projects too deep; its projects are moved up into the title, with a version status (§5.9) deduced from the folder name through a proposed mapping to the statuses of the library, confirmed by the user (unmatched names: no status, folder name kept in the report); names de-duplicated;
    - media (audio, video, MIDI, subprojects `<SOURCE RPP_PROJECT` with their `.rpp-PROX`) moved into `Media/`, references rewritten, `RECORD_PATH` set to `Media` (targeted patch, §7.3); per-member media merged into the single pool; identical media (same hash) share one pool file and the duplicate is **moved** into `.trash/`; name collision: suffix and reference rewrite; a media named by a plugin state (§4.3) is left where it is and reported. The preview lists the operations planned (moves, copies, duplicates, rewrites, blocked projects);
@@ -389,8 +391,8 @@ Flow (wizard "Organize my band's folder", §5.1):
    - adoption of the `.RPP` files in batch, owner chosen among the declared members (deduced from the member subfolder when there is one), label taken from the file name (§4.2);
    - warning before any `.rpp` rewrite when REAPER is running (§5.7).
 5. **No file is ever deleted.** Every change is a move or a targeted rewrite; before rewriting a `.rpp`, its raw original is copied into `.migration/<timestamp>/`. After each batch of fixes and at the end, the inventory is checked: same number of files, every original hash still present, every move accounted for. Any gap is reported and blocks the conversion. A batch is cancellable at every step (inventory, between two fixes, check): a fix already started is completed, the fixes done are kept and shown in the report, then the library is rescanned. The values of the folders moved (or declared in place) join the known values.
-   - **Journal**: every operation of a fix (move, rewrite, file created), with the start and the end of the fix, is appended to `.migration/<timestamp>/journal.jsonl`; the inventory is appended line by line to `inventory.jsonl`. A project rewritten by the migration keeps its modification date (its version date, §4.2); as its size and date may then be unchanged, the next scan reads again every project the journal records as rewritten since the last scan.
-   - **Failed fix** (read or write error in the middle of its operations, drive unmounted): undone at once, then reported as failed with its reason; the other fixes of the batch go on, and its items stay listed in "To sort", ready to be fixed again.
+   - **Journal**: every operation of a fix (move, rewrite, file created), with the start and the end of the fix, is appended to `.migration/<timestamp>/journal.jsonl`, before the operation it describes; the inventory is appended line by line to `inventory.jsonl` (append operation of the `RepositoryStorage` port). A last line cut by a crash is ignored. A project rewritten by the migration keeps its modification date (its version date, §4.2); as its size and date may then be unchanged, the next scan reads again every project the journal records as rewritten since the last scan.
+   - **Failed fix** (read or write error in the middle of its operations, drive unmounted): undone at once, then reported as failed with its reason; the other fixes of the batch go on, and its items stay listed in "To sort", ready to be fixed again. If the undo fails too (drive still unmounted), the batch stops and the fix is offered to be undone like an interrupted one.
    - **Interrupted fix** (the application stopped: crash, power cut): detected from the journal when the application starts and before any new batch on the library. The application offers to undo it, and runs no other batch on that library meanwhile.
    - **Undo** of a fix: operations reversed from the last one, rewritten files restored from their originals, files created by the fix moved to `.migration/<timestamp>/undone/` (nothing is deleted), then inventory check and rescan. The undo is journaled and can itself be resumed.
    - **Cancelled batch**: as a cancellation only takes effect between two fixes, every fix is complete or not started; the remaining ones stay listed in "To sort" and can be started again.
@@ -532,7 +534,7 @@ Switch procedure (single action in the settings):
 - **Hash**: requirements: negligible collision probability outside an adversarial context (no security use), throughput at least the disk's, streamed computation on large files. A 64-bit fingerprint is enough: hashes are only ever compared together with name and size, between a few files (same path, media pool), never across the whole corpus (~3·10⁻⁶ collision probability even for 10 million files compared pairwise). Chosen: **XXH3-64**, pure Dart (`xxh3` package, streaming API), stored as 16 lowercase hex digits. The hash is computed only if size or mtime changed.
   Benchmark (Windows x64, AOT executable, 1 GB file in the OS cache read by 1 MB blocks, read alone ~7.5 GB/s): pure Dart `xxh3` XXH3-64 ~1.9 GB/s; `hashlib` XXH3-128 ~90 MB/s, BLAKE2b/MD5 ~170 MB/s, `crypto` SHA-256 ~160 MB/s; no pure Dart BLAKE3. Native through `dart:ffi`: XXH3-128 ~6.1 GB/s (SSE2) / ~7.0 GB/s (AVX2), BLAKE3 single-threaded ~3.0 GB/s. Pure Dart XXH3-64 is faster than real disk reads (HDD, SATA SSD, most NVMe, streaming cloud folders) and needs no native toolchain; the native path stays available behind the same hasher function if ever needed.
 - **Concurrency**: all long tasks (scan, bulk parsing, hash, copies) run in **isolates**, never on the UI isolate. The hash is computed in the background, in batches (one title and its versions).
-- **Local data**: the index is a cache of the file system, rebuilt from scratch when its schema changes; it is written by the background isolate that scans, the UI isolate only reads it. The sync state (base hash of each checked-out file, §5.5) is not a cache: it lives in its own database, whose schema changes by step-by-step migrations and is never dropped.
+- **Local data**: the index is a cache of the file system, rebuilt from scratch when its schema changes; it is written by the background isolate that scans, the UI isolate only reads it (read-only connection). The sync state (base hash of each checked-out file, §5.5) is not a cache: it lives in its own database, whose schema changes by step-by-step migrations and is never dropped.
 
 ### 7.2 Package layout
 Monorepo of Dart packages (workspace):

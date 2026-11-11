@@ -23,8 +23,17 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - Assets: a link opening the `Assets/` folder is enough until M3 (#106); the assets view comes in M3, right after the statuses and before the activity (#52, #28).
 - Distribution: the members are not technical, so M2 delivers a Windows installer with auto-update (#31); the zip shared by hand is dropped (#75 closed), a portable zip stays attached to each release. #31 starts with a study of the Microsoft Store as another route. Code signing (SignPath Foundation) is out of M2: Backlog, #113; the M2 installer is unsigned, with a guide for the SmartScreen warning.
 - Recovery: a failed fix is undone at once, an interrupted one is offered to be undone, a cancelled batch leaves only complete fixes (#94); a checkout or publish started again copies only what is missing (#18, #19).
-- The scan creates no folder and never writes in a repository (#97); a version adopted in batch takes its file name as label (#98); a file named by a plugin state is never moved nor purged (#96); purge is for `local` mode only in the MVP (#111).
+- The scan creates no folder and never writes in a repository (#97); a version adopted in batch takes its file name as label (#114, former #98); a file named by a plugin state is never moved nor purged (#96); purge is for `local` mode only in the MVP (#111).
 - Identity: the installation keeps its own; a `collab` library stores the member it acts as, and each installation writes in its own client folder, so a member can join again from another computer (#108).
+
+## Decisions (2026-11-11, hardening tickets review)
+- The hardening tickets are completed on GitHub so that an agent can take one without other context; order, lanes and advised models are in the hardening plan of M1.
+- #98 is folded into #114: the default label of a version adopted in batch is written in `.node.json` by the lift.
+- #97 only adds the `writeNodes` flag: a repository folder without node file gives no title; how it is shown is decided in #74.
+- Until the collab store exists (M3), label and owner are in `.node.json` in every mode; an owner is written only when the library declares members (#114). SPEC.md is updated with it and with the other decisions of this review.
+- The migration journal and inventory are appended line by line: `RepositoryStorage` gets an `append` operation (#92).
+- Files needed by the tests of #91 and #96 are built by the tests, not added to the fixtures.
+- Version actions take the turn of their library like the tasks, without being shown in the tasks zone (#101); the UI isolate opens the index read-only (#103).
 
 ## M0 — Foundations (closed)
 - [x] #61 portable mode
@@ -48,24 +57,68 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - [x] #69 media normalization and pool merge (scan detectors done: media outside `Media/`, missing, absolute or outside the library, record path other than `Media`, render target outside `Renders/`, one issue per project with the references as detail, recomputed from the indexed references without reading unchanged projects; "Full scan" on the To sort page reads every project again. Normalization fix done, in batch from To sort, one per title: media moved once into `Media/` (copied when outside the title or used by a blocked project), identical duplicates to `.trash/`, name collisions suffixed, references rewritten, record path `Media`, subprojects with their proxy; projects with missing or external media left intact and reported; non-regression on every fixture; record path already `.\Media` left as written; media used by no project in the title subfolders merged into the pool; files of projects not lifted yet kept; subprojects of the pool checked by the scan (references indexed) and normalized. Validated in REAPER by hand. Guided move goes through the normalization of the whole target title (project references kept on the move, its unshared media moved, shared ones copied, blocked project moved with its media left in place). Fixture corpus replaced (REAPER 7.85, one case per file). A title whose media (outside `Media/`) are used by another title is left as is and reported, from the indexed references; the guided move copies such media. Integration test: normalization and guided move from To sort. Projects rewritten by the migration keep their modification date (version date), read again by the rescan; report details as absolute paths. `RENDER_FILE` fix and issues in the detail view: #84)
 - [x] #15 REAPER-running warning before `.rpp` rewrites (checked in the code: opening in the running instance, every rewrite started from the interface goes through `runProjectChange`)
 
-Core hardening, in this order, before the remaining features:
+Core hardening, before the remaining features (listed in the order of the steps below; #98 is folded into #114 and closed):
 - [ ] #90 one module for library paths and media references
 - [ ] #91 one reader and writer for project files, one encoding policy (not valid UTF-8: reported, never rewritten)
+- [ ] #104 recovery screen when `settings.json` is unreadable or newer (independent)
 - [ ] #92 Migration split into inventory, append-only journal and guarded storage
 - [ ] #93 batch of fixes run outside the app, in one isolate
+- [ ] #114 only `versionId` in the `.RPP`; label and owner in `.node.json` in every mode until the collab store exists (M3); default label of the versions adopted in batch (former #98); no migration of existing data
+- [ ] #97 scan creating no folder, never writing in a repository
 - [ ] #94 undo of a fix that failed or was interrupted, from the journal
 - [ ] #95 media normalization as gather, pure plan, then apply (the plan is the preview)
 - [ ] #96 files named by a plugin state never moved nor purged
-- [ ] #97 scan creating no folder, never writing in a repository
-- [ ] #114 only `versionId` in the `.RPP`; label and owner in `.node.json` (collab store in `collab` mode), no migration of existing data
-- [ ] #98 default label for versions adopted in batch
 - [ ] #99 fix proposals computed outside the interface
 - [ ] #100 LibraryService split into one service per role
 - [ ] #101 one writing task per library at a time
 - [ ] #102 rescan of the title changed by an action only
 - [ ] #103 index written outside the UI isolate
-- [ ] #104 recovery screen when `settings.json` is unreadable or newer (independent)
 - [ ] #105 one interface file per page or component
+
+### Hardening plan for the agents (2026-11-11)
+
+Every ticket was checked against the code and completed on GitHub with an "Implementation details" section (formats, signatures, texts, tests, order): a ticket is self-sufficient with the SPEC sections it names. The same order is written in each ticket.
+
+Steps. A ticket starts when the tickets named before it are merged; at most 3 agents at once, one branch or worktree per ticket.
+
+| Step | Tickets | Run | Starts when merged |
+|---|---|---|---|
+| 1 | #90 | alone | now |
+| 2 | #91 | alone | #90 |
+| 3 | #92, then #93 | lane "migration" | #91 |
+| 3 | #114 | lane "version metadata", beside the two others | #91 |
+| 3 | #97 | lane "scan", beside the two others | #91 |
+| 4 | #94 | beside #95 | #93, #114 |
+| 4 | #95 | beside #94 | #93 |
+| 5 | #96 | beside #99 | #95 |
+| 5 | #99 | beside #96 | #95, #114 |
+| 6 | #100 | alone | every ticket above |
+| 7 | #101 | beside #102, merged first | #100 |
+| 7 | #102 | beside #101 | #100 |
+| 8 | #103 | beside #105 | #102 |
+| 8 | #105 | beside #103 | #101, #102 |
+| any | #104 | beside any step | now |
+
+- #90, #91 and #100 run alone: the first two touch every file of `packages/repository`, the last moves the whole of `state/libraries.dart`.
+- Longest chain: #90, #91, #92, #93, #95, #99, #100, #102, #103 (9 tickets in a row instead of 16).
+- Files shared by tickets run side by side (small conflicts expected, the second to merge rebases): `ReportKind` in `domain/report.dart` (the declaration order is the display order), `app_en.arb` and `app_fr.arb`, the exports of `reaharvest_repository.dart`, the schema version of the index, `scanner.dart`, `fixes.dart`, `state/libraries.dart` until #100.
+
+Smallest model advised per ticket (a judgment from the tickets and the code, not a measure):
+
+| Model | Tickets | Why |
+|---|---|---|
+| Sonnet | #90, #91, #96, #97, #99, #100, #101, #104, #105 | Moves, splits and bounded rules, fully specified, with the existing tests as a net |
+| Opus | #92, #93, #95, #102, #103, #114 | Formats and crash safety, isolates, rewrite of subtle rules, consistency of the index, change across every package |
+| Opus, then a review by the largest model before merge | #94 | Undo after a failure or a crash: data safety |
+
+Haiku is not advised for any of these tickets: the only one small enough was #98.
+
+Brief common to every ticket:
+- Read the ticket in full (its "Implementation details" win over the older text above them when they differ), the SPEC sections it names and this plan. Counts given in a ticket ("six files", "eleven places") are indicative: search the code.
+- Done means: `flutter analyze` clean, `dart tool/coverage.dart <suite>` passing for every suite named in the ticket, texts in both ARB files, the box ticked here. SPEC.md already states the target of every ticket (updated on 2026-11-11): it changes only when a ticket finds a gap in it.
+- Fixtures are saved by REAPER, never edited by hand, and hold no plugin storing a path (`test/fixtures/README.md`): the special files of #91 (Latin-1) and #96 (plugin state naming a file) are built by the tests.
+- No in-memory `RepositoryStorage` is shared today: #92 adds one to the tests of `packages/repository`, with injected failures; #93, #94 and #95 reuse it.
+- Not for an agent: the REAPER validation of #91 (**[TO VALIDATE]**, SPEC §5.8, see "Pending outside the plan"), the hand validation of M1.
 
 Remaining features:
 - [ ] #84 issues in the detail view, render target fix
@@ -112,7 +165,7 @@ Remaining features:
 Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## Pending outside the plan
-None.
+- REAPER validation of #91 (SPEC §5.8, §10 point 12): open a project holding a byte that is not valid UTF-8 (e.g. a track name in Windows-1252) in REAPER 7, save it, and check whether the saved file is UTF-8. The file tried on 2026-11-11 (`test/fixtures/non-utf8.rpp`, not committed) is plain ASCII: it holds no such byte and proves nothing.
 
 ## Next step
-Core hardening of M1, starting with #90, then #91 to #105 in order; then #84 and #70.
+Core hardening of M1, along the steps of the hardening plan: start #90, with #104 beside it; then #91, then the three lanes. Then #84 and #70.
