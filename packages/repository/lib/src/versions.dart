@@ -5,6 +5,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'adoption.dart';
+import 'free_names.dart';
+import 'library_path.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
 
@@ -52,7 +54,7 @@ Future<String> duplicateVersion(
   VersionMetadata metadata,
 ) async {
   final path = await _newVersionPath(storage, titleDir, fileName);
-  final text = await _readText(storage, _join(titleDir, source));
+  final text = await _readText(storage, joinPath(titleDir, source));
   await _writeText(
     storage,
     path,
@@ -70,8 +72,8 @@ Future<String> renameVersion(
   String fileName,
   String newName,
 ) async {
-  final from = _join(titleDir, fileName);
-  final to = await _newVersionPath(storage, _parent(from), newName);
+  final from = joinPath(titleDir, fileName);
+  final to = await _newVersionPath(storage, parentOf(from), newName);
   await storage.move(from, to);
   return to;
 }
@@ -84,7 +86,7 @@ Future<void> setVersionLabel(
   String fileName,
   String label,
 ) async {
-  final path = _join(titleDir, fileName);
+  final path = joinPath(titleDir, fileName);
   final metadata = VersionMetadata.fromExtState(
     RppProject.parse(await _readText(storage, path))
         .extState(VersionMetadata.section),
@@ -105,10 +107,10 @@ Future<String> deleteVersion(
   String titleDir,
   String fileName,
 ) async {
-  final from = _join(titleDir, fileName);
+  final from = joinPath(titleDir, fileName);
   final to = await freePath(
     storage,
-    _join(_join(_parent(from), trashFolderName), p.posix.basename(from)),
+    joinPath(joinPath(parentOf(from), trashFolderName), p.posix.basename(from)),
   );
   await storage.move(from, to);
   return to;
@@ -132,7 +134,7 @@ Future<void> purgeTrash(
   Iterable<String> paths,
 ) async {
   for (final path in paths) {
-    if (!_isUnder(titleDir, path) || !_isInTrash(path)) {
+    if (!isWithin(path, titleDir, caseSensitive: true) || !_isInTrash(path)) {
       throw ArgumentError.value(path, 'paths', 'Not in the trash');
     }
   }
@@ -150,7 +152,7 @@ Future<List<StorageEntry>> unreferencedMedia(
   RepositoryStorage storage,
   String titleDir,
 ) async {
-  final pool = _join(titleDir, mediaFolderName);
+  final pool = joinPath(titleDir, mediaFolderName);
   if (await storage.stat(pool) == null) return const [];
   final referenced = <String>{};
   final absoluteNames = <String>{};
@@ -159,20 +161,21 @@ Future<List<StorageEntry>> unreferencedMedia(
       continue;
     }
     final project = RppProject.parse(await _readText(storage, e.path));
-    final dir = _parent(e.path);
+    final dir = parentOf(e.path);
     final record = project.document.root.line('RECORD_PATH')?.params;
     final dirs = {
       dir,
       for (final r in record ?? const <String>[])
-        if (r.isNotEmpty && !_isAbsolute(r)) _normalize(_join(dir, _slash(r))),
+        if (r.isNotEmpty && !isAbsoluteReference(r))
+          _normalize(joinPath(dir, _slash(r))),
     };
     for (final ref in project.mediaFiles) {
-      if (_isAbsolute(ref)) {
+      if (isAbsoluteReference(ref)) {
         absoluteNames.add(_slash(ref).split('/').last.toLowerCase());
         continue;
       }
       for (final d in dirs) {
-        referenced.add(_normalize(_join(d, _slash(ref))).toLowerCase());
+        referenced.add(_normalize(joinPath(d, _slash(ref))).toLowerCase());
       }
     }
   }
@@ -194,9 +197,9 @@ Future<void> purgeMedia(
   String titleDir,
   Iterable<String> paths,
 ) async {
-  final pool = _join(titleDir, mediaFolderName);
+  final pool = joinPath(titleDir, mediaFolderName);
   for (final path in paths) {
-    if (!_isUnder(pool, path)) {
+    if (!isWithin(path, pool, caseSensitive: true)) {
       throw ArgumentError.value(path, 'paths', 'Not in the media pool');
     }
   }
@@ -216,7 +219,7 @@ Future<String> _newVersionPath(
       p.posix.basenameWithoutExtension(fileName).trim().isEmpty) {
     throw ArgumentError.value(fileName, 'fileName', 'Invalid version name');
   }
-  final path = _join(dir, fileName);
+  final path = joinPath(dir, fileName);
   if (await storage.stat(path) != null) {
     throw StateError('Version already exists: $path');
   }
@@ -229,14 +232,6 @@ bool _isInTrash(String path) {
       segments[segments.length - 2].toLowerCase() == trashFolderName;
 }
 
-bool _isUnder(String dir, String path) =>
-    dir.isEmpty ? !path.startsWith('../') : p.posix.isWithin(dir, path);
-
-bool _isAbsolute(String ref) {
-  final slashed = _slash(ref);
-  return slashed.startsWith('/') || RegExp(r'^[A-Za-z]:').hasMatch(slashed);
-}
-
 String _slash(String ref) => ref.replaceAll(r'\', '/');
 
 String _normalize(String path) => p.posix.normalize(path);
@@ -246,10 +241,3 @@ Future<String> _readText(RepositoryStorage storage, String path) =>
 
 Future<void> _writeText(RepositoryStorage storage, String path, String text) =>
     storage.write(path, Stream.value(utf8.encode(text)));
-
-String _join(String dir, String name) => dir.isEmpty ? name : '$dir/$name';
-
-String _parent(String path) {
-  final i = path.lastIndexOf('/');
-  return i < 0 ? '' : path.substring(0, i);
-}

@@ -4,7 +4,8 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
-import 'adoption.dart';
+import 'free_names.dart';
+import 'library_path.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
 import 'scanner.dart' show ScanResult;
@@ -55,7 +56,7 @@ Map<String, List<String>> mediaUsage(ScanResult result) {
   final usage = <String, List<String>>{};
   void add(String project, List<String> refs) {
     for (final ref in refs) {
-      if (resolveReference(_parent(project), ref) case final file?) {
+      if (resolveReference(parentOf(project), ref) case final file?) {
         usage.putIfAbsent(file, () => []).add(project);
       }
     }
@@ -63,7 +64,7 @@ Map<String, List<String>> mediaUsage(ScanResult result) {
 
   for (final title in result.titles) {
     for (final v in title.versions) {
-      add(_join(title.path, v.fileName), v.media);
+      add(joinPath(title.path, v.fileName), v.media);
     }
   }
   result.subprojects.forEach(add);
@@ -87,7 +88,7 @@ Future<Report> moveProjectToTitle(
   Map<String, List<String>> usage = const {},
 }) async {
   final text = await utf8.decodeStream(storage.read(project));
-  final sourceDir = _parent(project);
+  final sourceDir = parentOf(project);
   final shared = {
     ...await _mediaOfOtherProjects(storage, sourceDir, project),
     for (final file in usage.keys) file.toLowerCase(),
@@ -101,12 +102,7 @@ Future<Report> moveProjectToTitle(
   String relocated(String ref) {
     final file = resolveReference(sourceDir, ref);
     if (file == null || sourceDir == titleDir) return ref;
-    final relative = p.posix.relative(
-      file,
-      from: titleDir.isEmpty ? '.' : titleDir,
-    );
-    final separator = separatorOf(ref);
-    return separator == '/' ? relative : relative.replaceAll('/', separator);
+    return relativeReference(titleDir, file, like: ref);
   }
 
   var patched = rewriteMediaPaths(text, relocated);
@@ -119,7 +115,7 @@ Future<Report> moveProjectToTitle(
   }
   final target = await freePath(
     storage,
-    _join(titleDir, p.posix.basename(project)),
+    joinPath(titleDir, p.posix.basename(project)),
   );
   await storage.move(project, target);
   if (patched != text) {
@@ -155,7 +151,7 @@ Future<Set<String>> _mediaOfOtherProjects(
     try {
       final text = await utf8.decodeStream(storage.read(e.path));
       for (final ref in RppProject.parse(text).mediaFiles) {
-        if (resolveReference(_parent(e.path), ref) case final path?) {
+        if (resolveReference(parentOf(e.path), ref) case final path?) {
           media.add(path.toLowerCase());
         }
       }
@@ -172,7 +168,7 @@ final class _Normalization {
     this.titleDir, {
     this.movable = const {},
     this.usage = const {},
-  }) : pool = _join(titleDir, mediaFolderName);
+  }) : pool = joinPath(titleDir, mediaFolderName);
 
   final RepositoryStorage storage;
   final String titleDir;
@@ -213,10 +209,12 @@ final class _Normalization {
   Future<Report> run() async {
     // Files that would move from under the projects of another title.
     for (final MapEntry(key: file, value: projects) in usage.entries) {
-      final others = projects.where((project) => !_inTitle(project)).toList();
+      final others = projects
+          .where((project) => !isWithin(project, titleDir))
+          .toList();
       if (others.isNotEmpty &&
-          _inTitle(file) &&
-          !_inPool(file) &&
+          isWithin(file, titleDir) &&
+          !isWithin(file, pool) &&
           !_relative(file).split('/').any(isExcludedFolder)) {
         _add(
           ReportKind.mediaUsedElsewhere,
@@ -228,7 +226,7 @@ final class _Normalization {
     final entries = await storage.list(titleDir, recursive: true);
     for (final e in entries) {
       if (e.isDirectory || !isProjectFile(e.path)) continue;
-      final dir = _parent(e.path);
+      final dir = parentOf(e.path);
       final segments = _relative(e.path).split('/');
       if (segments.any(isExcludedFolder)) continue;
       final text = await utf8.decodeStream(storage.read(e.path));
@@ -252,7 +250,7 @@ final class _Normalization {
     for (final MapEntry(key: project, value: refs) in files.entries) {
       if (blocked.contains(project)) continue;
       for (final MapEntry(key: key, value: file) in refs.entries) {
-        if (!targets.containsKey(key) && !_inPool(file)) {
+        if (!targets.containsKey(key) && !isWithin(file, pool)) {
           await _bring(file, keep: kept.contains(key));
         }
       }
@@ -266,7 +264,7 @@ final class _Normalization {
         project,
         now,
         text,
-        recordPath: now == project && _parent(project) == titleDir,
+        recordPath: now == project && parentOf(project) == titleDir,
       );
     }
     // Media used by no project, e.g. left in a member subfolder.
@@ -293,7 +291,7 @@ final class _Normalization {
     final missing = <String>[];
     final external = <String>[];
     for (final ref in RppProject.parse(text).mediaFiles) {
-      final file = resolveReference(_parent(project), ref);
+      final file = resolveReference(parentOf(project), ref);
       if (file == null) {
         external.add(ref);
       } else if (await storage.stat(file) case StorageEntry(
@@ -323,12 +321,13 @@ final class _Normalization {
     final (target, exists) = await poolTarget(storage, pool, file);
     targets[file.toLowerCase()] = target;
     final move =
-        (_inTitle(file) || movable.contains(file.toLowerCase())) && !keep;
+        (isWithin(file, titleDir) || movable.contains(file.toLowerCase())) &&
+        !keep;
     if (exists) {
       if (!move) return;
       final trashed = await freePath(
         storage,
-        _join(_join(titleDir, trashFolderName), p.posix.basename(file)),
+        joinPath(joinPath(titleDir, trashFolderName), p.posix.basename(file)),
       );
       await storage.move(file, trashed);
       this.trashed.add(file.toLowerCase());
@@ -371,19 +370,14 @@ final class _Normalization {
     required bool recordPath,
     bool report = true,
   }) async {
-    final oldDir = _parent(old);
-    final newDir = _parent(now);
+    final oldDir = parentOf(old);
+    final newDir = parentOf(now);
     var patched = rewriteMediaPaths(text, (ref) {
       final file = resolveReference(oldDir, ref);
       if (file == null) return ref;
       final current = targets[file.toLowerCase()] ?? file;
       if (current == file && newDir == oldDir) return ref;
-      final relative = p.posix.relative(
-        current,
-        from: newDir.isEmpty ? '.' : newDir,
-      );
-      final separator = separatorOf(ref);
-      return separator == '/' ? relative : relative.replaceAll('/', separator);
+      return relativeReference(newDir, current, like: ref);
     });
     if (recordPath) {
       final record = RppProject.parse(patched).document.root
@@ -412,20 +406,6 @@ final class _Normalization {
   static bool _isReserved(String name) =>
       reservedTitleFolders.contains(name.toLowerCase());
 
-  bool _inPool(String file) =>
-      file.toLowerCase().startsWith('${pool.toLowerCase()}/');
-
-  bool _inTitle(String file) =>
-      titleDir.isEmpty ||
-      file.toLowerCase().startsWith('${titleDir.toLowerCase()}/');
-
   void _add(ReportKind kind, ReportItem item) =>
       items.putIfAbsent(kind, () => []).add(item);
-}
-
-String _join(String dir, String name) => dir.isEmpty ? name : '$dir/$name';
-
-String _parent(String path) {
-  final i = path.lastIndexOf('/');
-  return i < 0 ? '' : path.substring(0, i);
 }
