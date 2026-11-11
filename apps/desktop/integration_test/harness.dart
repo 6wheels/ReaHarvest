@@ -33,7 +33,8 @@ class QueuedPickers extends Pickers {
 /// never started: launches and folder openings are recorded.
 class Harness {
   Harness() : root = Directory.systemTemp.createTempSync('reaharvest_it_') {
-    Directory(p.join(resources, 'ProjectTemplates')).createSync(recursive: true);
+    Directory(p.join(resources, 'ProjectTemplates'))
+        .createSync(recursive: true);
     writeReaperIni(resources, recommended: true);
     Directory(data).createSync();
   }
@@ -165,6 +166,18 @@ class Harness {
     final target = path(relative);
     Directory(p.dirname(target)).createSync(recursive: true);
     return File(fixture(name)).copySync(target).path;
+  }
+
+  /// Copies `render.rpp` to [relative] with its media in a `Media/` folder
+  /// next to it: a version with nothing to sort. Returns its path.
+  String copyCleanProject(String relative) {
+    final project = copyFixture('render.rpp', relative);
+    for (final name in ['01-261108_1921.wav', '02-261108_1921.wav']) {
+      File(p.join(p.dirname(project), 'Media', name))
+        ..createSync(recursive: true)
+        ..writeAsStringSync(name);
+    }
+    return project;
   }
 
   /// Absolute path of [relative] (folders split on `/`) in the throwaway
