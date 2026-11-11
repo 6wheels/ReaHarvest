@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
@@ -7,7 +8,18 @@ const fixtures = '../../test/fixtures';
 
 String lf(String s) => s.replaceAll('\r', '');
 
-String fixture(String name) => File('$fixtures/$name').readAsStringSync();
+String fixture(String name) => readText(File('$fixtures/$name'));
+
+/// Text of [f]: UTF-8, or Latin-1 for a project that is not valid UTF-8
+/// (`windows-1252.rpp`), which keeps every byte as one character.
+String readText(File f) {
+  final bytes = f.readAsBytesSync();
+  try {
+    return utf8.decode(bytes);
+  } on FormatException {
+    return latin1.decode(bytes);
+  }
+}
 
 List<File> allProjects() =>
     Directory(fixtures)
@@ -40,7 +52,7 @@ void main() {
   group('document', () {
     test('every fixture parses and round-trips byte-exact', () {
       for (final f in allProjects()) {
-        final text = f.readAsStringSync();
+        final text = readText(f);
         final doc = RppDocument.parse(text);
         expect(doc.root.name, 'REAPER_PROJECT', reason: f.path);
         expect(doc.text, text, reason: f.path);
@@ -82,7 +94,7 @@ void main() {
 
     test('reads tracks, depth, plugins and media on all fixtures', () {
       for (final f in allProjects()) {
-        final p = RppProject.parse(f.readAsStringSync());
+        final p = RppProject.parse(readText(f));
         for (final t in p.tracks) {
           expect(t.depth, greaterThanOrEqualTo(0), reason: f.path);
         }
@@ -110,7 +122,7 @@ void main() {
       expect(p.length, greaterThan(0));
 
       final plugins = allProjects()
-          .expand((f) => RppProject.parse(f.readAsStringSync()).allPlugins)
+          .expand((f) => RppProject.parse(readText(f)).allPlugins)
           .toSet();
       expect(
         plugins,
@@ -275,7 +287,7 @@ void main() {
       expect(lf(out), contains(r'FILE "Media\'));
       // Trailing tokens (MIDI `QN`) are preserved.
       final midi = allProjects()
-          .map((f) => f.readAsStringSync())
+          .map(readText)
           .firstWhere((t) => RegExp(r'FILE "[^"]+" QN').hasMatch(t));
       expect(
         rewriteMediaPaths(midi, toMedia),
@@ -287,7 +299,7 @@ void main() {
 
     test('non-regression: all patches on every fixture', () {
       for (final f in [...allProjects()]) {
-        final text = f.readAsStringSync();
+        final text = readText(f);
         var out = setRootAttribute(text, 'TITLE', ['A "song" title']);
         out = setRootAttribute(out, 'AUTHOR', ['band']);
         out = setNotes(out, 'line 1\nline 2');
