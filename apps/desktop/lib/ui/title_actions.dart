@@ -40,9 +40,7 @@ Future<void> openLatestInReaper(
         content: Text(
           l10n.notYourVersionHint(
             p.posix.withoutExtension(version.fileName),
-            owner == null
-                ? '?'
-                : ownerName(ref.read(ownerNamesProvider), owner),
+            ref.read(ownerNamesProvider)[owner] ?? l10n.unknownOwner,
           ),
         ),
         actions: [

@@ -819,7 +819,8 @@ void main() {
     expect(filter().libraries, isEmpty);
     await toggle('Mode: Local', 'Local');
     expect(filter().modes, isEmpty);
-    await toggle('Owner: demo-mem', 'demo-mem');
+    // An owner without a known name is shown as unknown, never as an id.
+    await toggle('Owner: Unknown', 'Unknown');
     expect(filter().owners, isEmpty);
     await toggle('Status', 'Mixing');
     expect(filter().statuses, {'mixing'});

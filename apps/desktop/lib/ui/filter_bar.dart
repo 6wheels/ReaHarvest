@@ -73,7 +73,7 @@ class FilterBar extends ConsumerWidget {
           label: l10n.filterOwner,
           options: options.owners,
           selected: filter.owners,
-          labelOf: (o) => ownerName(owners, o),
+          labelOf: (o) => owners[o] ?? l10n.unknownOwner,
           onChanged: (s) => set(filter.copyWith(owners: s)),
         ),
       if (options.missingPlugins || filter.missingPlugins)

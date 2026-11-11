@@ -126,7 +126,7 @@ String versionDetails(
   final m = version.metadata;
   return [
     if (withLabel && m != null && m.label.isNotEmpty) m.label,
-    if (m != null) ownerName(owners, m.owner),
+    if (m != null) owners[m.owner] ?? l10n.unknownOwner,
     shortDate(l10n, version.modified),
     if (version.tempo case final bpm?) l10n.bpm(bpm.round()),
   ].join(' · ');
@@ -493,7 +493,7 @@ class _VersionItem extends ConsumerWidget {
     final generic = alerts.notAdopted || (m != null && m.label.isEmpty);
     final details = [
       shortDate(l10n, version.modified),
-      if (m != null) ownerName(owners, m.owner),
+      if (m != null) owners[m.owner] ?? l10n.unknownOwner,
     ].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -698,7 +698,7 @@ class _AdoptState extends ConsumerState<_Adopt> {
           Text(
             l10n.filterValue(
               l10n.filterOwner,
-              ownerName(ref.watch(ownerNamesProvider), owner),
+              ref.watch(ownerNamesProvider)[owner] ?? l10n.unknownOwner,
             ),
             style: Theme.of(context).textTheme.bodySmall
                 ?.copyWith(color: context.colors.muted),

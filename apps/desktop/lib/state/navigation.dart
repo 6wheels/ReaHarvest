@@ -123,11 +123,6 @@ final ownerNamesProvider = Provider<Map<MemberId, String>>((ref) {
   };
 });
 
-/// Display name of a version owner, from [names] ([ownerNamesProvider]),
-/// else a short id.
-String ownerName(Map<MemberId, String> names, MemberId owner) =>
-    names[owner] ?? owner.substring(0, owner.length < 8 ? owner.length : 8);
-
 /// Tempo of the latest version that has one; null when unknown.
 int? tempoOf(Title t) {
   final dated = [...t.versions.where((v) => v.tempo != null)]

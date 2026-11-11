@@ -137,6 +137,7 @@
   "notAdoptedCount": "{count, plural, =1{1 version non adoptée} other{{count} versions non adoptées}}",
   "toAdoptCount": "{count} à adopter",
   "noLabel": "Sans libellé",
+  "unknownOwner": "Inconnu",
   "labelRequired": "Le libellé est obligatoire",
   "history": "Historique",
   "noBackups": "Aucun point de sauvegarde pour l'instant.",
