@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/ui/filter_bar.dart';
@@ -55,9 +56,13 @@ void main() {
     await openOverviewDetail(tester);
   }
 
-  /// Back to the library. Escape is left out: after an adoption the focus
-  /// is lost with the adoption form (reported on #59).
-  Future<void> back(WidgetTester tester) => tapTooltip(tester, 'Back');
+  /// Back to the library with Escape, also after an adoption, whose form
+  /// leaves with the focus (#59).
+  Future<void> back(WidgetTester tester) async {
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(TitleDetailPage), findsNothing);
+  }
 
   /// Adopts the selected version of the open detail as [label].
   Future<void> adopt(WidgetTester tester, String label) async {
