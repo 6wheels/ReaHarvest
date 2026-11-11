@@ -100,10 +100,8 @@ void main() {
       tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
       ThemeMode.dark,
     );
-    // One tap at the end of the slider: a drag saves the settings once per
-    // step, concurrently (reported on #59).
-    final slider = tester.getRect(find.byType(Slider));
-    await tester.tapAt(slider.centerRight - const Offset(4, 0));
+    // Dragged across every step: each one is saved (#59).
+    await tester.drag(find.byType(Slider), const Offset(600, 0));
     await tester.pumpAndSettle();
     expect(h.settings.textScale, 1.3);
     await tester.ensureVisible(find.text(h.logs));

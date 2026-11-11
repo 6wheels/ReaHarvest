@@ -27,9 +27,16 @@ class SettingsNotifier extends Notifier<AppSettings> {
   @override
   AppSettings build() => ref.read(initialSettingsProvider);
 
+  /// Last save, the next one waits for it.
+  Future<void> _saving = Future.value();
+
+  /// Applies [edit] at once and saves the result after the previous saves:
+  /// two saves never run together (a slider changes the settings on every
+  /// step).
   Future<void> change(AppSettings Function(AppSettings) edit) {
-    state = edit(state);
-    return persist(state);
+    final settings = state = edit(state);
+    Future<void> save(Object? _) => persist(settings);
+    return _saving = _saving.then(save, onError: save);
   }
 
   @protected

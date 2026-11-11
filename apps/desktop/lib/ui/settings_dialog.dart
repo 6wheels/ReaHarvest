@@ -400,9 +400,8 @@ class _Libraries extends ConsumerWidget {
               submitLabel: l10n.addLibrary,
               // The report of the scan is already open over this dialog:
               // close this dialog, not the top route.
-              onAdded: () => Navigator.of(
-                context,
-              ).removeRoute(ModalRoute.of(context)!),
+              onAdded: () =>
+                  Navigator.of(context).removeRoute(ModalRoute.of(context)!),
             ),
           ),
         ),
