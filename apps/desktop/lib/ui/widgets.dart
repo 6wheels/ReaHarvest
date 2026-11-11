@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
 import '../state/libraries.dart';
@@ -102,7 +103,7 @@ Future<bool> runProjectChange(
     return true;
   } on Object catch (error) {
     messenger.showSnackBar(
-      SnackBar(content: Text(l10n.actionFailed('$error'))),
+      SnackBar(content: Text(failureMessage(l10n, error))),
     );
     return false;
   }
@@ -124,7 +125,13 @@ Future<void> openVersionInReaper(
     }
   } on Object catch (error) {
     messenger.showSnackBar(
-      SnackBar(content: Text(l10n.actionFailed('$error'))),
+      SnackBar(content: Text(failureMessage(l10n, error))),
     );
   }
 }
+
+/// Text shown when an action fails with [error].
+String failureMessage(AppLocalizations l10n, Object error) =>
+    error is ProjectEncodingException
+    ? l10n.projectEncodingFailed
+    : l10n.actionFailed('$error');

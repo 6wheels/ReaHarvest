@@ -69,7 +69,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 
 Core hardening, before the remaining features (listed in the order of the steps below; #98 is folded into #114 and closed):
 - [x] #90 one module for library paths and media references
-- [ ] #91 one reader and writer for project files, one encoding policy (not valid UTF-8: read as Windows-1252, written back as read)
+- [x] #91 one reader and writer for project files, one encoding policy (not valid UTF-8: read as Windows-1252, written back as read)
 - [ ] #104 recovery screen when `settings.json` is unreadable or newer (independent)
 - [ ] #92 Migration split into inventory, append-only journal and guarded storage
 - [ ] #93 batch of fixes run outside the app, in one isolate

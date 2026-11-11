@@ -143,6 +143,7 @@
   "@actionFailed": {
     "placeholders": { "error": { "type": "String" } }
   },
+  "projectEncodingFailed": "This project uses an old text encoding that cannot hold this name. Rename the folder or the file without special characters, then try again.",
   "noFilterResults": "No title matches these filters",
   "filterValue": "{label}: {value}",
   "@filterValue": {

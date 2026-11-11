@@ -12,6 +12,7 @@ export 'src/media.dart';
 export 'src/migration.dart';
 export 'src/mounted_folder_storage.dart';
 export 'src/node_file.dart';
+export 'src/project_file.dart';
 export 'src/scaffold.dart';
 export 'src/scanner.dart';
 export 'src/versions.dart';
