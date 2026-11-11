@@ -224,7 +224,6 @@ Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 - #52: confirm that the built-in PDF preview is left out of the MVP (in the ticket; SPEC §5.9 asks for it).
 - #23: produce a real conflict on Google Drive for desktop to confirm its naming pattern (SPEC §3.0).
 - #31: the Microsoft Store study, at the start of M2. #25: the watching spike on the real Drive, at the start of M3. #110: the design proposal.
-- `test/fixtures/non-utf8.rpp` (not tracked) is plain ASCII and is not used: `windows-1252.rpp` replaces it. To delete.
 
 ## Next step
 Now: #90, with the two lots of #59 beside it (and #104 if a fourth agent is available). Then #91, then the three lanes of step 3, along the hardening plan. After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.
