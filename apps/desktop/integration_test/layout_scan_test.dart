@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/ui/filter_bar.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_card.dart';
+import 'package:reaharvest/ui/title_views.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import 'harness.dart';
@@ -24,10 +26,10 @@ void main() {
 
   Finder card(String name) => find.widgetWithText(TitleCard, name);
 
-  /// Names of the title cards shown.
+  /// Names of the titles shown, scrolled out of view included: the grid
+  /// only builds the cards on screen.
   Set<String> cards(WidgetTester tester) => {
-    for (final c in tester.widgetList<TitleCard>(find.byType(TitleCard)))
-      titleName(c.title),
+    for (final t in h.container.read(visibleTitlesProvider)) titleName(t),
   };
 
   testWidgets('scans each layout and the free tree', (tester) async {
@@ -68,13 +70,6 @@ void main() {
       'Titles',
       'Riff',
     });
-    expect(
-      find.descendant(
-        of: card('Riff'),
-        matching: find.textContaining('2 versions'),
-      ),
-      findsOne,
-    );
     expect(
       find.descendant(
         of: card('Demo'),
@@ -128,6 +123,22 @@ void main() {
     expect(find.text('Demo'), findsNothing);
     await tapText(tester, 'Duo');
     shown(['Movie', 'Feature', 'Act 2', 'Finale', 'Sketches', 'Ideas', 'Riff']);
+    // The free tree title holds the projects below it.
+    expect(
+      find.descendant(
+        of: find.widgetWithText(TitleRow, 'Riff'),
+        matching: find.text('2 versions'),
+      ),
+      findsOne,
+    );
+    // The free tree title holds the projects below it.
+    expect(
+      find.descendant(
+        of: find.widgetWithText(TitleRow, 'Riff'),
+        matching: find.text('2 versions'),
+      ),
+      findsOne,
+    );
     await tapText(tester, 'Band');
     expect(find.text('Demo'), findsOne);
 

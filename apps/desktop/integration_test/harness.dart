@@ -84,6 +84,10 @@ class Harness {
   /// Starts the application like `main()`: settings loaded from their file
   /// (created on first run), index opened, then the app pumped.
   Future<void> start(WidgetTester tester) async {
+    // Same layout on every machine: the window of a CI runner is small.
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final settings = (await tester.runAsync(
       () => SettingsFile(settingsPath).load(),
     ))!;
