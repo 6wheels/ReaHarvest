@@ -6,10 +6,12 @@ import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
+import '../state/libraries.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
+import 'media_plan_preview.dart';
 import 'report_dialog.dart';
 
 /// Issue kinds fixed in batch from the "To sort" page (SPEC §5.8 step 4).
@@ -43,7 +45,7 @@ String mediaTitleOf(String path) {
 /// proposals agree); unknown folders also get the level they belong to.
 /// Projects too deep get their owner and the status deduced from their
 /// status subfolder. Projects whose media are to normalize stand for
-/// their title. Returns the checked fixes by library, or null if
+/// their title, whose planned operations are previewed. Returns the checked fixes by library, or null if
 /// cancelled.
 Future<Map<LibraryId, List<MigrationFix>>?> showFixDialog(
   BuildContext context,
@@ -141,6 +143,13 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   late final List<Member> _owners;
   late final List<_Lift> _lifts;
 
+  // Media normalization.
+
+  /// Plan of each title, by library and title; null while computed.
+  Map<(LibraryId, String), MediaPlan>? _plans;
+
+  Object? _previewError;
+
   // Folders.
 
   late final Layout _layout;
@@ -156,7 +165,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   void initState() {
     super.initState();
     final libraries = ref.read(indexedLibrariesProvider);
-    if (_normalizing) return;
+    if (_normalizing) {
+      _preview();
+      return;
+    }
     if (_lifting) {
       final identity = ref.read(settingsProvider).identity;
       final members = {
@@ -204,6 +216,53 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Computes the normalization plan of the title of every issue.
+  Future<void> _preview() async {
+    final titles = <LibraryId, Set<String>>{};
+    for (final issue in widget.issues) {
+      titles
+          .putIfAbsent(issue.library, () => {})
+          .add(mediaTitleOf(issue.item.path));
+    }
+    final service = ref.read(libraryServiceProvider);
+    try {
+      final plans = <(LibraryId, String), MediaPlan>{};
+      for (final MapEntry(key: library, value: paths) in titles.entries) {
+        final found = await service.previewNormalization(library, [...paths]);
+        for (final MapEntry(key: title, value: plan) in found.entries) {
+          plans[(library, title)] = plan;
+        }
+      }
+      if (mounted) setState(() => _plans = plans);
+    } on Object catch (error) {
+      if (mounted) setState(() => _previewError = error);
+    }
+  }
+
+  /// Preview of the plans of the checked titles.
+  List<Widget> _planPreviews(AppLocalizations l10n, TextStyle? muted) {
+    if (_previewError case final error?) {
+      return [Text(l10n.fixPreviewFailed('$error'), style: muted)];
+    }
+    final plans = _plans;
+    if (plans == null) {
+      return [
+        Text(l10n.fixPreviewLoading, style: muted),
+        const SizedBox(height: Space.s),
+        const LinearProgressIndicator(),
+      ];
+    }
+    final checked = {
+      for (final i in _checked)
+        (widget.issues[i].library, mediaTitleOf(widget.issues[i].item.path)),
+    };
+    return [
+      for (final MapEntry(key: (library, title), value: plan) in plans.entries)
+        if (checked.contains((library, title)))
+          MediaPlanPreview(title: title, plan: plan),
+    ];
   }
 
   /// Member and status subfolders of the project too deep [issue].
@@ -440,6 +499,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
                   title: Text(issue.item.path),
                   subtitle: Text(_details(l10n, i), style: muted),
                 ),
+              if (_normalizing) ...[
+                const SizedBox(height: Space.s),
+                ..._planPreviews(l10n, muted),
+              ],
             ],
           ),
         ),

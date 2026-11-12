@@ -586,6 +586,16 @@ void main() {
     final id = container.read(settingsProvider).libraries.single.id;
     expect(index.issues(kind: ReportKind.mediaOutsidePool), hasLength(1));
 
+    // The preview plans the operations, without making them.
+    final preview = await service().previewNormalization(id, const [
+      'Artist/Album/Other',
+    ]);
+    expect(preview['Artist/Album/Other']!.operations.map((op) => '$op'), [
+      'move Artist/Album/Other/audio/a.wav -> Artist/Album/Other/Media/a.wav',
+      r'rewrite Artist/Album/Other/v.rpp, audio\a.wav -> Media\a.wav',
+    ]);
+    expect(File(p.join(other, 'audio', 'a.wav')).existsSync(), isTrue);
+
     await service().fix(id, const [NormalizeMedia('Artist/Album/Other')]);
 
     expect(

@@ -282,6 +282,23 @@ class LibraryService {
     ], (l10n) => l10n.taskMove(p.posix.basename(path)));
   }
 
+  /// Plans of the media normalization of the [titles] of [library] (dry
+  /// run of the fix, SPEC §5.8 step 4), by title, computed in an isolate
+  /// ([planNormalizationOn]).
+  Future<Map<String, MediaPlan>> previewNormalization(
+    LibraryId library,
+    List<String> titles,
+  ) {
+    final entry = _entry(library);
+    return planNormalizationOn(
+      entry.libraryRoot,
+      titles,
+      usage: mediaUsage(
+        ref.read(localIndexProvider).scanResult(library) ?? const ScanResult(),
+      ),
+    );
+  }
+
   /// Applies the migration [fixes] to [library] (SPEC §5.8 step 4), as a
   /// task whose report is shown at the end. Then rescans.
   Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) =>

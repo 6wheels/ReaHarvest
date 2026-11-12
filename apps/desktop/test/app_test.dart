@@ -61,6 +61,11 @@ final revealed = <String>[];
 /// When set, adopt and addVersion of the fake service wait for it (spinners).
 Completer<void>? pending;
 
+/// Normalization plans returned by the fake previewNormalization, by title
+/// (an empty plan for the others); its error when set.
+Map<String, MediaPlan> previewPlans = const {};
+Object? previewError;
+
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
   FakeLibraryService(super.ref);
@@ -100,6 +105,20 @@ class FakeLibraryService extends LibraryService {
   Future<void> deleteOrphanNode(LibraryId library, String path) async {
     if (path.startsWith('locked/')) throw StateError('locked');
     orphansDeleted.add(path);
+  }
+
+  @override
+  Future<Map<String, MediaPlan>> previewNormalization(
+    LibraryId library,
+    List<String> titles,
+  ) async {
+    if (previewError case final error?) throw error;
+    return {
+      for (final title in titles)
+        title:
+            previewPlans[title] ??
+            (operations: const [], blocked: const Report()),
+    };
   }
 
   /// Whether [fix] runs as a task whose report opens at the end, like the
@@ -288,6 +307,8 @@ void main() {
     existingLibrary = null;
     revealed.clear();
     pending = null;
+    previewPlans = const {};
+    previewError = null;
     existingLocked = false;
     existingProjects = false;
     backupOpening = true;
@@ -1850,6 +1871,81 @@ void main() {
       'Artist/Album/Song',
       'Artist/Album/Other',
     ]);
+  });
+
+  testWidgets('previews the operations of the normalization', (tester) async {
+    const song = 'Artist/Album/Song';
+    LibraryIssue outside(String path) => (
+      library: band.id,
+      kind: ReportKind.mediaOutsidePool,
+      item: ReportItem(path, r'audio\kick.wav'),
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {band.id: demoLibrary},
+      issues: [
+        outside('$song/a.rpp'),
+        outside('$song/c.rpp'),
+        outside('Artist/Album/Other/d.rpp'),
+      ],
+    );
+    previewPlans = {
+      song: (
+        operations: const [
+          MoveFile('$song/audio/kick.wav', '$song/Media/kick.wav'),
+          CopyFile('Artist/x.wav', '$song/Media/x (2).wav'),
+          TrashDuplicate(
+            '$song/old/snare.wav',
+            '$song/.trash/snare.wav',
+            '$song/Media/snare.wav',
+          ),
+          RewriteProject('$song/a.rpp', {r'audio\kick.wav': r'Media\kick.wav'}),
+        ],
+        blocked: const Report({
+          ReportKind.missingMedia: [ReportItem('$song/b.rpp', 'gone.wav')],
+        }),
+      ),
+    };
+    await tester.tap(find.text('To sort · 3'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+
+    // One preview per title, collapsed.
+    expect(
+      find.text(
+        '1 moved · 1 copied · 1 duplicates to the trash · 1 renamed · '
+        '1 projects rewritten · 1 left intact',
+      ),
+      findsOne,
+    );
+    expect(find.text('Nothing to change'), findsOne);
+    expect(find.text('Rewrite a.rpp'), findsNothing);
+    await tester.tap(find.text(song).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Media not found: b.rpp · gone.wav'), findsOne);
+    expect(find.text('Move audio/kick.wav → Media/kick.wav'), findsOne);
+    expect(find.text('Copy Artist/x.wav → Media/x (2).wav'), findsOne);
+    expect(
+      find.text(
+        'Duplicate of Media/snare.wav: old/snare.wav → .trash/snare.wav',
+      ),
+      findsOne,
+    );
+    expect(find.text('Rewrite a.rpp'), findsOne);
+
+    // Only the checked titles are previewed.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing to change'), findsNothing);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    previewError = StateError('unreadable');
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Preview unavailable: Bad state: unreadable'), findsOne);
   });
 
   testWidgets('fixes folders in batch or moves one anywhere', (tester) async {
