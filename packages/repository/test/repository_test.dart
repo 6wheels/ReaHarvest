@@ -59,6 +59,10 @@ final class CountingStorage implements RepositoryStorage {
       inner.write(path, content);
 
   @override
+  Future<void> append(String path, List<int> bytes) =>
+      inner.append(path, bytes);
+
+  @override
   Future<void> move(String from, String to) => inner.move(from, to);
 
   @override
@@ -130,6 +134,15 @@ void main() {
       );
     });
 
+    test('appends to a file, created with its folders', () async {
+      await storage.append('a/b/log.jsonl', utf8.encode('one\n'));
+      await storage.append('a/b/log.jsonl', utf8.encode('two\n'));
+      expect(
+        File(p.join(root.path, 'a', 'b', 'log.jsonl')).readAsStringSync(),
+        'one\ntwo\n',
+      );
+    });
+
     test(
       'hides dot-prefixed files and folders on Windows (SPEC §3.2)',
       () async {
@@ -142,6 +155,7 @@ void main() {
         await storage.createDirectory('.collab/m1');
         await storage.write('a/b.rpp', Stream.value(utf8.encode('')));
         await storage.move('a/b.rpp', 'a/.trash/b.rpp');
+        await storage.append('.migration/s/journal.jsonl', [10]);
 
         expect(hidden('.library.json'), isTrue);
         expect(hidden('a/.node.json'), isTrue);
@@ -150,6 +164,7 @@ void main() {
         expect(hidden('a'), isFalse);
         expect(hidden('.collab/m1'), isFalse);
         expect(hidden('a/.trash/b.rpp'), isFalse);
+        expect(hidden('.migration'), isTrue);
       },
       testOn: 'windows',
     );

@@ -71,7 +71,7 @@ Core hardening, before the remaining features (listed in the order of the steps 
 - [x] #90 one module for library paths and media references
 - [x] #91 one reader and writer for project files, one encoding policy (not valid UTF-8: read as Windows-1252, written back as read)
 - [ ] #104 recovery screen when `settings.json` is unreadable or newer (independent)
-- [ ] #92 Migration split into inventory, append-only journal and guarded storage
+- [x] #92 Migration split into inventory, append-only journal and guarded storage
 - [ ] #93 batch of fixes run outside the app, in one isolate
 - [ ] #114 only `versionId` in the `.RPP`; label and owner in `.node.json` in every mode until the collab store exists (M3); default label of the versions adopted in batch (former #98); no migration of existing data
 - [ ] #97 scan creating no folder, never writing in a repository
@@ -226,4 +226,5 @@ Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 - #31: the Microsoft Store study, at the start of M2. #25: the watching spike on the real Drive, at the start of M3. #110: the design proposal.
 
 ## Next step
-Now: #90, with the two lots of #59 beside it (and #104 if a fourth agent is available). Then #91, then the three lanes of step 3, along the hardening plan. After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.
+Done: #90, #91 and both lots of #59 (the integration harness now sizes the native window to 1024x768, so the app stays visible during the tests, #119).
+Now: step 3 of the hardening plan. #92 is in review (PR #120); #93 starts once it is merged. #114 and #97, the two other lanes of step 3, are not started; nor is #104 (beside any step). After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.

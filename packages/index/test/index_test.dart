@@ -33,6 +33,10 @@ final class CountingStorage implements RepositoryStorage {
       inner.write(path, content);
 
   @override
+  Future<void> append(String path, List<int> bytes) =>
+      inner.append(path, bytes);
+
+  @override
   Future<void> move(String from, String to) => inner.move(from, to);
 
   @override
@@ -308,6 +312,16 @@ void main() {
 
       index.update(two, const ScanResult());
       expect(index.titles().single.path, 'A/B/C');
+    });
+
+    test('stores the journal position of the last scan', () {
+      final lib = library();
+      expect(index.journalPosition(lib.id), isNull);
+      const position = (folder: '.migration/2026-11-12_000000_000', line: 7);
+      index.update(lib, const ScanResult(journalPosition: position));
+      expect(index.journalPosition(lib.id), position);
+      index.update(lib, const ScanResult());
+      expect(index.journalPosition(lib.id), isNull);
     });
 
     test('persists to disk and survives a reopen', () {

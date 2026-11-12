@@ -9,6 +9,7 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'library_path.dart';
 import 'project_file.dart';
 import 'conventions.dart';
+import 'migration.dart';
 import 'mounted_folder_storage.dart';
 import 'node_file.dart';
 import 'scaffold.dart';
@@ -27,6 +28,7 @@ final class ScanResult {
     this.stamps = const {},
     this.subprojects = const {},
     this.freeTree = false,
+    this.journalPosition,
   });
 
   /// Titles found, sorted by path.
@@ -66,6 +68,10 @@ final class ScanResult {
   /// Whether the library is a free tree (SPEC §3.3).
   final bool freeTree;
 
+  /// Position of the migration journals taken into account by this scan:
+  /// the next scan reads again the files rewritten after it.
+  final JournalPosition? journalPosition;
+
   /// This result without the stamps of [paths]: the next incremental scan
   /// reads these files again.
   ScanResult withoutStamps(Set<String> paths) => ScanResult(
@@ -80,6 +86,7 @@ final class ScanResult {
     },
     subprojects: subprojects,
     freeTree: freeTree,
+    journalPosition: journalPosition,
   );
 
   /// Versions without metadata ("To adopt", SPEC §4.2); always empty in a
@@ -97,27 +104,43 @@ Future<ScanResult> scanFolder(
   String root,
   Library library, {
   ScanResult? previous,
+  JournalPosition? journalPosition,
 }) => Isolate.run(
-  () => scan(MountedFolderStorage(root), library, previous: previous),
+  () => scan(
+    MountedFolderStorage(root),
+    library,
+    previous: previous,
+    journalPosition: journalPosition,
+  ),
 );
 
 /// Scans a library root following its layout, or as a free tree (SPEC §3).
 ///
-/// Files whose stamp did not change since [previous] are not read again;
-/// free tree projects are never read (no metadata, SPEC §3.3). A layout
-/// folder is a node only if a project lies in it or below it (outside the
-/// reserved title folders), or, for a title, if its trash or history still
-/// holds one (#54). Missing `.node.json` files are written for these nodes
+/// Files whose stamp did not change since [previous] are not read again,
+/// except those a migration rewrote after [journalPosition] (the position
+/// stored with [previous], [rewrittenSince]); free tree projects are never
+/// read (no metadata, SPEC §3.3). A layout folder is a node only if a
+/// project lies in it or below it (outside the reserved title folders), or,
+/// for a title, if its trash or history still holds one (#54). Missing `.node.json` files are written for these nodes
 /// and for free tree titles, and layout titles without one are scaffolded
 /// ([scaffoldTitle]); these are the only writes.
 Future<ScanResult> scan(
   RepositoryStorage storage,
   Library library, {
   ScanResult? previous,
-}) => _Scanner(storage, library, previous ?? const ScanResult()).run();
+  JournalPosition? journalPosition,
+}) async {
+  final (:paths, :position) = await rewrittenSince(storage, journalPosition);
+  return _Scanner(
+    storage,
+    library,
+    (previous ?? const ScanResult()).withoutStamps(paths),
+    position,
+  ).run();
+}
 
 final class _Scanner {
-  _Scanner(this.storage, this.library, this.previous)
+  _Scanner(this.storage, this.library, this.previous, this.journalPosition)
     : previousVersions = {
         for (final t in previous.titles)
           for (final v in t.versions) joinPath(t.path, v.fileName): v,
@@ -126,6 +149,7 @@ final class _Scanner {
   final RepositoryStorage storage;
   final Library library;
   final ScanResult previous;
+  final JournalPosition journalPosition;
   final Map<String, Version> previousVersions;
 
   final dirs = <String>{''};
@@ -206,6 +230,7 @@ final class _Scanner {
       stamps: stamps,
       subprojects: subprojects,
       freeTree: layout == null,
+      journalPosition: journalPosition,
     );
   }
 

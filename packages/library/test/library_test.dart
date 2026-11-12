@@ -35,6 +35,10 @@ final class MemoryStorage implements RepositoryStorage {
       throw UnimplementedError();
 
   @override
+  Future<void> append(String path, List<int> bytes) async =>
+      files[path] = [...?files[path], ...bytes];
+
+  @override
   Future<void> move(String from, String to) => throw UnimplementedError();
 
   @override

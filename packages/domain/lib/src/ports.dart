@@ -33,6 +33,10 @@ abstract interface class RepositoryStorage {
   /// parent folders.
   Future<void> write(String path, Stream<List<int>> content);
 
+  /// Appends [bytes] to the file [path], created with its parent folders if
+  /// absent.
+  Future<void> append(String path, List<int> bytes);
+
   /// Moves [from] to [to] (e.g. to `.trash/` or `.history/`).
   Future<void> move(String from, String to);
 

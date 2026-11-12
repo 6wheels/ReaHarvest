@@ -328,8 +328,6 @@ class LibraryService {
     return ref.read(tasksProvider.notifier).run(label, (task) async {
       final declared = [for (final f in fixes.where(inPlace)) f.path];
       var report = Report({ReportKind.valueDeclared: _items(root, declared)});
-      // Rewritten files, read again by the rescan.
-      final rewritten = <String>{};
       for (final path in declared) {
         _log.info('${entry.displayName}: folder $path kept in place');
       }
@@ -341,7 +339,7 @@ class LibraryService {
           // A fresh inventory for each task, unless one was interrupted:
           // files changed or added since the previous one are covered.
           final previous = await Migration.latest(storage);
-          final migration = previous != null && !previous.inventoryComplete
+          final migration = previous != null && !previous.inventory.isComplete
               ? previous
               : Migration.start(storage, previous: previous);
           // From the index: stale for the titles changed by the previous
@@ -351,7 +349,7 @@ class LibraryService {
                 const ScanResult(),
           );
           task.step((l10n) => l10n.taskStepInventory);
-          await migration.takeInventory(
+          await migration.inventory.take(
             hash,
             checkCancelled: task.checkCancelled,
             onProgress: task.progress,
@@ -360,8 +358,7 @@ class LibraryService {
             task.checkCancelled();
             task.step((l10n) => l10n.taskStepFix(i + 1, moves.length));
             task.progress(i / moves.length);
-            final (done, written) = await _applyFixes(root, [fix], usage);
-            rewritten.addAll(written);
+            final done = await _applyFixes(root, [fix], usage);
             applied.add(fix);
             _log.log(
               done.hasErrors ? Level.WARNING : Level.INFO,
@@ -372,8 +369,9 @@ class LibraryService {
           task.checkCancelled();
           task.step((l10n) => l10n.taskStepCheck);
           final latest = (await Migration.latest(storage))!;
-          final check = await latest.check(
+          final check = await latest.inventory.check(
             hash,
+            locate: latest.journal.locate,
             checkCancelled: task.checkCancelled,
             onProgress: task.progress,
           );
@@ -404,7 +402,7 @@ class LibraryService {
               NormalizeMedia() => null,
             },
         ]);
-        await scan(entry, changed: rewritten);
+        await scan(entry);
       }
       return report;
     }, openReport: true);
@@ -674,28 +672,21 @@ class LibraryService {
   }
 
   /// Scans [entry]; failures are only logged, the library stays configured
-  /// and is scanned again on next start. The files [changed] are read
-  /// again, whatever their size and date.
-  Future<void> scan(
-    LibraryEntry entry, {
-    Set<String> changed = const {},
-  }) async {
+  /// and is scanned again on next start.
+  Future<void> scan(LibraryEntry entry) async {
     try {
-      await _scan(entry, changed: changed);
+      await _scan(entry);
     } on Object catch (error) {
       _log.warning('Scan of ${entry.displayName} failed', error);
     }
   }
 
   /// Scans [entry] in an isolate, incrementally from the stored scan unless
-  /// [full] (the files [changed] read again), and updates the index.
+  /// [full] (the files rewritten by a migration since read again), and
+  /// updates the index.
   /// Unavailable libraries are skipped. Reports the problems found (SPEC
   /// §5.2).
-  Future<Report> _scan(
-    LibraryEntry entry, {
-    bool full = false,
-    Set<String> changed = const {},
-  }) async {
+  Future<Report> _scan(LibraryEntry entry, {bool full = false}) async {
     final root = entry.libraryRoot;
     final storage = MountedFolderStorage(root);
     final library = await readLibrary(storage);
@@ -709,9 +700,8 @@ class LibraryService {
     final result = await scanFolder(
       root,
       library,
-      previous: full
-          ? null
-          : index.scanResult(library.id)?.withoutStamps(changed),
+      previous: full ? null : index.scanResult(library.id),
+      journalPosition: full ? null : index.journalPosition(library.id),
     );
     index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();
@@ -730,9 +720,8 @@ class LibraryService {
 }
 
 /// Applies [fixes] to the library at [root] through its migration, in an
-/// isolate (top-level: the closure must not capture the service). Returns
-/// the report and the library paths of the files rewritten.
-Future<(Report, Set<String>)> _applyFixes(
+/// isolate (top-level: the closure must not capture the service).
+Future<Report> _applyFixes(
   String root,
   List<MigrationFix> fixes,
   Map<String, List<String>> usage,
@@ -740,7 +729,7 @@ Future<(Report, Set<String>)> _applyFixes(
   final storage = MountedFolderStorage(root);
   final migration = (await Migration.latest(storage))!;
   final report = await applyFixes(migration, fixes, usage: usage);
-  return (_rooted(root, report), migration.rewritten);
+  return _rooted(root, report);
 });
 
 /// Absolute path of the project file of [version] of [title], in the

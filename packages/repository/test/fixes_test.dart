@@ -50,9 +50,13 @@ void main() {
 
   Future<Migration> migration() async {
     final m = Migration.start(storage);
-    await m.takeInventory(hash);
+    await m.inventory.take(hash);
     return m;
   }
+
+  /// Whether the inventory check of [m] finds no gap.
+  Future<bool> noLoss(Migration m) async =>
+      (await m.inventory.check(hash, locate: m.journal.locate)).isEmpty;
 
   /// Library path of the media [ref] of a project in [dir].
   String resolveMedia(String dir, String ref) =>
@@ -65,33 +69,41 @@ void main() {
 
   tearDown(() => root.deleteSync(recursive: true));
 
-  test('the migration storage keeps originals and refuses deletion', () async {
-    put('a.rpp', 'original');
-    put('notes.txt');
+  test('each fix is journaled between its start and its end', () async {
+    put('a/v.rpp', 'original');
     final date = DateTime(2020, 1, 2, 3, 4, 5);
-    file('a.rpp').setLastModifiedSync(date);
-    file('notes.txt').setLastModifiedSync(date);
-    final m = Migration.start(storage);
-    expect(() => m.storage, throwsStateError);
-    await m.takeInventory(hash);
-    final guarded = m.storage;
+    file('a/v.rpp').setLastModifiedSync(date);
+    final m = await migration();
 
-    await guarded.move('a.rpp', 'song/a.rpp');
-    await guarded.write('song/a.rpp', Stream.value(utf8.encode('rewritten')));
-    await guarded.write('new.txt', Stream.value(utf8.encode('new')));
-    await guarded.write('notes.txt', Stream.value(utf8.encode('notes')));
-    await guarded.createDirectory('empty');
-    await expectLater(guarded.delete('notes.txt'), throwsUnsupportedError);
+    final report = await applyFixes(m, const [
+      MoveFolder('a', 'b'),
+      MoveFolder('missing', 'c'),
+    ]);
 
-    expect(file('${m.folder}/originals/a.rpp').readAsStringSync(), 'original');
-    expect(file('${m.folder}/originals/new.txt').existsSync(), isFalse);
-    // A rewritten project keeps its date (version date); other files not.
-    expect(file('song/a.rpp').lastModifiedSync(), date);
-    expect(file('notes.txt').lastModifiedSync(), isNot(date));
-    expect(m.rewritten, {'song/a.rpp', 'notes.txt'});
-    expect(await guarded.stat('empty'), isNotNull);
-    expect(await guarded.list(''), isNotEmpty);
-    expect((await m.check(hash)).isEmpty, isTrue);
+    expect(report.items[ReportKind.fixFailed], hasLength(1));
+    final lines = [
+      for (final l in const LineSplitter().convert(
+        file('${m.folder}/${MigrationJournal.fileName}').readAsStringSync(),
+      ))
+        jsonDecode(l),
+    ];
+    expect(lines, [
+      {'op': 'fixStart', 'fix': 1, 'kind': 'moveFolder', 'path': 'a'},
+      {'op': 'move', 'from': 'a', 'to': 'b'},
+      {'op': 'fixEnd', 'fix': 1, 'ok': true},
+      {'op': 'fixStart', 'fix': 2, 'kind': 'moveFolder', 'path': 'missing'},
+      {'op': 'move', 'from': 'missing', 'to': 'c'},
+      {'op': 'fixEnd', 'fix': 2, 'ok': false},
+    ]);
+    expect(m.journal.unfinishedFix, 2);
+
+    // On disk too, a rewritten project keeps its date (version date).
+    await m.storage.write('b/v.rpp', Stream.value(utf8.encode('rewritten')));
+    expect(file('b/v.rpp').lastModifiedSync(), date);
+    expect(
+      file('${m.folder}/originals/a/v.rpp').readAsStringSync(),
+      'original',
+    );
   });
 
   test('lifts a project into its title, references kept', () async {
@@ -128,7 +140,7 @@ void main() {
     expect(metadata.owner, 'alice');
     final node = (await readNodeFile(storage, 'Song'))!;
     expect(node.versionStatuses, {metadata.id: 'mixing'});
-    expect((await m.check(hash)).isEmpty, isTrue);
+    expect(await noLoss(m), isTrue);
 
     // An adopted project keeps its metadata; no status is set without one.
     put('Root/sub/b.rpp', text);
@@ -198,7 +210,7 @@ void main() {
     ]);
     expect(report.items[ReportKind.fixFailed]!.single.path, 'Gone');
     expect(file('Band/_Unassigned/Old/v.rpp').existsSync(), isTrue);
-    expect((await m.check(hash)).isEmpty, isTrue);
+    expect(await noLoss(m), isTrue);
   });
 
   test('merges a title moved onto an existing title', () async {
@@ -256,7 +268,7 @@ void main() {
     // What is left of the source is kept in the migration folder.
     expect(await storage.stat('Song'), isNull);
     expect(file('${m.folder}/merged/Song/.node.json').existsSync(), isTrue);
-    expect((await m.check(hash)).isEmpty, isTrue);
+    expect(await noLoss(m), isTrue);
   });
 
   test('merges intermediate folders recursively', () async {
@@ -281,7 +293,7 @@ void main() {
     expect(report.items[ReportKind.titleStatusDropped], isEmpty);
     expect(file('Band/Album/Two/two.rpp').existsSync(), isTrue);
     expect(file('${m.folder}/merged/Band 2/.node.json').existsSync(), isTrue);
-    expect((await m.check(hash)).isEmpty, isTrue);
+    expect(await noLoss(m), isTrue);
   });
 
   test('does not merge a folder into itself or its parent', () async {
@@ -401,7 +413,7 @@ void main() {
       expect(file('$song/.trash/bass.wav').readAsStringSync(), 'bass');
       expect(file('$song/Media/bass (2).wav').readAsStringSync(), 'other bass');
       expect(file('${m.folder}/originals/$song/a.rpp').existsSync(), isTrue);
-      expect((await m.check(hash)).isEmpty, isTrue);
+      expect(await noLoss(m), isTrue);
 
       // Normalized: nothing left to do.
       final again = await applyFixes(m, const [NormalizeMedia(song)]);
@@ -456,7 +468,7 @@ void main() {
       // Next to its media in the pool.
       expect(media('$song/Media/sub.rpp'), 'v.wav');
       expect(file('$song/Media/v.wav').readAsStringSync(), 'voice');
-      expect((await m.check(hash)).isEmpty, isTrue);
+      expect(await noLoss(m), isTrue);
     });
 
     test('non-regression: every fixture keeps its media', () async {
@@ -501,7 +513,7 @@ void main() {
           expect(file(path).existsSync(), isTrue, reason: '$name: $ref');
         }
       }
-      expect((await m.check(hash)).isEmpty, isTrue);
+      expect(await noLoss(m), isTrue);
     });
 
     test('blocks a title whose media another title uses', () async {
@@ -554,7 +566,7 @@ void main() {
       ], usage: await usage());
       expect(done.items[ReportKind.mediaUsedElsewhere], isNull);
       expect(media('$song/a.rpp'), r'Media\x.wav');
-      expect((await m.check(hash)).isEmpty, isTrue);
+      expect(await noLoss(m), isTrue);
     });
 
     test('leaves the media-paths fixture intact and reports it', () async {
@@ -617,7 +629,7 @@ void main() {
       // Other files (Assets, #70) and renders stay.
       expect(file('$song/Bob/notes.txt').existsSync(), isTrue);
       expect(file('$song/Renders/mix.wav').existsSync(), isTrue);
-      expect((await m.check(hash)).isEmpty, isTrue);
+      expect(await noLoss(m), isTrue);
     });
 
     test('keeps the media of the projects not lifted yet', () async {
