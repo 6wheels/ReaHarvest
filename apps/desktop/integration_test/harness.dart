@@ -140,18 +140,20 @@ class Harness {
   }
 
   /// Adds the local library [name] at [folder] (in the throwaway folder),
-  /// through the service, and waits for its scan.
+  /// with its [knownValues], through the service, and waits for its scan.
   Future<void> addLibrary(
     WidgetTester tester,
     String name,
     Layout? layout, {
     String? folder,
+    List<KnownValue> knownValues = const [],
   }) async {
     final before = tasks.length;
     final adding = service.addLocal(
       folder: folder ?? p.join(root.path, name),
       displayName: name,
       layout: layout,
+      knownValues: knownValues,
     );
     await waitFor(
       tester,
