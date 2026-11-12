@@ -71,7 +71,7 @@ Core hardening, before the remaining features (listed in the order of the steps 
 - [x] #90 one module for library paths and media references
 - [x] #91 one reader and writer for project files, one encoding policy (not valid UTF-8: read as Windows-1252, written back as read)
 - [ ] #104 recovery screen when `settings.json` is unreadable or newer (independent)
-- [ ] #92 Migration split into inventory, append-only journal and guarded storage
+- [x] #92 Migration split into inventory, append-only journal and guarded storage
 - [ ] #93 batch of fixes run outside the app, in one isolate
 - [ ] #114 only `versionId` in the `.RPP`; label and owner in `.node.json` in every mode until the collab store exists (M3); default label of the versions adopted in batch (former #98); no migration of existing data
 - [ ] #97 scan creating no folder, never writing in a repository
