@@ -39,7 +39,7 @@ final class Migration {
   ContentHash inventoryHash(ContentHash hash) => (path) async {
     if (!isProjectFile(path)) {
       final origin = journal.origin(path);
-      final entry = origin == null ? null : inventory.files[origin];
+      final entry = origin == null ? null : inventory.entryOf(origin);
       if (entry != null) {
         final found = await _storage.stat(path);
         if (found != null &&

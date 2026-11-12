@@ -29,10 +29,10 @@ final class MemoryStorage implements RepositoryStorage {
   /// Paths read, in order (when their reading starts).
   final reads = <String>[];
 
-  /// Largest number of files read at the same time.
-  int maxOpenReads = 0;
+  /// Largest number of project files read at the same time.
+  int maxOpenProjectReads = 0;
 
-  var _openReads = 0;
+  var _openProjectReads = 0;
 
   /// Number (from 1) of the change that throws an [InjectedFailure]
   /// instead of being made; null for none.
@@ -124,11 +124,14 @@ final class MemoryStorage implements RepositoryStorage {
     final f = files[path];
     if (f == null) throw StateError('No file $path');
     reads.add(path);
-    if (++_openReads > maxOpenReads) maxOpenReads = _openReads;
+    final project = path.toLowerCase().endsWith('.rpp');
+    if (project && ++_openProjectReads > maxOpenProjectReads) {
+      maxOpenProjectReads = _openProjectReads;
+    }
     try {
       yield f.bytes;
     } finally {
-      _openReads--;
+      if (project) _openProjectReads--;
     }
   }
 

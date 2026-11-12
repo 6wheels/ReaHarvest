@@ -104,6 +104,10 @@ final class Inventory {
   /// Inventoried files, by library path.
   Map<String, InventoryEntry> get files => Map.unmodifiable(_files);
 
+  /// Inventoried file [path], or null (no copy of the map, unlike
+  /// [files]).
+  InventoryEntry? entryOf(String path) => _files[path];
+
   /// Whether the inventory is complete: changes are allowed from then on.
   bool get isComplete => _complete;
 

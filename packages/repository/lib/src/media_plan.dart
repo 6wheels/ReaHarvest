@@ -90,10 +90,6 @@ final class TitleFacts {
 String relativeTo(String dir, String path) =>
     dir.isEmpty ? path : path.substring(dir.length + 1);
 
-/// Whether [name] is a reserved folder of a title (`Media`, `.trash`…).
-bool isReservedTitleFolder(String name) =>
-    reservedTitleFolders.contains(name.toLowerCase());
-
 /// What a moved or copied file is, for the report.
 enum FileRole { media, proxy, project }
 
@@ -127,13 +123,17 @@ final class CopyFile extends MediaOperation {
 }
 
 /// Moves [from], identical to [poolFile], to [to] in the trash of the
-/// title (never deleted).
+/// title (never deleted). [sameAs] is where the content of [poolFile] is
+/// before the plan ([poolFile] itself, or the file an earlier operation
+/// brings there): both are compared byte by byte before any change.
 final class TrashDuplicate extends MediaOperation {
-  const TrashDuplicate(this.from, this.to, this.poolFile);
+  const TrashDuplicate(this.from, this.to, this.poolFile, {String? sameAs})
+    : sameAs = sameAs ?? poolFile;
 
   final String from;
   final String to;
   final String poolFile;
+  final String sameAs;
 
   @override
   String toString() => 'trash $from -> $to (same as $poolFile)';
@@ -288,14 +288,16 @@ final class _Planner {
   final moved = <String>{};
   final trashed = <String>{};
 
-  /// Files of the pool as it fills, by lowercase name: size and content key.
-  late final poolFiles = <String, ({int size, String? key})>{
+  /// Files of the pool as it fills, by lowercase name: size, content key
+  /// and path of the content before the plan.
+  late final poolFiles = <String, ({int size, String? key, String source})>{
     for (final e in facts.entries)
       if (!e.isDirectory &&
           parentOf(e.path).toLowerCase() == pool.toLowerCase())
         p.posix.basename(e.path).toLowerCase(): (
           size: e.size,
           key: facts.contentKeys[e.path.toLowerCase()],
+          source: e.path,
         ),
   };
 
@@ -321,31 +323,13 @@ final class _Planner {
   String get _trash => joinPath(titleDir, trashFolderName);
 
   MediaPlan plan() {
-    // Files that would move from under the projects of another title.
-    for (final MapEntry(key: file, value: projects) in usage.entries) {
-      final others = projects
-          .where((project) => !isWithin(project, titleDir))
-          .toList();
-      if (others.isNotEmpty &&
-          isWithin(file, titleDir) &&
-          !isWithin(file, pool) &&
-          !relativeTo(titleDir, file).split('/').any(isExcludedFolder)) {
-        _block(
-          ReportKind.mediaUsedElsewhere,
-          ReportItem(file, others.join('\n')),
-        );
-      }
+    for (final item in usedElsewhere(titleDir, usage)) {
+      _block(ReportKind.mediaUsedElsewhere, item);
     }
     if (blockedItems.isEmpty && facts.unreadable.isNotEmpty) {
       _block(
         ReportKind.fixFailed,
-        ReportItem(
-          titleDir,
-          [
-            for (final MapEntry(:key, :value) in facts.unreadable.entries)
-              '$key: $value',
-          ].join('\n'),
-        ),
+        ReportItem(titleDir, '${TitleUnreadable(titleDir, facts.unreadable)}'),
       );
     }
     if (blockedItems.isNotEmpty) {
@@ -356,7 +340,9 @@ final class _Planner {
         case ProjectRole.title:
           projects[path] = project;
         case ProjectRole.notLifted:
-          // Not lifted yet: its files stay where it expects them.
+          // Not lifted yet: it stays, and its files stay where it expects
+          // them (copied if a project of the title uses them).
+          kept.add(path.toLowerCase());
           for (final ref in project.references) {
             if (resolveReference(parentOf(path), ref) case final file?) {
               kept.add(file.toLowerCase());
@@ -369,8 +355,12 @@ final class _Planner {
     for (final MapEntry(key: path, value: project) in projects.entries) {
       _resolve(path, project);
     }
+    // A blocked project is left intact, its files too; used as a
+    // subproject, it is copied.
     for (final project in blocked) {
-      kept.addAll(files[project]!.keys);
+      kept
+        ..add(project.toLowerCase())
+        ..addAll(files[project]!.keys);
     }
     for (final MapEntry(key: project, value: refs) in files.entries) {
       if (blocked.contains(project)) continue;
@@ -445,13 +435,15 @@ final class _Planner {
   /// title's trash).
   void _bring(String file, {required bool keep}) {
     final key = file.toLowerCase();
-    final (target, exists) = _poolTarget(file);
+    final (target, sameAs) = _poolTarget(file);
     targets[key] = target;
     final move = (isWithin(file, titleDir) || movable.contains(key)) && !keep;
-    if (exists) {
+    if (sameAs != null) {
       if (!move) return;
       final name = _free(trashNames, p.posix.basename(file));
-      operations.add(TrashDuplicate(file, joinPath(_trash, name), target));
+      operations.add(
+        TrashDuplicate(file, joinPath(_trash, name), target, sameAs: sameAs),
+      );
       trashed.add(key);
       return;
     }
@@ -486,8 +478,9 @@ final class _Planner {
   }
 
   /// Pool path for [file]: its name, reused when the pool file is identical
-  /// (second value true), suffixed when another file has the name.
-  (String, bool) _poolTarget(String file) {
+  /// (second value: where its content is before the plan), suffixed when
+  /// another file has the name.
+  (String, String?) _poolTarget(String file) {
     final name = p.posix.basename(file);
     final stem = p.posix.basenameWithoutExtension(name);
     final ext = p.posix.extension(name);
@@ -496,9 +489,9 @@ final class _Planner {
     for (var i = 1; ; i++) {
       final candidate = i == 1 ? name : '$stem ($i)$ext';
       final existing = poolFiles[candidate.toLowerCase()];
-      if (existing == null) return (joinPath(pool, candidate), false);
+      if (existing == null) return (joinPath(pool, candidate), null);
       if (key != null && existing.key == key && existing.size == size) {
-        return (joinPath(pool, candidate), true);
+        return (joinPath(pool, candidate), existing.source);
       }
     }
   }
@@ -508,6 +501,7 @@ final class _Planner {
       poolFiles[p.posix.basename(target).toLowerCase()] = (
         size: _sizeOf(source)!,
         key: facts.contentKeys[source.toLowerCase()],
+        source: source,
       );
 
   int? _sizeOf(String path) =>
@@ -562,6 +556,46 @@ final class _Planner {
 
   void _block(ReportKind kind, ReportItem item) =>
       blockedItems.putIfAbsent(kind, () => []).add(item);
+}
+
+/// A project of the title [titleDir] cannot be read: its media are
+/// unknown, so nothing can be changed in the title.
+final class TitleUnreadable implements Exception {
+  const TitleUnreadable(this.titleDir, this.projects);
+
+  final String titleDir;
+
+  /// Unreadable projects, by path, with the reason.
+  final Map<String, String> projects;
+
+  @override
+  String toString() => [
+    'Project unreadable, nothing can be changed in this title:',
+    for (final MapEntry(:key, :value) in projects.entries) '$key ($value)',
+  ].join(' ');
+}
+
+/// Files of the title [titleDir] outside its pool that projects of other
+/// titles reference, by [usage] (`mediaUsage`), each with those projects:
+/// normalizing the title would move them from under these projects.
+List<ReportItem> usedElsewhere(
+  String titleDir,
+  Map<String, List<String>> usage,
+) {
+  final pool = joinPath(titleDir, mediaFolderName);
+  final items = <ReportItem>[];
+  for (final MapEntry(key: file, value: projects) in usage.entries) {
+    final others = projects
+        .where((project) => !isWithin(project, titleDir))
+        .toList();
+    if (others.isNotEmpty &&
+        isWithin(file, titleDir) &&
+        !isWithin(file, pool) &&
+        !relativeTo(titleDir, file).split('/').any(isExcludedFolder)) {
+      items.add(ReportItem(file, others.join('\n')));
+    }
+  }
+  return items;
 }
 
 /// Facts of a guided move ("To sort", SPEC §5.2), gathered by reads only.

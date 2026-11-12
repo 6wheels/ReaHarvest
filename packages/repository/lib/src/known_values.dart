@@ -23,7 +23,7 @@ Future<List<KnownValue>> prefillKnownValues(
         folders.length < layout.levels.length ||
         segments.first == collabFolderName ||
         folders.any(isExcludedFolder) ||
-        folders.take(layout.levels.length).any(_isReserved)) {
+        folders.take(layout.levels.length).any(isReservedTitleFolder)) {
       continue;
     }
     paths.add(folders.take(intermediate).join('/'));
@@ -38,6 +38,3 @@ Future<List<KnownValue>> prefillKnownValues(
 /// [prefillKnownValues] of the folder [root], in a background isolate.
 Future<List<KnownValue>> prefillKnownValuesIn(String root, Layout layout) =>
     Isolate.run(() => prefillKnownValues(MountedFolderStorage(root), layout));
-
-bool _isReserved(String name) =>
-    reservedTitleFolders.contains(name.toLowerCase());

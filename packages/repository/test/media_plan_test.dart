@@ -372,9 +372,55 @@ void main() {
       expect(plan.operations, isEmpty);
       expect(plan.blocked.items, {
         ReportKind.fixFailed: [
-          const ReportItem(song, '$song/bad.rpp: Not a project'),
+          const ReportItem(
+            song,
+            'Project unreadable, nothing can be changed in this title: '
+            '$song/bad.rpp (Not a project)',
+          ),
         ],
       });
+    });
+
+    test('7. a blocked subproject is copied, never moved', () {
+      final plan = planNormalization(
+        facts(
+          files: {'$song/audio/y.wav': 'y'},
+          projects: {
+            '$song/main.rpp': const ProjectFacts([r'.\sub.rpp'], ['Media']),
+            '$song/sub.rpp': const ProjectFacts(
+              [r'audio\y.wav', r'gone\x.wav'],
+              ['Media'],
+            ),
+          },
+        ),
+      );
+
+      expect(ops(plan), [
+        'copy $song/sub.rpp -> $song/Media/sub.rpp',
+        r'rewrite Band/Album/Song/Media/sub.rpp, audio\y.wav -> ..\audio\y.wav, '
+            r'gone\x.wav -> ..\gone\x.wav',
+        r'rewrite Band/Album/Song/main.rpp, .\sub.rpp -> Media\sub.rpp',
+      ]);
+      expect(plan.blocked.items.keys, [ReportKind.missingMedia]);
+    });
+
+    test('8. a subproject not lifted yet is copied, never moved', () {
+      final plan = planNormalization(
+        facts(
+          files: {'$song/Alice/Media/y.wav': 'y'},
+          projects: {
+            '$song/main.rpp': const ProjectFacts([r'Alice\sub.rpp'], ['Media']),
+            '$song/Alice/sub.rpp': const ProjectFacts([r'Media\y.wav']),
+          },
+        ),
+      );
+
+      expect(ops(plan), [
+        'copy $song/Alice/sub.rpp -> $song/Media/sub.rpp',
+        r'rewrite Band/Album/Song/Media/sub.rpp, Media\y.wav -> '
+            r'..\Alice\Media\y.wav',
+        r'rewrite Band/Album/Song/main.rpp, Alice\sub.rpp -> Media\sub.rpp',
+      ]);
     });
 
     test('13. guided move: references kept, unshared media movable', () {
@@ -445,7 +491,7 @@ void main() {
       ]);
       expect(gathered.projects['$song/a.rpp']!.recordPath, ['audio-files', '']);
       expect(storage.reads, [...gathered.projects.keys]);
-      expect(storage.maxOpenReads, 1);
+      expect(storage.maxOpenProjectReads, 1);
       expect(gathered.files.keys, [
         '$song/audio/x.wav',
         '$song/sub.rpp',
@@ -472,17 +518,30 @@ void main() {
       expect(gathered.files['$other/Media/pad.wav']!.size, 3);
     });
 
-    test('records an unreadable project and goes on', () async {
+    test('stops at an unreadable project', () async {
       storage
         ..put('$song/a.rpp', rpp([r'audio\x.wav']))
         ..put('$song/bad.rpp', 'not a project')
+        ..put('$song/c.rpp', rpp([]))
         ..put('$song/audio/x.wav', 'x');
 
       final gathered = await gatherTitle(storage, song, hash: hash);
 
       expect(gathered.unreadable.keys, ['$song/bad.rpp']);
       expect(gathered.projects.keys, ['$song/a.rpp']);
+      expect(storage.reads, ['$song/a.rpp', '$song/bad.rpp']);
       expect(storage.log, isEmpty);
+    });
+
+    test('stops at an unreadable subproject', () async {
+      storage
+        ..put('$song/a.rpp', rpp([r'..\Other\bad.rpp', r'audio\x.wav']))
+        ..put('$other/bad.rpp', 'not a project')
+        ..put('$song/audio/x.wav', 'x');
+
+      final gathered = await gatherTitle(storage, song, hash: hash);
+
+      expect(gathered.unreadable.keys, ['$other/bad.rpp']);
     });
 
     test('a guided move reads its project, then the others', () async {
@@ -497,7 +556,7 @@ void main() {
       expect(move.facts.references, [r'audio\kick.wav']);
       expect(move.shared, {'band/audio/kick.wav', 'band/audio/hat.wav'});
       expect(move.titleNames, {'a.rpp'});
-      expect(storage.maxOpenReads, 1);
+      expect(storage.maxOpenProjectReads, 1);
       // A new title has no entries yet.
       final fresh = await gatherMove(storage, 'band/a.rpp', 'band/new');
       expect(fresh.titleNames, isEmpty);
@@ -556,13 +615,16 @@ void main() {
         const ReportItem('$song/b.rpp'),
         const ReportItem('$song/Media/sub.rpp'),
       ]);
-      // Projects read once each; the proxy and media moved, not read.
+      // The duplicate compared byte by byte first, then the projects read
+      // once each; the proxy and media moved, not read.
       expect(storage.reads, [
+        '$song/old/bass.wav',
+        '$song/Media/bass.wav',
         '$song/a.rpp',
         '$song/b.rpp',
         '$song/Media/sub.rpp',
       ]);
-      expect(storage.maxOpenReads, 1);
+      expect(storage.maxOpenProjectReads, 1);
       expect(RppProject.parse(storage.text('$song/b.rpp')).mediaFiles, [
         r'Media\x.wav',
         r'Media\bass.wav',
@@ -626,6 +688,88 @@ void main() {
       ]);
     });
 
+    test('a duplicate that differs stops the plan before any change', () {
+      storage
+        ..put('$song/x/bass.wav', 'bass')
+        ..put('$song/y/bass.wav', 'BASS')
+        ..put('$song/Media/bass.wav', 'bass');
+      // As if a stale inventory gave them the same hash.
+      const plan = (
+        operations: <MediaOperation>[
+          MoveFile('$song/x/bass.wav', '$song/Media/bass (2).wav'),
+          TrashDuplicate(
+            '$song/y/bass.wav',
+            '$song/.trash/bass.wav',
+            '$song/Media/bass (2).wav',
+            sameAs: '$song/x/bass.wav',
+          ),
+        ],
+        blocked: Report(),
+      );
+
+      expect(
+        applyPlan(storage, plan),
+        throwsA(
+          isA<ContentMismatch>().having(
+            (e) => '$e',
+            'message',
+            contains('nothing was changed'),
+          ),
+        ),
+      );
+      expect(storage.log, isEmpty);
+    });
+
+    test('compares contents of any size and chunking', () async {
+      storage
+        ..put('a', 'same')
+        ..put('b', 'same')
+        ..put('c', 'diff')
+        ..put('d', 'longer');
+      expect(await sameContent(storage, 'a', 'b'), isTrue);
+      expect(await sameContent(storage, 'a', 'c'), isFalse);
+      expect(await sameContent(storage, 'a', 'd'), isFalse);
+      expect(await sameContent(storage, 'a', 'none'), isFalse);
+    });
+
+    test('an unreadable title fails, journaled, nothing changed', () async {
+      title();
+      storage.put('$song/bad.rpp', 'not a project');
+      final m = Migration.start(storage);
+      await m.inventory.take(hash);
+      final changes = storage.changes;
+
+      final report = await applyFixes(m, const [
+        NormalizeMedia(song),
+      ], hash: hash);
+
+      expect(
+        report.items[ReportKind.fixFailed]!.single.detail,
+        contains(
+          'Project unreadable, nothing can be changed in this title: '
+          '$song/bad.rpp',
+        ),
+      );
+      // Only the start and end lines of the fix, the end not ok.
+      expect(storage.changes, changes + 2);
+      expect(m.journal.unfinishedFix, isNotNull);
+    });
+
+    test('a title used elsewhere is reported without reading', () async {
+      title();
+
+      final report = await normalizeMedia(
+        storage,
+        song,
+        usage: {
+          '$song/audio/x.wav': ['$other/v.rpp'],
+        },
+      );
+
+      expect(report.items.keys, [ReportKind.mediaUsedElsewhere]);
+      expect(storage.reads, isEmpty);
+    });
+
     test('a project rewrite fails without writing it', () async {
       storage.put('$song/a.rpp', rpp([r'audio\x.wav']));
       const plan = (
@@ -671,7 +815,7 @@ void main() {
       final moved = RppProject.parse(storage.text('band/song/loose.rpp'));
       expect(moved.mediaFiles, [r'Media\kick.wav']);
       expect(moved.recordPath, 'Media');
-      expect(storage.maxOpenReads, 1);
+      expect(storage.maxOpenProjectReads, 1);
     });
   });
 
@@ -700,6 +844,15 @@ void main() {
           'RECORD_PATH Media ',
     ]);
     expect(plans['Band/None']!.blocked.items.keys, [ReportKind.fixFailed]);
+    // A title whose media another title uses is not read.
+    final blocked = await planNormalizationOn(
+      root.path,
+      const [song],
+      usage: {
+        '$song/audio/bass.wav': ['$other/v.rpp'],
+      },
+    );
+    expect(blocked[song]!.blocked.items.keys, [ReportKind.mediaUsedElsewhere]);
     // Nothing written.
     expect(File('${root.path}/$song/audio/bass.wav').existsSync(), isTrue);
   });
