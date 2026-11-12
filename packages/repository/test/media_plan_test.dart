@@ -129,6 +129,8 @@ void main() {
       expect(ops(plan), [
         'trash $song/old/bass.wav -> $song/.trash/bass (2).wav '
             '(same as $song/Media/bass.wav)',
+        // Outside the title: left in place, the pool file used instead.
+        'reuse $song/Media/bass.wav for $other/Media/bass.wav',
         r'rewrite Band/Album/Song/a.rpp, old\bass.wav -> Media\bass.wav, '
             r'..\Other\Media\bass.wav -> Media\bass.wav',
       ]);
@@ -720,6 +722,35 @@ void main() {
       expect(storage.log, isEmpty);
     });
 
+    test('a reused pool file that differs stops the plan', () {
+      storage
+        ..put('$other/Media/bass.wav', 'bass')
+        ..put('$song/Media/bass.wav', 'BASS');
+      const plan = (
+        operations: <MediaOperation>[
+          ReuseDuplicate('$other/Media/bass.wav', '$song/Media/bass.wav'),
+        ],
+        blocked: Report(),
+      );
+
+      expect(applyPlan(storage, plan), throwsA(isA<ContentMismatch>()));
+    });
+
+    test('a reused pool file changes nothing', () async {
+      storage
+        ..put('$other/Media/bass.wav', 'bass')
+        ..put('$song/Media/bass.wav', 'bass');
+      const plan = (
+        operations: <MediaOperation>[
+          ReuseDuplicate('$other/Media/bass.wav', '$song/Media/bass.wav'),
+        ],
+        blocked: Report(),
+      );
+
+      expect((await applyPlan(storage, plan)).isEmpty, isTrue);
+      expect(storage.log, isEmpty);
+    });
+
     test('compares contents of any size and chunking', () async {
       storage
         ..put('a', 'same')
@@ -835,7 +866,7 @@ void main() {
     final plans = await planNormalizationOn(root.path, const [
       song,
       'Band/None',
-    ], usage: const {});
+    ], usage: const {}).plans;
 
     expect(ops(plans[song]!), [
       'trash $song/audio/bass.wav -> $song/.trash/bass.wav '
@@ -851,9 +882,39 @@ void main() {
       usage: {
         '$song/audio/bass.wav': ['$other/v.rpp'],
       },
-    );
+    ).plans;
     expect(blocked[song]!.blocked.items.keys, [ReportKind.mediaUsedElsewhere]);
     // Nothing written.
     expect(File('${root.path}/$song/audio/bass.wav').existsSync(), isTrue);
+
+    // An error of the isolate fails the plans.
+    final broken = Directory.systemTemp.createTempSync('reaharvest_broken_');
+    addTearDown(() => broken.deleteSync(recursive: true));
+    File('${broken.path}/.migration').writeAsStringSync('not a folder');
+    await expectLater(
+      planNormalizationOn(broken.path, const [song], usage: const {}).plans,
+      throwsStateError,
+    );
+
+    // Cancelled: the isolate is stopped, the plans fail.
+    final cancelled = planNormalizationOn(root.path, const [
+      song,
+    ], usage: const {});
+    final ended = cancelled.cancel();
+    await expectLater(cancelled.plans, throwsA(isA<PreviewCancelled>()));
+    await cancelled.cancel();
+    await ended;
+    // Cancelled once the isolate runs.
+    final later = planNormalizationOn(root.path, const [song], usage: const {});
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    // Either done before the cancellation, or cancelled; then the isolate
+    // has ended and closed its files (the folder can be deleted).
+    final stopped = later.cancel();
+    try {
+      await later.plans;
+    } on PreviewCancelled {
+      // Expected when still running.
+    }
+    await stopped;
   });
 }

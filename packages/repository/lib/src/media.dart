@@ -17,14 +17,9 @@ import 'scaffold.dart';
 import 'scanner.dart' show ScanResult;
 
 /// Normalizes the media of the title [titleDir] (SPEC §5.8 step 4, #69):
-/// gathers its facts ([gatherTitle], hashing with [hash], by default
-/// [contentHasher]), plans the operations ([planNormalization], whose rules
-/// it documents) and applies them ([applyPlan]). Files of [movable]
-/// (lowercase paths outside the title) may be moved rather than copied.
-///
-/// A title whose media another title uses ([usedElsewhere]) is reported
-/// before anything is read. Throws [TitleUnreadable], before any change,
-/// if one of its projects cannot be read.
+/// plans it ([planTitle]) and applies the plan ([applyPlan]). Throws
+/// [TitleUnreadable], before any change, if one of its projects cannot be
+/// read.
 Future<Report> normalizeMedia(
   RepositoryStorage storage,
   String titleDir, {
@@ -32,22 +27,41 @@ Future<Report> normalizeMedia(
   Set<String> movable = const {},
   ContentHash? hash,
 }) async {
-  final elsewhere = usedElsewhere(titleDir, usage);
-  if (elsewhere.isNotEmpty) {
-    return Report({ReportKind.mediaUsedElsewhere: elsewhere});
-  }
-  final facts = await gatherTitle(
+  final plan = await planTitle(
     storage,
     titleDir,
+    usage: usage,
+    movable: movable,
     hash: hash ?? contentHasher(storage),
   );
-  if (facts.unreadable.isNotEmpty) {
-    throw TitleUnreadable(titleDir, facts.unreadable);
+  // Only an unreadable project fails a plan.
+  if (plan.blocked.items[ReportKind.fixFailed] case [final failed, ...]) {
+    throw TitleUnreadable(failed.detail ?? failed.path);
   }
-  return applyPlan(
-    storage,
-    planNormalization(facts, usage: usage, movable: movable),
-  );
+  return applyPlan(storage, plan);
+}
+
+/// Plan of the normalization of the title [titleDir]: its facts gathered
+/// ([gatherTitle], hashing with [hash]), then the operations planned
+/// ([planNormalization], whose rules it documents; files of [movable],
+/// lowercase paths outside the title, may be moved rather than copied). A
+/// title whose media another title uses ([usedElsewhere]) is not read.
+Future<MediaPlan> planTitle(
+  RepositoryStorage storage,
+  String titleDir, {
+  required ContentHash hash,
+  Map<String, List<String>> usage = const {},
+  Set<String> movable = const {},
+}) async {
+  final elsewhere = usedElsewhere(titleDir, usage);
+  if (elsewhere.isNotEmpty) {
+    return (
+      operations: const <MediaOperation>[],
+      blocked: Report({ReportKind.mediaUsedElsewhere: elsewhere}),
+    );
+  }
+  final facts = await gatherTitle(storage, titleDir, hash: hash);
+  return planNormalization(facts, usage: usage, movable: movable);
 }
 
 /// Projects referencing each media of the library, by file path, from the
@@ -272,15 +286,20 @@ Future<ProjectFacts> _readFacts(RepositoryStorage storage, String path) async {
 /// is made): each project is read, patched and written one at a time.
 /// Returns the report: what [plan] leaves intact, then what was done.
 ///
-/// Before any change, every duplicate to trash is compared byte by byte
-/// with the pool file it stands for: if one differs (a hash taken from a
-/// stale inventory), throws [ContentMismatch] and changes nothing.
+/// Before any change, every duplicate to trash or to reuse is compared
+/// byte by byte with the pool file it stands for: if one differs (a hash
+/// taken from a stale inventory), throws [ContentMismatch] and changes
+/// nothing.
 /// Otherwise stops at the first error, which it throws: the changes made
 /// so far stay (their undo is the migration's).
 Future<Report> applyPlan(RepositoryStorage storage, MediaPlan plan) async {
-  for (final op in plan.operations.whereType<TrashDuplicate>()) {
-    if (!await sameContent(storage, op.from, op.sameAs)) {
-      throw ContentMismatch(op.from, op.sameAs);
+  for (final op in plan.operations) {
+    if (op
+        case TrashDuplicate(:final from, :final sameAs) ||
+            ReuseDuplicate(:final from, :final sameAs)) {
+      if (!await sameContent(storage, from, sameAs)) {
+        throw ContentMismatch(from, sameAs);
+      }
     }
   }
   final items = <ReportKind, List<ReportItem>>{};
@@ -306,6 +325,8 @@ Future<Report> applyPlan(RepositoryStorage storage, MediaPlan plan) async {
       case TrashDuplicate(:final from, :final to, :final poolFile):
         await storage.move(from, to);
         add(ReportKind.mediaTrashed, ReportItem(to, poolFile));
+      case ReuseDuplicate():
+        break;
       case RewriteProject(:final path, :final reported):
         if (await _rewrite(storage, op) && reported) {
           add(ReportKind.mediaNormalized, ReportItem(path));
@@ -376,25 +397,176 @@ Future<bool> _rewrite(RepositoryStorage storage, RewriteProject op) async {
   return true;
 }
 
+/// Normalization plans being computed ([planNormalizationOn]): the
+/// [plans], by title, and [cancel], which stops the computation: [plans]
+/// fails at once with [PreviewCancelled], and the future [cancel] returns
+/// completes once the isolate has closed its files and ended.
+typedef PlanPreview = ({
+  Future<Map<String, MediaPlan>> plans,
+  Future<void> Function() cancel,
+});
+
+/// Thrown by the [PlanPreview.plans] of a cancelled preview.
+final class PreviewCancelled implements Exception {
+  const PreviewCancelled();
+}
+
 /// Normalization plans of the [titles] of the library folder [root] (dry
-/// run of the fix, SPEC §5.8 step 4), by title, computed in one isolate
-/// (nothing is written). Hashes come from the latest inventory for the
-/// files unchanged since. A title whose media another title uses is not
-/// read. A title that cannot be gathered gets a plan with no operation and
-/// its error as [ReportKind.fixFailed].
-Future<Map<String, MediaPlan>> planNormalizationOn(
+/// run of the fix, SPEC §5.8 step 4), by title ([planTitle]), computed in
+/// one isolate (nothing is written). Hashes come from the latest inventory
+/// for the files unchanged since. A title that cannot be gathered gets a
+/// plan with no operation and its error as [ReportKind.fixFailed].
+///
+/// The isolate is not killed on [PlanPreview.cancel] (on Windows, the
+/// files it reads would stay open): it stops reading at the next chunk,
+/// closing its files.
+PlanPreview planNormalizationOn(
   String root,
   List<String> titles, {
   required Map<String, List<String>> usage,
-}) => Isolate.run(() async {
-  final storage = MountedFolderStorage(root);
-  final hash = contentHasher(storage);
-  final known = (await Migration.latest(storage))?.inventoryHash(hash) ?? hash;
-  return {
-    for (final title in titles)
-      title: await _planOrError(storage, title, known, usage),
-  };
-});
+}) {
+  final port = ReceivePort();
+  final plans = Completer<Map<String, MediaPlan>>();
+  final ended = Completer<void>();
+  SendPort? control;
+  var cancelled = false;
+  void end() {
+    port.close();
+    if (!ended.isCompleted) ended.complete();
+  }
+
+  port.listen((message) {
+    switch (message) {
+      case final SendPort port:
+        control = port;
+        if (cancelled) port.send(null);
+      case final Map<String, MediaPlan> result:
+        if (!plans.isCompleted) plans.complete(result);
+      case null:
+        // The isolate ended.
+        if (!plans.isCompleted) {
+          // coverage:ignore-start
+          // Cannot happen: the isolate sends its plans or an error first.
+          plans.completeError(StateError('Preview ended without plans'));
+          // coverage:ignore-end
+        }
+        end();
+      default:
+        // An uncaught error of the isolate: [error, stack].
+        if (!plans.isCompleted) plans.completeError(StateError('$message'));
+    }
+  });
+  Isolate.spawn(
+    _preview,
+    (port.sendPort, root, titles, usage),
+    onError: port.sendPort,
+    onExit: port.sendPort,
+  ).catchError((Object error) {
+    // coverage:ignore-start
+    // The isolate could not start (out of resources).
+    if (!plans.isCompleted) plans.completeError(error);
+    end();
+    return Isolate.current;
+    // coverage:ignore-end
+  });
+  return (
+    plans: plans.future,
+    cancel: () {
+      if (!cancelled) {
+        cancelled = true;
+        control?.send(null);
+        if (!plans.isCompleted) plans.completeError(const PreviewCancelled());
+      }
+      return ended.future;
+    },
+  );
+}
+
+/// Entry point of the isolate of [planNormalizationOn].
+Future<void> _preview(
+  (SendPort, String, List<String>, Map<String, List<String>>) args,
+) async {
+  final (port, root, titles, usage) = args;
+  final storage = _CancellableStorage(MountedFolderStorage(root));
+  final control = ReceivePort();
+  control.listen((_) => storage.cancelled = true);
+  port.send(control.sendPort);
+  try {
+    final hash = contentHasher(storage);
+    final known =
+        (await Migration.latest(storage))?.inventoryHash(hash) ?? hash;
+    port.send({
+      for (final title in titles)
+        title: await _planOrError(storage, title, known, usage),
+    });
+  } on PreviewCancelled {
+    // Nothing more to send.
+  } finally {
+    control.close();
+  }
+}
+
+/// Read-only access to [_inner] that throws [PreviewCancelled] once
+/// [cancelled], also between two chunks of a file being read (its file is
+/// then closed).
+final class _CancellableStorage implements RepositoryStorage {
+  _CancellableStorage(this._inner);
+
+  final RepositoryStorage _inner;
+  var cancelled = false;
+
+  void _check() {
+    if (cancelled) throw const PreviewCancelled();
+  }
+
+  @override
+  Future<List<StorageEntry>> list(String dir, {bool recursive = false}) {
+    _check();
+    return _inner.list(dir, recursive: recursive);
+  }
+
+  @override
+  Future<StorageEntry?> stat(String path) {
+    _check();
+    return _inner.stat(path);
+  }
+
+  @override
+  Stream<List<int>> read(String path) async* {
+    _check();
+    await for (final chunk in _inner.read(path)) {
+      _check();
+      yield chunk;
+    }
+  }
+
+  // coverage:ignore-start
+  // Never called: the preview only reads.
+  @override
+  Future<void> write(String path, Stream<List<int>> content) =>
+      throw UnsupportedError('Preview: no write');
+
+  @override
+  Future<void> append(String path, List<int> bytes) =>
+      throw UnsupportedError('Preview: no write');
+
+  @override
+  Future<void> move(String from, String to) =>
+      throw UnsupportedError('Preview: no write');
+
+  @override
+  Future<void> createDirectory(String path) =>
+      throw UnsupportedError('Preview: no write');
+
+  @override
+  Future<void> delete(String path) =>
+      throw UnsupportedError('Preview: no write');
+
+  @override
+  Future<void> setModified(String path, DateTime modified) =>
+      throw UnsupportedError('Preview: no write');
+  // coverage:ignore-end
+}
 
 Future<MediaPlan> _planOrError(
   RepositoryStorage storage,
@@ -402,16 +574,10 @@ Future<MediaPlan> _planOrError(
   ContentHash hash,
   Map<String, List<String>> usage,
 ) async {
-  final elsewhere = usedElsewhere(title, usage);
-  if (elsewhere.isNotEmpty) {
-    return (
-      operations: const <MediaOperation>[],
-      blocked: Report({ReportKind.mediaUsedElsewhere: elsewhere}),
-    );
-  }
   try {
-    final facts = await gatherTitle(storage, title, hash: hash);
-    return planNormalization(facts, usage: usage);
+    return await planTitle(storage, title, usage: usage, hash: hash);
+  } on PreviewCancelled {
+    rethrow;
   } on Object catch (error) {
     return (
       operations: const <MediaOperation>[],

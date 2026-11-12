@@ -139,6 +139,23 @@ final class TrashDuplicate extends MediaOperation {
   String toString() => 'trash $from -> $to (same as $poolFile)';
 }
 
+/// Uses [poolFile], identical to [from], instead of bringing [from] into
+/// the pool: [from] is left where it is (a file of another title, or kept
+/// for a project). No change; [from] and [sameAs] (where the content of
+/// [poolFile] is before the plan) are compared byte by byte before any
+/// change of the plan.
+final class ReuseDuplicate extends MediaOperation {
+  const ReuseDuplicate(this.from, this.poolFile, {String? sameAs})
+    : sameAs = sameAs ?? poolFile;
+
+  final String from;
+  final String poolFile;
+  final String sameAs;
+
+  @override
+  String toString() => 'reuse $poolFile for $from';
+}
+
 /// Rewrites the project read at [path]: each media reference of
 /// [references] replaced by its value and, if set, its record path
 /// replaced by [recordPath] (targeted patches, SPEC §7.3). Reported as
@@ -193,6 +210,8 @@ MediaPlanCounts countPlan(MediaPlan plan) {
         if (p.posix.basename(from) != p.posix.basename(to)) renamed++;
       case TrashDuplicate():
         trashed++;
+      case ReuseDuplicate():
+        break;
       case RewriteProject():
         rewritten++;
       case MoveFile() || CopyFile():
@@ -329,7 +348,7 @@ final class _Planner {
     if (blockedItems.isEmpty && facts.unreadable.isNotEmpty) {
       _block(
         ReportKind.fixFailed,
-        ReportItem(titleDir, '${TitleUnreadable(titleDir, facts.unreadable)}'),
+        ReportItem(titleDir, _unreadable(facts.unreadable)),
       );
     }
     if (blockedItems.isNotEmpty) {
@@ -439,7 +458,10 @@ final class _Planner {
     targets[key] = target;
     final move = (isWithin(file, titleDir) || movable.contains(key)) && !keep;
     if (sameAs != null) {
-      if (!move) return;
+      if (!move) {
+        operations.add(ReuseDuplicate(file, target, sameAs: sameAs));
+        return;
+      }
       final name = _free(trashNames, p.posix.basename(file));
       operations.add(
         TrashDuplicate(file, joinPath(_trash, name), target, sameAs: sameAs),
@@ -561,19 +583,21 @@ final class _Planner {
 /// A project of the title [titleDir] cannot be read: its media are
 /// unknown, so nothing can be changed in the title.
 final class TitleUnreadable implements Exception {
-  const TitleUnreadable(this.titleDir, this.projects);
+  const TitleUnreadable(this.message);
 
-  final String titleDir;
-
-  /// Unreadable projects, by path, with the reason.
-  final Map<String, String> projects;
+  /// The projects that cannot be read, with the reason.
+  final String message;
 
   @override
-  String toString() => [
-    'Project unreadable, nothing can be changed in this title:',
-    for (final MapEntry(:key, :value) in projects.entries) '$key ($value)',
-  ].join(' ');
+  String toString() => message;
 }
+
+/// Message of a title whose [projects] (by path, with the reason) cannot
+/// be read.
+String _unreadable(Map<String, String> projects) => [
+  'Project unreadable, nothing can be changed in this title:',
+  for (final MapEntry(:key, :value) in projects.entries) '$key ($value)',
+].join(' ');
 
 /// Files of the title [titleDir] outside its pool that projects of other
 /// titles reference, by [usage] (`mediaUsage`), each with those projects:
