@@ -97,7 +97,8 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          # Trial (#126): batch 3 downloads the SDK instead of the cache.
+          cache: ${{ matrix.batch != 3 }}
       - run: flutter pub get
       - run: flutter gen-l10n
         working-directory: apps/desktop
