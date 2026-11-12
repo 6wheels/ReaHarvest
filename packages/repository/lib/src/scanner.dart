@@ -105,12 +105,14 @@ Future<ScanResult> scanFolder(
   Library library, {
   ScanResult? previous,
   JournalPosition? journalPosition,
+  bool writeNodes = true,
 }) => Isolate.run(
   () => scan(
     MountedFolderStorage(root),
     library,
     previous: previous,
     journalPosition: journalPosition,
+    writeNodes: writeNodes,
   ),
 );
 
@@ -121,14 +123,19 @@ Future<ScanResult> scanFolder(
 /// stored with [previous], [rewrittenSince]); free tree projects are never
 /// read (no metadata, SPEC §3.3). A layout folder is a node only if a
 /// project lies in it or below it (outside the reserved title folders), or,
-/// for a title, if its trash or history still holds one (#54). Missing `.node.json` files are written for these nodes
-/// and for free tree titles, and layout titles without one are scaffolded
-/// ([scaffoldTitle]); these are the only writes.
+/// for a title, if its trash or history still holds one (#54).
+///
+/// With [writeNodes] (root of a `local` library, workspace), missing
+/// `.node.json` files are written for these nodes and for free tree titles:
+/// the only writes; no folder is created (SPEC §3.2). Without it (repository
+/// in `cloud` or `collab` mode), nothing is written and a folder without
+/// node file is not a node: it gives no title, nor does any folder below it.
 Future<ScanResult> scan(
   RepositoryStorage storage,
   Library library, {
   ScanResult? previous,
   JournalPosition? journalPosition,
+  bool writeNodes = true,
 }) async {
   final (:paths, :position) = await rewrittenSince(storage, journalPosition);
   return _Scanner(
@@ -136,12 +143,18 @@ Future<ScanResult> scan(
     library,
     (previous ?? const ScanResult()).withoutStamps(paths),
     position,
+    writeNodes,
   ).run();
 }
 
 final class _Scanner {
-  _Scanner(this.storage, this.library, this.previous, this.journalPosition)
-    : previousVersions = {
+  _Scanner(
+    this.storage,
+    this.library,
+    this.previous,
+    this.journalPosition,
+    this.writeNodes,
+  ) : previousVersions = {
         for (final t in previous.titles)
           for (final v in t.versions) joinPath(t.path, v.fileName): v,
       };
@@ -150,6 +163,7 @@ final class _Scanner {
   final Library library;
   final ScanResult previous;
   final JournalPosition journalPosition;
+  final bool writeNodes;
   final Map<String, Version> previousVersions;
 
   final dirs = <String>{''};
@@ -332,7 +346,7 @@ final class _Scanner {
         if (d == 0) continue;
       }
       final level = layout.levels[d - 1].key;
-      final node = await _node(dir, level, scaffold: d == depth);
+      final node = await _node(dir, level);
       if (node == null) {
         skipped.add(dir);
         continue;
@@ -618,14 +632,10 @@ final class _Scanner {
     );
   }
 
-  /// Node file of [dir], written with [level] if missing (with the title
-  /// folders if [scaffold]); null (and the file reported as corrupted) if
-  /// unreadable.
-  Future<NodeFile?> _node(
-    String dir,
-    String level, {
-    bool scaffold = false,
-  }) async {
+  /// Node file of [dir], written with [level] if missing and [writeNodes];
+  /// null if missing without [writeNodes], or unreadable (the file then
+  /// reported as corrupted).
+  Future<NodeFile?> _node(String dir, String level) async {
     final path = joinPath(dir, nodeFileName);
     final entry = files[dir]?.where((e) => e.path == path).firstOrNull;
     NodeFile? node;
@@ -642,12 +652,9 @@ final class _Scanner {
         }
       }
     } else {
-      if (scaffold) {
-        node = await scaffoldTitle(storage, dir, level);
-      } else {
-        node = NodeFile(NodeId.generate(), level);
-        await writeNodeFile(storage, dir, node);
-      }
+      if (!writeNodes) return null;
+      node = NodeFile(NodeId.generate(), level);
+      await writeNodeFile(storage, dir, node);
       final written = await storage.stat(path);
       if (written != null) stamps[path] = _stamp(written);
     }
