@@ -209,53 +209,62 @@ class LibraryService {
   }
 
   /// Adopts [version] of [title] ("To adopt", SPEC §4.2): writes a new
-  /// version id, [owner] (by default the local member) and [label] into the
-  /// project, then rescans.
+  /// version id into the project, [label] and [owner] (none when the library
+  /// declares no members) into the title's node file, then rescans.
   Future<void> adopt(
     Title title,
     Version version,
     String label, {
     MemberId? owner,
-  }) => _writeMetadata(
-    title,
-    version,
-    VersionMetadata(
-      id: VersionId.generate(),
-      owner: owner ?? ref.read(settingsProvider).identity.memberId,
-      label: label.trim(),
-    ),
-  );
-
-  /// Makes the manual duplicate [version] of [title] a new version (SPEC
-  /// §4.2): new id, owned by the local member, label kept. Then rescans.
-  Future<void> separateDuplicate(Title title, Version version) =>
-      _writeMetadata(
-        title,
-        version,
-        VersionMetadata(
-          id: VersionId.generate(),
-          owner: ref.read(settingsProvider).identity.memberId,
-          label: version.metadata?.label ?? '',
-        ),
-      );
-
-  Future<void> _writeMetadata(
-    Title title,
-    Version version,
-    VersionMetadata metadata,
-  ) async {
+  }) async {
     final entry = _entry(title.libraryId);
     final root = entry.libraryRoot;
-    final path = title.path.isEmpty
-        ? version.fileName
-        : '${title.path}/${version.fileName}';
+    final dir = title.path;
+    final name = version.fileName;
+    final metadata = VersionMetadata(
+      id: VersionId.generate(),
+      label: label.trim(),
+      owner: owner,
+    );
     await Isolate.run(
-      () => writeVersionMetadata(MountedFolderStorage(root), path, metadata),
+      () => adoptVersion(MountedFolderStorage(root), dir, name, metadata),
     );
     _log.info(
-      'Version $path of ${entry.displayName} adopted: id ${metadata.id}, '
+      'Version ${_at(title, version)} adopted: id ${metadata.id}, '
       'owner ${metadata.owner}, label "${metadata.label}"',
     );
+    await scan(entry);
+  }
+
+  /// Makes the manual duplicate [version] of [title] a new version (SPEC
+  /// §4.2): new id, label of the original copied (another version of the
+  /// title with the same id, else [version] itself when the original is in
+  /// another title), owned by the local member when the library declares
+  /// it. Then rescans.
+  Future<void> separateDuplicate(Title title, Version version) async {
+    final entry = _entry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    final name = version.fileName;
+    final owner = ref.read(localOwnerProvider(title.libraryId));
+    // The original: another version of the title sharing its id; its label
+    // as shown, file name fallback included (SPEC §4.2).
+    final original = title.versions
+        .where(
+          (v) => v.fileName != name && v.metadata?.id == version.metadata?.id,
+        )
+        .firstOrNull;
+    final label = (original ?? version).metadata?.label ?? '';
+    final id = await Isolate.run(
+      () => separateDuplicateVersion(
+        MountedFolderStorage(root),
+        dir,
+        name,
+        label: label,
+        owner: owner,
+      ),
+    );
+    _log.info('Version ${_at(title, version)} separated: id $id');
     await scan(entry);
   }
 
@@ -409,8 +418,9 @@ class LibraryService {
   }
 
   /// Creates the version [fileName] of [title] with [label], owned by the
-  /// local member (SPEC §5.4): a copy of [source] when given, else from the
-  /// project file [template], else blank (REAPER's default template for new
+  /// local member when the library declares it ([localOwnerProvider], SPEC
+  /// §5.4): a copy of [source] when given, else from the project file
+  /// [template], else blank (REAPER's default template for new
   /// projects when set). Then rescans. Returns its file name.
   Future<String> addVersion(
     Title title,
@@ -424,7 +434,7 @@ class LibraryService {
     final dir = title.path;
     final metadata = VersionMetadata(
       id: VersionId.generate(),
-      owner: ref.read(settingsProvider).identity.memberId,
+      owner: ref.read(localOwnerProvider(title.libraryId)),
       label: label.trim(),
     );
     final String path;
@@ -467,9 +477,10 @@ class LibraryService {
     return resources == null ? null : loadDefaultProjectTemplate(resources);
   }
 
-  /// Sets the [label] of [version] of [title] (adopted versions only) and
-  /// renames its file to [fileName] (SPEC §5.4); unchanged values are left
-  /// as is. Then rescans. Returns its file name.
+  /// Sets the [label] of [version] of [title] (adopted versions only), in
+  /// the title's node file, and renames its file to [fileName] (SPEC §5.4);
+  /// the label is written when changed or on a rename. Then rescans.
+  /// Returns its file name.
   Future<String> editVersion(
     Title title,
     Version version, {
@@ -480,11 +491,15 @@ class LibraryService {
     final root = entry.libraryRoot;
     final dir = title.path;
     final old = version.fileName;
-    final m = version.metadata;
-    final relabel = m != null && m.label != label.trim();
+    final id = version.metadata?.id;
+    // Also written on a rename: a label shown from the file name fallback
+    // would otherwise follow the new name (SPEC §4.2).
+    final relabel =
+        id != null &&
+        (version.metadata!.label != label.trim() || fileName != old);
     final name = await Isolate.run(() async {
       final storage = MountedFolderStorage(root);
-      if (relabel) await setVersionLabel(storage, dir, old, label.trim());
+      if (relabel) await setVersionLabel(storage, dir, id, label.trim());
       if (fileName == old) return old;
       return p.posix.basename(await renameVersion(storage, dir, old, fileName));
     });
@@ -737,6 +752,15 @@ bool sameLayout(Layout? a, Layout? b) =>
     jsonEncode(a?.toJson()) == jsonEncode(b?.toJson());
 
 final libraryServiceProvider = Provider<LibraryService>(LibraryService.new);
+
+/// Owner of the versions the local member creates in a library (SPEC
+/// §4.2): the local member if the library declares it, else none.
+final localOwnerProvider = Provider.family<MemberId?, LibraryId>((ref, id) {
+  final me = ref.watch(settingsProvider.select((s) => s.identity.memberId));
+  final members =
+      ref.watch(indexedLibrariesProvider)[id]?.members ?? const <Member>[];
+  return members.any((m) => m.id == me) ? me : null;
+});
 
 /// Backups of the versions of a title, by version, newest first (SPEC
 /// §5.4); empty for free tree titles, which have no history.

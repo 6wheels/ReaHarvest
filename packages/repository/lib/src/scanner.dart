@@ -550,6 +550,9 @@ final class _Scanner {
     size: e.size,
   );
 
+  /// Adds the title [dir]; the label and owner of its adopted versions are
+  /// read from [node] at every scan, the label falling back to the file
+  /// name without its extension (SPEC §4.2).
   void _addTitle(
     String dir,
     NodeFile node,
@@ -563,7 +566,21 @@ final class _Scanner {
         libraryId: library.id,
         path: dir,
         tags: tags,
-        versions: versions,
+        versions: [
+          for (final v in versions)
+            if (v.metadata case final m?)
+              v.withMetadata(
+                VersionMetadata(
+                  id: m.id,
+                  label:
+                      node.versionLabels[m.id] ??
+                      p.posix.basenameWithoutExtension(v.fileName),
+                  owner: node.versionOwners[m.id] as MemberId?,
+                ),
+              )
+            else
+              v,
+        ],
         status: node.status,
         versionStatuses: node.versionStatuses,
       ),

@@ -48,7 +48,7 @@ final class TitleSearch {
       ..._words(p.withoutExtension(v.fileName)),
       if (v.metadata case final m?) ...[
         ..._words(m.label),
-        ..._words(names[m.owner] ?? m.owner),
+        if (m.owner case final owner?) ..._words(names[owner] ?? owner),
       ],
     ],
   }.toList();

@@ -127,8 +127,8 @@ String versionDetails(
   final owners = ref.watch(ownerNamesProvider);
   final m = version.metadata;
   return [
-    if (withLabel && m != null && m.label.isNotEmpty) m.label,
-    if (m != null) owners[m.owner] ?? l10n.unknownOwner,
+    if (withLabel && m != null) m.label,
+    if (m?.owner case final owner?) owners[owner] ?? l10n.unknownOwner,
     shortDate(l10n, version.modified),
     if (version.tempo case final bpm?) l10n.bpm(bpm.round()),
   ].join(' · ');
@@ -484,18 +484,17 @@ class _VersionItem extends ConsumerWidget {
     final m = version.metadata;
     final status = title.statusOf(version);
     // Free tree versions have no metadata: their file name is their label.
+    // Adopted versions always have one (file name fallback, SPEC §4.2).
     final label = m == null
         ? alerts.notAdopted
               ? l10n.notAdopted
               : p.posix.withoutExtension(version.fileName)
-        : m.label.isEmpty
-        ? l10n.noLabel
         : m.label;
     // Generic labels: muted, the file name tells the versions apart.
-    final generic = alerts.notAdopted || (m != null && m.label.isEmpty);
+    final generic = alerts.notAdopted;
     final details = [
       shortDate(l10n, version.modified),
-      if (m != null) owners[m.owner] ?? l10n.unknownOwner,
+      if (m?.owner case final owner?) owners[owner] ?? l10n.unknownOwner,
     ].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -577,9 +576,9 @@ class _VersionItem extends ConsumerWidget {
   }
 }
 
-/// Adoption of a version without metadata: label and owner (chosen among
-/// the declared members, if any, else the local member), written into the
-/// project (SPEC §4.2).
+/// Adoption of a version without metadata: its id written into the project,
+/// its label and owner (chosen among the declared members; none when the
+/// library declares none) into the title's node file (SPEC §4.2).
 class _Adopt extends ConsumerStatefulWidget {
   const _Adopt(this.title, this.version);
 
@@ -602,17 +601,17 @@ class _AdoptState extends ConsumerState<_Adopt> {
       ref.watch(indexedLibrariesProvider)[widget.title.libraryId]?.members ??
       const [];
 
-  /// Owner written on adoption: the picked member, else the local member if
-  /// declared (or none is), else the first declared member.
-  MemberId get _owner {
+  /// Owner written on adoption: none when the library declares no members,
+  /// else the picked member, the local member if declared, or the first
+  /// declared member.
+  MemberId? get _owner {
     final local = ref.watch(
       settingsProvider.select((s) => s.identity.memberId),
     );
     final members = _members;
+    if (members.isEmpty) return null;
     return _picked ??
-        (members.isEmpty || members.any((m) => m.id == local)
-            ? local
-            : members.first.id);
+        (members.any((m) => m.id == local) ? local : members.first.id);
   }
 
   @override
@@ -695,17 +694,6 @@ class _AdoptState extends ConsumerState<_Adopt> {
             ],
           ),
         ),
-        if (members.isEmpty) ...[
-          const SizedBox(height: Space.xs),
-          Text(
-            l10n.filterValue(
-              l10n.filterOwner,
-              ref.watch(ownerNamesProvider)[owner] ?? l10n.unknownOwner,
-            ),
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: context.colors.muted),
-          ),
-        ],
       ],
     );
   }
@@ -777,8 +765,6 @@ class _VersionPane extends ConsumerWidget {
                     ? version.fileName
                     : m == null
                     ? p.posix.withoutExtension(version.fileName)
-                    : m.label.isEmpty
-                    ? l10n.noLabel
                     : m.label,
                 style: text.titleLarge?.copyWith(
                   fontStyle: alerts.notAdopted ? FontStyle.italic : null,

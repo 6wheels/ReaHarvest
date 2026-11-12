@@ -1317,7 +1317,8 @@ void main() {
       },
       versions: [
         version('Opening mix.rpp', label: 'mix'),
-        version('Opening raw.rpp', label: ''),
+        // Label from the file name fallback of the scan (SPEC §4.2).
+        version('Opening raw.rpp', label: 'Opening raw'),
         version('Opening old.rpp'),
       ],
       versionStatuses: const {'id-Opening mix.rpp': 'mixing'},
@@ -1336,8 +1337,8 @@ void main() {
     // Labels only; generic labels followed by the file name, in italic.
     expect(find.text('mix'), findsNWidgets(2)); // list and pane heading
     expect(find.textContaining('Opening mix'), findsNothing);
-    expect(find.text('No label'), findsOneWidget);
-    expect(find.textContaining('· Opening raw.rpp'), findsOneWidget);
+    expect(find.text('Opening raw'), findsOneWidget);
+    expect(find.textContaining('· Opening raw.rpp'), findsNothing);
     expect(find.textContaining('· Opening old.rpp'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_outline_rounded), findsNWidgets(2));
     expect(find.text('Mixing'), findsWidgets);
@@ -1598,13 +1599,15 @@ void main() {
     expect(find.text('Proposed place: Artist/Album/Song'), findsOne);
     expect(find.text('Old'), findsOne);
 
-    // Without declared members, the local member owns the lifted projects.
+    // Without declared members, the lifted projects get no owner; the
+    // preview shows their label, the file name (SPEC §4.2).
     await tester.tap(find.text('Fix…').at(1));
     await tester.pumpAndSettle();
     expect(
       find.text('Owner of the projects outside a member folder'),
-      findsOne,
+      findsNothing,
     );
+    expect(find.text('→ Artist/Album/Song · a · Mixing'), findsOne);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
@@ -1686,7 +1689,7 @@ void main() {
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
     expect(find.text('Status for the “mix” folders'), findsOne);
-    expect(find.text('→ Artist/Album/Song · Alice · Mixing'), findsOne);
+    expect(find.text('→ Artist/Album/Song · a · Alice · Mixing'), findsOne);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('Status for the “mix” folders'), findsNothing);
@@ -1738,6 +1741,70 @@ void main() {
           null,
         ),
       ],
+    );
+  });
+
+  testWidgets('lifts projects of several libraries, each with its owner', (
+    tester,
+  ) async {
+    const title = LayoutLevel('title');
+    const other = LibraryEntry(
+      id: LibraryId('L2'),
+      displayName: 'Other',
+      workspaceRoot: '/music/Other',
+    );
+    LibraryIssue deep(LibraryId library, String path) => (
+      library: library,
+      kind: ReportKind.projectTooDeep,
+      item: ReportItem.misplaced('Song/$path', level: title, target: 'Song'),
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      configured: const [band, other],
+      indexed: {
+        band.id: demoLibrary.withMembers(const [
+          Member(MemberId('M'), 'Me'),
+          Member(MemberId('alice'), 'Alice'),
+        ]),
+        // The default owner (the local member) is not declared here.
+        other.id: Library(
+          id: other.id,
+          mode: LibraryMode.local,
+          layout: Layout.classic(),
+        ).withMembers(const [Member(MemberId('bob'), 'Bob')]),
+        const LibraryId('L3'): Library(
+          id: const LibraryId('L3'),
+          mode: LibraryMode.local,
+          layout: Layout.classic(),
+        ),
+      },
+      issues: [
+        deep(band.id, 'mix/a.rpp'),
+        deep(other.id, 'mix/b.rpp'),
+        deep(const LibraryId('L3'), 'mix/c.rpp'),
+      ],
+    );
+    await tester.tap(find.textContaining('To sort ·'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(find.text('→ Song · b · Bob · Mixing'), findsOne);
+    // No declared members: no owner.
+    expect(find.text('→ Song · c · Mixing'), findsOne);
+    await tester.tap(find.text('Fix 3 items'));
+    await tester.pumpAndSettle();
+
+    expect(
+      {
+        for (final (library, fixes) in libraries.fixed)
+          library: [for (final f in fixes.cast<LiftProject>()) f.owner],
+      },
+      {
+        band.id: [const MemberId('M')],
+        other.id: [const MemberId('bob')],
+        const LibraryId('L3'): [null],
+      },
     );
   });
 

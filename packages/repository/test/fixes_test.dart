@@ -137,13 +137,26 @@ void main() {
     final metadata = VersionMetadata.fromExtState(
       lifted.extState(VersionMetadata.section),
     )!;
-    expect(metadata.owner, 'alice');
+    expect(lifted.extState(VersionMetadata.section).keys, ['VERSIONID']);
+    // Label: the final file name without its extension.
     final node = (await readNodeFile(storage, 'Song'))!;
     expect(node.versionStatuses, {metadata.id: 'mixing'});
+    expect(node.versionLabels, {metadata.id: 'a (2)'});
+    expect(node.versionOwners, {metadata.id: 'alice'});
     expect(await noLoss(m), isTrue);
 
-    // An adopted project keeps its metadata; no status is set without one.
+    // An adopted project keeps its id and its entries; no status is set
+    // without one.
     put('Root/sub/b.rpp', text);
+    put(
+      'Root/.node.json',
+      jsonEncode(
+        NodeFile(
+          NodeId.generate(),
+          'title',
+        ).withVersionLabel(metadata.id, 'kept').toJson(),
+      ),
+    );
     final again = await migration();
     final top = await liftProject(
       again.storage,
@@ -157,20 +170,38 @@ void main() {
           .extState(VersionMetadata.section),
     )!;
     expect(kept.id, metadata.id);
-    expect(kept.owner, 'alice');
-    expect(await readNodeFile(storage, 'Root'), isNull);
+    final root = (await readNodeFile(storage, 'Root'))!;
+    expect(root.versionLabels, {metadata.id: 'kept'});
+    // Only the missing entry is added.
+    expect(root.versionOwners, {metadata.id: 'bob'});
+    expect(root.versionStatuses, isEmpty);
   });
 
   test('lifts a project of a library whose root is the title', () async {
+    put('.node.json', '{"nodeId":"${newUlid()}","level":"title"}');
     put('sub/c.rpp', '<REAPER_PROJECT\n>\n');
     final m = await migration();
-    final moved = await liftProject(
-      m.storage,
-      'sub/c.rpp',
-      '',
-      owner: const MemberId('bob'),
-    );
+    final moved = await liftProject(m.storage, 'sub/c.rpp', '');
     expect(moved, 'c.rpp');
+    final id = VersionMetadata.fromExtState(
+      RppProject.parse(file(moved).readAsStringSync())
+          .extState(VersionMetadata.section),
+    )!.id;
+    final node = (await readNodeFile(storage, ''))!;
+    expect(node.versionLabels, {id: 'c'});
+    // A library without declared members stores no owner.
+    expect(node.versionOwners, isEmpty);
+  });
+
+  test('lifts nothing into a title without node file', () async {
+    put('Song/sub/c.rpp', '<REAPER_PROJECT\n>\n');
+    final m = await migration();
+    await expectLater(
+      liftProject(m.storage, 'Song/sub/c.rpp', 'Song'),
+      throwsStateError,
+    );
+    expect(file('Song/sub/c.rpp').readAsStringSync(), '<REAPER_PROJECT\n>\n');
+    expect(file('Song/c.rpp').existsSync(), isFalse);
   });
 
   test('applies fixes one by one and reports each', () async {
@@ -221,7 +252,9 @@ void main() {
     put(
       'Song/.node.json',
       '{"nodeId":"${newUlid()}","level":"title",'
-          '"status":"mixing","versionStatuses":{"$a":"demo","$b":"demo"}}',
+          '"status":"mixing","versionStatuses":{"$a":"demo","$b":"demo"},'
+          '"versionLabels":{"$a":"intro","$b":"lost"},'
+          '"versionOwners":{"$a":"alice","$b":"carol"}}',
     );
     put('Song/Song.rpp', media);
     put('Song/Media/kick.wav', 'mine');
@@ -230,7 +263,8 @@ void main() {
     put(
       'Band/_Unassigned/Song/.node.json',
       '{"nodeId":"${newUlid()}","level":"title",'
-          '"status":"final","versionStatuses":{"$b":"mixing"}}',
+          '"status":"final","versionStatuses":{"$b":"mixing"},'
+          '"versionLabels":{"$b":"chorus"},"versionOwners":{"$b":"bob"}}',
     );
     put('Band/_Unassigned/Song/Song.rpp', media);
     put('Band/_Unassigned/Song/Media/kick.wav', 'theirs');
@@ -265,6 +299,9 @@ void main() {
     final node = (await readNodeFile(storage, title))!;
     expect(node.status, 'final');
     expect(node.versionStatuses, {a: 'demo', b: 'mixing'});
+    // Labels and owners of both sides; the target wins on a same id.
+    expect(node.versionLabels, {a: 'intro', b: 'chorus'});
+    expect(node.versionOwners, {a: 'alice', b: 'bob'});
     // What is left of the source is kept in the migration folder.
     expect(await storage.stat('Song'), isNull);
     expect(file('${m.folder}/merged/Song/.node.json').existsSync(), isTrue);

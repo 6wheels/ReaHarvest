@@ -84,11 +84,7 @@ void main() {
     putBytes('$_title/a.rpp', original);
 
     final read = await readProject(storage, '$_title/a.rpp');
-    await writeVersionMetadata(
-      storage,
-      '$_title/a.rpp',
-      VersionMetadata(id: VersionId.generate(), owner: const MemberId('alice')),
-    );
+    await writeVersionId(storage, '$_title/a.rpp', VersionId.generate());
 
     expect(read.encoding, ProjectEncoding.windows1252);
     expect(read.text, contains('NAME "Café tête"'));
@@ -170,6 +166,7 @@ void main() {
       () async {
         final original = File(_fixture).readAsBytesSync();
         putBytes('$_title/日/a.rpp', original);
+        await scaffoldTitle(storage, _title, 'title');
 
         await expectLater(
           liftProject(

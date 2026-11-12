@@ -299,7 +299,8 @@ void main() {
       'Song - a.RPP',
     );
     final blank = version('Song - a.RPP').metadata!;
-    expect((blank.owner, blank.label), (const MemberId('M'), 'a'));
+    // No declared members: no owner (SPEC §4.2).
+    expect((blank.owner, blank.label), (null, 'a'));
     await service().addVersion(
       title(),
       'copy.RPP',
@@ -321,6 +322,21 @@ void main() {
     );
     final edited = version('Song - c.RPP').metadata!;
     expect((edited.id, edited.label), (copy.id, 'c'));
+
+    // A label edit leaves the project byte for byte, with its date.
+    final file = File(p.join(song.path, 'Song - c.RPP'));
+    final bytes = file.readAsBytesSync();
+    final date = DateTime(2025, 3, 4);
+    file.setLastModifiedSync(date);
+    await service().editVersion(
+      title(),
+      version('Song - c.RPP'),
+      fileName: 'Song - c.RPP',
+      label: 'd',
+    );
+    expect(version('Song - c.RPP').metadata!.label, 'd');
+    expect(file.readAsBytesSync(), bytes);
+    expect(file.lastModifiedSync(), date);
 
     await service().setStatusOf(title(), version('Song - c.RPP'), 'mixing');
     expect(title().statusOf(version('Song - c.RPP')), 'mixing');
@@ -420,7 +436,7 @@ void main() {
 
     await service().adopt(title(), version('v1.rpp'), ' main ');
     final adopted = version('v1.rpp').metadata!;
-    expect((adopted.owner, adopted.label), (const MemberId('M'), 'main'));
+    expect((adopted.owner, adopted.label), (null, 'main'));
 
     File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'dup.rpp'));
     await service().scanAll();
@@ -429,8 +445,66 @@ void main() {
     await service().separateDuplicate(title(), version('dup.rpp'));
     final separated = version('dup.rpp').metadata!;
     expect(separated.id, isNot(adopted.id));
-    expect(separated.label, 'main');
+    expect((separated.label, separated.owner), ('main', null));
     expect(duplicateVersions(index.titles()), isEmpty);
+  });
+
+  test('owns the versions of the local member once declared', () async {
+    final song = await bandWithSong();
+    final entry = container.read(settingsProvider).libraries.single;
+    await service().setMembers(entry, const [Member(MemberId('M'), 'Me')]);
+
+    await service().addVersion(title(), 'b.RPP', 'b');
+    expect(version('b.RPP').metadata!.owner, const MemberId('M'));
+    File(p.join(song, 'b.RPP')).copySync(p.join(song, 'c.RPP'));
+    await service().scanAll();
+    await service().separateDuplicate(title(), version('c.RPP'));
+    expect(version('c.RPP').metadata!.owner, const MemberId('M'));
+    expect(version('c.RPP').metadata!.label, 'b');
+  });
+
+  test('copies the fallback label of the original to its copy', () async {
+    final song = await bandWithSong();
+    await service().adopt(title(), version('v1.rpp'), 'main');
+    final id = version('v1.rpp').metadata!.id;
+    // The node entry is gone (e.g. node file reset): label from the name.
+    final root = container.read(settingsProvider).libraries.single.libraryRoot;
+    await setVersionLabel(
+      MountedFolderStorage(root),
+      'Artist/Album/Song',
+      id,
+      null,
+    );
+    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v1 copy.rpp'));
+    await service().scanAll();
+    expect(version('v1.rpp').metadata!.label, 'v1');
+
+    await service().separateDuplicate(title(), version('v1 copy.rpp'));
+    expect(version('v1 copy.rpp').metadata!.label, 'v1');
+  });
+
+  test('keeps the shown label on a rename', () async {
+    await bandWithSong();
+    await service().adopt(title(), version('v1.rpp'), 'main');
+    final id = version('v1.rpp').metadata!.id;
+    final root = container.read(settingsProvider).libraries.single.libraryRoot;
+    await setVersionLabel(
+      MountedFolderStorage(root),
+      'Artist/Album/Song',
+      id,
+      null,
+    );
+    await service().scanAll();
+    // Shown from the file name fallback, confirmed unchanged in the dialog.
+    expect(version('v1.rpp').metadata!.label, 'v1');
+
+    await service().editVersion(
+      title(),
+      version('v1.rpp'),
+      fileName: 'final.rpp',
+      label: 'v1',
+    );
+    expect(version('final.rpp').metadata!.label, 'v1');
   });
 
   test('declares members and adopts for one of them', () async {
@@ -466,7 +540,9 @@ void main() {
     );
 
     await service().restore(title(), version('v1.rpp'), saved);
-    expect(version('v1.rpp').metadata!.label, 'main');
+    // The label is stored outside the project: a restore keeps it.
+    expect(version('v1.rpp').metadata!.id, id);
+    expect(version('v1.rpp').metadata!.label, 'changed');
     // The state before the restore is backed up first.
     expect(await backups(), hasLength(2));
 

@@ -430,6 +430,42 @@ void main() {
         versionId: 'done',
       });
     });
+
+    test('keeps version labels and owners across a restart', () async {
+      final root = Directory.systemTemp.createTempSync('reaharvest_scan_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      const title = 'Band/Album/Song';
+      final lib = library();
+      final storage = MountedFolderStorage(root.path);
+      await scaffoldTitle(storage, title, 'title');
+      final kept = VersionMetadata(
+        id: VersionId.generate(),
+        label: 'chorus B',
+        owner: owner,
+      );
+      await createVersion(storage, title, 'v1.rpp', kept);
+      final gone = VersionId.generate();
+      await setVersionLabel(storage, title, gone, 'old take');
+      index.update(lib, await scan(storage, lib));
+
+      final stored = index.titles().single.versions.single.metadata!;
+      expect((stored.label, stored.owner), ('chorus B', owner));
+
+      // Unchanged node file: not read again, its entries come from the
+      // stored scan, those of versions that no longer exist included.
+      final again = await scan(
+        storage,
+        lib,
+        previous: index.scanResult(lib.id),
+      );
+      final m = again.titles.single.versions.single.metadata!;
+      expect((m.id, m.label, m.owner), (kept.id, 'chorus B', owner));
+      expect(again.nodes[title]!.versionLabels, {
+        kept.id: 'chorus B',
+        gone: 'old take',
+      });
+      expect(again.nodes[title]!.versionOwners, {kept.id: owner});
+    });
   });
 
   group('TitleSearch', () {
