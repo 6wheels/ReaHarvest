@@ -460,6 +460,51 @@ void main() {
     await service().scanAll();
     await service().separateDuplicate(title(), version('c.RPP'));
     expect(version('c.RPP').metadata!.owner, const MemberId('M'));
+    expect(version('c.RPP').metadata!.label, 'b');
+  });
+
+  test('copies the fallback label of the original to its copy', () async {
+    final song = await bandWithSong();
+    await service().adopt(title(), version('v1.rpp'), 'main');
+    final id = version('v1.rpp').metadata!.id;
+    // The node entry is gone (e.g. node file reset): label from the name.
+    final root = container.read(settingsProvider).libraries.single.libraryRoot;
+    await setVersionLabel(
+      MountedFolderStorage(root),
+      'Artist/Album/Song',
+      id,
+      null,
+    );
+    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v1 copy.rpp'));
+    await service().scanAll();
+    expect(version('v1.rpp').metadata!.label, 'v1');
+
+    await service().separateDuplicate(title(), version('v1 copy.rpp'));
+    expect(version('v1 copy.rpp').metadata!.label, 'v1');
+  });
+
+  test('keeps the shown label on a rename', () async {
+    await bandWithSong();
+    await service().adopt(title(), version('v1.rpp'), 'main');
+    final id = version('v1.rpp').metadata!.id;
+    final root = container.read(settingsProvider).libraries.single.libraryRoot;
+    await setVersionLabel(
+      MountedFolderStorage(root),
+      'Artist/Album/Song',
+      id,
+      null,
+    );
+    await service().scanAll();
+    // Shown from the file name fallback, confirmed unchanged in the dialog.
+    expect(version('v1.rpp').metadata!.label, 'v1');
+
+    await service().editVersion(
+      title(),
+      version('v1.rpp'),
+      fileName: 'final.rpp',
+      label: 'v1',
+    );
+    expect(version('final.rpp').metadata!.label, 'v1');
   });
 
   test('declares members and adopts for one of them', () async {

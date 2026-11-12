@@ -20,29 +20,30 @@ Future<void> adoptVersion(
 }
 
 /// Makes the *Save As* copy [fileName] of the title [titleDir] a new version
-/// (SPEC §4.2): a new id in the file, the label of the original copied to it
-/// and [owner], if any, set. Returns the new id. Throws [StateError] if the
-/// project is not adopted.
+/// (SPEC §4.2): a new id in the file, [label] (the label of the original, as
+/// shown, its file name fallback included) and [owner], if any, set for it.
+/// Returns the new id. Throws [StateError] if the project is not adopted.
 Future<VersionId> separateDuplicateVersion(
   RepositoryStorage storage,
   String titleDir,
   String fileName, {
+  required String label,
   MemberId? owner,
 }) async {
   final path = joinPath(titleDir, fileName);
   final (:text, :encoding) = await readProject(storage, path);
-  final original = VersionMetadata.fromExtState(
-    RppProject.parse(text).extState(VersionMetadata.section),
-  );
-  if (original == null) throw StateError('Version not adopted: $path');
+  if (VersionMetadata.fromExtState(
+        RppProject.parse(text).extState(VersionMetadata.section),
+      ) ==
+      null) {
+    throw StateError('Version not adopted: $path');
+  }
   final id = VersionId.generate();
-  await updateNodeFile(storage, titleDir, (node) {
-    var copy = node;
-    if (node.versionLabels[original.id] case final label?) {
-      copy = copy.withVersionLabel(id, label);
-    }
-    return owner == null ? copy : copy.withVersionOwner(id, owner);
-  });
+  await writeVersionEntries(
+    storage,
+    titleDir,
+    VersionMetadata(id: id, label: label, owner: owner),
+  );
   await writeProject(
     storage,
     path,

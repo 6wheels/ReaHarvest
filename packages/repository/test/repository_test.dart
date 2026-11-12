@@ -670,7 +670,12 @@ void main() {
       expect((m.id, m.label, m.owner), (adoptedId, 'new', null));
       expect(project().readAsStringSync(), legacy);
 
-      final copy = await separateDuplicateVersion(storage, title, 'v1.rpp');
+      final copy = await separateDuplicateVersion(
+        storage,
+        title,
+        'v1.rpp',
+        label: 'new',
+      );
       final values = RppProject.parse(project().readAsStringSync())
           .extState(VersionMetadata.section);
       expect(values, {'VERSIONID': copy, 'OWNER': 'M', 'LABEL': 'old label'});
@@ -1136,6 +1141,7 @@ void main() {
         storage,
         title,
         'Song copy.RPP',
+        label: 'chorus B',
         owner: owner,
       );
 
@@ -1157,24 +1163,26 @@ void main() {
 
       put('$title/Other.RPP', unknown);
       await expectLater(
-        separateDuplicateVersion(storage, title, 'Other.RPP'),
+        separateDuplicateVersion(storage, title, 'Other.RPP', label: 'x'),
         throwsStateError,
       );
     });
 
-    test('separates a Save As copy without label nor owner', () async {
+    test('separates a Save As copy, the fallback label kept', () async {
       put('$title/Song.RPP', adopted);
       put('$title/Song copy.RPP', adopted);
       await node();
 
+      // The original has no entry: its label is its file name.
       final id = await separateDuplicateVersion(
         storage,
         title,
         'Song copy.RPP',
+        label: 'Song',
       );
 
       final saved = (await readNodeFile(storage, title))!;
-      expect(saved.versionLabels, isEmpty);
+      expect(saved.versionLabels, {id: 'Song'});
       expect(saved.versionOwners, isEmpty);
       expect(metadataOf('$title/Song copy.RPP')!.id, id);
     });

@@ -289,12 +289,16 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   }
 
   /// Owner of the lifted project [i]: its member subfolder, else the
-  /// default owner; none when its library declares no members.
+  /// default owner when its library declares it, else the local member if
+  /// declared, else its first member; none when its library declares no
+  /// members.
   Member? _liftOwner(int i) {
     final library = widget.issues[i].library;
     final members = ref.read(indexedLibrariesProvider)[library]?.members;
     if (members == null || members.isEmpty) return null;
-    return _lifts[i].member ?? members.where((m) => m.id == _owner).firstOrNull;
+    final local = ref.read(settingsProvider).identity.memberId;
+    Member? find(MemberId? id) => members.where((m) => m.id == id).firstOrNull;
+    return _lifts[i].member ?? find(_owner) ?? find(local) ?? members.first;
   }
 
   String? _liftStatus(int i) {

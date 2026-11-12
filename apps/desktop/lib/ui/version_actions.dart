@@ -164,9 +164,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
         ref.watch(projectTemplatesProvider(widget.title.libraryId)).value ??
         const <String>[];
     // Shown only when written: the library declares the local member.
-    final owner =
-        ref.read(libraryServiceProvider).localOwner(widget.title.libraryId) ==
-            null
+    final owner = ref.watch(localOwnerProvider(widget.title.libraryId)) == null
         ? null
         : ref.watch(settingsProvider.select((s) => s.identity.displayName));
     final selected = widget.selected;
