@@ -15,4 +15,3 @@ dependencies:
   reaharvest_repository:
     path: ../repository
   sqlite3: ^3.9.0
-  xxh3: ^1.2.0
