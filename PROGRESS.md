@@ -216,6 +216,7 @@ Plan of M3:
 
 ## Parked (Backlog)
 #12, #14, #22, #32, #40, #43, #46, #47, #48, #53, #58, #78, #111, #112, #113, #121.
+In progress outside the milestones: #126 CI time (parallel jobs, integration tests in Windows batches, app coverage gate on the merged reports).
 Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## For the maintainer (not for an agent)
