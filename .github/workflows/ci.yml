@@ -12,8 +12,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Parallel jobs (#126): checks on Linux (faster setup), integration tests in
-# Windows batches, app coverage gate on the merged reports.
+# Parallel jobs (#126): Linux where the tests allow it (faster setup),
+# integration tests in Windows batches, app coverage gate on the merged
+# reports.
 env:
   FLUTTER_VERSION: 3.47.9
   # Integration batches: keep in sync with the `integration` matrix.
@@ -35,7 +36,13 @@ jobs:
       - run: flutter analyze
 
   packages:
-    runs-on: ubuntu-latest
+    # Windows: the repository tests expect Windows path separators.
+    # Skipped while the repository is private (paid minutes); runs on demand.
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
