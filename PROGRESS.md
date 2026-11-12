@@ -76,7 +76,7 @@ Core hardening, before the remaining features (listed in the order of the steps 
 - [x] #114 only `versionId` in the `.RPP`; label and owner in `.node.json` in every mode until the collab store exists (M3); default label of the versions adopted in batch (former #98); no migration of existing data
 - [x] #97 scan creating no folder, never writing in a repository
 - [ ] #94 undo of a fix that failed or was interrupted, from the journal
-- [ ] #95 media normalization as gather, pure plan, then apply (the plan is the preview)
+- [x] #95 media normalization as gather, pure plan, then apply (the plan is the preview; shown per title in the fix dialog with its counts and operations, computed in an isolate; the guided move goes through the same steps; `xxh3Hash` moved to `repository`, hashes taken from the inventory for unchanged media)
 - [ ] #96 files named by a plugin state never moved nor purged
 - [ ] #99 fix proposals computed outside the interface
 - [ ] #100 LibraryService split into one service per role
@@ -228,4 +228,4 @@ Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## Next step
 Done: #90, #91 and both lots of #59 (the integration harness now sizes the native window to 1024x768, so the app stays visible during the tests, #119).
-Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.
+Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is done (draft PR, review before merge): #96 can start once it is merged, #99 once #114 and #95 are. After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.
