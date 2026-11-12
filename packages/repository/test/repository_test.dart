@@ -818,20 +818,77 @@ void main() {
     bool dir(String path) =>
         Directory(p.joinAll([root.path, ...path.split('/')])).existsSync();
 
-    test('scan scaffolds new layout titles only', () async {
-      put('band/album/song/v1.rpp', adopted);
-      put(
-        'band/album/old/.node.json',
-        '{"nodeId":"${newUlid()}","level":"title"}',
+    /// A folder not organized yet: a title, a member subfolder in it, a
+    /// member folder standing at the title depth, loose projects.
+    MemoryStorage misorganized() => MemoryStorage()
+      ..put('band/album/song/v1.rpp', adopted)
+      ..put('band/album/song/Alice/mix/a.rpp', unknown)
+      ..put('band/single/Bob/take.rpp', unknown)
+      ..put('band/loose.rpp', unknown)
+      ..put('demo.rpp', unknown);
+
+    test('scan creates no folder, only node files', () async {
+      final memory = misorganized();
+      final before = {...memory.dirs};
+
+      final result = await scan(memory, library(Layout.classic()));
+
+      expect(result.titles.map((t) => t.path), [
+        'band/album/song',
+        'band/single/Bob',
+      ]);
+      expect(memory.dirs, before);
+      expect(memory.log, isNotEmpty);
+      expect(memory.log.where((op) => !op.endsWith('/$nodeFileName')), isEmpty);
+      expect(memory.log.every((op) => op.startsWith('write ')), isTrue);
+    });
+
+    test('scan without writeNodes writes nothing', () async {
+      final memory = misorganized()
+        ..put(
+          'band/album/old/$nodeFileName',
+          '{"nodeId":"${newUlid()}","level":"title"}',
+        )
+        ..put('band/album/old/v1.rpp', unknown);
+
+      final result = await scan(
+        memory,
+        library(Layout.classic()),
+        writeNodes: false,
       );
+
+      expect(memory.log, isEmpty);
+      expect(memory.changes, 0);
+      // Only a folder whose node file and parents' node files exist.
+      expect(result.titles, isEmpty);
+      expect(result.corrupted, isEmpty);
+    });
+
+    test('free tree scan without writeNodes writes nothing', () async {
+      final memory = MemoryStorage()
+        ..put('songs/demo/v1.rpp', unknown)
+        ..put(
+          'songs/kept/$nodeFileName',
+          '{"nodeId":"${newUlid()}","level":"$freeTreeLevel"}',
+        )
+        ..put('songs/kept/v1.rpp', unknown);
+
+      final result = await scan(memory, library(null), writeNodes: false);
+
+      expect(memory.changes, 0);
+      expect(result.titles.map((t) => t.path), ['songs/kept']);
+    });
+
+    test('scan keeps folders created by former scans', () async {
+      put('band/album/song/v1.rpp', adopted);
+      for (final name in titleFolders) {
+        Directory(p.joinAll([root.path, 'band', 'album', 'song', name]))
+            .createSync(recursive: true);
+      }
 
       await scan(storage, library(Layout.classic()));
 
-      for (final name in titleFolders) {
-        expect(dir('band/album/song/$name'), isTrue, reason: name);
-        expect(dir('band/album/old/$name'), isFalse, reason: name);
-        expect(dir('band/album/$name'), isFalse, reason: name);
-      }
+      expect(titleFolders.every((n) => dir('band/album/song/$n')), isTrue);
       expect(exists('band/album/song/.node.json'), isTrue);
     });
 
@@ -1060,6 +1117,28 @@ void main() {
       final result = await scan(storage, library(Layout.classic()));
       final read2 = result.titles.single.versions.single.metadata!;
       expect((read2.id, read2.label, read2.owner), (m.id, 'intro', owner));
+    });
+
+    test('version actions work on a title without its folders', () async {
+      put('$title/v1.rpp', adopted);
+      await scan(storage, library(Layout.classic()));
+      bool dir(String name) =>
+          Directory(p.joinAll([root.path, ...title.split('/'), name]))
+              .existsSync();
+      expect(titleFolders.where(dir), isEmpty);
+
+      expect(await readHistory(storage, title), isEmpty);
+      expect(await readTrash(storage, title), isEmpty);
+      expect(await unreferencedMedia(storage, title), isEmpty);
+
+      final created = await createVersion(storage, title, 'Song.RPP', meta());
+      final backup = await backupVersion(storage, title, 'v1.rpp');
+      final trashed = await deleteVersion(storage, title, 'Song.RPP');
+
+      expect(exists(backup), isTrue);
+      expect((await readHistory(storage, title)).values.single, hasLength(1));
+      expect(exists(created), isFalse);
+      expect((await readTrash(storage, title)).map((e) => e.path), [trashed]);
     });
 
     test('writes no project when the node file is missing', () async {
