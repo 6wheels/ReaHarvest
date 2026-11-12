@@ -13,7 +13,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import 'harness.dart';
 
-/// "To adopt": counter of titles, adoption in the title detail, Save As
+/// "To adopt": counter of titles, number of versions to adopt on the card,
+/// overview and detail (#80), adoption in the title detail, Save As
 /// duplicates made new versions (SPEC §4.2, §5.2, #59): `flutter test
 /// integration_test/to_adopt_test.dart -d windows`.
 void main() {
@@ -100,6 +101,8 @@ void main() {
     expect(find.text('Not adopted'), findsWidgets);
     await adopt(tester, 'first take');
     expect(find.text('Not adopted'), findsNothing);
+    // Nothing left to adopt: no count in the header.
+    expect(find.textContaining('not adopted'), findsNothing);
     expect(versionId(ballad), isNotNull);
     await back(tester);
 
@@ -112,12 +115,25 @@ void main() {
     await tester.tap(pill);
     await waitFor(tester, () => cards(tester).length == 2, reason: 'all');
 
-    // A Save As copy of an adopted version shares its identity.
-    await openDetail(tester, 'Song');
+    // A Save As copy of an adopted version shares its identity. The
+    // number of versions to adopt is in the overview and the detail header
+    // (#80).
+    await tester.tap(find.widgetWithText(TitleCard, 'Song'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.text('2 versions not adopted'),
+      ),
+      findsOne,
+    );
+    await openOverviewDetail(tester);
+    expect(find.text('2 versions not adopted'), findsOne);
     // Not adopted versions are listed with their file name.
     await tester.tap(find.textContaining('v1.rpp', findRichText: true).first);
     await tester.pumpAndSettle();
     await adopt(tester, 'intro');
+    expect(find.text('1 version not adopted'), findsOne);
     await back(tester);
     File(song).copySync(h.path('Band/Artist/Album/Song/v1 copy.rpp'));
     final copy = h.path('Band/Artist/Album/Song/v1 copy.rpp');
