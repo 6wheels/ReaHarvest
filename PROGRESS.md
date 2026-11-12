@@ -216,7 +216,7 @@ Plan of M3:
 
 ## Parked (Backlog)
 #12, #14, #22, #32, #40, #43, #46, #47, #48, #53, #58, #78, #111, #112, #113, #121.
-In progress outside the milestones: #126 CI time (parallel jobs, integration tests in Windows batches, app coverage gate on the merged reports).
+Done outside the milestones: #126 CI time, ~5 min 20 instead of ~12.5 (parallel jobs, integration tests in three Windows batches run by `tool/coverage.dart`, app coverage gate on the merged reports; new integration test files join a batch on their own).
 Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## For the maintainer (not for an agent)
