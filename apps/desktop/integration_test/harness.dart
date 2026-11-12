@@ -10,6 +10,7 @@ import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
+import 'package:reaharvest/ui/to_sort_page.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -247,3 +248,55 @@ Finder dialogField(String label) => find.descendant(
   of: find.byType(AlertDialog),
   matching: find.widgetWithText(TextField, label),
 );
+
+/// Scrolls the "To sort" page from its top until [finder] is built and
+/// visible: its list only builds the items near the screen.
+Future<void> showToSort(WidgetTester tester, Finder finder) async {
+  final list = find
+      .descendant(
+        of: find.byType(ToSortPage),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  final position = tester.state<ScrollableState>(list).position;
+  position.jumpTo(0);
+  await tester.pumpAndSettle();
+  while (finder.evaluate().isEmpty) {
+    if (position.pixels >= position.maxScrollExtent) fail('Not found');
+    position.jumpTo(position.pixels + 200);
+    await tester.pumpAndSettle();
+  }
+  await tester.ensureVisible(finder.first);
+  await tester.pumpAndSettle();
+}
+
+/// Header row of the "To sort" section labelled [label].
+Finder toSortSection(String label) =>
+    find.ancestor(of: find.text(label), matching: find.byType(Row)).first;
+
+/// Opens the batch fix preview of the "To sort" section labelled [label].
+Future<void> openSectionFix(WidgetTester tester, String label) async {
+  await showToSort(tester, find.text(label));
+  await tester.tap(
+    find.descendant(of: toSortSection(label), matching: find.text('Fix…')),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Confirms the open fix preview of [count] items, then waits for the end
+/// of its batch, whose report opens.
+Future<void> confirmFix(WidgetTester tester, Harness h, int count) async {
+  final before = h.tasks.length;
+  // The tasks zone may show an earlier batch under the same label.
+  await tester.tap(
+    find.widgetWithText(
+      FilledButton,
+      count == 1 ? 'Fix 1 item' : 'Fix $count items',
+    ),
+  );
+  await waitFor(
+    tester,
+    () => h.tasks.length > before && !h.tasks[before].isRunning,
+    reason: 'batch done',
+  );
+}
