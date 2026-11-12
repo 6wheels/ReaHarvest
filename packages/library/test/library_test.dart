@@ -13,7 +13,16 @@ final class MemoryStorage implements RepositoryStorage {
   @override
   Future<StorageEntry?> stat(String path) async {
     final data = files[path];
-    if (data == null) return null;
+    if (data == null) {
+      // A folder exists while it holds a file.
+      if (!files.keys.any((f) => f.startsWith('$path/'))) return null;
+      return StorageEntry(
+        path: path,
+        isDirectory: true,
+        size: 0,
+        modified: DateTime(2026),
+      );
+    }
     return StorageEntry(
       path: path,
       isDirectory: false,
@@ -128,6 +137,48 @@ void main() {
       expect(LayoutTemplate.recommended, LayoutTemplate.classic);
       expect(LayoutTemplate.projectOriented.create().levels.length, 2);
       expect(LayoutTemplate.film.create().leaf.key, 'scene');
+    });
+
+    test('adds the folders of existing paths to the known values', () async {
+      final storage = MemoryStorage()
+        ..files['Artist/New/One/one.rpp'] = [1]
+        ..files['Artist/Album/Song/song.rpp'] = [1];
+      final library =
+          Library(
+            id: LibraryId.generate(),
+            mode: LibraryMode.local,
+            layout: Layout.classic(),
+          ).withKnownValues(const [
+            KnownValue('Artist', [KnownValue('Album')]),
+          ]);
+      await writeLibrary(storage, library);
+
+      final added = await addKnownPaths(storage, [
+        'Artist/New/One',
+        'Artist/Album/Song',
+        'Artist/Gone/Two',
+      ]);
+
+      expect(added, ['Artist/New']);
+      final known = (await readLibrary(storage))!.knownValues;
+      expect(known.knows(['Artist', 'New']), isTrue);
+      expect(known.knows(['Artist', 'Gone']), isFalse);
+      expect(await addKnownPaths(storage, ['Artist/New/One']), isEmpty);
+    });
+
+    test('adds no known value to a library declaring none', () async {
+      final storage = MemoryStorage()..files['Artist/New/One/one.rpp'] = [1];
+      expect(await addKnownPaths(storage, ['Artist/New/One']), isEmpty);
+      await writeLibrary(
+        storage,
+        Library(
+          id: LibraryId.generate(),
+          mode: LibraryMode.local,
+          layout: Layout.classic(),
+        ),
+      );
+      expect(await addKnownPaths(storage, ['Artist/New/One']), isEmpty);
+      expect((await readLibrary(storage))!.knownValues, isEmpty);
     });
   });
 
