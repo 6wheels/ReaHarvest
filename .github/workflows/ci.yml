@@ -44,6 +44,9 @@ jobs:
       run:
         shell: pwsh
     steps:
+      # Real-time scanning slows down the cache extraction and the build.
+      - name: Disable Defender real-time scanning
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
@@ -86,6 +89,9 @@ jobs:
       run:
         shell: pwsh
     steps:
+      # Real-time scanning slows down the cache extraction and the build.
+      - name: Disable Defender real-time scanning
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
@@ -129,6 +135,9 @@ jobs:
       run:
         shell: pwsh
     steps:
+      # Real-time scanning slows down the cache extraction and the build.
+      - name: Disable Defender real-time scanning
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
