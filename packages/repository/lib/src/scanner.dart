@@ -575,10 +575,7 @@ final class _Scanner {
                   label:
                       node.versionLabels[m.id] ??
                       p.posix.basenameWithoutExtension(v.fileName),
-                  owner: switch (node.versionOwners[m.id]) {
-                    final owner? => MemberId(owner),
-                    null => null,
-                  },
+                  owner: node.versionOwners[m.id] as MemberId?,
                 ),
               )
             else

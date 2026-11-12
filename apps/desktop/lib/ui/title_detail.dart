@@ -127,7 +127,7 @@ String versionDetails(
   final owners = ref.watch(ownerNamesProvider);
   final m = version.metadata;
   return [
-    if (withLabel && m != null && m.label.isNotEmpty) m.label,
+    if (withLabel && m != null) m.label,
     if (m?.owner case final owner?) owners[owner] ?? l10n.unknownOwner,
     shortDate(l10n, version.modified),
     if (version.tempo case final bpm?) l10n.bpm(bpm.round()),
@@ -484,15 +484,14 @@ class _VersionItem extends ConsumerWidget {
     final m = version.metadata;
     final status = title.statusOf(version);
     // Free tree versions have no metadata: their file name is their label.
+    // Adopted versions always have one (file name fallback, SPEC §4.2).
     final label = m == null
         ? alerts.notAdopted
               ? l10n.notAdopted
               : p.posix.withoutExtension(version.fileName)
-        : m.label.isEmpty
-        ? l10n.noLabel
         : m.label;
     // Generic labels: muted, the file name tells the versions apart.
-    final generic = alerts.notAdopted || (m != null && m.label.isEmpty);
+    final generic = alerts.notAdopted;
     final details = [
       shortDate(l10n, version.modified),
       if (m?.owner case final owner?) owners[owner] ?? l10n.unknownOwner,
@@ -766,8 +765,6 @@ class _VersionPane extends ConsumerWidget {
                     ? version.fileName
                     : m == null
                     ? p.posix.withoutExtension(version.fileName)
-                    : m.label.isEmpty
-                    ? l10n.noLabel
                     : m.label,
                 style: text.titleLarge?.copyWith(
                   fontStyle: alerts.notAdopted ? FontStyle.italic : null,

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
@@ -242,31 +244,13 @@ final class _Merge {
     } on FormatException {
       return;
     }
-    var merged = into.status == null ? into.withStatus(from.status) : into;
     if (into.status != null &&
         from.status != null &&
         from.status != into.status) {
       dropped.add(ReportItem(target, from.status));
     }
-    for (final MapEntry(:key, :value) in from.versionStatuses.entries) {
-      if (!merged.versionStatuses.containsKey(key)) {
-        merged = merged.withVersionStatus(key, value);
-      }
-    }
-    for (final MapEntry(:key, :value) in from.versionLabels.entries) {
-      if (!merged.versionLabels.containsKey(key)) {
-        merged = merged.withVersionLabel(key, value);
-      }
-    }
-    for (final MapEntry(:key, :value) in from.versionOwners.entries) {
-      if (!merged.versionOwners.containsKey(key)) {
-        merged = merged.withVersionOwner(key, value);
-      }
-    }
-    if (merged.status != into.status ||
-        merged.versionStatuses.length != into.versionStatuses.length ||
-        merged.versionLabels.length != into.versionLabels.length ||
-        merged.versionOwners.length != into.versionOwners.length) {
+    final merged = into.mergedWith(from);
+    if (jsonEncode(merged.toJson()) != jsonEncode(into.toJson())) {
       await writeNodeFile(storage, target, merged);
     }
   }

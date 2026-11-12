@@ -80,6 +80,28 @@ final class NodeFile {
     return updated;
   }
 
+  /// This node with the entries of [other] it lacks: its title status if
+  /// it has none, and the version statuses, labels and owners of the ids it
+  /// does not know (folder merge, SPEC §5.8). Its own values win.
+  NodeFile mergedWith(NodeFile other) => NodeFile(
+    id,
+    level,
+    status: status ?? other.status,
+    versionStatuses: _withMissing(versionStatuses, other.versionStatuses),
+    versionLabels: _withMissing(versionLabels, other.versionLabels),
+    versionOwners: _withMissing(versionOwners, other.versionOwners),
+  );
+
+  /// [map] followed by the entries of [other] whose key it lacks.
+  static Map<String, String> _withMissing(
+    Map<String, String> map,
+    Map<String, String> other,
+  ) => {
+    ...map,
+    for (final e in other.entries)
+      if (!map.containsKey(e.key)) e.key: e.value,
+  };
+
   NodeFile _copy({
     Map<String, String>? versionStatuses,
     Map<String, String>? versionLabels,

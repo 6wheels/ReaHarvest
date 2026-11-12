@@ -489,10 +489,7 @@ final class LocalIndex {
           ? null
           : VersionMetadata(
               id: VersionId(versionId),
-              owner: switch (r['owner'] as String?) {
-                final owner? => MemberId(owner),
-                null => null,
-              },
+              owner: r['owner'] as MemberId?,
               label: r['label'] as String? ?? '',
             ),
       tempo: (r['tempo'] as num?)?.toDouble(),

@@ -185,7 +185,6 @@
   "@toAdoptCount": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "noLabel": "No label",
   "unknownOwner": "Unknown",
   "labelRequired": "A label is required",
   "history": "History",
