@@ -17,6 +17,7 @@ import 'logs.dart';
 import 'state/libraries.dart';
 import 'state/navigation.dart';
 import 'state/providers.dart';
+import 'ui/settings_recovery.dart';
 
 const _demo = bool.fromEnvironment('REAHARVEST_DEMO');
 
@@ -44,7 +45,7 @@ Future<void> main() async {
   startLogging(logFolder);
   Logger('app').info('Started; settings: $settingsPath, index: $indexPath');
   final settingsFile = SettingsFile(settingsPath);
-  final settings = await settingsFile.load();
+  final settings = await loadSettingsOrRecover(settingsFile, show: runApp);
 
   final container = ProviderContainer(
     overrides: [

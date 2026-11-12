@@ -213,6 +213,66 @@ void main() {
       expect(File(path).lengthSync(), greaterThan(0));
     });
 
+    group('unusable file', () {
+      Future<void> expectKept(String content, Matcher failure) async {
+        File(path)
+          ..createSync(recursive: true)
+          ..writeAsStringSync(content);
+        await expectLater(SettingsFile(path).load(), throwsA(failure));
+        expect(File(path).readAsStringSync(), content);
+      }
+
+      test('truncated file', () async {
+        await expectKept(
+          '{"schemaVersion": 1, "identity": {',
+          isA<SettingsUnreadableException>(),
+        );
+      });
+
+      test('wrong shape', () async {
+        await expectKept('[1, 2]', isA<SettingsUnreadableException>());
+        await expectKept(
+          '{"schemaVersion": 1, "libraries": 3}',
+          isA<SettingsUnreadableException>(),
+        );
+      });
+
+      test('missing or other schema version', () async {
+        await expectKept('{}', isA<SettingsUnreadableException>());
+        await expectKept(
+          '{"schemaVersion": 0}',
+          isA<SettingsUnreadableException>(),
+        );
+        await expectKept(
+          '{"schemaVersion": "2"}',
+          isA<SettingsUnreadableException>(),
+        );
+      });
+
+      test('newer schema version', () async {
+        await expectKept(
+          '{"schemaVersion": ${AppSettings.schemaVersion + 1}}',
+          isA<SettingsNewerException>(),
+        );
+      });
+
+      test('set aside, then new settings on the next load', () async {
+        File(path)
+          ..createSync(recursive: true)
+          ..writeAsStringSync('broken');
+        final aside = await SettingsFile(path).setAside();
+        expect(
+          p.basename(aside),
+          matches(RegExp(r'^settings\.json\.broken-\d{8}-\d{6}$')),
+        );
+        expect(File(aside).readAsStringSync(), 'broken');
+        expect(File(path).existsSync(), isFalse);
+
+        final settings = await SettingsFile(path).load();
+        expect(settings.libraries, isEmpty);
+      });
+    });
+
     test('round-trips libraries and paths', () async {
       final file = SettingsFile(path);
       final settings = (await file.load())
