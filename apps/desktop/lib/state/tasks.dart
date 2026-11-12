@@ -25,9 +25,12 @@ final class TaskControl {
   final TasksNotifier _notifier;
   final int _id;
 
+  /// Whether the task was asked to stop.
+  bool get isCancelled => _notifier._task(_id).cancelling;
+
   /// Throws [TaskCancelled] if the task was asked to stop.
   void checkCancelled() {
-    if (_notifier._task(_id).cancelling) throw const TaskCancelled();
+    if (isCancelled) throw const TaskCancelled();
   }
 
   /// Sets the progress, from 0 to 1.
