@@ -15,12 +15,14 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 8;
+const _schemaVersion = 9;
 
 const _schema = '''
 CREATE TABLE libraries (
   id TEXT PRIMARY KEY,
-  json TEXT NOT NULL
+  json TEXT NOT NULL,
+  journal_folder TEXT,
+  journal_line INTEGER
 );
 CREATE TABLE nodes (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
@@ -122,15 +124,24 @@ final class LocalIndex {
 
   void close() => _db.close();
 
-  /// Stores [library] and the result of its latest [scan]. File hashes are
-  /// kept for files whose stamp did not change, and cleared otherwise.
+  /// Stores [library] and the result of its latest [scan], with the
+  /// position of the migration journals it took into account. File hashes
+  /// are kept for files whose stamp did not change, and cleared otherwise.
   void update(Library library, ScanResult scan) {
     final id = library.id;
     _transaction(() {
       _db.execute(
-        'INSERT INTO libraries (id, json) VALUES (?, ?) '
-        'ON CONFLICT (id) DO UPDATE SET json = excluded.json',
-        [id, jsonEncode(library.toJson())],
+        'INSERT INTO libraries (id, json, journal_folder, journal_line) '
+        'VALUES (?, ?, ?, ?) '
+        'ON CONFLICT (id) DO UPDATE SET json = excluded.json, '
+        'journal_folder = excluded.journal_folder, '
+        'journal_line = excluded.journal_line',
+        [
+          id,
+          jsonEncode(library.toJson()),
+          scan.journalPosition?.folder,
+          scan.journalPosition?.line,
+        ],
       );
       for (final t in [
         'nodes',
@@ -243,6 +254,20 @@ final class LocalIndex {
       upsert.close();
       delete.close();
     }
+  }
+
+  /// Position of the migration journals taken into account by the last scan
+  /// stored for [id], or null if none.
+  JournalPosition? journalPosition(LibraryId id) {
+    final rows = _db.select(
+      'SELECT journal_folder, journal_line FROM libraries WHERE id = ?',
+      [id],
+    );
+    return switch (rows.firstOrNull) {
+      {'journal_folder': final String folder, 'journal_line': final int line} =>
+        (folder: folder, line: line),
+      _ => null,
+    };
   }
 
   /// Removes [id] and everything indexed for it.

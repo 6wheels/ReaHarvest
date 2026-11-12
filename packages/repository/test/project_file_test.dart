@@ -134,7 +134,7 @@ void main() {
   group('with a Windows-1252 project', () {
     Future<Migration> migration() async {
       final m = Migration.start(storage);
-      await m.takeInventory(
+      await m.inventory.take(
         (path) async => base64.encode(
           Uint8List.fromList(
             await storage.read(path).expand((c) => c).toList(),

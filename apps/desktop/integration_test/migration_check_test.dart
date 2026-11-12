@@ -86,9 +86,9 @@ void main() {
     // Every file inventoried before the first change, the library
     // description left out.
     final migration = (await latest(tester))!;
-    expect(migration.inventoryComplete, isTrue);
+    expect(migration.inventory.isComplete, isTrue);
     expect(
-      migration.files.keys,
+      migration.inventory.files.keys,
       containsAll([
         'Artist/Album/Song/v1.rpp',
         'Artist/Album/Song/Alice/take.rpp',
@@ -96,7 +96,7 @@ void main() {
         'Live/Ballad/v1.rpp',
       ]),
     );
-    expect(migration.files.keys, isNot(contains('.library.json')));
+    expect(migration.inventory.files.keys, isNot(contains('.library.json')));
     // The rewritten project's raw original is kept in the migration.
     expect(File(take).existsSync(), isFalse);
     final kept = [
@@ -129,7 +129,7 @@ void main() {
     await tapText(tester, 'Close');
     expect(File(h.path('Band/Live/Ballad/v1.rpp')).existsSync(), isTrue);
     final interrupted = (await latest(tester))!;
-    expect(interrupted.inventoryComplete, isFalse);
+    expect(interrupted.inventory.isComplete, isFalse);
     // The item is still to sort.
     expect(find.text(wrongLevel), findsOne);
 
@@ -141,7 +141,7 @@ void main() {
     expect(File(h.path('Band/Artist/Live/Ballad/v1.rpp')).existsSync(), isTrue);
     final resumed = (await latest(tester))!;
     expect(resumed.folder, interrupted.folder);
-    expect(resumed.inventoryComplete, isTrue);
+    expect(resumed.inventory.isComplete, isTrue);
     expect(migrations(), hasLength(1));
   });
 
