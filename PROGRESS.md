@@ -55,7 +55,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 
 ## M1 — Migration (umbrella #30)
 - [x] #79 center the main window at launch (priority 1)
-- [ ] #59 integration tests of M1 and of the existing features (regression net; one integration test ticket per milestone: M0 #85, M2 #86, M3 #87; the version management test follows the label display again; the repository is public: CI runs on every push; lot A, the existing features, done with a shared `integration_test/harness.dart`; lot B to do)
+- [x] #59 integration tests of M1 and of the existing features (regression net; one integration test ticket per milestone: M0 #85, M2 #86, M3 #87; the version management test follows the label display again; the repository is public: CI runs on every push; lot A, the existing features, done with a shared `integration_test/harness.dart`; lot B, the delivered M1 features, done: To sort issues and bulk selection, inventory with its resume and gap, layout moves, lifts and merges, members, versions to adopt; the remaining lines are ticked by their feature tickets)
 - [x] #77 known level values (artists, albums) for layout recognition
 - [x] #66 inventory and no-loss check (logic in `repository`; started as a background task by the M1 fix flows)
 - [x] #67 typed migration issues in To sort (layout, levels, duplicated `versionId`; media, Assets and conflict-copy detectors come with #69, #70, #23)
