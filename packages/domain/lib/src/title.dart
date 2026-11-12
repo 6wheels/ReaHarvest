@@ -63,43 +63,34 @@ Map<VersionId, List<(Title, Version)>> duplicateVersions(
   };
 }
 
-/// Version metadata stored in the `.RPP` EXTSTATE section (SPEC §4.2).
+/// Version metadata (SPEC §4.2): the id is stored in the `.RPP` EXTSTATE
+/// section; label and owner in the title's `.node.json`, filled in by the
+/// scan.
 final class VersionMetadata {
-  const VersionMetadata({
-    required this.id,
-    required this.owner,
-    this.label = '',
-  });
+  const VersionMetadata({required this.id, this.label = '', this.owner});
 
   static const section = 'REAHARVEST';
   static const idKey = 'VERSIONID';
-  static const ownerKey = 'OWNER';
-  static const labelKey = 'LABEL';
 
   final VersionId id;
-  final MemberId owner;
   final String label;
 
-  /// EXTSTATE values; an empty value removes the key.
-  Map<String, String> toExtState() => {
-    idKey: id,
-    ownerKey: owner,
-    labelKey: label,
-  };
+  /// Null when the library declares no members, or none was chosen.
+  final MemberId? owner;
 
-  /// Reads an EXTSTATE section; null if the version is not adopted.
+  /// EXTSTATE values: the version id only. `OWNER` and `LABEL` keys found
+  /// in a project are neither read nor removed.
+  Map<String, String> toExtState() => {idKey: id};
+
+  /// Reads an EXTSTATE section (id only, label and owner left empty); null
+  /// if the version is not adopted.
   static VersionMetadata? fromExtState(Map<String, String> values) {
-    final upper = {
-      for (final e in values.entries) e.key.toUpperCase(): e.value,
-    };
-    final id = upper[idKey];
-    final owner = upper[ownerKey];
-    if (id == null || id.isEmpty || owner == null || owner.isEmpty) return null;
-    return VersionMetadata(
-      id: VersionId(id),
-      owner: MemberId(owner),
-      label: upper[labelKey] ?? '',
-    );
+    final id = [
+      for (final e in values.entries)
+        if (e.key.toUpperCase() == idKey) e.value,
+    ].firstOrNull;
+    if (id == null || id.isEmpty) return null;
+    return VersionMetadata(id: VersionId(id));
   }
 }
 
@@ -161,6 +152,22 @@ final class Version {
   final String? renderFile;
 
   bool get isAdopted => metadata != null;
+
+  /// This version with [metadata] instead of its own.
+  Version withMetadata(VersionMetadata? metadata) => Version(
+    fileName: fileName,
+    modified: modified,
+    size: size,
+    metadata: metadata,
+    tempo: tempo,
+    length: length,
+    trackCount: trackCount,
+    itemCount: itemCount,
+    plugins: plugins,
+    media: media,
+    recordPath: recordPath,
+    renderFile: renderFile,
+  );
 
   /// Version identity used for statuses: the version id, or [fileName] when
   /// the version has no metadata (free tree versions, SPEC §3.3).

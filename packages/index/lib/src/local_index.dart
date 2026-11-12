@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 9;
+const _schemaVersion = 10;
 
 const _schema = '''
 CREATE TABLE libraries (
@@ -38,6 +38,8 @@ CREATE TABLE titles (
   tags TEXT NOT NULL,
   status TEXT,
   version_statuses TEXT NOT NULL,
+  version_labels TEXT NOT NULL,
+  version_owners TEXT NOT NULL,
   PRIMARY KEY (library_id, path)
 );
 CREATE TABLE versions (
@@ -162,7 +164,8 @@ final class LocalIndex {
       );
       _insertAll(
         'INSERT INTO titles (library_id, path, id, tags, status, '
-        'version_statuses) VALUES (?, ?, ?, ?, ?, ?)',
+        'version_statuses, version_labels, version_owners) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           for (final t in scan.titles)
             [
@@ -172,6 +175,10 @@ final class LocalIndex {
               jsonEncode(t.tags),
               t.status,
               jsonEncode(t.versionStatuses),
+              // Raw node entries: the next scan reuses them while the node
+              // file is unchanged (SPEC §4.2).
+              jsonEncode(scan.nodes[t.path]?.versionLabels ?? const {}),
+              jsonEncode(scan.nodes[t.path]?.versionOwners ?? const {}),
             ],
         ],
       );
@@ -305,11 +312,7 @@ final class LocalIndex {
           tags: (jsonDecode(r['tags'] as String) as Map).cast(),
           versions: versions[(r['library_id'], r['path'])] ?? const [],
           status: r['status'] as String?,
-          versionStatuses: {
-            for (final e
-                in (jsonDecode(r['version_statuses'] as String) as Map).entries)
-              e.key as String: e.value as String,
-          },
+          versionStatuses: _stringMap(r['version_statuses'] as String),
         ),
     ];
   }
@@ -329,6 +332,17 @@ final class LocalIndex {
     ];
     final restored = titles(library: id);
     final byPath = {for (final t in restored) t.path: t};
+    final entries = {
+      for (final r in _db.select(
+        'SELECT path, version_labels, version_owners FROM titles '
+        'WHERE library_id = ?',
+        [id],
+      ))
+        r['path'] as String: (
+          labels: _stringMap(r['version_labels'] as String),
+          owners: _stringMap(r['version_owners'] as String),
+        ),
+    };
     return ScanResult(
       titles: restored,
       nodes: {
@@ -340,6 +354,8 @@ final class LocalIndex {
             r['level'] as String,
             status: byPath[r['path']]?.status,
             versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
+            versionLabels: entries[r['path']]?.labels ?? const {},
+            versionOwners: entries[r['path']]?.owners ?? const {},
           ),
       },
       issues: Report({
@@ -473,7 +489,10 @@ final class LocalIndex {
           ? null
           : VersionMetadata(
               id: VersionId(versionId),
-              owner: MemberId(r['owner'] as String),
+              owner: switch (r['owner'] as String?) {
+                final owner? => MemberId(owner),
+                null => null,
+              },
               label: r['label'] as String? ?? '',
             ),
       tempo: (r['tempo'] as num?)?.toDouble(),
@@ -489,6 +508,11 @@ final class LocalIndex {
       renderFile: r['render_file'] as String?,
     );
   }
+
+  static Map<String, String> _stringMap(String json) => {
+    for (final e in (jsonDecode(json) as Map).entries)
+      e.key as String: e.value as String,
+  };
 
   void _insertAll(String sql, List<List<Object?>> rows) {
     final statement = _db.prepare(sql);

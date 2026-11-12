@@ -199,26 +199,34 @@ void main() {
   });
 
   group('version metadata', () {
-    test('round-trips EXTSTATE values', () {
+    test('stores only the version id in EXTSTATE', () {
       final meta = VersionMetadata(
         id: VersionId.generate(),
         owner: MemberId.generate(),
         label: 'chorus B',
       );
+      expect(meta.toExtState(), {'VERSIONID': meta.id});
       final read = VersionMetadata.fromExtState(meta.toExtState())!;
-      expect(
-        (read.id, read.owner, read.label),
-        (meta.id, meta.owner, meta.label),
-      );
+      expect((read.id, read.owner, read.label), (meta.id, null, ''));
     });
 
-    test('reads keys case-insensitively and requires id and owner', () {
-      expect(
-        VersionMetadata.fromExtState({'versionid': 'V', 'owner': 'M'})!.label,
-        '',
-      );
-      expect(VersionMetadata.fromExtState({'VERSIONID': 'V'}), isNull);
+    test('reads the id case-insensitively, ignoring owner and label', () {
+      final read = VersionMetadata.fromExtState({
+        'versionid': 'V',
+        'OWNER': 'M',
+        'LABEL': 'old',
+      })!;
+      expect((read.id, read.owner, read.label), ('V', null, ''));
+      expect(VersionMetadata.fromExtState({'OWNER': 'M'}), isNull);
+      expect(VersionMetadata.fromExtState({'VERSIONID': ''}), isNull);
       expect(VersionMetadata.fromExtState(const {}), isNull);
+    });
+
+    test('replaces the metadata of a version', () {
+      final v = Version(fileName: 'a.rpp', modified: DateTime(2026), size: 1);
+      const m = VersionMetadata(id: VersionId('V'), label: 'x');
+      final copy = v.withMetadata(m);
+      expect((copy.fileName, copy.size, copy.metadata), ('a.rpp', 1, m));
     });
   });
 

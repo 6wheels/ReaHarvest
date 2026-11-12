@@ -20,9 +20,11 @@ String suggestedVersionName(String title, String label, {String? owner}) =>
     '${[title, label, ?owner].map((s) => s.trim()).where((s) => s.isNotEmpty).join(' - ')}.RPP';
 
 /// Creates the version [fileName] in the title folder [titleDir], blank or
-/// from the project [template] (SPEC §5.4): [metadata] written in its
-/// EXTSTATE, record path `Media` and render folder `Renders`. Throws
-/// [ArgumentError] on an invalid name, [StateError] if the file exists.
+/// from the project [template] (SPEC §5.4): the id of [metadata] written in
+/// its EXTSTATE, its label and owner in the title's node file (first), record
+/// path `Media` and render folder `Renders`. Throws [ArgumentError] on an
+/// invalid name, [StateError] if the file exists or the title has no node
+/// file.
 Future<String> createVersion(
   RepositoryStorage storage,
   String titleDir,
@@ -31,6 +33,7 @@ Future<String> createVersion(
   String? template,
 }) async {
   final path = await _newVersionPath(storage, titleDir, fileName);
+  await writeVersionEntries(storage, titleDir, metadata);
   var text = template ?? blankProject;
   final record = RppProject.parse(text).document.root.line('RECORD_PATH');
   text = setRootAttribute(text, 'RECORD_PATH', [
@@ -44,7 +47,8 @@ Future<String> createVersion(
 }
 
 /// Duplicates the version [source] of the title [titleDir] as [fileName]
-/// (SPEC §5.4): same content, new [metadata]. Throws like [createVersion].
+/// (SPEC §5.4): same content, new [metadata] (id in the file, label and
+/// owner in the node file). Throws like [createVersion].
 Future<String> duplicateVersion(
   RepositoryStorage storage,
   String titleDir,
@@ -53,6 +57,7 @@ Future<String> duplicateVersion(
   VersionMetadata metadata,
 ) async {
   final path = await _newVersionPath(storage, titleDir, fileName);
+  await writeVersionEntries(storage, titleDir, metadata);
   final (:text, :encoding) = await readProject(
     storage,
     joinPath(titleDir, source),
@@ -79,27 +84,6 @@ Future<String> renameVersion(
   final to = await _newVersionPath(storage, parentOf(from), newName);
   await storage.move(from, to);
   return to;
-}
-
-/// Sets the label of the version [fileName] of the title [titleDir]
-/// (SPEC §4.2). Throws [StateError] if the version is not adopted.
-Future<void> setVersionLabel(
-  RepositoryStorage storage,
-  String titleDir,
-  String fileName,
-  String label,
-) async {
-  final path = joinPath(titleDir, fileName);
-  final metadata = VersionMetadata.fromExtState(
-    RppProject.parse((await readProject(storage, path)).text)
-        .extState(VersionMetadata.section),
-  );
-  if (metadata == null) throw StateError('Version not adopted: $path');
-  await writeVersionMetadata(
-    storage,
-    path,
-    VersionMetadata(id: metadata.id, owner: metadata.owner, label: label),
-  );
 }
 
 /// Moves the version [fileName] of the title [titleDir] to the `.trash/`

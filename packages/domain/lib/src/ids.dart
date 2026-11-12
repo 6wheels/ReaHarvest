@@ -23,7 +23,7 @@ String newUlid({DateTime? now, Random? random}) {
 /// Whether [value] is a canonical (uppercase) ULID.
 bool isUlid(String value) => _ulidPattern.hasMatch(value);
 
-/// Local member identity; owner of versions in every mode.
+/// Member identity; owner of versions when the library declares members.
 extension type const MemberId(String value) implements String {
   MemberId.generate() : this(newUlid());
 }

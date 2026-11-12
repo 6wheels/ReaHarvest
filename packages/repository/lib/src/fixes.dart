@@ -47,15 +47,16 @@ final class LiftProject extends MigrationFix {
   const LiftProject(
     super.path,
     this.titleDir, {
-    required this.owner,
+    this.owner,
     this.status,
     this.statusFolder,
   });
 
   final String titleDir;
 
-  /// Owner if the project is not adopted yet.
-  final MemberId owner;
+  /// Owner, set if the version has none; null when the library declares no
+  /// members.
+  final MemberId? owner;
 
   /// Version status to set, deduced from [statusFolder].
   final String? status;
@@ -165,8 +166,8 @@ Future<Report> _moveFolder(
 /// collision gets a free name (`name (2).ext`) and the references of the
 /// moved projects are rewritten to follow it. The projects of two titles
 /// thus become versions of one title. Node files are merged: the target's
-/// title status wins (the dropped one is reported), version statuses are
-/// added. What is left of [source] (its node files, empty folders) is
+/// title status wins (the dropped one is reported), version statuses,
+/// labels and owners are added (the target's win on a same id). What is left of [source] (its node files, empty folders) is
 /// moved into the migration folder. Only moves and targeted rewrites: no
 /// file is read except projects and node files.
 Future<Report> mergeFolder(
@@ -252,8 +253,20 @@ final class _Merge {
         merged = merged.withVersionStatus(key, value);
       }
     }
+    for (final MapEntry(:key, :value) in from.versionLabels.entries) {
+      if (!merged.versionLabels.containsKey(key)) {
+        merged = merged.withVersionLabel(key, value);
+      }
+    }
+    for (final MapEntry(:key, :value) in from.versionOwners.entries) {
+      if (!merged.versionOwners.containsKey(key)) {
+        merged = merged.withVersionOwner(key, value);
+      }
+    }
     if (merged.status != into.status ||
-        merged.versionStatuses.length != into.versionStatuses.length) {
+        merged.versionStatuses.length != into.versionStatuses.length ||
+        merged.versionLabels.length != into.versionLabels.length ||
+        merged.versionOwners.length != into.versionOwners.length) {
       await writeNodeFile(storage, target, merged);
     }
   }
@@ -320,13 +333,17 @@ Future<Report> _lift(RepositoryStorage storage, LiftProject fix) async {
 /// (member or status subfolder, SPEC §5.8), up into the title, under a
 /// free name. Its relative media references and record path are rewritten
 /// to keep pointing at the same files, which do not move (their pool merge
-/// is another fix). A project without metadata is adopted for [owner];
-/// [status], if set, becomes its version status. Returns its new path.
+/// is another fix). A project without id gets one. The node file of the
+/// title gets, for that id and only where it has none, [owner] (if set) and
+/// the new file name without its extension as label (SPEC §4.2, §5.8);
+/// [status], if set, becomes its version status. The node file is written
+/// first: a title without one throws [StateError] before the project is
+/// touched. Returns its new path.
 Future<String> liftProject(
   RepositoryStorage storage,
   String path,
   String titleDir, {
-  required MemberId owner,
+  MemberId? owner,
   String? status,
 }) async {
   final folder = p.posix.dirname(path);
@@ -343,7 +360,7 @@ Future<String> liftProject(
     RppProject.parse(text).extState(VersionMetadata.section),
   );
   if (metadata == null) {
-    metadata = VersionMetadata(id: VersionId.generate(), owner: owner);
+    metadata = VersionMetadata(id: VersionId.generate());
     text = setExtState(text, VersionMetadata.section, metadata.toExtState());
   }
   final target = await freePath(
@@ -352,11 +369,19 @@ Future<String> liftProject(
         ? p.posix.basename(path)
         : '$titleDir/${p.posix.basename(path)}',
   );
+  final entries = VersionMetadata(
+    id: metadata.id,
+    label: p.posix.basenameWithoutExtension(target),
+    owner: owner,
+  );
+  await updateNodeFile(storage, titleDir, (node) {
+    final updated = node.withVersion(entries, onlyMissing: true);
+    return status == null
+        ? updated
+        : updated.withVersionStatus(entries.id, status);
+  });
   await storage.move(path, target);
   await writeProject(storage, target, text, encoding);
-  if (status != null) {
-    await setVersionStatus(storage, titleDir, metadata.id, status);
-  }
   return target;
 }
 

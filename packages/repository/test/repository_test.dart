@@ -8,6 +8,8 @@ import 'package:reaharvest_repository/src/windows_hidden.dart' as windows;
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'package:test/test.dart';
 
+import 'memory_storage.dart';
+
 const fixtures = '../../test/fixtures';
 
 /// Issues about the media, record path and render target of the projects
@@ -585,13 +587,99 @@ void main() {
     });
 
     test('reject an invalid shape', () {
+      for (final key in ['versionStatuses', 'versionLabels', 'versionOwners']) {
+        expect(
+          () => NodeFile.fromJson({
+            'nodeId': newUlid(),
+            'level': 'title',
+            key: {'v': 1},
+          }),
+          throwsFormatException,
+          reason: key,
+        );
+      }
+    });
+  });
+
+  group('version labels and owners', () {
+    const title = 'band/album/song';
+    const file = '$title/v1.rpp';
+
+    File project() => File(p.joinAll([root.path, ...file.split('/')]));
+
+    Map<String, Object?> node() => (jsonDecode(
+      File(p.joinAll([root.path, ...title.split('/'), '.node.json']))
+          .readAsStringSync(),
+    ) as Map).cast();
+
+    test('are edited in the node file, the project left untouched', () async {
+      final lib = library(Layout.classic());
+      put(file, adopted);
+      final date = DateTime(2025, 1, 2);
+      project().setLastModifiedSync(date);
+      final first = await scan(storage, lib);
+      final bytes = project().readAsBytesSync();
+      final owner = MemberId.generate();
+
+      await setVersionLabel(storage, title, adoptedId, 'bridge');
+      await setVersionOwner(storage, title, adoptedId, owner);
+
+      expect(project().readAsBytesSync(), bytes);
+      expect(project().lastModifiedSync(), date);
+      expect(node()['versionLabels'], {adoptedId: 'bridge'});
+      expect(node()['versionOwners'], {adoptedId: owner});
+      // Unchanged project, changed node file: read again from the node.
+      final second = await scan(storage, lib, previous: first);
+      final m = second.titles.single.versions.single.metadata!;
+      expect((m.id, m.label, m.owner), (adoptedId, 'bridge', owner));
+
+      await setVersionOwner(storage, title, adoptedId, null);
+      await setVersionLabel(storage, title, adoptedId, '');
+      expect(node().keys, isNot(contains('versionOwners')));
+      expect(node().keys, isNot(contains('versionLabels')));
+      final third = await scan(storage, lib, previous: second);
+      final cleared = third.titles.single.versions.single.metadata!;
+      expect((cleared.label, cleared.owner), ('v1', null));
+    });
+
+    test('fall back to the file name, without owner', () async {
+      put(file, adopted);
+      final m = (await scan(
+        storage,
+        library(Layout.classic()),
+      )).titles.single.versions.single.metadata!;
+      expect((m.id, m.label, m.owner), (adoptedId, 'v1', null));
+      expect(node().keys, isNot(contains('versionLabels')));
+    });
+
+    test('ignore and keep OWNER and LABEL keys of a project', () async {
+      final legacy = setExtState(unknown, VersionMetadata.section, {
+        'VERSIONID': adoptedId,
+        'OWNER': 'M',
+        'LABEL': 'old label',
+      });
+      put(file, legacy);
+      final lib = library(Layout.classic());
+      await scan(storage, lib);
+
+      await setVersionLabel(storage, title, adoptedId, 'new');
+      final m = (await scan(
+        storage,
+        lib,
+      )).titles.single.versions.single.metadata!;
+      expect((m.id, m.label, m.owner), (adoptedId, 'new', null));
+      expect(project().readAsStringSync(), legacy);
+
+      final copy = await separateDuplicateVersion(storage, title, 'v1.rpp');
+      final values = RppProject.parse(project().readAsStringSync())
+          .extState(VersionMetadata.section);
+      expect(values, {'VERSIONID': copy, 'OWNER': 'M', 'LABEL': 'old label'});
+    });
+
+    test('require an existing node file', () {
       expect(
-        () => NodeFile.fromJson({
-          'nodeId': newUlid(),
-          'level': 'title',
-          'versionStatuses': {'v': 1},
-        }),
-        throwsFormatException,
+        setVersionLabel(storage, 'missing', adoptedId, 'x'),
+        throwsA(isA<StateError>()),
       );
     });
   });
@@ -931,8 +1019,13 @@ void main() {
       RppProject.parse(read(path)).extState(VersionMetadata.section),
     );
 
-    VersionMetadata meta([String label = '']) =>
+    VersionMetadata meta([String label = 'x']) =>
         VersionMetadata(id: VersionId.generate(), owner: owner, label: label);
+
+    /// Node file of the title, created if missing.
+    Future<NodeFile> node() async =>
+        await readNodeFile(storage, title) ??
+        await scaffoldTitle(storage, title, 'title');
 
     String withoutMetadata(String text) => setExtState(
       text,
@@ -948,6 +1041,7 @@ void main() {
     );
 
     test('creates a blank version, scanned as adopted', () async {
+      await node();
       final m = meta('intro');
       final path = await createVersion(storage, title, 'Song - intro.RPP', m);
 
@@ -955,12 +1049,33 @@ void main() {
       final root = RppProject.parse(read(path)).document.root;
       expect(root.line('RECORD_PATH')!.params, ['Media', '']);
       expect(root.line('RENDER_FILE')!.params, ['Renders']);
-      expect(metadataOf(path)!.id, m.id);
+      expect(RppProject.parse(read(path)).extState(VersionMetadata.section), {
+        'VERSIONID': m.id,
+      });
       final result = await scan(storage, library(Layout.classic()));
-      expect(result.titles.single.versions.single.metadata!.label, 'intro');
+      final read2 = result.titles.single.versions.single.metadata!;
+      expect((read2.id, read2.label, read2.owner), (m.id, 'intro', owner));
+    });
+
+    test('writes no project when the node file is missing', () async {
+      await expectLater(
+        createVersion(storage, title, 'Song.RPP', meta()),
+        throwsStateError,
+      );
+      expect(exists('$title/Song.RPP'), isFalse);
+    });
+
+    test('writes no owner when none is given', () async {
+      await node();
+      final m = VersionMetadata(id: VersionId.generate(), label: 'solo');
+      await createVersion(storage, title, 'Song.RPP', m);
+      final saved = (await readNodeFile(storage, title))!;
+      expect(saved.versionLabels, {m.id: 'solo'});
+      expect(saved.versionOwners, isEmpty);
     });
 
     test('creates a version from a template, keeping its content', () async {
+      await node();
       final path = await createVersion(
         storage,
         title,
@@ -991,6 +1106,7 @@ void main() {
 
     test('duplicates a version under a new identity', () async {
       put('$title/Song.RPP', adopted);
+      await node();
       final m = meta('copy');
 
       final path = await duplicateVersion(
@@ -1003,10 +1119,69 @@ void main() {
 
       expect(metadataOf(path)!.id, m.id);
       expect(withoutMetadata(read(path)), withoutMetadata(adopted));
+      final saved = (await readNodeFile(storage, title))!;
+      expect(saved.versionLabels, {m.id: 'copy'});
+      expect(saved.versionOwners, {m.id: owner});
+    });
+
+    test('separates a Save As copy, its label copied', () async {
+      put('$title/Song.RPP', adopted);
+      put('$title/Song copy.RPP', adopted);
+      await node();
+      await setVersionLabel(storage, title, adoptedId, 'chorus B');
+      final other = MemberId.generate();
+      await setVersionOwner(storage, title, adoptedId, other);
+
+      final id = await separateDuplicateVersion(
+        storage,
+        title,
+        'Song copy.RPP',
+        owner: owner,
+      );
+
+      expect(id, isNot(adoptedId));
+      expect(read('$title/Song.RPP'), adopted);
+      expect(metadataOf('$title/Song copy.RPP')!.id, id);
+      final saved = (await readNodeFile(storage, title))!;
+      expect(saved.versionLabels, {adoptedId: 'chorus B', id: 'chorus B'});
+      expect(saved.versionOwners, {adoptedId: other, id: owner});
+      final versions = {
+        for (final v in (await scan(
+          storage,
+          library(Layout.classic()),
+        )).titles.single.versions)
+          v.fileName: v.metadata!,
+      };
+      expect(versions['Song copy.RPP']!.label, 'chorus B');
+      expect(versions['Song.RPP']!.owner, other);
+
+      put('$title/Other.RPP', unknown);
+      await expectLater(
+        separateDuplicateVersion(storage, title, 'Other.RPP'),
+        throwsStateError,
+      );
+    });
+
+    test('separates a Save As copy without label nor owner', () async {
+      put('$title/Song.RPP', adopted);
+      put('$title/Song copy.RPP', adopted);
+      await node();
+
+      final id = await separateDuplicateVersion(
+        storage,
+        title,
+        'Song copy.RPP',
+      );
+
+      final saved = (await readNodeFile(storage, title))!;
+      expect(saved.versionLabels, isEmpty);
+      expect(saved.versionOwners, isEmpty);
+      expect(metadataOf('$title/Song copy.RPP')!.id, id);
     });
 
     test('renames a version and edits its label', () async {
       put('$title/Song.RPP', adopted);
+      await node();
       final id = metadataOf('$title/Song.RPP')!.id;
 
       final path = await renameVersion(
@@ -1015,19 +1190,19 @@ void main() {
         'Song.RPP',
         'Song B.RPP',
       );
-      await setVersionLabel(storage, title, 'Song B.RPP', 'bridge');
+      await setVersionLabel(storage, title, id, 'bridge');
 
       expect(path, '$title/Song B.RPP');
       expect(exists('$title/Song.RPP'), isFalse);
       expect(metadataOf(path)!.id, id);
-      expect(metadataOf(path)!.label, 'bridge');
+      final m = (await scan(
+        storage,
+        library(Layout.classic()),
+      )).titles.single.versions.single.metadata!;
+      expect((m.id, m.label), (id, 'bridge'));
       put('$title/Other.RPP', unknown);
       expect(
         () => renameVersion(storage, title, 'Other.RPP', 'Song B.RPP'),
-        throwsStateError,
-      );
-      expect(
-        () => setVersionLabel(storage, title, 'Other.RPP', 'x'),
         throwsStateError,
       );
     });
@@ -1114,21 +1289,59 @@ void main() {
   });
 
   group('adoption', () {
-    test('writes version metadata into the project', () async {
+    test('writes the id into the project, label and owner aside', () async {
       put('band/album/song/v1.rpp', unknown);
+      final lib = library(Layout.classic());
+      expect((await scan(storage, lib)).toAdopt, hasLength(1));
       final metadata = VersionMetadata(
         id: VersionId.generate(),
         owner: MemberId.generate(),
         label: 'chorus B',
       );
-      await writeVersionMetadata(storage, 'band/album/song/v1.rpp', metadata);
-      final result = await scan(storage, library(Layout.classic()));
+      await adoptVersion(storage, 'band/album/song', 'v1.rpp', metadata);
+      final result = await scan(storage, lib);
       final read = result.titles.single.versions.single.metadata!;
       expect(
         (read.id, read.owner, read.label),
         (metadata.id, metadata.owner, 'chorus B'),
       );
       expect(result.toAdopt, isEmpty);
+      final text = File(
+        p.joinAll([root.path, 'band', 'album', 'song', 'v1.rpp']),
+      ).readAsStringSync();
+      expect(RppProject.parse(text).extState(VersionMetadata.section), {
+        'VERSIONID': metadata.id,
+      });
+    });
+
+    test('leaves the project intact when its write fails', () async {
+      final memory = MemoryStorage()
+        ..put('song/v1.rpp', unknown)
+        ..put('song/.node.json', '{"nodeId":"${newUlid()}","level":"title"}');
+      final metadata = VersionMetadata(id: VersionId.generate(), label: 'a');
+      // Change 1: the node file; change 2: the project.
+      memory.failAt = 2;
+
+      await expectLater(
+        adoptVersion(memory, 'song', 'v1.rpp', metadata),
+        throwsA(isA<InjectedFailure>()),
+      );
+
+      expect(memory.text('song/v1.rpp'), unknown);
+      // The entry left behind names no version: harmless, and the adoption
+      // can simply start again under a new id.
+      memory.failAt = null;
+      final retry = VersionMetadata(id: VersionId.generate(), label: 'b');
+      await adoptVersion(memory, 'song', 'v1.rpp', retry);
+      final node = (await readNodeFile(memory, 'song'))!;
+      expect(node.versionLabels, {metadata.id: 'a', retry.id: 'b'});
+      expect(
+        VersionMetadata.fromExtState(
+          RppProject.parse(memory.text('song/v1.rpp'))
+              .extState(VersionMetadata.section),
+        )!.id,
+        retry.id,
+      );
     });
 
     test('accepts portable folder names only', () {
