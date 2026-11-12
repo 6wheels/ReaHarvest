@@ -66,6 +66,10 @@ Completer<void>? pending;
 Map<String, MediaPlan> previewPlans = const {};
 Map<LibraryId, Object> previewErrors = const {};
 
+/// When set, the fake preview waits for it; whether it was cancelled.
+Completer<void>? previewPending;
+bool previewCancelled = false;
+
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
   FakeLibraryService(super.ref);
@@ -108,17 +112,21 @@ class FakeLibraryService extends LibraryService {
   }
 
   @override
-  Future<Map<String, MediaPlan>> previewNormalization(
-    LibraryId library,
-    List<String> titles,
-  ) async {
-    if (previewErrors[library] case final error?) throw error;
-    return {
-      for (final title in titles)
-        title:
-            previewPlans[title] ??
-            (operations: const [], blocked: const Report()),
-    };
+  PlanPreview previewNormalization(LibraryId library, List<String> titles) {
+    previewCancelled = false;
+    return (
+      plans: () async {
+        if (previewErrors[library] case final error?) throw error;
+        if (previewPending case final pending?) await pending.future;
+        return {
+          for (final title in titles)
+            title:
+                previewPlans[title] ??
+                (operations: const <MediaOperation>[], blocked: const Report()),
+        };
+      }(),
+      cancel: () async => previewCancelled = true,
+    );
   }
 
   /// Whether [fix] runs as a task whose report opens at the end, like the
@@ -309,6 +317,7 @@ void main() {
     pending = null;
     previewPlans = const {};
     previewErrors = const {};
+    previewPending = null;
     existingLocked = false;
     existingProjects = false;
     backupOpening = true;
@@ -1900,6 +1909,7 @@ void main() {
             '$song/.trash/snare.wav',
             '$song/Media/snare.wav',
           ),
+          ReuseDuplicate('Artist/hat.wav', '$song/Media/hat.wav'),
           RewriteProject('$song/a.rpp', {r'audio\kick.wav': r'Media\kick.wav'}),
         ],
         blocked: const Report({
@@ -1933,6 +1943,12 @@ void main() {
       ),
       findsOne,
     );
+    expect(
+      find.text(
+        'Use Media/hat.wav, identical to Artist/hat.wav, left in place',
+      ),
+      findsOne,
+    );
     expect(find.text('Rewrite a.rpp'), findsOne);
 
     // Only the checked titles are previewed.
@@ -1941,6 +1957,48 @@ void main() {
     expect(find.text('Nothing to change'), findsNothing);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('confirms the fix once the preview is shown', (tester) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {band.id: demoLibrary},
+      issues: [
+        (
+          library: band.id,
+          kind: ReportKind.mediaOutsidePool,
+          item: const ReportItem('Artist/Album/Song/a.rpp', r'audio\kick.wav'),
+        ),
+      ],
+    );
+    previewPending = Completer();
+    await tester.tap(find.text('To sort · 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix…'));
+    await tester.pump();
+    await tester.pump();
+
+    FilledButton fix() => tester.widget(
+      find.ancestor(
+        of: find.text('Fix 1 item'),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    expect(find.text('Preparing the preview of the operations…'), findsOne);
+    expect(fix().onPressed, isNull);
+
+    // Closing the dialog stops the preview.
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    expect(previewCancelled, isTrue);
+    previewPending!.complete();
+    await tester.pumpAndSettle();
+
+    previewPending = null;
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(fix().onPressed, isNotNull);
   });
 
   testWidgets('keeps the previews of a library when another fails', (

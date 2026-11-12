@@ -154,6 +154,9 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   /// Error of the libraries whose plans could not be computed.
   final _previewErrors = <LibraryId, Object>{};
 
+  /// Stops the preview computations still running.
+  final _cancels = <Future<void> Function()>[];
+
   // Folders.
 
   late final Layout _layout;
@@ -216,6 +219,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   @override
   void dispose() {
+    // The files read by a preview are closed before a fix moves them.
+    for (final cancel in _cancels) {
+      cancel();
+    }
     for (final c in _fields) {
       c.dispose();
     }
@@ -235,10 +242,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     await Future.wait([
       for (final MapEntry(key: library, value: paths) in titles.entries)
         () async {
+          final preview = service.previewNormalization(library, [...paths]);
+          _cancels.add(preview.cancel);
           try {
-            final found = await service.previewNormalization(library, [
-              ...paths,
-            ]);
+            final found = await preview.plans;
             for (final MapEntry(key: title, value: plan) in found.entries) {
               _plans[(library, title)] = plan;
             }
@@ -249,6 +256,8 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     ]);
     if (mounted) setState(() => _previewing = false);
   }
+
+  bool get _waitingPreview => _normalizing && _previewing;
 
   /// Preview of the plans of the checked titles.
   List<Widget> _planPreviews(AppLocalizations l10n, TextStyle? muted) {
@@ -269,7 +278,11 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           Text(l10n.fixPreviewFailed('$error'), style: muted),
       for (final MapEntry(key: (library, title), value: plan) in _plans.entries)
         if (checked.contains((library, title)))
-          MediaPlanPreview(title: title, plan: plan),
+          MediaPlanPreview(
+            key: ValueKey((library, title)),
+            title: title,
+            plan: plan,
+          ),
     ];
   }
 
@@ -521,7 +534,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           child: Text(l10n.cancel),
         ),
         FilledButton(
-          onPressed: _checked.isEmpty || !_valid ? null : _confirm,
+          // The operations are shown before they are confirmed.
+          onPressed: _checked.isEmpty || !_valid || _waitingPreview
+              ? null
+              : _confirm,
           child: Text(l10n.taskFix(_checked.length)),
         ),
       ],

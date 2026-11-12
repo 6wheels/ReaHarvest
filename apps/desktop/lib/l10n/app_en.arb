@@ -314,6 +314,8 @@
   "@fixOpCopy": {"placeholders": {"from": {"type": "String"}, "to": {"type": "String"}}},
   "fixOpTrash": "Duplicate of {pool}: {from} → {to}",
   "@fixOpTrash": {"placeholders": {"pool": {"type": "String"}, "from": {"type": "String"}, "to": {"type": "String"}}},
+  "fixOpReuse": "Use {pool}, identical to {from}, left in place",
+  "@fixOpReuse": {"placeholders": {"pool": {"type": "String"}, "from": {"type": "String"}}},
   "fixOpRewrite": "Rewrite {project}",
   "@fixOpRewrite": {"placeholders": {"project": {"type": "String"}}},
   "fixOpBlocked": "{reason}: {path}",

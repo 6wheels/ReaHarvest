@@ -589,7 +589,7 @@ void main() {
     // The preview plans the operations, without making them.
     final preview = await service().previewNormalization(id, const [
       'Artist/Album/Other',
-    ]);
+    ]).plans;
     expect(preview['Artist/Album/Other']!.operations.map((op) => '$op'), [
       'move Artist/Album/Other/audio/a.wav -> Artist/Album/Other/Media/a.wav',
       r'rewrite Artist/Album/Other/v.rpp, audio\a.wav -> Media\a.wav',

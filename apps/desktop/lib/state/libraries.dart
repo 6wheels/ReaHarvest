@@ -284,11 +284,8 @@ class LibraryService {
 
   /// Plans of the media normalization of the [titles] of [library] (dry
   /// run of the fix, SPEC §5.8 step 4), by title, computed in an isolate
-  /// ([planNormalizationOn]).
-  Future<Map<String, MediaPlan>> previewNormalization(
-    LibraryId library,
-    List<String> titles,
-  ) {
+  /// that can be cancelled ([planNormalizationOn]).
+  PlanPreview previewNormalization(LibraryId library, List<String> titles) {
     final entry = _entry(library);
     return planNormalizationOn(
       entry.libraryRoot,

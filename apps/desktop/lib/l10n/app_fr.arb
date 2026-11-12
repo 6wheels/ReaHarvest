@@ -245,6 +245,7 @@
   "fixOpMove": "Déplacer {from} → {to}",
   "fixOpCopy": "Copier {from} → {to}",
   "fixOpTrash": "Doublon de {pool} : {from} → {to}",
+  "fixOpReuse": "Utiliser {pool}, identique à {from}, laissé en place",
   "fixOpRewrite": "Réécrire {project}",
   "fixOpBlocked": "{reason} : {path}",
   "sortMergeHint": "Ce dossier existe déjà : les deux sont fusionnés, et les fichiers de même nom sont renommés.",

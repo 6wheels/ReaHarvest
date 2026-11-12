@@ -31,6 +31,10 @@ class MediaPlanPreview extends StatelessWidget {
       _short(from),
       _short(to),
     ),
+    ReuseDuplicate(:final from, :final poolFile) => l10n.fixOpReuse(
+      _short(poolFile),
+      _short(from),
+    ),
     RewriteProject(:final path) => l10n.fixOpRewrite(_short(path)),
   };
 
