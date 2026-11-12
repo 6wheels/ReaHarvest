@@ -6,4 +6,5 @@ export 'src/ids.dart';
 export 'src/library.dart';
 export 'src/ports.dart';
 export 'src/report.dart';
+export 'src/task_reporter.dart';
 export 'src/title.dart';
