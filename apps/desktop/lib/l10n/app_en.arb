@@ -241,7 +241,7 @@
   "orphanNodesHint": "These folders hold no REAPER project: their ReaHarvest file (.node.json) is not used.",
   "deleteOrphanNode": "Delete this file",
   "deleteOrphanNodeTitle": "Delete this ReaHarvest file?",
-  "deleteOrphanNodeHint": "Only the .node.json file of “{folder}” is deleted: the folder keeps its content. Statuses stored in this file are lost.",
+  "deleteOrphanNodeHint": "Only the .node.json file of “{folder}” is deleted: the folder keeps its content. Statuses, version labels and owners stored in this file are lost.",
   "@deleteOrphanNodeHint": {"placeholders": {"folder": {"type": "String"}}},
   "corruptedTitle": "Unreadable files",
   "corruptedHint": "ReaHarvest cannot read these files. Check them, or restore them from a backup.",

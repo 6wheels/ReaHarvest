@@ -186,7 +186,7 @@
   "orphanNodesHint": "Ces dossiers ne contiennent aucun projet REAPER : leur fichier ReaHarvest (.node.json) n'est pas utilisé.",
   "deleteOrphanNode": "Supprimer ce fichier",
   "deleteOrphanNodeTitle": "Supprimer ce fichier ReaHarvest ?",
-  "deleteOrphanNodeHint": "Seul le fichier .node.json de « {folder} » est supprimé : le dossier garde son contenu. Les statuts enregistrés dans ce fichier sont perdus.",
+  "deleteOrphanNodeHint": "Seul le fichier .node.json de « {folder} » est supprimé : le dossier garde son contenu. Les statuts, labels et propriétaires de versions enregistrés dans ce fichier sont perdus.",
   "corruptedTitle": "Fichiers illisibles",
   "corruptedHint": "ReaHarvest ne peut pas lire ces fichiers. Vérifiez-les ou restaurez-les depuis une sauvegarde.",
   "tasks": "Tâches",

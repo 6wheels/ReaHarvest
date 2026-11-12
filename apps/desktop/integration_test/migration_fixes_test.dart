@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -138,9 +139,13 @@ void main() {
       tester,
       'PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 3',
     );
-    expect(find.text('→ Artist/Album/Song · Alice · No status'), findsOne);
-    expect(find.text('→ Artist/Album/Song · Tester · Mixing'), findsOne);
-    expect(find.text('→ Artist/Album/Song · Bob · No status'), findsOne);
+    // The label of each lifted project is its file name (SPEC §4.2).
+    expect(find.text('→ Artist/Album/Song · v1 · Alice · No status'), findsOne);
+    expect(
+      find.text('→ Artist/Album/Song · final · Tester · Mixing'),
+      findsOne,
+    );
+    expect(find.text('→ Artist/Album/Song · idea · Bob · No status'), findsOne);
     await confirmFix(tester, h, 3);
     expect(find.text('Project moved · 3'), findsOne);
     expect(
@@ -157,6 +162,20 @@ void main() {
       expect(versionId('Artist/Album/Song/$name'), isNotNull, reason: name);
     }
     expect(versionId('Artist/Album/Song/v1.rpp'), isNull);
+    // Labels and owners in the node file of the title, by final file name;
+    // the projects hold their id only.
+    final node = jsonDecode(
+      File(h.path('Band/Artist/Album/Song/.node.json')).readAsStringSync(),
+    ) as Map;
+    expect(
+      (node['versionLabels'] as Map).values,
+      unorderedEquals(['v1 (2)', 'final', 'idea']),
+    );
+    expect(node['versionOwners'] as Map, hasLength(3));
+    expect(
+      File(h.path('Band/Artist/Album/Song/final.rpp')).readAsStringSync(),
+      isNot(contains('OWNER')),
+    );
     expect(
       Directory(h.path('Band/Artist/Album/Song/Alice'))
           .listSync(recursive: true)

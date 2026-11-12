@@ -1598,13 +1598,15 @@ void main() {
     expect(find.text('Proposed place: Artist/Album/Song'), findsOne);
     expect(find.text('Old'), findsOne);
 
-    // Without declared members, the local member owns the lifted projects.
+    // Without declared members, the lifted projects get no owner; the
+    // preview shows their label, the file name (SPEC §4.2).
     await tester.tap(find.text('Fix…').at(1));
     await tester.pumpAndSettle();
     expect(
       find.text('Owner of the projects outside a member folder'),
-      findsOne,
+      findsNothing,
     );
+    expect(find.text('→ Artist/Album/Song · a · Mixing'), findsOne);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
@@ -1686,7 +1688,7 @@ void main() {
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
     expect(find.text('Status for the “mix” folders'), findsOne);
-    expect(find.text('→ Artist/Album/Song · Alice · Mixing'), findsOne);
+    expect(find.text('→ Artist/Album/Song · a · Alice · Mixing'), findsOne);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('Status for the “mix” folders'), findsNothing);

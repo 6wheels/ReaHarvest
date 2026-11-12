@@ -20,7 +20,8 @@ Version? quickVersion(Title title, MemberId me) {
 }
 
 /// Opens the [quickVersion] of [title] in REAPER. In `collab` mode, a
-/// version of another member is opened after a confirmation.
+/// version of another member is opened after a confirmation; a version
+/// without owner is not.
 Future<void> openLatestInReaper(
   BuildContext context,
   WidgetRef ref,
@@ -32,7 +33,9 @@ Future<void> openLatestInReaper(
   if (version == null) return;
   final mode = ref.read(indexedLibrariesProvider)[title.libraryId]?.mode;
   final owner = version.metadata?.owner;
-  if (mode == LibraryMode.collab && owner != identity.memberId) {
+  if (mode == LibraryMode.collab &&
+      owner != null &&
+      owner != identity.memberId) {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

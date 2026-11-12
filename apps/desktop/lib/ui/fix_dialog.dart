@@ -131,8 +131,9 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   // Projects too deep.
 
-  /// Owner of the projects without member subfolder.
-  late MemberId _owner;
+  /// Owner of the projects without member subfolder; null when no library
+  /// of the issues declares members (no owner is written, SPEC §4.2).
+  MemberId? _owner;
 
   /// Status chosen for each status subfolder name.
   final _statuses = <String, String?>{};
@@ -163,12 +164,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           for (final m in libraries[i.library]?.members ?? const <Member>[])
             m.id: m,
       };
-      _owners = members.isEmpty
-          ? [Member(identity.memberId, identity.displayName)]
-          : members.values.toList();
+      _owners = members.values.toList();
       _owner = members.containsKey(identity.memberId)
           ? identity.memberId
-          : _owners.first.id;
+          : _owners.firstOrNull?.id;
       _lifts = [
         for (final i in widget.issues)
           _lift(i, libraries[i.library]?.members ?? const []),
@@ -279,15 +278,28 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     final item = widget.issues[i].item;
     if (_normalizing) return NormalizeMedia(mediaTitleOf(item.path));
     if (!_lifting) return MoveFolder(item.path, _target(i));
-    final (:member, :statusFolder) = _lifts[i];
-    final status = statusFolder == null ? null : _statuses[statusFolder];
+    final status = _liftStatus(i);
     return LiftProject(
       item.path,
       item.target!,
-      owner: member?.id ?? _owner,
+      owner: _liftOwner(i)?.id,
       status: status,
-      statusFolder: status == null ? statusFolder : null,
+      statusFolder: status == null ? _lifts[i].statusFolder : null,
     );
+  }
+
+  /// Owner of the lifted project [i]: its member subfolder, else the
+  /// default owner; none when its library declares no members.
+  Member? _liftOwner(int i) {
+    final library = widget.issues[i].library;
+    final members = ref.read(indexedLibrariesProvider)[library]?.members;
+    if (members == null || members.isEmpty) return null;
+    return _lifts[i].member ?? members.where((m) => m.id == _owner).firstOrNull;
+  }
+
+  String? _liftStatus(int i) {
+    final folder = _lifts[i].statusFolder;
+    return folder == null ? null : _statuses[folder];
   }
 
   /// Target, and for a project its owner and status, joined.
@@ -306,12 +318,13 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
       );
       return ['→ $target', if (merges) l10n.fixMerged].join(' · ');
     }
-    final (:member, :statusFolder) = _lifts[i];
-    final owner = member ?? _owners.firstWhere((m) => m.id == _owner);
-    final status = statusFolder == null ? null : _statuses[statusFolder];
+    final status = _liftStatus(i);
+    final path = widget.issues[i].item.path;
     return [
       '→ ${widget.issues[i].item.target}',
-      owner.name,
+      // Label of a version not adopted yet: its file name (SPEC §4.2).
+      p.posix.basenameWithoutExtension(path),
+      ?_liftOwner(i)?.name,
       status == null ? l10n.noStatus : statusLabel(l10n, status),
     ].join(' · ');
   }
@@ -331,12 +344,13 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   }
 
   List<Widget> _liftChoices(AppLocalizations l10n) => [
-    Choice<MemberId>(
-      label: l10n.fixDefaultOwner,
-      value: _owner,
-      options: {for (final m in _owners) m.id: m.name},
-      onChanged: (id) => setState(() => _owner = id),
-    ),
+    if (_owner case final owner?)
+      Choice<MemberId>(
+        label: l10n.fixDefaultOwner,
+        value: owner,
+        options: {for (final m in _owners) m.id: m.name},
+        onChanged: (id) => setState(() => _owner = id),
+      ),
     for (final folder in _statuses.keys)
       Choice<String?>(
         label: l10n.fixStatusFor(folder),

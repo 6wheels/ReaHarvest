@@ -163,9 +163,12 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
     final templates =
         ref.watch(projectTemplatesProvider(widget.title.libraryId)).value ??
         const <String>[];
-    final owner = ref.watch(
-      settingsProvider.select((s) => s.identity.displayName),
-    );
+    // Shown only when written: the library declares the local member.
+    final owner =
+        ref.read(libraryServiceProvider).localOwner(widget.title.libraryId) ==
+            null
+        ? null
+        : ref.watch(settingsProvider.select((s) => s.identity.displayName));
     final selected = widget.selected;
     final error = versionNameError(l10n, widget.title, _name.text);
     final labelMissing = _label.text.trim().isEmpty;
@@ -264,11 +267,13 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
                 isDense: true,
               ),
             ),
-            const SizedBox(height: Space.s),
-            Text(
-              l10n.filterValue(l10n.filterOwner, owner),
-              style: text.bodySmall?.copyWith(color: c.muted),
-            ),
+            if (owner != null) ...[
+              const SizedBox(height: Space.s),
+              Text(
+                l10n.filterValue(l10n.filterOwner, owner),
+                style: text.bodySmall?.copyWith(color: c.muted),
+              ),
+            ],
           ],
         ),
       ),
@@ -287,7 +292,8 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
 }
 
 /// Asks for a new file name and label of [version] of [title] and applies
-/// them, after the REAPER warning (SPEC §5.7). Returns its file name, null
+/// them. A rename waits for the REAPER warning (SPEC §5.7); a label, stored
+/// outside the project, does not (SPEC §4.2). Returns its file name, null
 /// when cancelled or failed.
 Future<String?> showEditVersionDialog(
   BuildContext context,
@@ -304,15 +310,22 @@ Future<String?> showEditVersionDialog(
   if (name == version.fileName && label == (version.metadata?.label ?? '')) {
     return null;
   }
-  String? result;
-  await runProjectChange(
-    context,
-    ref,
-    () async => result = await ref
-        .read(libraryServiceProvider)
-        .editVersion(title, version, fileName: name, label: label),
-  );
-  return result;
+  Future<String> edit() => ref
+      .read(libraryServiceProvider)
+      .editVersion(title, version, fileName: name, label: label);
+  if (name != version.fileName) {
+    String? result;
+    await runProjectChange(context, ref, () async => result = await edit());
+    return result;
+  }
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    return await edit();
+  } on Object catch (e) {
+    _fail(messenger, l10n, e);
+    return null;
+  }
 }
 
 class _EditVersionDialog extends StatefulWidget {

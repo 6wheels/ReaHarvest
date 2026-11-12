@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart' hide Title;
@@ -29,6 +30,9 @@ void main() {
   late String song;
   late ProviderContainer container;
 
+  /// Whether REAPER is reported running (SPEC §5.7).
+  var reaperRunning = false;
+
   /// Fixture [name], found from the working directory upwards.
   String fixture(String name) {
     for (var dir = Directory.current.absolute; ; dir = dir.parent) {
@@ -45,7 +49,15 @@ void main() {
         .extState(VersionMetadata.section),
   );
 
+  /// Label of the version [id] in the node file of the title (SPEC §4.2).
+  String? labelOf(VersionId id) =>
+      ((jsonDecode(file('.node.json').readAsStringSync())
+                  as Map)['versionLabels']
+              as Map?)?[id]
+          as String?;
+
   setUp(() async {
+    reaperRunning = false;
     root = Directory.systemTemp.createTempSync('reaharvest_it_');
     final band = p.join(root.path, 'Band');
     song = p.join(band, 'Artist', 'Album', 'Song');
@@ -77,7 +89,7 @@ void main() {
         defaultReaperResourcesProvider.overrideWithValue(
           p.join(root.path, 'resources'),
         ),
-        reaperRunningProvider.overrideWithValue(() async => false),
+        reaperRunningProvider.overrideWithValue(() async => reaperRunning),
         logFolderProvider.overrideWithValue(p.join(data, 'logs')),
       ],
     );
@@ -160,7 +172,15 @@ void main() {
       () => find.text('bridge').evaluate().isNotEmpty,
       reason: 'version created',
     );
-    expect(metadataOf('Song - bridge.RPP')?.label, 'bridge');
+    // The project holds its id only; the label is in the node file.
+    final bridge = metadataOf('Song - bridge.RPP')!;
+    expect(
+      RppProject.parse(file('Song - bridge.RPP').readAsStringSync())
+          .extState(VersionMetadata.section)
+          .keys,
+      ['VERSIONID'],
+    );
+    expect(labelOf(bridge.id), 'bridge');
     final record = RppProject.parse(
       file('Song - bridge.RPP').readAsStringSync(),
     ).document.root.line('RECORD_PATH');
@@ -202,7 +222,28 @@ void main() {
     );
     expect(file('Song - solo.RPP').existsSync(), isFalse);
     final renamed = metadataOf('Song - guitar solo.RPP')!;
-    expect((renamed.id, renamed.label), (copy.id, 'guitar'));
+    expect((renamed.id, labelOf(renamed.id)), (copy.id, 'guitar'));
+
+    // A label alone: no REAPER warning, the project left untouched.
+    reaperRunning = true;
+    final bytes = file('Song - guitar solo.RPP').readAsBytesSync();
+    final date = DateTime(2025, 5, 6);
+    file('Song - guitar solo.RPP').setLastModifiedSync(date);
+    await openMenu(tester);
+    await tapText(tester, 'Rename…');
+    await tester.enterText(field('Label'), 'lead');
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Save');
+    expect(find.text('REAPER is open'), findsNothing);
+    await waitFor(
+      tester,
+      () => find.text('lead').evaluate().isNotEmpty,
+      reason: 'label edited',
+    );
+    expect(labelOf(renamed.id), 'lead');
+    expect(file('Song - guitar solo.RPP').readAsBytesSync(), bytes);
+    expect(file('Song - guitar solo.RPP').lastModifiedSync(), date);
+    reaperRunning = false;
 
     // Status, written into the title's .node.json.
     await openMenu(tester);
@@ -235,7 +276,7 @@ void main() {
       tester,
       () =>
           file('.trash/Song - guitar solo.RPP').existsSync() &&
-          find.text('guitar').evaluate().isEmpty,
+          find.text('lead').evaluate().isEmpty,
       reason: 'version trashed',
     );
 
