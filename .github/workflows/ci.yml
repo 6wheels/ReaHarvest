@@ -3,15 +3,40 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md']
   pull_request:
+    paths-ignore: ['**.md']
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Parallel jobs (#126): Linux where the tests allow it (faster setup),
+# integration tests in Windows batches, app coverage gate on the merged
+# reports.
+env:
+  FLUTTER_VERSION: 3.47.9
+  # Integration batches: keep in sync with the `integration` matrix.
+  BATCHES: 3
+
 jobs:
-  windows:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter gen-l10n
+        working-directory: apps/desktop
+      - run: flutter analyze
+
+  packages:
+    # Windows: the repository tests expect Windows path separators.
     # Skipped while the repository is private (paid minutes); runs on demand.
     if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
     runs-on: windows-latest
@@ -20,26 +45,99 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
-
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.9
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-
-      - name: Resolve dependencies
-        run: flutter pub get
-
-      - name: Generate localizations
-        working-directory: apps/desktop
-        run: flutter gen-l10n
-
-      - name: Analyze
-        run: flutter analyze
-
+      - run: flutter pub get
       - name: Test with coverage gate
-        run: dart tool/coverage.dart
+        run: dart tool/coverage.dart packages
 
+  widget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter gen-l10n
+        working-directory: apps/desktop
+      - name: Test with coverage
+        run: dart tool/coverage.dart --no-gate widget
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-widget
+          path: coverage/app-widget.lcov
+          if-no-files-found: error
+
+  integration:
+    # Skipped while the repository is private (paid minutes); runs on demand.
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [1, 2, 3]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter gen-l10n
+        working-directory: apps/desktop
+      - name: Test with coverage
+        run: dart tool/coverage.dart --no-gate --batch=${{ matrix.batch }}/${{ env.BATCHES }} integration
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-${{ matrix.batch }}
+          path: coverage/app-integration-*.lcov
+          if-no-files-found: error
+
+  coverage:
+    needs: [widget, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage
+          merge-multiple: true
+      - name: App coverage gate
+        run: dart tool/coverage.dart --gate-only app
+
+  build:
+    # Skipped while the repository is private (paid minutes); runs on demand.
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter gen-l10n
+        working-directory: apps/desktop
       - name: Build Windows app
         working-directory: apps/desktop
         run: flutter build windows --release
