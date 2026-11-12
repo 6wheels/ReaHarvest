@@ -84,7 +84,7 @@ Future<BatchResult> runMigrationBatch(
       checkCancelled();
       reporter.step(TaskStep.fix, index: i + 1, total: moves.length);
       reporter.progress(i / moves.length);
-      final done = await applyFixes(migration, [fix], usage: usage);
+      final done = await applyFixes(migration, [fix], usage: usage, hash: hash);
       applied.add(fix);
       reporter.log('$fix\n$done', warning: done.hasErrors);
       report += done;

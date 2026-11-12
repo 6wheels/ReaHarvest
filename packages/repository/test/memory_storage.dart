@@ -26,6 +26,14 @@ final class MemoryStorage implements RepositoryStorage {
   /// Bytes passed to [write] and [append].
   int bytesWritten = 0;
 
+  /// Paths read, in order (when their reading starts).
+  final reads = <String>[];
+
+  /// Largest number of files read at the same time.
+  int maxOpenReads = 0;
+
+  var _openReads = 0;
+
   /// Number (from 1) of the change that throws an [InjectedFailure]
   /// instead of being made; null for none.
   int? failAt;
@@ -115,7 +123,13 @@ final class MemoryStorage implements RepositoryStorage {
   Stream<List<int>> read(String path) async* {
     final f = files[path];
     if (f == null) throw StateError('No file $path');
-    yield f.bytes;
+    reads.add(path);
+    if (++_openReads > maxOpenReads) maxOpenReads = _openReads;
+    try {
+      yield f.bytes;
+    } finally {
+      _openReads--;
+    }
   }
 
   @override
