@@ -72,6 +72,28 @@ void main() {
       expect(states(), [TaskState.cancelled]);
     });
 
+    test('tell their cancellation when it is asked', () async {
+      final step = Completer<void>();
+      var told = false;
+      final result = tasks().run((l10n) => 'A', (task) async {
+        unawaited(task.whenCancelled.then((_) => told = true));
+        await step.future;
+        expect(task.isCancelled, isTrue);
+        return true;
+      });
+      await pumpEventQueue();
+      expect(told, isFalse);
+      final id = container.read(tasksProvider).single.id;
+      tasks()
+        ..cancel(id)
+        ..cancel(id);
+      await pumpEventQueue();
+      expect(told, isTrue);
+
+      step.complete();
+      expect(await result, isTrue);
+    });
+
     test('clear the finished ones only', () async {
       final step = Completer<void>();
       await tasks().run((l10n) => 'A', (_) async {});

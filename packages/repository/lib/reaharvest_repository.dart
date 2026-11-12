@@ -12,6 +12,7 @@ export 'src/known_values.dart';
 export 'src/library_path.dart';
 export 'src/media.dart';
 export 'src/migration.dart';
+export 'src/migration_batch.dart';
 export 'src/migration_journal.dart';
 export 'src/mounted_folder_storage.dart';
 export 'src/node_file.dart';

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
@@ -25,9 +26,15 @@ final class TaskControl {
   final TasksNotifier _notifier;
   final int _id;
 
+  /// Whether the task was asked to stop.
+  bool get isCancelled => _notifier._task(_id).cancelling;
+
+  /// Completes when the task is asked to stop.
+  Future<void> get whenCancelled => _notifier._cancels[_id]!.future;
+
   /// Throws [TaskCancelled] if the task was asked to stop.
   void checkCancelled() {
-    if (_notifier._task(_id).cancelling) throw const TaskCancelled();
+    if (isCancelled) throw const TaskCancelled();
   }
 
   /// Sets the progress, from 0 to 1.
@@ -121,6 +128,9 @@ final _english = lookupAppLocalizations(const Locale('en'));
 class TasksNotifier extends Notifier<List<BackgroundTask>> {
   var _next = 0;
 
+  /// Completed by [cancel], for each running task.
+  final _cancels = <int, Completer<void>>{};
+
   @override
   List<BackgroundTask> build() => const [];
 
@@ -135,6 +145,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     bool openReport = false,
   }) async {
     final id = _next++;
+    _cancels[id] = Completer<void>();
     state = [
       ...state,
       BackgroundTask(id: id, label: label, openReport: openReport),
@@ -158,6 +169,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       _update(id, (t) => t._with(state: TaskState.failed, error: '$error'));
       _log.severe(_task(id).label(_english), error, stack);
     } finally {
+      _cancels.remove(id);
       _logEnd(_task(id));
     }
     return null;
@@ -173,7 +185,10 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   );
 
   /// Asks the running task [id] to stop at its next step.
-  void cancel(int id) => _update(id, (t) => t._with(cancelling: true));
+  void cancel(int id) {
+    _update(id, (t) => t._with(cancelling: true));
+    if (_cancels[id] case final c? when !c.isCompleted) c.complete();
+  }
 
   /// Removes the finished tasks.
   void clearFinished() => state = [...state.where((t) => t.isRunning)];

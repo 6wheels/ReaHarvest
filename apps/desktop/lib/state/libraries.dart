@@ -196,33 +196,6 @@ class LibraryService {
     await scan(entry);
   }
 
-  /// Adds the intermediate folders of the existing [paths] of the library
-  /// [entry] (folders or titles, moved or created there) to its known
-  /// values, when it declares some (SPEC §3.1): a value created by a move
-  /// is no longer reported as unknown.
-  Future<void> _rememberPaths(LibraryEntry entry, List<String> paths) async {
-    final storage = MountedFolderStorage(entry.libraryRoot);
-    final library = await readLibrary(storage);
-    final layout = library?.layout;
-    if (library == null || layout == null || library.knownValues.isEmpty) {
-      return;
-    }
-    var known = library.knownValues;
-    final added = <String>[];
-    for (final path in paths) {
-      final values = path.split('/').take(layout.levels.length - 1).toList();
-      if (!known.knows(values) && await storage.stat(path) != null) {
-        known = known.withPath(values);
-        added.add(values.join('/'));
-      }
-    }
-    if (added.isEmpty) return;
-    await writeLibrary(storage, library.withKnownValues(known));
-    _log.info(
-      'Known values of ${entry.displayName} added: ${added.join(', ')}',
-    );
-  }
-
   /// Forgets [id]: settings and index only, files are left untouched.
   Future<void> remove(LibraryId id) async {
     await ref
@@ -305,105 +278,52 @@ class LibraryService {
   Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) =>
       _fix(_entry(library), fixes, (l10n) => l10n.taskFix(fixes.length));
 
-  /// Runs [fixes] on [entry] so that no file is lost (SPEC §5.8 step 5),
-  /// telling each step: first a new inventory (or the interrupted one
-  /// resumed), reusing the hashes of the previous one; then the
-  /// fixes one by one, each in an isolate; then the inventory check, whose
-  /// gaps are reported as errors. A folder "moved" to its own place is only
-  /// declared. Cancellable at every step, between two files or two fixes:
-  /// the fixes done are kept, and reported. In any case, the values of the folders moved or declared join the
-  /// known values, then the library is rescanned.
+  /// Runs [fixes] on [entry] as a batch in one isolate, so that no file is
+  /// lost (SPEC §5.8 step 5, [runMigrationBatchOn]), its steps shown under
+  /// the task. Then, also after a cancellation, the values of the folders
+  /// moved or declared join the known values and the library is rescanned.
+  /// A cancelled batch ends the task with the report of what was done.
   Future<Report?> _fix(
     LibraryEntry entry,
     List<MigrationFix> fixes,
     String Function(AppLocalizations l10n) label,
   ) {
     final root = entry.libraryRoot;
-    bool inPlace(MigrationFix fix) =>
-        fix is MoveFolder && fix.target == fix.path;
-    final moves = [
-      for (final f in fixes)
-        if (!inPlace(f)) f,
-    ];
     return ref.read(tasksProvider.notifier).run(label, (task) async {
-      final declared = [for (final f in fixes.where(inPlace)) f.path];
-      var report = Report({ReportKind.valueDeclared: _items(root, declared)});
-      for (final path in declared) {
-        _log.info('${entry.displayName}: folder $path kept in place');
-      }
-      final applied = [...fixes.where(inPlace)];
+      // From the index: stale for the titles changed by the previous fixes
+      // of the batch, which can only block more (SPEC §5.8).
+      final usage = mediaUsage(
+        ref.read(localIndexProvider).scanResult(entry.id) ?? const ScanResult(),
+      );
+      BatchResult? result;
       try {
-        if (moves.isNotEmpty) {
-          final storage = MountedFolderStorage(root);
-          final hash = xxh3Hasher(storage);
-          // A fresh inventory for each task, unless one was interrupted:
-          // files changed or added since the previous one are covered.
-          final previous = await Migration.latest(storage);
-          final migration = previous != null && !previous.inventory.isComplete
-              ? previous
-              : Migration.start(storage, previous: previous);
-          // From the index: stale for the titles changed by the previous
-          // fixes of the batch, which can only block more (SPEC §5.8).
-          final usage = mediaUsage(
-            ref.read(localIndexProvider).scanResult(entry.id) ??
-                const ScanResult(),
-          );
-          task.step((l10n) => l10n.taskStepInventory);
-          await migration.inventory.take(
-            hash,
-            checkCancelled: task.checkCancelled,
-            onProgress: task.progress,
-          );
-          for (final (i, fix) in moves.indexed) {
-            task.checkCancelled();
-            task.step((l10n) => l10n.taskStepFix(i + 1, moves.length));
-            task.progress(i / moves.length);
-            final done = await _applyFixes(root, [fix], usage);
-            applied.add(fix);
-            _log.log(
-              done.hasErrors ? Level.WARNING : Level.INFO,
-              '${entry.displayName}: $fix\n$done',
-            );
-            report += done;
-          }
-          task.checkCancelled();
-          task.step((l10n) => l10n.taskStepCheck);
-          final latest = (await Migration.latest(storage))!;
-          final check = await latest.inventory.check(
-            hash,
-            locate: latest.journal.locate,
-            checkCancelled: task.checkCancelled,
-            onProgress: task.progress,
-          );
-          _log.log(
-            check.hasErrors ? Level.WARNING : Level.INFO,
-            '${entry.displayName}: inventory checked'
-            '${check.isEmpty ? ', no file lost' : '\n$check'}',
-          );
-          report += _rooted(root, check);
-        }
-      } on TaskCancelled {
-        _log.warning(
-          '${entry.displayName}: cancelled after '
-          '${applied.length - declared.length} of ${moves.length} fixes',
+        result = await runMigrationBatchOn(
+          root,
+          fixes,
+          usage: usage,
+          hasherOf: xxh3Hasher,
+          reporter: _TaskReporter(task, entry.displayName),
         );
-        // What was done before stopping is kept: the report tells it.
-        throw TaskCancelled(report);
       } finally {
         // Also after a cancellation: the library shows what was moved.
         task.step((l10n) => l10n.taskStepScan);
-        await _rememberPaths(entry, [
-          for (final f in applied)
-            ?switch (f) {
-              MoveFolder(:final target) => target,
-              MoveProject(:final titleDir) ||
-              LiftProject(:final titleDir) => titleDir,
-              // The title stays where it is.
-              NormalizeMedia() => null,
-            },
-        ]);
+        if (result != null) {
+          final added = await addKnownPaths(
+            MountedFolderStorage(root),
+            result.knownPaths,
+          );
+          if (added.isNotEmpty) {
+            _log.info(
+              'Known values of ${entry.displayName} added: '
+              '${added.join(', ')}',
+            );
+          }
+        }
         await scan(entry);
       }
+      final report = _rooted(root, result.report);
+      // What was done before stopping is kept: the report tells it.
+      if (result.cancelled) throw TaskCancelled(report);
       return report;
     }, openReport: true);
   }
@@ -719,18 +639,36 @@ class LibraryService {
   }
 }
 
-/// Applies [fixes] to the library at [root] through its migration, in an
-/// isolate (top-level: the closure must not capture the service).
-Future<Report> _applyFixes(
-  String root,
-  List<MigrationFix> fixes,
-  Map<String, List<String>> usage,
-) => Isolate.run(() async {
-  final storage = MountedFolderStorage(root);
-  final migration = (await Migration.latest(storage))!;
-  final report = await applyFixes(migration, fixes, usage: usage);
-  return _rooted(root, report);
-});
+/// [TaskReporter] of a batch over the [task] of the library [name]: steps
+/// shown with their labels, log lines prefixed with the library.
+final class _TaskReporter implements TaskReporter {
+  _TaskReporter(this.task, this.name);
+
+  final TaskControl task;
+  final String name;
+
+  @override
+  void step(TaskStep step, {int? index, int? total}) => task.step(
+    (l10n) => switch (step) {
+      TaskStep.inventory => l10n.taskStepInventory,
+      TaskStep.fix => l10n.taskStepFix(index!, total!),
+      TaskStep.check => l10n.taskStepCheck,
+    },
+  );
+
+  @override
+  void progress(double value) => task.progress(value);
+
+  @override
+  bool get isCancelled => task.isCancelled;
+
+  @override
+  Future<void> get whenCancelled => task.whenCancelled;
+
+  @override
+  void log(String message, {bool warning = false}) =>
+      _log.log(warning ? Level.WARNING : Level.INFO, '$name: $message');
+}
 
 /// Absolute path of the project file of [version] of [title], in the
 /// library [entry].
