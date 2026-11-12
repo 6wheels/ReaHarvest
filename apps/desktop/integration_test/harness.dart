@@ -15,6 +15,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
+import 'window.dart';
+
 /// Pickers answering with the paths queued in [answers], in order.
 class QueuedPickers extends Pickers {
   QueuedPickers(this.answers);
@@ -85,10 +87,7 @@ class Harness {
   /// Starts the application like `main()`: settings loaded from their file
   /// (created on first run), index opened, then the app pumped.
   Future<void> start(WidgetTester tester) async {
-    // Same layout on every machine: the window of a CI runner is small.
-    tester.view.physicalSize = const Size(1024, 768);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+    await _fitWindow(tester);
     final settings = (await tester.runAsync(
       () => SettingsFile(settingsPath).load(),
     ))!;
@@ -120,6 +119,32 @@ class Harness {
     );
     await tester.pumpAndSettle();
   }
+
+  /// Same layout on every machine, [windowSize] logical pixels (the window
+  /// of a CI runner is small): the native window is resized, so that the
+  /// app stays visible in it. When it cannot reach that size (small
+  /// screen), the test view is overridden instead, and the window shows a
+  /// blank surface.
+  static Future<void> _fitWindow(WidgetTester tester) async {
+    final view = tester.view;
+    final target = windowSize * view.devicePixelRatio;
+    bool fits() =>
+        (view.physicalSize.width - target.width).abs() <= 1 &&
+        (view.physicalSize.height - target.height).abs() <= 1;
+    if (!fits() && resizeAppWindow(target)) {
+      final end = DateTime.now().add(const Duration(seconds: 3));
+      while (!fits() && DateTime.now().isBefore(end)) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+    if (fits()) return;
+    view.physicalSize = windowSize;
+    view.devicePixelRatio = 1;
+    addTearDown(view.reset);
+  }
+
+  /// Logical size of the app window in every test.
+  static const windowSize = Size(1024, 768);
 
   /// Quits the application, then starts it again on the same files.
   Future<void> restart(WidgetTester tester) async {
