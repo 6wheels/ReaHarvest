@@ -44,9 +44,6 @@ jobs:
       run:
         shell: pwsh
     steps:
-      # Real-time scanning slows down the cache extraction and the build.
-      - name: Disable Defender real-time scanning
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
@@ -89,16 +86,12 @@ jobs:
       run:
         shell: pwsh
     steps:
-      # Real-time scanning slows down the cache extraction and the build.
-      - name: Disable Defender real-time scanning
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          # Trial (#126): batch 3 downloads the SDK instead of the cache.
-          cache: ${{ matrix.batch != 3 }}
+          cache: true
       - run: flutter pub get
       - run: flutter gen-l10n
         working-directory: apps/desktop
@@ -136,9 +129,6 @@ jobs:
       run:
         shell: pwsh
     steps:
-      # Real-time scanning slows down the cache extraction and the build.
-      - name: Disable Defender real-time scanning
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
