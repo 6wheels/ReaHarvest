@@ -145,10 +145,14 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   // Media normalization.
 
-  /// Plan of each title, by library and title; null while computed.
-  Map<(LibraryId, String), MediaPlan>? _plans;
+  /// Whether the plans are being computed.
+  var _previewing = true;
 
-  Object? _previewError;
+  /// Plan of each title, by library and title.
+  final _plans = <(LibraryId, String), MediaPlan>{};
+
+  /// Error of the libraries whose plans could not be computed.
+  final _previewErrors = <LibraryId, Object>{};
 
   // Folders.
 
@@ -218,7 +222,8 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     super.dispose();
   }
 
-  /// Computes the normalization plan of the title of every issue.
+  /// Computes the normalization plan of the title of every issue, the
+  /// libraries side by side; a library that fails keeps its error.
   Future<void> _preview() async {
     final titles = <LibraryId, Set<String>>{};
     for (final issue in widget.issues) {
@@ -227,27 +232,27 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           .add(mediaTitleOf(issue.item.path));
     }
     final service = ref.read(libraryServiceProvider);
-    try {
-      final plans = <(LibraryId, String), MediaPlan>{};
-      for (final MapEntry(key: library, value: paths) in titles.entries) {
-        final found = await service.previewNormalization(library, [...paths]);
-        for (final MapEntry(key: title, value: plan) in found.entries) {
-          plans[(library, title)] = plan;
-        }
-      }
-      if (mounted) setState(() => _plans = plans);
-    } on Object catch (error) {
-      if (mounted) setState(() => _previewError = error);
-    }
+    await Future.wait([
+      for (final MapEntry(key: library, value: paths) in titles.entries)
+        () async {
+          try {
+            final found = await service.previewNormalization(library, [
+              ...paths,
+            ]);
+            for (final MapEntry(key: title, value: plan) in found.entries) {
+              _plans[(library, title)] = plan;
+            }
+          } on Object catch (error) {
+            _previewErrors[library] = error;
+          }
+        }(),
+    ]);
+    if (mounted) setState(() => _previewing = false);
   }
 
   /// Preview of the plans of the checked titles.
   List<Widget> _planPreviews(AppLocalizations l10n, TextStyle? muted) {
-    if (_previewError case final error?) {
-      return [Text(l10n.fixPreviewFailed('$error'), style: muted)];
-    }
-    final plans = _plans;
-    if (plans == null) {
+    if (_previewing) {
       return [
         Text(l10n.fixPreviewLoading, style: muted),
         const SizedBox(height: Space.s),
@@ -259,7 +264,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
         (widget.issues[i].library, mediaTitleOf(widget.issues[i].item.path)),
     };
     return [
-      for (final MapEntry(key: (library, title), value: plan) in plans.entries)
+      for (final MapEntry(key: library, value: error) in _previewErrors.entries)
+        if (checked.any((c) => c.$1 == library))
+          Text(l10n.fixPreviewFailed('$error'), style: muted),
+      for (final MapEntry(key: (library, title), value: plan) in _plans.entries)
         if (checked.contains((library, title)))
           MediaPlanPreview(title: title, plan: plan),
     ];

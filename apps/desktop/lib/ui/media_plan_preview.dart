@@ -61,14 +61,15 @@ class MediaPlanPreview extends StatelessWidget {
       subtitle: Text(
         lines.isEmpty
             ? l10n.fixPreviewNothing
-            : l10n.fixPreviewCounts(
-                counts.moved,
-                counts.copied,
-                counts.trashed,
-                counts.renamed,
-                counts.rewritten,
-                counts.blocked,
-              ),
+            : [
+                if (counts.moved > 0) l10n.fixCountMoved(counts.moved),
+                if (counts.copied > 0) l10n.fixCountCopied(counts.copied),
+                if (counts.trashed > 0) l10n.fixCountTrashed(counts.trashed),
+                if (counts.renamed > 0) l10n.fixCountRenamed(counts.renamed),
+                if (counts.rewritten > 0)
+                  l10n.fixCountRewritten(counts.rewritten),
+                if (counts.blocked > 0) l10n.fixCountBlocked(counts.blocked),
+              ].join(' · '),
         style: muted,
       ),
       children: [for (final line in lines) Text(line, style: muted)],
