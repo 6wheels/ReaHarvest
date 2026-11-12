@@ -63,26 +63,11 @@ void main() {
       if (e is Directory) p.basename(e.path),
   ];
 
-  /// Fixes every item of the section [header] through its preview, and
-  /// waits for the report.
+  /// Fixes the single item of the section [header], and waits for the
+  /// report.
   Future<void> fixSection(WidgetTester tester, String header) async {
-    final before = h.tasks.length;
-    await tester.tap(
-      find.descendant(
-        of: find
-            .ancestor(of: find.text(header), matching: find.byType(Row))
-            .first,
-        matching: find.text('Fix…'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    // The tasks zone may show an earlier task with the same label.
-    await tester.tap(find.widgetWithText(FilledButton, 'Fix 1 item'));
-    await waitFor(
-      tester,
-      () => h.tasks.length > before && !h.tasks[before].isRunning,
-      reason: 'batch done',
-    );
+    await openSectionFix(tester, header);
+    await confirmFix(tester, h, 1);
   }
 
   testWidgets('inventories, keeps the originals and checks the batch', (

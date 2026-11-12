@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:reaharvest/ui/to_sort_page.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
@@ -22,31 +21,6 @@ void main() {
   setUp(() => h = Harness());
 
   tearDown(() => h.dispose());
-
-  /// Scrolls the "To sort" list from its top until [finder] is built and
-  /// visible: the list only builds the items near the screen.
-  Future<void> show(WidgetTester tester, Finder finder) async {
-    final list = find
-        .descendant(
-          of: find.byType(ToSortPage),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    final position = tester.state<ScrollableState>(list).position;
-    position.jumpTo(0);
-    await tester.pumpAndSettle();
-    while (finder.evaluate().isEmpty) {
-      if (position.pixels >= position.maxScrollExtent) fail('Not found');
-      position.jumpTo(position.pixels + 200);
-      await tester.pumpAndSettle();
-    }
-    await tester.ensureVisible(finder.first);
-    await tester.pumpAndSettle();
-  }
-
-  /// Header row of the section labelled [label].
-  Finder section(String label) =>
-      find.ancestor(of: find.text(label), matching: find.byType(Row)).first;
 
   /// Checkbox of the item [title].
   Finder box(String title) => find.descendant(
@@ -137,25 +111,25 @@ void main() {
       ('PROJECTS ABOVE THE TITLE LEVEL · 1', ['loose.rpp']),
       ('COPIES OF THE SAME VERSION (SAVE AS) · 2', ['v1 copy.rpp']),
     ]) {
-      await show(tester, find.text(header));
+      await showToSort(tester, find.text(header));
       for (final line in lines) {
-        await show(tester, find.text(line));
+        await showToSort(tester, find.text(line));
       }
     }
 
     // Two items of a section selected, with their counter; "select all"
     // is then partly checked.
-    await show(tester, find.text(tooHigh));
+    await showToSort(tester, find.text(tooHigh));
     final all = find.descendant(
-      of: section(tooHigh),
+      of: toSortSection(tooHigh),
       matching: find.byType(Checkbox),
     );
     await tester.tap(box('Lonely'));
     await tester.pumpAndSettle();
-    await show(tester, box('Single'));
+    await showToSort(tester, box('Single'));
     await tester.tap(box('Single'));
     await tester.pumpAndSettle();
-    await show(tester, find.text(tooHigh));
+    await showToSort(tester, find.text(tooHigh));
     expect(find.text('2 selected'), findsOne);
     expect(checked(tester, all), isNull);
     // Select all, then none.
@@ -167,28 +141,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('selected'), findsNothing);
     await tester.tap(box('Lonely'));
-    await show(tester, box('Single'));
+    await showToSort(tester, box('Single'));
     await tester.tap(box('Single'));
     await tester.pumpAndSettle();
 
     // The selection is kept through a rescan.
     await fullScan(tester);
-    await show(tester, find.text(tooHigh));
+    await showToSort(tester, find.text(tooHigh));
     expect(find.text('2 selected'), findsOne);
     expect(checked(tester, box('Lonely')), isTrue);
     expect(checked(tester, box('Bside')), isFalse);
 
     // "Fix…" previews the selected items only, then fixes them.
-    await tester.tap(
-      find.descendant(of: section(tooHigh), matching: find.text('Fix…')),
-    );
-    await tester.pumpAndSettle();
+    await openSectionFix(tester, tooHigh);
     expect(find.text('Artist/Lonely'), findsOne);
     expect(find.text('Artist/Single'), findsOne);
     expect(find.text('Artist/Bside'), findsNothing);
     expect(find.text('→ Artist/_Unassigned/Lonely'), findsOne);
-    await tapText(tester, 'Fix 2 items');
-    await waitForText(tester, 'Folders moved · 2');
+    await confirmFix(tester, h, 2);
+    expect(find.text('Folders moved · 2'), findsOne);
     expect(find.textContaining('Files missing or changed'), findsNothing);
     await tapText(tester, 'Close');
     await waitForText(tester, 'TITLES PLACED TOO HIGH · 1');
