@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -18,13 +19,18 @@ final class Reporter implements TaskReporter {
   final steps = <String>[];
   final progresses = <double>[];
   final logs = <String>[];
-  var cancelled = false;
+  final _cancelled = Completer<void>();
+
+  /// Asks the operation to stop.
+  void cancel() {
+    if (!_cancelled.isCompleted) _cancelled.complete();
+  }
 
   @override
   void step(TaskStep step, {int? index, int? total}) {
     final label = index == null ? step.name : '${step.name} $index/$total';
     steps.add(label);
-    if (label == cancelAt) cancelled = true;
+    if (label == cancelAt) cancel();
     onStep?.call(label);
   }
 
@@ -32,7 +38,10 @@ final class Reporter implements TaskReporter {
   void progress(double value) => progresses.add(value);
 
   @override
-  bool get isCancelled => cancelled;
+  bool get isCancelled => _cancelled.isCompleted;
+
+  @override
+  Future<void> get whenCancelled => _cancelled.future;
 
   @override
   void log(String message, {bool warning = false}) =>
@@ -259,7 +268,7 @@ void main() {
     });
 
     test('sends the cancellation to the isolate', () async {
-      final reporter = Reporter()..cancelled = true;
+      final reporter = Reporter()..cancel();
 
       final result = await runMigrationBatchOn(
         dir.path,
@@ -272,6 +281,23 @@ void main() {
       expect(result.cancelled, isTrue);
       expect(result.report.items[ReportKind.folderMoved], isNull);
       expect(Directory(p.join(dir.path, 'One')).existsSync(), isTrue);
+    });
+
+    test('the cancellation reaches the isolate during a fix', () async {
+      final reporter = Reporter(cancelAt: 'fix 1/2');
+
+      final result = await runMigrationBatchOn(
+        dir.path,
+        moves,
+        usage: const {},
+        hasherOf: sizeHasher,
+        reporter: reporter,
+      );
+
+      expect(result.cancelled, isTrue);
+      expect(result.knownPaths, ['New/One']);
+      expect(Directory(p.join(dir.path, 'Two')).existsSync(), isTrue);
+      expect(reporter.steps, ['inventory', 'fix 1/2']);
     });
 
     test('rethrows an error of the batch', () async {

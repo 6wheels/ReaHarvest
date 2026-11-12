@@ -127,17 +127,20 @@ Future<BatchResult> runMigrationBatchOn(
   final events = ReceivePort();
   final done = Completer<BatchResult>();
   SendPort? control;
-  var cancelSent = false;
-  void sendCancel() {
-    if (cancelSent || control == null || !reporter.isCancelled) return;
-    cancelSent = true;
-    control!.send(null);
-  }
-
+  var cancelled = false;
+  // Pushed to the isolate as soon as the reporter is cancelled; before the
+  // isolate gives its port, sent when the port arrives.
+  unawaited(
+    reporter.whenCancelled.then((_) {
+      cancelled = true;
+      control?.send(null);
+    }),
+  );
   events.listen((message) {
     switch (message) {
       case final SendPort port:
         control = port;
+        if (cancelled) port.send(null);
       case (final TaskStep step, final int? index, final int? total):
         reporter.step(step, index: index, total: total);
       case final double value:
@@ -147,19 +150,12 @@ Future<BatchResult> runMigrationBatchOn(
       case final BatchResult result:
         done.complete(result);
     }
-    sendCancel();
   });
-  // Also while the isolate is silent, e.g. hashing a large file.
-  final timer = Timer.periodic(
-    const Duration(milliseconds: 100),
-    (_) => sendCancel(),
-  );
   try {
     await _spawn(root, fixes, usage, hasherOf, events.sendPort);
     // Sent last on the same port: every event before it was given.
     return await done.future;
   } finally {
-    timer.cancel();
     events.close();
   }
 }
@@ -175,7 +171,7 @@ Future<void> _spawn(
 ) => Isolate.run(() async {
   final control = ReceivePort();
   final reporter = _PortReporter(events);
-  control.listen((_) => reporter.cancelled = true);
+  control.listen((_) => reporter.cancel());
   events.send(control.sendPort);
   try {
     final storage = MountedFolderStorage(root);
@@ -199,8 +195,12 @@ final class _PortReporter implements TaskReporter {
 
   final SendPort _events;
 
-  /// Set when the cancellation message arrives.
-  var cancelled = false;
+  final _cancelled = Completer<void>();
+
+  /// Called when the cancellation message arrives.
+  void cancel() {
+    if (!_cancelled.isCompleted) _cancelled.complete();
+  }
 
   @override
   void step(TaskStep step, {int? index, int? total}) =>
@@ -210,7 +210,10 @@ final class _PortReporter implements TaskReporter {
   void progress(double value) => _events.send(value);
 
   @override
-  bool get isCancelled => cancelled;
+  bool get isCancelled => _cancelled.isCompleted;
+
+  @override
+  Future<void> get whenCancelled => _cancelled.future;
 
   @override
   void log(String message, {bool warning = false}) =>

@@ -663,6 +663,9 @@ final class _TaskReporter implements TaskReporter {
   bool get isCancelled => task.isCancelled;
 
   @override
+  Future<void> get whenCancelled => task.whenCancelled;
+
+  @override
   void log(String message, {bool warning = false}) =>
       _log.log(warning ? Level.WARNING : Level.INFO, '$name: $message');
 }

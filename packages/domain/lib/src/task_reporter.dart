@@ -14,6 +14,10 @@ abstract interface class TaskReporter {
   /// Whether the operation was asked to stop.
   bool get isCancelled;
 
+  /// Completes when the operation is asked to stop (already complete if it
+  /// was); never completes otherwise.
+  Future<void> get whenCancelled;
+
   /// A line for the log of the application.
   void log(String message, {bool warning = false});
 }
