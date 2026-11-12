@@ -394,6 +394,29 @@ final class AppSettings {
   }
 }
 
+/// The settings file was written by a newer version of the application.
+final class SettingsNewerException implements Exception {
+  const SettingsNewerException(this.path, this.version);
+
+  final String path;
+  final int version;
+
+  @override
+  String toString() => 'Settings $path come from a newer version: $version';
+}
+
+/// The settings file cannot be loaded (not JSON, wrong shape, missing or
+/// other schema version).
+final class SettingsUnreadableException implements Exception {
+  const SettingsUnreadableException(this.path, this.cause);
+
+  final String path;
+  final Object cause;
+
+  @override
+  String toString() => 'Settings $path are unreadable: $cause';
+}
+
 /// Persists [AppSettings] as JSON in [path] (app support folder, provided by
 /// the app).
 final class SettingsFile {
@@ -403,19 +426,46 @@ final class SettingsFile {
 
   /// Loads the settings. On first launch (no file), creates them with a new
   /// local identity named after the OS user, and saves them.
+  ///
+  /// Throws [SettingsNewerException] for a file written by a newer version,
+  /// [SettingsUnreadableException] for any other file that cannot be loaded.
+  /// The file is never modified in these cases.
   Future<AppSettings> load() async {
     final file = File(path);
     // An empty file (portable mode marker) is a first launch.
     if (await file.exists() && await file.length() > 0) {
-      return AppSettings.fromJson(
-        (jsonDecode(await file.readAsString()) as Map).cast(),
-      );
+      try {
+        final json = (jsonDecode(await file.readAsString()) as Map)
+            .cast<String, Object?>();
+        final version = json['schemaVersion'];
+        if (version is int && version > AppSettings.schemaVersion) {
+          throw SettingsNewerException(path, version);
+        }
+        return AppSettings.fromJson(json);
+      } on SettingsNewerException {
+        rethrow;
+      } catch (e) {
+        throw SettingsUnreadableException(path, e);
+      }
     }
     final settings = AppSettings(
       identity: LocalIdentity(MemberId.generate(), _osUserName()),
     );
     await save(settings);
     return settings;
+  }
+
+  /// Renames the file to `settings.json.broken-<yyyyMMdd-HHmmss>` and returns
+  /// the new path, so that the next [load] starts from new settings.
+  Future<String> setAside() async {
+    final n = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    final stamp =
+        '${n.year}${two(n.month)}${two(n.day)}-'
+        '${two(n.hour)}${two(n.minute)}${two(n.second)}';
+    final target = '$path.broken-$stamp';
+    await File(path).rename(target);
+    return target;
   }
 
   /// Saves [settings] atomically (temporary file, then rename).
