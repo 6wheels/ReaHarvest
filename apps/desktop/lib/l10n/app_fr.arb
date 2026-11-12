@@ -275,5 +275,12 @@
   "knownValuesEmpty": "Ajoutez au moins une valeur.",
   "knownValuesMissingChild": "Chaque valeur doit avoir au moins une valeur en dessous (ou Non classé).",
   "knownValuesInvalid": "Ces valeurs ne correspondent pas à l'organisation.",
-  "knownValuesUsed": "Une valeur encore utilisée par un dossier ne peut pas être retirée."
+  "knownValuesUsed": "Une valeur encore utilisée par un dossier ne peut pas être retirée.",
+  "settingsUnreadableTitle": "Les réglages sont illisibles",
+  "settingsUnreadableBody": "{path} est endommagé. Vous pouvez repartir avec de nouveaux réglages : ce fichier est mis de côté, vos bibliothèques seront à ajouter de nouveau, leurs dossiers ne sont pas modifiés.",
+  "settingsStartNew": "Repartir avec de nouveaux réglages",
+  "settingsNewerTitle": "Les réglages viennent d'une version plus récente",
+  "settingsNewerBody": "{path} a été écrit par une version plus récente de ReaHarvest. Mettez l'application à jour, ou ouvrez le dossier pour déplacer le fichier.",
+  "settingsOpenFolder": "Ouvrir le dossier",
+  "quit": "Quitter"
 }

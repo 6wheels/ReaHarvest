@@ -342,5 +342,18 @@
   "knownValuesEmpty": "Add at least one value.",
   "knownValuesMissingChild": "Each value needs at least one value below it (or Unassigned).",
   "knownValuesInvalid": "These values do not match the layout.",
-  "knownValuesUsed": "A value still used by a folder cannot be removed."
+  "knownValuesUsed": "A value still used by a folder cannot be removed.",
+  "settingsUnreadableTitle": "Settings cannot be read",
+  "settingsUnreadableBody": "{path} is damaged. You can start with new settings: this file is kept aside, your libraries will have to be added again, their folders are untouched.",
+  "@settingsUnreadableBody": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "settingsStartNew": "Start with new settings",
+  "settingsNewerTitle": "Settings come from a newer version",
+  "settingsNewerBody": "{path} was written by a newer version of ReaHarvest. Update the application, or open the folder to move the file away.",
+  "@settingsNewerBody": {
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "settingsOpenFolder": "Open folder",
+  "quit": "Quit"
 }
