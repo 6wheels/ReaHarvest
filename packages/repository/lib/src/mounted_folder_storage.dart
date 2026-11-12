@@ -81,6 +81,20 @@ final class MountedFolderStorage implements RepositoryStorage {
   }
 
   @override
+  Future<void> append(String path, List<int> bytes) async {
+    final target = File(_abs(path));
+    await target.parent.create(recursive: true);
+    final file = await target.open(mode: FileMode.append);
+    try {
+      await file.writeFrom(bytes);
+      await file.flush();
+    } finally {
+      await file.close();
+    }
+    _hideDotSegments(path);
+  }
+
+  @override
   Future<void> move(String from, String to) async {
     final target = _abs(to);
     if (await FileSystemEntity.type(target) != FileSystemEntityType.notFound) {

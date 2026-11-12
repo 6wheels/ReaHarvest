@@ -33,6 +33,10 @@ final class CountingStorage implements RepositoryStorage {
       inner.write(path, content);
 
   @override
+  Future<void> append(String path, List<int> bytes) =>
+      inner.append(path, bytes);
+
+  @override
   Future<void> move(String from, String to) => inner.move(from, to);
 
   @override
