@@ -139,8 +139,12 @@ void main() {
       tester,
       'PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 3',
     );
-    // The label of each lifted project is its file name (SPEC §4.2).
-    expect(find.text('→ Artist/Album/Song · v1 · Alice · No status'), findsOne);
+    // The label of each lifted project is its final file name (SPEC §4.2):
+    // the title holds a v1.rpp already.
+    expect(
+      find.text('→ Artist/Album/Song · v1 (2) · Alice · No status'),
+      findsOne,
+    );
     expect(
       find.text('→ Artist/Album/Song · final · Tester · Mixing'),
       findsOne,
