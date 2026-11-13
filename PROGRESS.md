@@ -79,7 +79,7 @@ Core hardening, before the remaining features (listed in the order of the steps 
 - [x] #95 media normalization as gather, pure plan, then apply (the plan is the preview; shown per title in the fix dialog with its counts and operations, computed in an isolate; the guided move goes through the same steps; `xxh3Hash` moved to `repository`, hashes taken from the inventory for unchanged media)
 - [x] #96 files named by a plugin state never moved nor purged (`namedOutsideSources`: plain text and base64 plugin states, UTF-8 and UTF-16LE; normalization leaves such a file and reports `referencedByPlugin`; the purge never lists it, versions and backups count, the trash does not)
 - [x] #99 fix proposals computed outside the interface (`proposeFixes` and `buildFixes` in `repository`; the dialog shows and collects; the lift preview shows the final label; PR #138)
-- [x] #100 LibraryService split into one service per role (`LibraryCatalog`, `LibraryScans`, `VersionActions`, `MigrationActions`, `ReaperActions` in `state/`, each with its provider and tests; `libraryServiceProvider` removed)
+- [x] #100 LibraryService split into one service per role (`LibraryCatalog`, `LibraryScans`, `VersionActions`, `MigrationActions`, `ReaperActions` in `state/`, each with its provider and tests; `libraryServiceProvider` removed; PR #139)
 - [ ] #101 one writing task per library at a time
 - [ ] #102 rescan of the title changed by an action only
 - [ ] #103 index written outside the UI isolate
