@@ -306,11 +306,14 @@ class LibraryService {
   /// the task. Then, also after a cancellation, the values of the folders
   /// moved or declared join the known values and the library is rescanned.
   /// A cancelled batch ends the task with the report of what was done.
+  /// While a fix of the library is left to undo, runs nothing and offers
+  /// to undo it instead ([offerUndo]).
   Future<Report?> _fix(
     LibraryEntry entry,
     List<MigrationFix> fixes,
     String Function(AppLocalizations l10n) label,
-  ) {
+  ) async {
+    if (await offerUndo(entry)) return null;
     final root = entry.libraryRoot;
     return ref.read(tasksProvider.notifier).run(label, (task) async {
       // From the index: stale for the titles changed by the previous fixes
@@ -348,6 +351,58 @@ class LibraryService {
       // What was done before stopping is kept: the report tells it.
       if (result.cancelled) throw TaskCancelled(report);
       return report;
+    }, openReport: true);
+  }
+
+  /// Offers to undo the fix left to undo in [entry], if any (SPEC §5.8 step
+  /// 5, #94): the dialog of [interruptedFixesProvider]. Returns whether
+  /// there is one.
+  Future<bool> offerUndo(LibraryEntry entry) async {
+    final fix = await unfinishedFixOn(entry.libraryRoot);
+    if (fix == null) return false;
+    _log.warning(
+      'Fix of ${fix.path} in ${entry.displayName} left to undo '
+      '(${fix.folder}, fix ${fix.fix})',
+    );
+    ref.read(interruptedFixesProvider.notifier).offer((
+      library: entry.id,
+      name: entry.displayName,
+      path: fix.path,
+    ));
+    return true;
+  }
+
+  /// Scans every library, then offers to undo the fixes left to undo
+  /// ([offerUndo]): what the application does when it starts.
+  Future<void> startup() async {
+    await scanAll();
+    for (final entry in ref.read(settingsProvider).libraries) {
+      try {
+        await offerUndo(entry);
+      } on Object catch (error) {
+        _log.warning('Journal of ${entry.displayName} unreadable', error);
+      }
+    }
+  }
+
+  /// Undoes the fix left to undo in [library] (SPEC §5.8 step 5,
+  /// [undoUnfinishedFixOn]), as a task whose report opens at the end. Then
+  /// rescans.
+  Future<Report?> undoInterruptedFix(LibraryId library) {
+    final entry = _entry(library);
+    final root = entry.libraryRoot;
+    return ref.read(tasksProvider.notifier).run((l10n) => l10n.taskUndoFix, (
+      task,
+    ) async {
+      try {
+        return _rooted(
+          root,
+          await undoUnfinishedFixOn(root, hasherOf: xxh3Hasher),
+        );
+      } finally {
+        task.step((l10n) => l10n.taskStepScan);
+        await scan(entry);
+      }
     }, openReport: true);
   }
 
@@ -766,6 +821,32 @@ bool sameLayout(Layout? a, Layout? b) =>
     jsonEncode(a?.toJson()) == jsonEncode(b?.toJson());
 
 final libraryServiceProvider = Provider<LibraryService>(LibraryService.new);
+
+/// A fix left to undo in a library, offered to be undone: the library, its
+/// display name and the library path of the fix.
+typedef InterruptedFix = ({LibraryId library, String name, String path});
+
+/// Fixes offered to be undone, one per library, oldest first; the
+/// interface shows them one after the other (SPEC §5.8 step 5, #94).
+class InterruptedFixes extends Notifier<List<InterruptedFix>> {
+  @override
+  List<InterruptedFix> build() => const [];
+
+  /// Offers [fix], unless its library already has one offered.
+  void offer(InterruptedFix fix) {
+    if (state.any((f) => f.library == fix.library)) return;
+    state = [...state, fix];
+  }
+
+  /// Removes the offer of [library], answered.
+  void answered(LibraryId library) =>
+      state = [...state.where((f) => f.library != library)];
+}
+
+final interruptedFixesProvider =
+    NotifierProvider<InterruptedFixes, List<InterruptedFix>>(
+      InterruptedFixes.new,
+    );
 
 /// Owner of the versions the local member creates in a library (SPEC
 /// §4.2): the local member if the library declares it, else none.
