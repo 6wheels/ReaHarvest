@@ -10,13 +10,16 @@ import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import 'library_catalog.dart';
 import 'library_scans.dart';
+import 'library_turns.dart';
 import 'providers.dart';
 import 'reaper.dart';
+import 'tasks.dart';
 
 final _log = Logger('library.versions');
 
 /// Actions on the versions of a title: adopt, separate a duplicate, create,
-/// edit, status, trash, purge, backup and restore (SPEC §4.2, §5.4, §5.9).
+/// edit, status, trash, purge, backup and restore (SPEC §4.2, §5.4, §5.9),
+/// each in the turn of its library ([_turn]).
 class VersionActions {
   VersionActions(this.ref);
 
@@ -26,6 +29,13 @@ class VersionActions {
   /// version id into the project, [label] and [owner] (none when the library
   /// declares no members) into the title's node file, then rescans.
   Future<void> adopt(
+    Title title,
+    Version version,
+    String label, {
+    MemberId? owner,
+  }) => _turn(title, () => _adopt(title, version, label, owner: owner));
+
+  Future<void> _adopt(
     Title title,
     Version version,
     String label, {
@@ -55,7 +65,10 @@ class VersionActions {
   /// title with the same id, else [version] itself when the original is in
   /// another title), owned by the local member when the library declares
   /// it. Then rescans.
-  Future<void> separateDuplicate(Title title, Version version) async {
+  Future<void> separateDuplicate(Title title, Version version) =>
+      _turn(title, () => _separateDuplicate(title, version));
+
+  Future<void> _separateDuplicate(Title title, Version version) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
@@ -84,7 +97,10 @@ class VersionActions {
 
   /// Backs up [version] of [title] into its `.history/` (UI: « Créer un
   /// point de sauvegarde », SPEC §5.4); the version is unchanged.
-  Future<void> backup(Title title, Version version) async {
+  Future<void> backup(Title title, Version version) =>
+      _turn(title, () => _backup(title, version));
+
+  Future<void> _backup(Title title, Version version) async {
     final root = ref.libraryEntry(title.libraryId).libraryRoot;
     await Isolate.run(
       () => backupVersion(
@@ -99,7 +115,10 @@ class VersionActions {
 
   /// Restores [backup] into [version] of [title], after backing up its
   /// current state (SPEC §5.4). Then rescans.
-  Future<void> restore(Title title, Version version, Backup backup) async {
+  Future<void> restore(Title title, Version version, Backup backup) =>
+      _turn(title, () => _restore(title, version, backup));
+
+  Future<void> _restore(Title title, Version version, Backup backup) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final path = backup.path;
@@ -122,6 +141,18 @@ class VersionActions {
   /// [template], else blank (REAPER's default template for new
   /// projects when set). Then rescans. Returns its file name.
   Future<String> addVersion(
+    Title title,
+    String fileName,
+    String label, {
+    Version? source,
+    String? template,
+  }) => _turn(
+    title,
+    () =>
+        _addVersion(title, fileName, label, source: source, template: template),
+  );
+
+  Future<String> _addVersion(
     Title title,
     String fileName,
     String label, {
@@ -185,6 +216,16 @@ class VersionActions {
     Version version, {
     required String fileName,
     required String label,
+  }) => _turn(
+    title,
+    () => _editVersion(title, version, fileName: fileName, label: label),
+  );
+
+  Future<String> _editVersion(
+    Title title,
+    Version version, {
+    required String fileName,
+    required String label,
   }) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
@@ -213,7 +254,14 @@ class VersionActions {
 
   /// Sets the [status] of [version] of [title] (null clears it), in the
   /// title's `.node.json` (SPEC §5.9). Then rescans.
-  Future<void> setStatusOf(Title title, Version version, String? status) async {
+  Future<void> setStatusOf(Title title, Version version, String? status) =>
+      _turn(title, () => _setStatusOf(title, version, status));
+
+  Future<void> _setStatusOf(
+    Title title,
+    Version version,
+    String? status,
+  ) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
@@ -226,7 +274,10 @@ class VersionActions {
   }
 
   /// Moves [version] of [title] to the trash (SPEC §5.4). Then rescans.
-  Future<void> trashVersion(Title title, Version version) async {
+  Future<void> trashVersion(Title title, Version version) =>
+      _turn(title, () => _trashVersion(title, version));
+
+  Future<void> _trashVersion(Title title, Version version) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
@@ -243,7 +294,10 @@ class VersionActions {
   /// Then returns the media of its pool used by no project any more, to
   /// offer their purge; empty in a free tree, which has no pool. Throws
   /// [FormatException] if a project cannot be read.
-  Future<List<StorageEntry>> purge(Title title, List<String> paths) async {
+  Future<List<StorageEntry>> purge(Title title, List<String> paths) =>
+      _turn(title, () => _purge(title, paths));
+
+  Future<List<StorageEntry>> _purge(Title title, List<String> paths) async {
     final root = ref.libraryEntry(title.libraryId).libraryRoot;
     final dir = title.path;
     final freeTree = _isFreeTree(title);
@@ -258,7 +312,10 @@ class VersionActions {
 
   /// Permanently deletes the media [paths] of the pool of [title], as
   /// returned by [purge]. Then rescans.
-  Future<void> purgeUnusedMedia(Title title, List<String> paths) async {
+  Future<void> purgeUnusedMedia(Title title, List<String> paths) =>
+      _turn(title, () => _purgeUnusedMedia(title, paths));
+
+  Future<void> _purgeUnusedMedia(Title title, List<String> paths) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
@@ -266,6 +323,12 @@ class VersionActions {
     _log.info('Unused media of $dir in $root purged: ${paths.join(', ')}');
     await ref.scanLibrary(entry);
   }
+
+  /// Runs [change] of [title] in the turn of its library ([LibraryTurns]):
+  /// never during a batch on the library, nor with another change of the
+  /// same node file. Version actions are not shown in the tasks zone.
+  Future<T> _turn<T>(Title title, Future<T> Function() change) =>
+      ref.read(libraryTurnsProvider).run(title.libraryId, change);
 
   /// [version] of [title], with its library, for the logs.
   String _at(Title title, Version version) =>

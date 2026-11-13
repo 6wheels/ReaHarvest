@@ -130,6 +130,24 @@ void main() {
     expect(duplicateVersions(index.titles()), isEmpty);
   });
 
+  test('keeps both changes of one node file asked together', () async {
+    final song = await bandWithSong();
+    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v2.rpp'));
+    await scans.scanAll();
+    await versions.adopt(title(), version('v1.rpp'), 'one');
+
+    // Each one reads and writes the node file of the title: one after the
+    // other in the turn of the library, neither is lost.
+    await Future.wait([
+      versions.adopt(title(), version('v2.rpp'), 'two'),
+      versions.setStatusOf(title(), version('v1.rpp'), 'mixing'),
+    ]);
+
+    expect(version('v2.rpp').metadata!.label, 'two');
+    expect(title().statusOf(version('v1.rpp')), 'mixing');
+    expect(version('v1.rpp').metadata!.label, 'one');
+  });
+
   test('owns the versions of the local member once declared', () async {
     final song = await bandWithSong();
     final entry = container.read(settingsProvider).libraries.single;

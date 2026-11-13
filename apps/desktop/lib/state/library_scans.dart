@@ -4,6 +4,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
+import 'library_turns.dart';
 import 'providers.dart';
 import 'report_paths.dart';
 import 'tasks.dart';
@@ -17,9 +18,10 @@ class LibraryScans {
   final Ref ref;
 
   /// Scans every configured library, one after the other, as a background
-  /// task cancellable between two libraries (SPEC §5.2). A failed library
-  /// does not stop the others; it is reported. A [full] scan reads every
-  /// file again, changed or not.
+  /// task cancellable between two libraries (SPEC §5.2), each in the turn
+  /// of its library ([LibraryTurns]). A failed library does not stop the
+  /// others; it is reported. A [full] scan reads every file again, changed
+  /// or not.
   Future<void> scanAll({bool full = false}) async {
     final entries = ref.read(settingsProvider).libraries;
     if (entries.isEmpty) return;
@@ -30,7 +32,9 @@ class LibraryScans {
         for (final (i, entry) in entries.indexed) {
           task.checkCancelled();
           try {
-            report += await _scanReport(entry, full: full);
+            report += await ref
+                .read(libraryTurnsProvider)
+                .run(entry.id, () => _scanReport(entry, full: full));
           } on Object catch (error) {
             report += Report({
               ReportKind.scanFailed: [ReportItem(entry.libraryRoot, '$error')],
@@ -44,7 +48,8 @@ class LibraryScans {
   }
 
   /// Scans [entry]; failures are only logged, the library stays configured
-  /// and is scanned again on next start.
+  /// and is scanned again on next start. Takes no turn: for the rescan that
+  /// ends a change, inside the turn of [entry] ([LibraryTurns]).
   Future<void> scan(LibraryEntry entry) async {
     try {
       await _scanReport(entry);
@@ -53,13 +58,15 @@ class LibraryScans {
     }
   }
 
-  /// Scans [entry] as a task whose report is shown at the end.
+  /// Scans [entry] as a task whose report is shown at the end, in the turn
+  /// of its library.
   Future<void> scanTask(LibraryEntry entry) => ref
       .read(tasksProvider.notifier)
       .run(
         (l10n) => l10n.taskScan(entry.displayName),
         (_) => _scanReport(entry),
         openReport: true,
+        library: entry.id,
       );
 
   /// Scans [entry] in an isolate, incrementally from the stored scan unless
@@ -103,7 +110,8 @@ class LibraryScans {
 final libraryScansProvider = Provider<LibraryScans>(LibraryScans.new);
 
 extension LibraryScan on Ref {
-  /// Scans [entry], failures only logged ([LibraryScans.scan]).
+  /// Scans [entry], failures only logged ([LibraryScans.scan]), inside the
+  /// turn of [entry].
   Future<void> scanLibrary(LibraryEntry entry) =>
       read(libraryScansProvider).scan(entry);
 }

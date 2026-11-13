@@ -12,6 +12,7 @@ import 'package:reaharvest_repository/reaharvest_repository.dart';
 import 'library_scans.dart';
 import 'navigation.dart';
 import 'providers.dart';
+import 'tasks.dart';
 
 final _log = Logger('library.catalog');
 
@@ -153,16 +154,24 @@ class LibraryCatalog {
     return (values: values, used: used);
   }
 
-  /// Replaces the known values of the library [entry] (SPEC §3.1). Then
-  /// rescans it, as a task whose report is shown at the end.
+  /// Replaces the known values of the library [entry] (SPEC §3.1), in the
+  /// turn of the library. Then rescans it, as a task whose report is shown
+  /// at the end.
   Future<void> setKnownValues(
     LibraryEntry entry,
     List<KnownValue> values,
   ) async {
-    final storage = MountedFolderStorage(entry.libraryRoot);
-    final library = await readLibrary(storage);
-    if (library == null) return;
-    await writeLibrary(storage, library.withKnownValues(values));
+    final written = await ref.read(libraryTurnsProvider).run(
+      entry.id,
+      () async {
+        final storage = MountedFolderStorage(entry.libraryRoot);
+        final library = await readLibrary(storage);
+        if (library == null) return false;
+        await writeLibrary(storage, library.withKnownValues(values));
+        return true;
+      },
+    );
+    if (!written) return;
     _log.info(
       'Known values of ${entry.displayName} set: '
       '${values.paths.map((v) => v.join('/')).join(', ')}',
@@ -176,18 +185,19 @@ class LibraryCatalog {
       const [];
 
   /// Replaces the declared members of the library [entry] (SPEC §6.5).
-  /// Then rescans it, to index them.
-  Future<void> setMembers(LibraryEntry entry, List<Member> members) async {
-    final storage = MountedFolderStorage(entry.libraryRoot);
-    final library = await readLibrary(storage);
-    if (library == null) return;
-    await writeLibrary(storage, library.withMembers(members));
-    _log.info(
-      'Members of ${entry.displayName} set: '
-      '${members.map((m) => m.name).join(', ')}',
-    );
-    await ref.read(libraryScansProvider).scan(entry);
-  }
+  /// Then rescans it, to index them. In the turn of the library.
+  Future<void> setMembers(LibraryEntry entry, List<Member> members) =>
+      ref.read(libraryTurnsProvider).run(entry.id, () async {
+        final storage = MountedFolderStorage(entry.libraryRoot);
+        final library = await readLibrary(storage);
+        if (library == null) return;
+        await writeLibrary(storage, library.withMembers(members));
+        _log.info(
+          'Members of ${entry.displayName} set: '
+          '${members.map((m) => m.name).join(', ')}',
+        );
+        await ref.read(libraryScansProvider).scan(entry);
+      });
 
   /// Forgets [id]: settings and index only, files are left untouched.
   Future<void> remove(LibraryId id) async {
