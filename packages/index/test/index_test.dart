@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
+import 'package:sqlite3/sqlite3.dart' show SqliteException;
 import 'package:test/test.dart';
 
 const fixtures = '../../test/fixtures';
@@ -16,11 +17,16 @@ final class CountingStorage implements RepositoryStorage {
   final reads = <String>[];
 
   @override
-  Future<List<StorageEntry>> list(String dir, {bool recursive = false}) =>
-      inner.list(dir, recursive: recursive);
+  Future<List<StorageEntry>> list(String dir, {bool recursive = false}) {
+    listed.add(recursive ? '$dir/**' : dir);
+    return inner.list(dir, recursive: recursive);
+  }
 
   @override
   Future<StorageEntry?> stat(String path) => inner.stat(path);
+
+  /// Folders listed, recursive ones suffixed with `/**`.
+  final listed = <String>[];
 
   @override
   Stream<List<int>> read(String path) {
@@ -465,6 +471,275 @@ void main() {
         gone: 'old take',
       });
       expect(again.nodes[title]!.versionOwners, {kept.id: owner});
+    });
+  });
+
+  group('updateTitle', () {
+    /// Comparable form of the scan stored in [index] for [id].
+    Object describe(LocalIndex index, LibraryId id) {
+      final s = index.scanResult(id)!;
+      return {
+        'titles': [
+          for (final t in s.titles)
+            [
+              t.id,
+              t.path,
+              t.tags,
+              t.status,
+              t.versionStatuses,
+              for (final v in t.versions)
+                [
+                  v.fileName,
+                  v.size,
+                  v.modified,
+                  v.metadata?.id,
+                  v.metadata?.label,
+                  v.metadata?.owner,
+                  v.tempo,
+                  v.trackCount,
+                  v.media,
+                  v.recordPath,
+                  v.renderFile,
+                ],
+            ],
+        ],
+        'nodes': {
+          for (final MapEntry(:key, :value) in s.nodes.entries)
+            key: [
+              value.id,
+              value.level,
+              value.status,
+              value.versionStatuses,
+              value.versionLabels,
+              value.versionOwners,
+            ],
+        },
+        'issues': [
+          for (final i in index.issues(library: id))
+            [i.kind, i.item.path, i.item.detail, i.item.level?.key],
+        ],
+        'stamps': s.stamps,
+        'subprojects': s.subprojects,
+      };
+    }
+
+    String project({VersionId? id, List<String> media = const []}) => [
+      '<REAPER_PROJECT 0.1 "7.84/win64" 0',
+      '  RECORD_PATH "Media" ""',
+      '  RENDER_FILE "Renders"',
+      '  <TRACK',
+      for (final m in media) ...[
+        '    <ITEM',
+        '      <SOURCE WAVE',
+        '        FILE "$m"',
+        '      >',
+        '    >',
+      ],
+      '  >',
+      if (id != null) ...[
+        '  <EXTSTATE',
+        '    <${VersionMetadata.section}',
+        '      ${VersionMetadata.idKey} $id',
+        '    >',
+        '  >',
+      ],
+      '>',
+    ].join('\n');
+
+    late Directory root;
+    late CountingStorage storage;
+
+    void put(String path, String content) =>
+        File(p.joinAll([root.path, ...path.split('/')]))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync(content);
+
+    setUp(() {
+      root = Directory.systemTemp.createTempSync('reaharvest_title_');
+      storage = CountingStorage(MountedFolderStorage(root.path));
+    });
+    tearDown(() => root.deleteSync(recursive: true));
+
+    /// Indexes [lib] with a full scan, then scans the title [path] only,
+    /// stores it, and checks the index against a full scan in another one.
+    Future<void> rescanAndCompare(Library lib, String path) async {
+      final stored = index.scanResult(lib.id)!;
+      // Only the stored rows of the title are loaded for its rescan.
+      final slice = index.storedTitle(lib.id, path)!;
+      expect(slice.titles.map((t) => t.path), [path]);
+      expect(slice.nodes.keys, [path]);
+      expect(slice.stamps.keys.every((k) => k.startsWith('$path/')), isTrue);
+      final previous = slice.titles.single;
+      storage
+        ..listed.clear()
+        ..reads.clear();
+      final result = await scanTitle(storage, lib, previous, stored: slice);
+      expect(storage.listed, ['$path/**']);
+      expect(storage.reads, isNot(contains('$path/.node.json')));
+      index.updateTitle(lib, path, result);
+
+      final full = LocalIndex.inMemory();
+      addTearDown(full.close);
+      full.update(lib, await scan(storage, lib, previous: stored));
+      expect(describe(index, lib.id), describe(full, lib.id));
+    }
+
+    test('rescans one title of 1,000 as a full scan would', () async {
+      final lib = library();
+      final shared = VersionId.generate();
+      for (var i = 0; i < 1000; i++) {
+        put(
+          'Artist ${i % 10}/Album ${i % 50}/Title $i/v.rpp',
+          project(id: i < 2 ? shared : VersionId.generate()),
+        );
+      }
+      index.update(lib, await scan(storage, lib));
+      expect(
+        index
+            .issues(kind: ReportKind.duplicateVersionId)
+            .map((i) => i.item.path),
+        ['Artist 0/Album 0/Title 0/v.rpp', 'Artist 1/Album 1/Title 1/v.rpp'],
+      );
+      const one = 'Artist 1/Album 1/Title 1';
+
+      // Separated: the duplicate across titles is gone.
+      put('$one/v.rpp', project(id: VersionId.generate()));
+      put('$one/Media/a.wav', 'a');
+      put('$one/mix/deep.rpp', project());
+      await rescanAndCompare(lib, one);
+      expect(index.issues(kind: ReportKind.duplicateVersionId), isEmpty);
+      expect(
+        index.issues(kind: ReportKind.projectTooDeep).single.item.path,
+        '$one/mix/deep.rpp',
+      );
+
+      // A copy keeping the id of another title: found again.
+      put(
+        '$one/copy.rpp',
+        project(
+          id: index.titles(library: lib.id).first.versions.single.metadata!.id,
+        ),
+      );
+      await rescanAndCompare(lib, one);
+      expect(index.issues(kind: ReportKind.duplicateVersionId), hasLength(2));
+    });
+
+    test('keeps hashes of unchanged files and the level issues', () async {
+      final lib = library().withKnownValues(const [
+        KnownValue('Band', [KnownValue('Album'), KnownValue('Album 2')]),
+      ]);
+      const song = 'Band/Album/Song';
+      put('$song/v.rpp', project(media: [r'Media\a.wav']));
+      put('$song/Media/a.wav', 'a');
+      put('$song/Media/b.wav', 'b');
+      put('Band/Loose/v.rpp', project());
+      put('Band/Album 2/Song/v.rpp', project());
+      index.update(lib, await scan(storage, lib));
+      await index.hashPending(lib.id, (path) async => 'h');
+      expect(
+        index.issues(kind: ReportKind.titleTooHigh).single.item.path,
+        'Band/Loose',
+      );
+
+      File(p.join(root.path, 'Band', 'Album', 'Song', 'Media', 'b.wav'))
+          .deleteSync();
+      put('$song/Media/c.wav', 'c');
+      await rescanAndCompare(lib, song);
+      expect(index.hashOf(lib.id, '$song/Media/a.wav'), 'h');
+      expect(index.hashOf(lib.id, '$song/Media/c.wav'), isNull);
+      expect(index.hashOf(lib.id, 'Band/Album 2/Song/v.rpp'), 'h');
+
+      put('Band/Loose/w.rpp', project());
+      await rescanAndCompare(lib, 'Band/Loose');
+      expect(
+        index.issues(kind: ReportKind.titleTooHigh).single.item.path,
+        'Band/Loose',
+      );
+    });
+
+    test('drops a folder that is no longer a title', () async {
+      final lib = library();
+      const song = 'Band/Album/Song';
+      put('$song/v.rpp', project());
+      put('$song/mix/deep.rpp', project());
+      put('Band/Album/Other/v.rpp', project());
+      index.update(lib, await scan(storage, lib));
+      final previous = index.titles().firstWhere((t) => t.path == song);
+
+      File(p.join(root.path, 'Band', 'Album', 'Song', 'v.rpp')).deleteSync();
+      File(p.join(root.path, 'Band', 'Album', 'Song', 'mix', 'deep.rpp'))
+          .deleteSync();
+      index.updateTitle(
+        lib,
+        song,
+        await scanTitle(
+          storage,
+          lib,
+          previous,
+          stored: index.scanResult(lib.id)!,
+        ),
+      );
+
+      expect(index.titles().map((t) => t.path), ['Band/Album/Other']);
+      expect(index.scanResult(lib.id)!.nodes.keys, isNot(contains(song)));
+      expect(index.issues().map((i) => (i.kind, i.item.path)), [
+        (ReportKind.orphanNode, '$song/.node.json'),
+      ]);
+      expect(
+        index.files(lib.id).map((f) => f.path),
+        isNot(contains('$song/v.rpp')),
+      );
+    });
+
+    test('stores the library, keeps the journal position', () {
+      final lib = library();
+      const position = (folder: '.migration/2026-11-12_000000_000', line: 7);
+      index.update(lib, const ScanResult(journalPosition: position));
+      expect(index.storedTitle(lib.id, 'A/B/C'), isNull);
+      expect(index.storedTitle(LibraryId.generate(), 'A/B/C'), isNull);
+      final changed = lib.withKnownValues(const [KnownValue('A')]);
+
+      index.updateTitle(changed, 'A/B/C', (
+        title: null,
+        node: null,
+        stamps: const {},
+        subprojects: const {},
+        issues: const Report(),
+        corrupted: const [],
+        orphanNodes: const [],
+      ));
+
+      expect(index.libraries().single.knownValues, changed.knownValues);
+      expect(index.journalPosition(lib.id), position);
+    });
+
+    test('changes nothing when it fails', () {
+      final lib = library();
+      final song = title(lib.id, 'A', 'B', 'C', versions: [version('v.rpp')]);
+      index.update(lib, ScanResult(titles: [song]));
+      final before = describe(index, lib.id);
+      // A version written twice breaks the key of the versions table.
+      final twice = Title(
+        id: song.id,
+        libraryId: lib.id,
+        path: song.path,
+        tags: song.tags,
+        versions: [version('v.rpp'), version('v.rpp')],
+      );
+
+      expect(
+        () => index.updateTitle(lib, song.path, (
+          title: twice,
+          node: null,
+          stamps: const {},
+          subprojects: const {},
+          issues: const Report(),
+          corrupted: const [],
+          orphanNodes: const [],
+        )),
+        throwsA(isA<SqliteException>()),
+      );
+      expect(describe(index, lib.id), before);
     });
   });
 

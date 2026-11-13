@@ -58,6 +58,48 @@ class LibraryScans {
     }
   }
 
+  /// Scans again the folder of [title] of [entry] only, in an isolate,
+  /// after an action on one of its versions (SPEC §8); the whole library is
+  /// scanned instead ([scan]) when the title is not indexed, when its folder
+  /// is no longer a title (the folders around it may have changed), or when
+  /// its scan fails (folder moved meanwhile…). Failures are only logged.
+  /// Takes no turn: inside the turn of [entry].
+  Future<void> rescanTitle(LibraryEntry entry, Title title) async {
+    try {
+      if (await _rescanTitle(entry, title)) return;
+    } on Object catch (error) {
+      _log.warning(
+        'Rescan of ${title.path} of ${entry.displayName} failed, '
+        'the whole library is scanned',
+        error,
+      );
+    }
+    await scan(entry);
+  }
+
+  /// Rescans the folder of [title] from its stored rows only; false when
+  /// the whole library must be scanned instead.
+  Future<bool> _rescanTitle(LibraryEntry entry, Title title) async {
+    final root = entry.libraryRoot;
+    final library = await readLibrary(MountedFolderStorage(root));
+    if (library == null) return false;
+    final index = ref.read(localIndexProvider);
+    final stored = index.storedTitle(library.id, title.path);
+    if (stored == null) return false;
+    final previous = stored.titles.single;
+    final result = await scanTitleFolder(
+      root,
+      library,
+      previous,
+      stored: stored,
+    );
+    if (result.title == null) return false;
+    index.updateTitle(library, title.path, result);
+    ref.read(indexRevisionProvider.notifier).bump();
+    _log.info('Rescanned ${title.path} of ${entry.displayName}');
+    return true;
+  }
+
   /// Scans [entry] as a task whose report is shown at the end, in the turn
   /// of its library.
   Future<void> scanTask(LibraryEntry entry) => ref
@@ -114,4 +156,9 @@ extension LibraryScan on Ref {
   /// turn of [entry].
   Future<void> scanLibrary(LibraryEntry entry) =>
       read(libraryScansProvider).scan(entry);
+
+  /// Scans again the folder of [title] of [entry] only, failures only
+  /// logged ([LibraryScans.rescanTitle]), inside the turn of [entry].
+  Future<void> rescanTitle(LibraryEntry entry, Title title) =>
+      read(libraryScansProvider).rescanTitle(entry, title);
 }

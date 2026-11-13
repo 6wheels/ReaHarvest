@@ -96,6 +96,70 @@ void main() {
     expect(report.items.keys, isNot(contains(ReportKind.unknownValue)));
   });
 
+  test('rescans only the title changed by a version action', () async {
+    final song = await bandWithSong();
+    final other = p.join(p.dirname(song), 'Other');
+    Directory(other).createSync();
+    File(p.join(song, 'v1.rpp')).copySync(p.join(other, 'v1.rpp'));
+    await scans.scanAll();
+    Title titleAt(String name) =>
+        index.titles().singleWhere((t) => t.tags['title'] == name);
+
+    // Changes outside the application, in both titles.
+    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v2.rpp'));
+    File(p.join(other, 'v1.rpp')).copySync(p.join(other, 'v2.rpp'));
+    final v1 = titleAt('Song').versions.single;
+    await versions.setStatusOf(titleAt('Song'), v1, 'mixing');
+
+    expect(titleAt('Song').statusOf(v1), 'mixing');
+    expect(titleAt('Song').versions, hasLength(2));
+    expect(titleAt('Other').versions, hasLength(1), reason: 'not listed');
+    await scans.scanAll();
+    expect(titleAt('Other').versions, hasLength(2));
+  });
+
+  test('scans the whole library once a folder is no longer a title', () async {
+    final band = folder('Band');
+    for (final dir in ['A', p.join('A', 'B')]) {
+      Directory(p.join(band, dir)).createSync();
+      File('../../test/fixtures/tracks.rpp')
+          .copySync(p.join(band, dir, 'v.rpp'));
+    }
+    await catalog.addLocal(folder: band, displayName: '', layout: null);
+    final a = index.titles().single;
+    expect(a.versions.map((v) => v.fileName), ['B/v.rpp', 'v.rpp']);
+
+    await versions.trashVersion(a, a.versions.last);
+
+    expect(index.titles().single.path, 'A/B');
+  });
+
+  test('scans the whole library when the title scan fails', () async {
+    final song = await bandWithSong();
+    final entry = container.read(settingsProvider).libraries.single;
+    final stale = title();
+    // Renamed outside the application: its folder cannot be listed.
+    Directory(song).renameSync(p.join(p.dirname(song), 'Renamed'));
+
+    await scans.rescanTitle(entry, stale);
+
+    expect(title().path, 'Artist/Album/Renamed');
+  });
+
+  test('a failed title rescan is only logged', () async {
+    final song = await bandWithSong();
+    final entry = container.read(settingsProvider).libraries.single;
+    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v2.rpp'));
+    // Hidden on Windows: replaced, not overwritten.
+    File(p.join(entry.libraryRoot, libraryFileName))
+      ..deleteSync()
+      ..writeAsStringSync('[]');
+
+    await scans.rescanTitle(entry, title());
+
+    expect(title().versions, hasLength(1));
+  });
+
   test('scans as background tasks', () async {
     await scans.scanAll();
     expect(container.read(tasksProvider), isEmpty, reason: 'no library');
