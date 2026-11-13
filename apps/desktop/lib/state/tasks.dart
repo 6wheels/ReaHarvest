@@ -4,11 +4,14 @@ import 'dart:ui' show Locale;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
-import 'package:reaharvest_domain/reaharvest_domain.dart' show Report;
+import 'package:reaharvest_domain/reaharvest_domain.dart'
+    show LibraryId, Report;
 
 import '../l10n/app_localizations.dart';
+import 'library_turns.dart';
 
-enum TaskState { running, done, failed, cancelled }
+/// [queued]: waiting for the turn of its library ([LibraryTurns]).
+enum TaskState { queued, running, done, failed, cancelled }
 
 /// Thrown by [TaskControl.checkCancelled] to stop a cancelled task; a task
 /// rethrows it with the [report] of what it did before stopping.
@@ -89,6 +92,11 @@ final class BackgroundTask {
 
   bool get isRunning => state == TaskState.running;
 
+  bool get isQueued => state == TaskState.queued;
+
+  /// Done, failed or cancelled.
+  bool get isFinished => !isRunning && !isQueued;
+
   BackgroundTask _with({
     TaskState? state,
     double? progress,
@@ -128,8 +136,11 @@ final _english = lookupAppLocalizations(const Locale('en'));
 class TasksNotifier extends Notifier<List<BackgroundTask>> {
   var _next = 0;
 
-  /// Completed by [cancel], for each running task.
+  /// Completed by [cancel], for each running or queued task.
   final _cancels = <int, Completer<void>>{};
+
+  /// Completed by [cancel], for each queued task: it leaves the queue.
+  final _queued = <int, Completer<void>>{};
 
   @override
   List<BackgroundTask> build() => const [];
@@ -138,19 +149,43 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   /// it failed or was cancelled (the outcome stays in the task). A [Report]
   /// result is kept in the task, which fails if it holds errors; with
   /// [openReport], the tasks zone opens it at the end (actions launched by
-  /// the user, SPEC §5.2).
+  /// the user, SPEC §5.2). A task writing in [library] is added at once,
+  /// queued, and runs in the turn of its library ([LibraryTurns]);
+  /// cancelled while queued, it ends at once and [body] never runs.
   Future<T?> run<T>(
     String Function(AppLocalizations l10n) label,
     Future<T> Function(TaskControl task) body, {
     bool openReport = false,
+    LibraryId? library,
   }) async {
     final id = _next++;
     _cancels[id] = Completer<void>();
     state = [
       ...state,
-      BackgroundTask(id: id, label: label, openReport: openReport),
+      BackgroundTask(
+        id: id,
+        label: label,
+        state: library == null ? TaskState.running : TaskState.queued,
+        openReport: openReport,
+      ),
     ];
-    _log.info('${label(_english)}: started');
+    if (library == null) return _execute(id, body);
+    _log.info('${label(_english)}: queued');
+    final left = _queued[id] = Completer<void>();
+    final turn = ref.read(libraryTurnsProvider).run(library, () async {
+      if (_queued.remove(id)!.isCompleted) return null;
+      _update(id, (t) => t._with(state: TaskState.running));
+      return _execute(id, body);
+    });
+    return Future.any([turn, left.future.then<T?>((_) => null)]);
+  }
+
+  /// Runs [body] as the running task [id], to its outcome.
+  Future<T?> _execute<T>(
+    int id,
+    Future<T> Function(TaskControl task) body,
+  ) async {
+    _log.info('${_task(id).label(_english)}: started');
     try {
       final result = await body(TaskControl._(this, id));
       final report = result is Report ? result : null;
@@ -184,20 +219,30 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     ].join('\n'),
   );
 
-  /// Asks the running task [id] to stop at its next step.
+  /// Asks the running task [id] to stop at its next step. A queued task
+  /// leaves the queue and ends cancelled at once.
   void cancel(int id) {
+    if (_queued[id] case final left? when !left.isCompleted) {
+      _update(id, (t) => t._with(state: TaskState.cancelled));
+      _cancels.remove(id);
+      left.complete();
+      _logEnd(_task(id));
+      return;
+    }
     _update(id, (t) => t._with(cancelling: true));
     if (_cancels[id] case final c? when !c.isCompleted) c.complete();
   }
 
   /// Removes the finished tasks.
-  void clearFinished() => state = [...state.where((t) => t.isRunning)];
+  void clearFinished() => state = [...state.where((t) => !t.isFinished)];
 
   BackgroundTask _task(int id) => state.firstWhere((t) => t.id == id);
 
   void _update(int id, BackgroundTask Function(BackgroundTask) change) =>
       state = [for (final t in state) t.id == id ? change(t) : t];
 }
+
+final libraryTurnsProvider = Provider<LibraryTurns>((ref) => LibraryTurns());
 
 final tasksProvider = NotifierProvider<TasksNotifier, List<BackgroundTask>>(
   TasksNotifier.new,
