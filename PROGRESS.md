@@ -120,8 +120,8 @@ Smallest model advised per ticket (a judgment from the tickets and the code, not
 
 | Model | Tickets | Why |
 |---|---|---|
-| Sonnet | #90, #91, #96, #97, #99, #100, #101, #104, #105, #141 | Moves, splits and bounded rules, fully specified, with the existing tests as a net |
-| Opus | #59, #92, #93, #95, #102, #103, #114 | Tests driving the real application, formats and crash safety, isolates, rewrite of subtle rules, consistency of the index, change across every package |
+| Sonnet | #90, #91, #96, #97, #99, #100, #101, #104, #105 | Moves, splits and bounded rules, fully specified, with the existing tests as a net |
+| Opus | #59, #92, #93, #95, #102, #103, #114, #141 | Tests driving the real application, formats and crash safety, isolates, rewrite of subtle rules, consistency of the index, change across every package |
 | Opus, then a review by the largest model before merge | #94 | Undo after a failure or a crash: data safety |
 
 Haiku is not advised for any of these tickets: the only one small enough was #98.
