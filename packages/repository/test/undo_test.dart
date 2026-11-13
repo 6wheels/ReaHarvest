@@ -435,6 +435,55 @@ void main() {
     expect(storage.text('$song/a.rpp'), 'new');
   });
 
+  test('a missing copy among several rewrites: nothing is undone', () async {
+    final m = await migration();
+    Stream<List<int>> text(String s) => Stream.value(utf8.encode(s));
+    final fix = await m.journal.startFix('normalizeMedia', song);
+    await m.storage.move('$song/audio/x.wav', '$song/Media/x.wav');
+    await m.storage.write('$song/a.rpp', text('new a'));
+    await m.storage.write('$song/b.rpp', text('new b'));
+    final copy =
+        (await MigrationJournal.read(
+              storage,
+              m.folder,
+            )).operationsOf(fix)[1]['copy']
+            as String;
+    final kept = storage.files.remove(copy)!;
+    final after = tree();
+
+    await expectLater(
+      undoUnfinishedFix(storage, hash: hash),
+      throwsA(isA<StateError>()),
+    );
+    // Not half undone: the later rewrite and the move are untouched.
+    expect(tree(), after);
+    expect(
+      storage.text('${m.folder}/${MigrationJournal.fileName}'),
+      isNot(contains('undoStart')),
+    );
+
+    // The copy is back (synced at last): the undo goes through.
+    storage.files[copy] = kept;
+    await undoUnfinishedFix(storage, hash: hash);
+    expect(await unfinishedFixIn(storage), isNull);
+    expect(tree().keys, contains('$song/audio/x.wav'));
+  });
+
+  test('the content replaced by an undo is kept', () async {
+    final m = await migration();
+    Stream<List<int>> text(String s) => Stream.value(utf8.encode(s));
+    final before = storage.text('$song/a.rpp');
+    await m.journal.startFix('normalizeMedia', song);
+    await m.storage.write('$song/a.rpp', text('fixed'));
+    // Saved in REAPER after the interruption, before the undo.
+    storage.put('$song/a.rpp', 'saved since');
+
+    await undoUnfinishedFix(storage, hash: hash);
+
+    expect(storage.text('$song/a.rpp'), before);
+    expect(storage.text('${m.folder}/replaced/$song/a.rpp'), 'saved since');
+  });
+
   test('in an isolate, on a library folder', () async {
     final root = Directory.systemTemp.createTempSync('reaharvest_undo_');
     addTearDown(() => root.deleteSync(recursive: true));
@@ -482,6 +531,34 @@ void main() {
       final m = (await Migration.latest(storage))!;
       expect(m.journal.unfinishedFix, isNull);
     });
+
+    test(
+      'a failing fix leaves the fixes of a later-stamped migration',
+      () async {
+        // A batch stamped after this one (clock set back since).
+        final earlier = await runMigrationBatch(
+          storage,
+          const [MoveFolder('Band/Song', 'Band/Other')],
+          usage: const {},
+          hash: hash,
+          reporter: Reporter(),
+          now: DateTime(2026, 11, 14),
+        );
+        expect(earlier.report.hasErrors, isFalse);
+
+        final result = await batch(const [
+          MoveFolder('Band/Gone', 'Band/New'),
+        ], Reporter());
+
+        final report = result.report;
+        expect(report.items[ReportKind.fixUndone], [
+          const ReportItem('Band/Gone'),
+        ]);
+        expect(report.items[ReportKind.fileLost], isNull);
+        expect(tree().keys, contains('Band/Other/a.rpp'));
+        expect(tree().keys, isNot(contains('Band/Song/a.rpp')));
+      },
+    );
 
     test('an undo failing too stops the batch, refused until undone', () async {
       final before = tree();

@@ -114,11 +114,11 @@ Future<BatchResult> runMigrationBatch(
           // Read again: a line whose append threw may be on disk (#92),
           // its end line included. This fix is undone if its start line
           // is there, whether it ended or not.
-          migration = (await Migration.latest(storage))!;
+          migration = await migration.reread();
           final failed = migration.journal.lastFix;
           if (failed != null && failed != previousFix) {
             done += await undoFix(storage, migration, failed);
-            migration = (await Migration.latest(storage))!;
+            migration = await migration.reread();
           }
         } on Object catch (error) {
           done += Report({

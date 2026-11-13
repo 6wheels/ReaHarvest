@@ -119,6 +119,19 @@ void main() {
     expect((await reread()).unfinishedFix, failed);
   });
 
+  test('a completed fix whose undo did not end is left to undo', () async {
+    final journal = MigrationJournal(storage, folder);
+    final fix = await journal.startFix('moveFolder', 'a');
+    await journal.endFix(fix, ok: true);
+    await journal.startUndo(fix);
+    expect(journal.unfinishedFix, fix);
+    expect((await reread()).unfinishedFix, fix);
+
+    await journal.endUndo(fix);
+    expect(journal.unfinishedFix, isNull);
+    expect((await reread()).unfinishedFix, isNull);
+  });
+
   test('ignores the operations of an undone fix', () async {
     final journal = MigrationJournal(storage, folder);
     final fix = await journal.startFix('moveProject', 'x/a.rpp');

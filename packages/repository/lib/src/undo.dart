@@ -45,13 +45,14 @@ Future<UnfinishedFix?> unfinishedFixIn(RepositoryStorage storage) async {
 /// - a move is moved back when its target exists and its source does not;
 ///   otherwise it was not made, or is already undone;
 /// - a rewritten file still there gets back the copy named by its line,
-///   with the date of the line;
+///   with the date of the line; the content it had is kept first under
+///   `<migration>/replaced/`;
 /// - a created file still there is moved to `<migration>/undone/`.
 ///
 /// Nothing is deleted. Each step can be repeated: an interrupted undo is
-/// run again from the start. Throws, leaving the fix to undo, if a step
-/// fails or a rewrite has no copy. Returns the fix as
-/// [ReportKind.fixUndone].
+/// run again from the start. Throws before any change if a rewrite has no
+/// copy; throws, leaving the fix to undo, if a step fails. Returns the fix
+/// as [ReportKind.fixUndone].
 Future<Report> undoFix(
   RepositoryStorage storage,
   Migration migration,
@@ -59,6 +60,21 @@ Future<Report> undoFix(
 ) async {
   final journal = await MigrationJournal.read(storage, migration.folder);
   final operations = journal.operationsOf(fix);
+  // Checked before the first change: no undo stopped halfway for good.
+  for (final op in operations) {
+    switch (op) {
+      case {
+        'op': 'rewrite',
+        'path': final String path,
+        'copy': final String copy,
+      }:
+        if (await storage.stat(copy) == null) {
+          throw StateError('Copy of $path missing: $copy');
+        }
+      case {'op': 'rewrite', 'path': final String path}:
+        throw StateError('No copy recorded to restore $path');
+    }
+  }
   await journal.startUndo(fix);
   for (final op in operations.reversed) {
     switch (op) {
@@ -75,16 +91,16 @@ Future<Report> undoFix(
       }:
         // Absent: moved back already by an interrupted undo.
         if (await storage.stat(path) == null) continue;
-        if (await storage.stat(copy) == null) {
-          throw StateError('Copy of $path missing: $copy');
-        }
+        // What the copy replaces may hold work saved since the fix.
+        await storage.write(
+          await freePath(storage, '${migration.folder}/replaced/$path'),
+          storage.read(path),
+        );
         await storage.write(path, storage.read(copy));
         await storage.setModified(
           path,
           DateTime.fromMicrosecondsSinceEpoch(modified),
         );
-      case {'op': 'rewrite', 'path': final String path}:
-        throw StateError('No copy recorded to restore $path');
       case {'op': 'create', 'path': final String path}:
         if (await storage.stat(path) case StorageEntry(isDirectory: false)) {
           await storage.move(

@@ -52,6 +52,14 @@ final class Migration {
     return hash(path);
   };
 
+  /// This migration, its journal read again from the storage: a line whose
+  /// append threw may be on disk.
+  Future<Migration> reread() async => Migration._(
+    _storage,
+    inventory,
+    await MigrationJournal.read(_storage, folder),
+  );
+
   /// A new migration, stamped with [now]; nothing is written before its
   /// inventory is taken. The inventory of a [previous] migration seeds it,
   /// at the current paths of its files: those unchanged since are not

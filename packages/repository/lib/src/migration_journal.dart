@@ -39,6 +39,7 @@ final class MigrationJournal {
   final _fixes = <int>[];
   final _paths = <int, String>{};
   final _succeeded = <int>{};
+  final _undoStarted = <int>{};
   final _undone = <({int line, int fix})>[];
   int? _openFix;
 
@@ -87,7 +88,8 @@ final class MigrationJournal {
       case {'op': 'fixEnd', 'fix': final int fix, 'ok': final bool ok}:
         if (ok) _succeeded.add(fix);
         _openFix = null;
-      case {'op': 'undoStart'}:
+      case {'op': 'undoStart', 'fix': final int fix}:
+        _undoStarted.add(fix);
         _openFix = null;
       case {'op': 'undoEnd', 'fix': final int fix}:
         _undone.add((line: line, fix: fix));
@@ -221,9 +223,12 @@ final class MigrationJournal {
     return current;
   }
 
-  /// The last fix started that neither completed nor was undone, or null.
+  /// The last fix left to undo, or null: neither completed nor undone, or
+  /// whose undo started and did not end.
   int? get unfinishedFix => _fixes.lastWhereOrNull(
-    (fix) => !_succeeded.contains(fix) && !_isUndone(fix),
+    (fix) =>
+        !_isUndone(fix) &&
+        (!_succeeded.contains(fix) || _undoStarted.contains(fix)),
   );
 
   /// Current paths of the files rewritten from the line [line] on, and of

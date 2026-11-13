@@ -51,6 +51,18 @@ class LibraryService {
 
   final Ref ref;
 
+  /// End of the last change of each library ([_exclusive]).
+  final _changes = <LibraryId, Future<void>>{};
+
+  /// Runs [change] once the previous changes of [library] have ended: a
+  /// batch of fixes, an undo and the search for a fix left to undo never
+  /// run together on a library (a fix being applied looks interrupted).
+  Future<T> _exclusive<T>(LibraryId library, Future<T> Function() change) {
+    final done = (_changes[library] ?? Future.value()).then((_) => change());
+    _changes[library] = done.then((_) {}, onError: (_) {});
+    return done;
+  }
+
   /// Library already described in [folder] (`.library.json`), or null.
   /// Throws [LibraryException] if the file is unreadable.
   Future<Library?> existing(String folder) async {
@@ -307,13 +319,14 @@ class LibraryService {
   /// moved or declared join the known values and the library is rescanned.
   /// A cancelled batch ends the task with the report of what was done.
   /// While a fix of the library is left to undo, runs nothing and offers
-  /// to undo it instead ([offerUndo]).
+  /// to undo it instead ([_offerUndo]). Waits for the changes of the
+  /// library already running ([_exclusive]).
   Future<Report?> _fix(
     LibraryEntry entry,
     List<MigrationFix> fixes,
     String Function(AppLocalizations l10n) label,
-  ) async {
-    if (await offerUndo(entry)) return null;
+  ) => _exclusive(entry.id, () async {
+    if (await _offerUndo(entry)) return null;
     final root = entry.libraryRoot;
     return ref.read(tasksProvider.notifier).run(label, (task) async {
       // From the index: stale for the titles changed by the previous fixes
@@ -352,12 +365,16 @@ class LibraryService {
       if (result.cancelled) throw TaskCancelled(report);
       return report;
     }, openReport: true);
-  }
+  });
 
   /// Offers to undo the fix left to undo in [entry], if any (SPEC §5.8 step
   /// 5, #94): the dialog of [interruptedFixesProvider]. Returns whether
-  /// there is one.
-  Future<bool> offerUndo(LibraryEntry entry) async {
+  /// there is one. Waits for the changes of the library already running.
+  Future<bool> offerUndo(LibraryEntry entry) =>
+      _exclusive(entry.id, () => _offerUndo(entry));
+
+  /// [offerUndo], for a change of the library already running.
+  Future<bool> _offerUndo(LibraryEntry entry) async {
     final fix = await unfinishedFixOn(entry.libraryRoot);
     if (fix == null) return false;
     _log.warning(
@@ -387,23 +404,26 @@ class LibraryService {
 
   /// Undoes the fix left to undo in [library] (SPEC §5.8 step 5,
   /// [undoUnfinishedFixOn]), as a task whose report opens at the end. Then
-  /// rescans.
+  /// rescans. Waits for the changes of the library already running.
   Future<Report?> undoInterruptedFix(LibraryId library) {
     final entry = _entry(library);
     final root = entry.libraryRoot;
-    return ref.read(tasksProvider.notifier).run((l10n) => l10n.taskUndoFix, (
-      task,
-    ) async {
-      try {
-        return _rooted(
-          root,
-          await undoUnfinishedFixOn(root, hasherOf: xxh3Hasher),
-        );
-      } finally {
-        task.step((l10n) => l10n.taskStepScan);
-        await scan(entry);
-      }
-    }, openReport: true);
+    return _exclusive(
+      library,
+      () => ref.read(tasksProvider.notifier).run((l10n) => l10n.taskUndoFix, (
+        task,
+      ) async {
+        try {
+          return _rooted(
+            root,
+            await undoUnfinishedFixOn(root, hasherOf: xxh3Hasher),
+          );
+        } finally {
+          task.step((l10n) => l10n.taskStepScan);
+          await scan(entry);
+        }
+      }, openReport: true),
+    );
   }
 
   /// Deletes the `.node.json` file [path] of [library], found in a folder

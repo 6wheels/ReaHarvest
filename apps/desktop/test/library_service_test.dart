@@ -812,6 +812,42 @@ void main() {
     );
   });
 
+  test('fixes of a library run one after the other', () async {
+    final song = await bandWithSong();
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    for (final name in ['One', 'Two']) {
+      final dir = Directory(p.join(band, 'Artist', name))..createSync();
+      File('../../test/fixtures/tracks.rpp')
+          .copySync(p.join(dir.path, '$name.rpp'));
+    }
+    final entry = container.read(settingsProvider).libraries.single;
+
+    // The second is asked while the first runs: it is not taken for an
+    // interrupted fix.
+    final reports = await Future.wait([
+      service().fix(entry.id, const [
+        MoveFolder('Artist/One', 'Artist/New/One'),
+      ]),
+      service().fix(entry.id, const [
+        MoveFolder('Artist/Two', 'Artist/New/Two'),
+      ]),
+      service().offerUndo(entry),
+    ]);
+
+    expect(reports[2], isFalse);
+    expect((reports[0]! as Report).hasErrors, isFalse);
+    expect((reports[1]! as Report).hasErrors, isFalse);
+    expect(container.read(interruptedFixesProvider), isEmpty);
+    expect(
+      Directory(p.join(band, 'Artist', 'New', 'One')).existsSync(),
+      isTrue,
+    );
+    expect(
+      Directory(p.join(band, 'Artist', 'New', 'Two')).existsSync(),
+      isTrue,
+    );
+  });
+
   test('a cancelled fix stops before the next one, library updated', () async {
     final song = await bandWithSong();
     final band = p.dirname(p.dirname(p.dirname(song)));
