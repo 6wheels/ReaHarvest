@@ -14,7 +14,7 @@ import '../theme/app_theme.dart';
 import 'filter_bar.dart';
 import 'settings_dialog.dart';
 import 'overview.dart';
-import 'title_detail.dart';
+import 'title_detail/title_detail_page.dart';
 import 'title_card.dart';
 import 'title_views.dart';
 

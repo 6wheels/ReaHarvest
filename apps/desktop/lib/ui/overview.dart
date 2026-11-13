@@ -10,7 +10,8 @@ import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
-import 'title_detail.dart';
+import 'formats.dart';
+import 'title_detail/title_detail_page.dart';
 import 'widgets.dart';
 
 /// Height of the overview dock.

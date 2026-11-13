@@ -7,7 +7,7 @@ import 'package:reaharvest/ui/filter_bar.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/ui/title_card.dart';
-import 'package:reaharvest/ui/title_detail.dart';
+import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest/ui/title_views.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';

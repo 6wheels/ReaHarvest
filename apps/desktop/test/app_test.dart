@@ -23,7 +23,7 @@ import 'package:reaharvest/ui/first_run_wizard.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
-import 'package:reaharvest/ui/title_detail.dart';
+import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest/ui/title_card.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';

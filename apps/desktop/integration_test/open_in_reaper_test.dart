@@ -6,7 +6,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/ui/title_card.dart';
-import 'package:reaharvest/ui/title_detail.dart';
+import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import 'harness.dart';
