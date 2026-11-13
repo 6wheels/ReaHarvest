@@ -6,10 +6,12 @@ import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
+import '../state/libraries.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
+import 'media_plan_preview.dart';
 import 'report_dialog.dart';
 
 /// Issue kinds fixed in batch from the "To sort" page (SPEC §5.8 step 4).
@@ -43,7 +45,7 @@ String mediaTitleOf(String path) {
 /// proposals agree); unknown folders also get the level they belong to.
 /// Projects too deep get their owner and the status deduced from their
 /// status subfolder. Projects whose media are to normalize stand for
-/// their title. Returns the checked fixes by library, or null if
+/// their title, whose planned operations are previewed. Returns the checked fixes by library, or null if
 /// cancelled.
 Future<Map<LibraryId, List<MigrationFix>>?> showFixDialog(
   BuildContext context,
@@ -141,6 +143,20 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   late final List<Member> _owners;
   late final List<_Lift> _lifts;
 
+  // Media normalization.
+
+  /// Whether the plans are being computed.
+  var _previewing = true;
+
+  /// Plan of each title, by library and title.
+  final _plans = <(LibraryId, String), MediaPlan>{};
+
+  /// Error of the libraries whose plans could not be computed.
+  final _previewErrors = <LibraryId, Object>{};
+
+  /// Stops the preview computations still running.
+  final _cancels = <Future<void> Function()>[];
+
   // Folders.
 
   late final Layout _layout;
@@ -156,7 +172,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   void initState() {
     super.initState();
     final libraries = ref.read(indexedLibrariesProvider);
-    if (_normalizing) return;
+    if (_normalizing) {
+      _preview();
+      return;
+    }
     if (_lifting) {
       final identity = ref.read(settingsProvider).identity;
       final members = {
@@ -200,10 +219,71 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   @override
   void dispose() {
+    // The files read by a preview are closed before a fix moves them.
+    for (final cancel in _cancels) {
+      cancel();
+    }
     for (final c in _fields) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Computes the normalization plan of the title of every issue, the
+  /// libraries side by side; a library that fails keeps its error.
+  Future<void> _preview() async {
+    final titles = <LibraryId, Set<String>>{};
+    for (final issue in widget.issues) {
+      titles
+          .putIfAbsent(issue.library, () => {})
+          .add(mediaTitleOf(issue.item.path));
+    }
+    final service = ref.read(libraryServiceProvider);
+    await Future.wait([
+      for (final MapEntry(key: library, value: paths) in titles.entries)
+        () async {
+          final preview = service.previewNormalization(library, [...paths]);
+          _cancels.add(preview.cancel);
+          try {
+            final found = await preview.plans;
+            for (final MapEntry(key: title, value: plan) in found.entries) {
+              _plans[(library, title)] = plan;
+            }
+          } on Object catch (error) {
+            _previewErrors[library] = error;
+          }
+        }(),
+    ]);
+    if (mounted) setState(() => _previewing = false);
+  }
+
+  bool get _waitingPreview => _normalizing && _previewing;
+
+  /// Preview of the plans of the checked titles.
+  List<Widget> _planPreviews(AppLocalizations l10n, TextStyle? muted) {
+    if (_previewing) {
+      return [
+        Text(l10n.fixPreviewLoading, style: muted),
+        const SizedBox(height: Space.s),
+        const LinearProgressIndicator(),
+      ];
+    }
+    final checked = {
+      for (final i in _checked)
+        (widget.issues[i].library, mediaTitleOf(widget.issues[i].item.path)),
+    };
+    return [
+      for (final MapEntry(key: library, value: error) in _previewErrors.entries)
+        if (checked.any((c) => c.$1 == library))
+          Text(l10n.fixPreviewFailed('$error'), style: muted),
+      for (final MapEntry(key: (library, title), value: plan) in _plans.entries)
+        if (checked.contains((library, title)))
+          MediaPlanPreview(
+            key: ValueKey((library, title)),
+            title: title,
+            plan: plan,
+          ),
+    ];
   }
 
   /// Member and status subfolders of the project too deep [issue].
@@ -440,6 +520,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
                   title: Text(issue.item.path),
                   subtitle: Text(_details(l10n, i), style: muted),
                 ),
+              if (_normalizing) ...[
+                const SizedBox(height: Space.s),
+                ..._planPreviews(l10n, muted),
+              ],
             ],
           ),
         ),
@@ -450,7 +534,10 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           child: Text(l10n.cancel),
         ),
         FilledButton(
-          onPressed: _checked.isEmpty || !_valid ? null : _confirm,
+          // The operations are shown before they are confirmed.
+          onPressed: _checked.isEmpty || !_valid || _waitingPreview
+              ? null
+              : _confirm,
           child: Text(l10n.taskFix(_checked.length)),
         ),
       ],

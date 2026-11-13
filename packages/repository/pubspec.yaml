@@ -14,3 +14,4 @@ dependencies:
     path: ../domain
   reaharvest_rpp:
     path: ../rpp
+  xxh3: ^1.2.0

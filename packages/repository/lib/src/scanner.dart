@@ -306,7 +306,7 @@ final class _Scanner {
       if (d > depth) {
         // Inside a title (member or status subfolder…): its projects belong
         // to the title.
-        if (reservedTitleFolders.contains(segments[depth].toLowerCase())) {
+        if (isReservedTitleFolder(segments[depth])) {
           continue;
         }
         for (final e in _projects(dir)) {
@@ -540,22 +540,20 @@ final class _Scanner {
 
     for (final MapEntry(key: dir, value: entries) in files.entries) {
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
-      if (!entries.any(_isProject) || segments.take(depth).any(_isReserved)) {
+      if (!entries.any(_isProject) ||
+          segments.take(depth).any(isReservedTitleFolder)) {
         continue;
       }
       addWithParents(dir);
     }
     for (final dir in traces) {
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
-      if (segments.length == depth && !segments.any(_isReserved)) {
+      if (segments.length == depth && !segments.any(isReservedTitleFolder)) {
         addWithParents(dir);
       }
     }
     return qualified;
   }
-
-  static bool _isReserved(String name) =>
-      reservedTitleFolders.contains(name.toLowerCase());
 
   /// Version without project data (free tree projects are never read).
   static Version _version(String dir, StorageEntry e) => Version(

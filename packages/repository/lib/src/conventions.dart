@@ -19,6 +19,10 @@ const reservedTitleFolders = {
   'backups',
 };
 
+/// Whether [name] is a reserved folder of a title (`Media`, `.trash`…).
+bool isReservedTitleFolder(String name) =>
+    reservedTitleFolders.contains(name.toLowerCase());
+
 /// Folders never scanned for versions, wherever they are, lowercase:
 /// REAPER backups, history and trash.
 const _excludedFolders = {'backups', '.history', '.trash'};

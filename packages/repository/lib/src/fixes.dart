@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
+import 'content_hash.dart';
 import 'free_names.dart';
 import 'library_path.dart';
 import 'project_file.dart';
@@ -88,14 +89,18 @@ final class NormalizeMedia extends MigrationFix {
 /// others go on.
 /// [usage] tells the projects referencing each media of the library
 /// ([mediaUsage]): a title whose media are used by another title is not
-/// normalized.
+/// normalized. Media that may be identical are compared by their [hash]
+/// (by default [contentHasher]), taken from the inventory of [migration]
+/// when it holds the file unchanged.
 Future<Report> applyFixes(
   Migration migration,
   List<MigrationFix> fixes, {
   Map<String, List<String>> usage = const {},
+  ContentHash? hash,
 }) async {
   final storage = migration.storage;
   final journal = migration.journal;
+  final known = migration.inventoryHash(hash ?? contentHasher(storage));
   var report = const Report();
   for (final fix in fixes) {
     final number = await journal.startFix(switch (fix) {
@@ -121,12 +126,14 @@ Future<Report> applyFixes(
           path,
           titleDir,
           usage: usage,
+          hash: known,
         ),
         final LiftProject lift => await _lift(storage, lift),
         NormalizeMedia(:final path) => await normalizeMedia(
           storage,
           path,
           usage: usage,
+          hash: known,
         ),
       };
     } on Object catch (error) {

@@ -61,6 +61,15 @@ final revealed = <String>[];
 /// When set, adopt and addVersion of the fake service wait for it (spinners).
 Completer<void>? pending;
 
+/// Normalization plans returned by the fake previewNormalization, by title
+/// (an empty plan for the others); the error of a library when set.
+Map<String, MediaPlan> previewPlans = const {};
+Map<LibraryId, Object> previewErrors = const {};
+
+/// When set, the fake preview waits for it; whether it was cancelled.
+Completer<void>? previewPending;
+bool previewCancelled = false;
+
 /// Library service recording calls, without file system access.
 class FakeLibraryService extends LibraryService {
   FakeLibraryService(super.ref);
@@ -100,6 +109,24 @@ class FakeLibraryService extends LibraryService {
   Future<void> deleteOrphanNode(LibraryId library, String path) async {
     if (path.startsWith('locked/')) throw StateError('locked');
     orphansDeleted.add(path);
+  }
+
+  @override
+  PlanPreview previewNormalization(LibraryId library, List<String> titles) {
+    previewCancelled = false;
+    return (
+      plans: () async {
+        if (previewErrors[library] case final error?) throw error;
+        if (previewPending case final pending?) await pending.future;
+        return {
+          for (final title in titles)
+            title:
+                previewPlans[title] ??
+                (operations: const <MediaOperation>[], blocked: const Report()),
+        };
+      }(),
+      cancel: () async => previewCancelled = true,
+    );
   }
 
   /// Whether [fix] runs as a task whose report opens at the end, like the
@@ -288,6 +315,9 @@ void main() {
     existingLibrary = null;
     revealed.clear();
     pending = null;
+    previewPlans = const {};
+    previewErrors = const {};
+    previewPending = null;
     existingLocked = false;
     existingProjects = false;
     backupOpening = true;
@@ -1850,6 +1880,165 @@ void main() {
       'Artist/Album/Song',
       'Artist/Album/Other',
     ]);
+  });
+
+  testWidgets('previews the operations of the normalization', (tester) async {
+    const song = 'Artist/Album/Song';
+    LibraryIssue outside(String path) => (
+      library: band.id,
+      kind: ReportKind.mediaOutsidePool,
+      item: ReportItem(path, r'audio\kick.wav'),
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {band.id: demoLibrary},
+      issues: [
+        outside('$song/a.rpp'),
+        outside('$song/c.rpp'),
+        outside('Artist/Album/Other/d.rpp'),
+      ],
+    );
+    previewPlans = {
+      song: (
+        operations: const [
+          MoveFile('$song/audio/kick.wav', '$song/Media/kick.wav'),
+          CopyFile('Artist/x.wav', '$song/Media/x (2).wav'),
+          TrashDuplicate(
+            '$song/old/snare.wav',
+            '$song/.trash/snare.wav',
+            '$song/Media/snare.wav',
+          ),
+          ReuseDuplicate('Artist/hat.wav', '$song/Media/hat.wav'),
+          RewriteProject('$song/a.rpp', {r'audio\kick.wav': r'Media\kick.wav'}),
+        ],
+        blocked: const Report({
+          ReportKind.missingMedia: [ReportItem('$song/b.rpp', 'gone.wav')],
+        }),
+      ),
+    };
+    await tester.tap(find.text('To sort · 3'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+
+    // One preview per title, collapsed.
+    expect(
+      find.text(
+        '1 moved · 1 copied · 1 duplicate to the trash · 1 renamed · '
+        '1 project rewritten · 1 left intact',
+      ),
+      findsOne,
+    );
+    expect(find.text('Nothing to change'), findsOne);
+    expect(find.text('Rewrite a.rpp'), findsNothing);
+    await tester.tap(find.text(song).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Media not found: b.rpp · gone.wav'), findsOne);
+    expect(find.text('Move audio/kick.wav → Media/kick.wav'), findsOne);
+    expect(find.text('Copy Artist/x.wav → Media/x (2).wav'), findsOne);
+    expect(
+      find.text(
+        'Duplicate of Media/snare.wav: old/snare.wav → .trash/snare.wav',
+      ),
+      findsOne,
+    );
+    expect(
+      find.text(
+        'Use Media/hat.wav, identical to Artist/hat.wav, left in place',
+      ),
+      findsOne,
+    );
+    expect(find.text('Rewrite a.rpp'), findsOne);
+
+    // Only the checked titles are previewed.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing to change'), findsNothing);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('confirms the fix once the preview is shown', (tester) async {
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      indexed: {band.id: demoLibrary},
+      issues: [
+        (
+          library: band.id,
+          kind: ReportKind.mediaOutsidePool,
+          item: const ReportItem('Artist/Album/Song/a.rpp', r'audio\kick.wav'),
+        ),
+      ],
+    );
+    previewPending = Completer();
+    await tester.tap(find.text('To sort · 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix…'));
+    await tester.pump();
+    await tester.pump();
+
+    FilledButton fix() => tester.widget(
+      find.ancestor(
+        of: find.text('Fix 1 item'),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    expect(find.text('Preparing the preview of the operations…'), findsOne);
+    expect(fix().onPressed, isNull);
+
+    // Closing the dialog stops the preview.
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    expect(previewCancelled, isTrue);
+    previewPending!.complete();
+    await tester.pumpAndSettle();
+
+    previewPending = null;
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    expect(fix().onPressed, isNotNull);
+  });
+
+  testWidgets('keeps the previews of a library when another fails', (
+    tester,
+  ) async {
+    const other = LibraryEntry(
+      id: LibraryId('L2'),
+      displayName: 'Other',
+      workspaceRoot: '/music/Other',
+    );
+    LibraryIssue outside(LibraryId library, String path) => (
+      library: library,
+      kind: ReportKind.mediaOutsidePool,
+      item: ReportItem(path, r'audio\kick.wav'),
+    );
+    await pumpApp(
+      tester,
+      titles: demoTitles(),
+      configured: const [band, other],
+      indexed: {
+        band.id: demoLibrary,
+        other.id: Library(
+          id: other.id,
+          mode: LibraryMode.local,
+          layout: Layout.classic(),
+        ),
+      },
+      issues: [
+        outside(band.id, 'Artist/Album/Song/a.rpp'),
+        outside(other.id, 'A/B/C/d.rpp'),
+      ],
+    );
+    previewErrors = {other.id: StateError('unreadable')};
+    await tester.tap(find.textContaining('To sort ·'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preview unavailable: Bad state: unreadable'), findsOne);
+    expect(find.text('Nothing to change'), findsOne);
   });
 
   testWidgets('fixes folders in batch or moves one anywhere', (tester) async {
