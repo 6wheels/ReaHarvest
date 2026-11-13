@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
@@ -13,31 +12,6 @@ import 'labels.dart';
 import 'layout_labels.dart';
 import 'media_plan_preview.dart';
 import 'report_dialog.dart';
-
-/// Issue kinds fixed in batch from the "To sort" page (SPEC §5.8 step 4).
-const batchFixKinds = {
-  ReportKind.titleTooHigh,
-  ReportKind.misplacedLevel,
-  ReportKind.unknownValue,
-  ReportKind.projectTooDeep,
-  ...normalizeKinds,
-};
-
-/// Issue kinds fixed by normalizing the media of the title of the project
-/// (#69): the whole title is fixed at once, its media being shared.
-const normalizeKinds = {
-  ReportKind.mediaOutsidePool,
-  ReportKind.recordPathNotMedia,
-};
-
-/// Title folder of the project [path] whose media are to normalize: its
-/// folder, or the title of the pool holding it (a subproject).
-String mediaTitleOf(String path) {
-  final dir = p.posix.dirname(path);
-  return p.posix.basename(dir).toLowerCase() == 'media'
-      ? p.posix.dirname(dir)
-      : dir;
-}
 
 /// Previews the batch fix of [issues], all of [kind] (dry run): each item
 /// with its target, checked by default. Folders get optional values for
@@ -53,61 +27,6 @@ Future<Map<LibraryId, List<MigrationFix>>?> showFixDialog(
   List<LibraryIssue> issues,
 ) => showDialog(context: context, builder: (_) => _FixDialog(kind, issues));
 
-/// Status of the library deduced from the status subfolder [folder]: the
-/// status whose key or label equals it, or starts with it (e.g. `mix`);
-/// null if none.
-String? proposeStatus(AppLocalizations l10n, String folder) {
-  final name = folder.toLowerCase();
-  for (final status in Title.defaultStatuses) {
-    final label = statusLabel(l10n, status).toLowerCase();
-    if (name == status || name == label) return status;
-    if (name.length >= 3 &&
-        (status.startsWith(name) || label.startsWith(name))) {
-      return status;
-    }
-  }
-  return null;
-}
-
-/// Existing values of level [i] of [layout] among the [titles] of
-/// [libraries], under the values [above] (an empty value matches any).
-List<String> levelValues(
-  Iterable<Title> titles,
-  Set<LibraryId> libraries,
-  Layout layout,
-  int i,
-  List<String> above,
-) {
-  final keys = [for (final l in layout.levels) l.key];
-  return {
-    for (final t in titles)
-      if (libraries.contains(t.libraryId) &&
-          [
-            for (final (j, value) in above.indexed)
-              value.isEmpty || t.tags[keys[j]] == value,
-          ].every((ok) => ok))
-        ?t.tags[keys[i]],
-  }.toList()..sort();
-}
-
-/// Whether moving the folder [path] of [library] to [target] merges it
-/// with an existing folder (#81): [target] holds titles of [library].
-/// Compared case-insensitively, like Windows paths.
-bool mergesInto(
-  Iterable<Title> titles,
-  LibraryId library,
-  String path,
-  String target,
-) {
-  final folder = target.toLowerCase();
-  if (folder == path.toLowerCase()) return false;
-  return titles.any((t) {
-    final title = t.path.toLowerCase();
-    return t.libraryId == library &&
-        (title == folder || title.startsWith('$folder/'));
-  });
-}
-
 class _FixDialog extends ConsumerStatefulWidget {
   const _FixDialog(this.kind, this.issues);
 
@@ -118,10 +37,6 @@ class _FixDialog extends ConsumerStatefulWidget {
   ConsumerState<_FixDialog> createState() => _FixDialogState();
 }
 
-/// A project too deep: its member subfolder's member and its status
-/// subfolder, if any.
-typedef _Lift = ({Member? member, String? statusFolder});
-
 class _FixDialogState extends ConsumerState<_FixDialog> {
   late final Set<int> _checked = {
     for (var i = 0; i < widget.issues.length; i++) i,
@@ -131,6 +46,11 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   bool get _normalizing => normalizeKinds.contains(widget.kind);
 
+  /// What is proposed, in the language of the interface: made once the
+  /// localizations are known, again when the level of unknown folders
+  /// changes.
+  FixProposals? _proposals;
+
   // Projects too deep.
 
   /// Owner of the projects without member subfolder; null when no library
@@ -139,9 +59,6 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   /// Status chosen for each status subfolder name.
   final _statuses = <String, String?>{};
-
-  late final List<Member> _owners;
-  late final List<_Lift> _lifts;
 
   // Media normalization.
 
@@ -159,8 +76,6 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
 
   // Folders.
 
-  late final Layout _layout;
-
   /// Level of the unknown folders, chosen by the user (index in the
   /// layout); null for the other kinds, whose items carry their level.
   int? _level;
@@ -171,50 +86,47 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
   @override
   void initState() {
     super.initState();
-    final libraries = ref.read(indexedLibrariesProvider);
-    if (_normalizing) {
-      _preview();
-      return;
-    }
-    if (_lifting) {
-      final identity = ref.read(settingsProvider).identity;
-      final members = {
-        for (final i in widget.issues)
-          for (final m in libraries[i.library]?.members ?? const <Member>[])
-            m.id: m,
-      };
-      _owners = members.values.toList();
-      _owner = members.containsKey(identity.memberId)
-          ? identity.memberId
-          : _owners.firstOrNull?.id;
-      _lifts = [
-        for (final i in widget.issues)
-          _lift(i, libraries[i.library]?.members ?? const []),
-      ];
-      return;
-    }
-    _layout = libraries[widget.issues.first.library]!.layout!;
-    if (widget.kind == ReportKind.unknownValue) {
-      _level = _levelOf(widget.issues.first);
-    }
+    if (_normalizing) _preview();
+    if (_normalizing || _lifting) return;
+    final layout = ref
+        .read(indexedLibrariesProvider)[widget.issues.first.library]!
+        .layout!;
     _fields.addAll([
-      for (var j = 0; j < _layout.levels.length - 1; j++)
+      for (var j = 0; j < layout.levels.length - 1; j++)
         TextEditingController(),
     ]);
-    _prefill();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_lifting) return;
-    // Proposed once, in the language of the interface.
-    final l10n = AppLocalizations.of(context);
-    for (final (member: _, :statusFolder) in _lifts) {
-      if (statusFolder != null && !_statuses.containsKey(statusFolder)) {
-        _statuses[statusFolder] = proposeStatus(l10n, statusFolder);
+    if (_proposals != null) return;
+    final proposals = _proposals = _propose();
+    _level = proposals.level;
+    _owner = proposals.owner;
+    for (final item in proposals.items) {
+      if (item.statusFolder case final folder?) {
+        _statuses.putIfAbsent(folder, () => item.status);
       }
     }
+    _prefill();
+  }
+
+  /// The proposals of the issues, the statuses labeled in the language of
+  /// the interface.
+  FixProposals _propose() {
+    final l10n = AppLocalizations.of(context);
+    return proposeFixes(
+      widget.kind,
+      [for (final i in widget.issues) (library: i.library, item: i.item)],
+      libraries: ref.read(indexedLibrariesProvider),
+      titles: ref.read(titlesProvider),
+      statusLabels: {
+        for (final s in Title.defaultStatuses) s: statusLabel(l10n, s),
+      },
+      identity: ref.read(settingsProvider).identity.memberId,
+      level: _level,
+    );
   }
 
   @override
@@ -286,114 +198,40 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     ];
   }
 
-  /// Member and status subfolders of the project too deep [issue].
-  _Lift _lift(LibraryIssue issue, List<Member> members) {
-    final folder = p.posix.dirname(issue.item.path);
-    final segments = folder.substring(issue.item.target!.length + 1).split('/');
-    final member = members
-        .where((m) => m.name.toLowerCase() == segments.first.toLowerCase())
-        .firstOrNull;
-    final rest = member == null ? segments : segments.skip(1);
-    return (member: member, statusFolder: rest.lastOrNull);
-  }
-
-  /// Index in the layout of the level of the folder [issue].
-  int _levelOf(LibraryIssue issue) =>
-      _layout.levels.indexWhere((l) => l.key == issue.item.level!.key);
-
-  /// Level index of the item [i]: the chosen one for unknown folders.
-  int _levelOfItem(int i) => _level ?? _levelOf(widget.issues[i]);
-
-  /// Proposed values of the levels above the item [i]: its target, else
-  /// its current parents, `_Unassigned` for the missing ones.
-  List<String> _proposed(int i) {
-    final item = widget.issues[i].item;
-    final count = _levelOfItem(i);
-    final target = item.target?.split('/');
-    if (target != null && target.length == count + 1) {
-      return target.take(count).toList();
-    }
-    final parents = p.posix.dirname(item.path).split('/')
-      ..removeWhere((s) => s == '.');
-    return [
-      for (var j = 0; j < count; j++)
-        j < parents.length ? parents[j] : Layout.unassigned,
-    ];
-  }
-
   /// Number of level fields shown: the levels above the deepest item.
-  int get _fieldCount =>
-      [for (var i = 0; i < widget.issues.length; i++) _levelOfItem(i)]
-          .reduce((a, b) => a > b ? a : b);
+  int get _fieldCount => _proposals!.items.fold(
+    0,
+    (count, item) => item.levels.length > count ? item.levels.length : count,
+  );
 
   /// Fills each field with the value proposed for every item, if they
   /// agree; empty otherwise.
   void _prefill() {
-    final proposals = [
-      for (var i = 0; i < widget.issues.length; i++) _proposed(i),
-    ];
     for (final (j, field) in _fields.indexed) {
-      final values = {
-        for (final proposed in proposals)
-          if (j < proposed.length) proposed[j],
-      };
-      field.text = values.length == 1 ? values.single : '';
+      field.text = _proposals!.commonValues[j] ?? '';
     }
   }
 
-  /// Target of the folder item [i]: the field values, else its proposals,
-  /// then its name.
-  String _target(int i) => [
-    for (final (j, value) in _proposed(i).indexed)
-      _fields[j].text.trim().isEmpty ? value : _fields[j].text.trim(),
-    p.posix.basename(widget.issues[i].item.path),
-  ].join('/');
+  List<String> get _levelValues => [for (final f in _fields) f.text];
 
   bool get _valid => _fields
-      .take(_lifting || _normalizing ? 0 : _fieldCount)
+      .take(_fieldCount)
       .map((f) => f.text.trim())
       .every((v) => v.isEmpty || isValidFolderName(v));
 
-  MigrationFix _fix(int i) {
-    final item = widget.issues[i].item;
-    if (_normalizing) return NormalizeMedia(mediaTitleOf(item.path));
-    if (!_lifting) return MoveFolder(item.path, _target(i));
-    final status = _liftStatus(i);
-    return LiftProject(
-      item.path,
-      item.target!,
-      owner: _liftOwner(i)?.id,
-      status: status,
-      statusFolder: status == null ? _lifts[i].statusFolder : null,
-    );
-  }
-
-  /// Owner of the lifted project [i]: its member subfolder, else the
-  /// default owner when its library declares it, else the local member if
-  /// declared, else its first member; none when its library declares no
-  /// members.
-  Member? _liftOwner(int i) {
-    final library = widget.issues[i].library;
-    final members = ref.read(indexedLibrariesProvider)[library]?.members;
-    if (members == null || members.isEmpty) return null;
-    final local = ref.read(settingsProvider).identity.memberId;
-    Member? find(MemberId? id) => members.where((m) => m.id == id).firstOrNull;
-    return _lifts[i].member ?? find(_owner) ?? find(local) ?? members.first;
-  }
-
-  String? _liftStatus(int i) {
-    final folder = _lifts[i].statusFolder;
+  String? _liftStatus(FixProposal proposal) {
+    final folder = proposal.statusFolder;
     return folder == null ? null : _statuses[folder];
   }
 
   /// Target, and for a project its owner and status, joined.
   String _details(AppLocalizations l10n, int i) {
-    if (_normalizing) {
-      return l10n.fixNormalize(mediaTitleOf(widget.issues[i].item.path));
-    }
+    final proposals = _proposals!;
+    final proposal = proposals.items[i];
+    final issue = proposal.issue;
+    if (_normalizing) return l10n.fixNormalize(mediaTitleOf(issue.item.path));
     if (!_lifting) {
-      final issue = widget.issues[i];
-      final target = _target(i);
+      final target = folderTarget(proposal, _levelValues);
       final merges = mergesInto(
         ref.read(titlesProvider),
         issue.library,
@@ -402,29 +240,25 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
       );
       return ['→ $target', if (merges) l10n.fixMerged].join(' · ');
     }
-    final status = _liftStatus(i);
-    final path = widget.issues[i].item.path;
+    final status = _liftStatus(proposal);
     return [
-      '→ ${widget.issues[i].item.target}',
-      // Label of a version not adopted yet: its file name (SPEC §4.2).
-      p.posix.basenameWithoutExtension(path),
-      ?_liftOwner(i)?.name,
+      '→ ${proposal.target}',
+      proposal.label,
+      ?liftOwner(proposals, proposal, _owner)?.name,
       status == null ? l10n.noStatus : statusLabel(l10n, status),
     ].join(' · ');
   }
 
   void _confirm() {
-    final fixes = <LibraryId, List<MigrationFix>>{};
-    for (final i in _checked.toList()..sort()) {
-      final fix = _fix(i);
-      final list = fixes.putIfAbsent(widget.issues[i].library, () => []);
-      // One normalization per title.
-      if (fix is NormalizeMedia && list.any((f) => f.path == fix.path)) {
-        continue;
-      }
-      list.add(fix);
-    }
-    Navigator.of(context).pop(fixes);
+    final proposals = _proposals!;
+    Navigator.of(context).pop(
+      buildFixes(widget.kind, proposals, (
+        checked: _checked,
+        levelValues: _levelValues,
+        owner: _owner,
+        statuses: _statuses,
+      )),
+    );
   }
 
   List<Widget> _liftChoices(AppLocalizations l10n) => [
@@ -432,7 +266,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
       Choice<MemberId>(
         label: l10n.fixDefaultOwner,
         value: owner,
-        options: {for (final m in _owners) m.id: m.name},
+        options: {for (final m in _proposals!.owners) m.id: m.name},
         onChanged: (id) => setState(() => _owner = id),
       ),
     for (final folder in _statuses.keys)
@@ -455,11 +289,12 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           label: l10n.fixFoldersAre,
           value: level,
           options: {
-            for (final (j, l) in _layout.levels.indexed)
+            for (final (j, l) in _proposals!.layout!.levels.indexed)
               j: layoutLevelLabel(l10n, l),
           },
           onChanged: (j) => setState(() {
             _level = j;
+            _proposals = _propose();
             _prefill();
           }),
         ),
@@ -467,13 +302,13 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
         Padding(
           padding: const EdgeInsets.only(top: Space.s),
           child: LevelField(
-            label: layoutLevelLabel(l10n, _layout.levels[j]),
+            label: layoutLevelLabel(l10n, _proposals!.layout!.levels[j]),
             hint: l10n.fixKeepProposed,
             controller: _fields[j],
             options: () => levelValues(
               ref.read(titlesProvider),
               libraries,
-              _layout,
+              _proposals!.layout!,
               j,
               [for (final f in _fields.take(j)) f.text.trim()],
             ),

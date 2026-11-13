@@ -17,7 +17,6 @@ import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
-import 'package:reaharvest/ui/fix_dialog.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
@@ -2244,28 +2243,6 @@ void main() {
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
     expect(find.text('Fix 2 items'), findsOne);
-  });
-
-  test('a move onto a folder holding titles merges them', () {
-    final titles = demoTitles();
-    final library = titles.first.libraryId;
-    final song = titles.first.path;
-    expect(mergesInto(titles, library, 'X', 'sample artist'), isTrue);
-    expect(mergesInto(titles, library, 'X', song), isTrue);
-    expect(mergesInto(titles, library, song, song), isFalse);
-    expect(mergesInto(titles, library, 'X', 'Sample'), isFalse);
-    expect(mergesInto(titles, const LibraryId('other'), 'X', song), isFalse);
-  });
-
-  test('statuses are proposed from status folder names', () {
-    final en = lookupAppLocalizations(const Locale('en'));
-    final fr = lookupAppLocalizations(const Locale('fr'));
-    expect(proposeStatus(en, 'Mix'), 'mixing');
-    expect(proposeStatus(en, 'rec'), 'recording');
-    expect(proposeStatus(en, 'Done'), 'done');
-    expect(proposeStatus(fr, statusLabel(fr, 'writing')), 'writing');
-    expect(proposeStatus(en, 'demo'), isNull);
-    expect(proposeStatus(en, 'mi'), isNull);
   });
 
   testWidgets('lists and deletes node files without project', (tester) async {

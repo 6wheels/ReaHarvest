@@ -4,6 +4,7 @@ library;
 export 'src/adoption.dart';
 export 'src/content_hash.dart';
 export 'src/conventions.dart';
+export 'src/fix_proposals.dart';
 export 'src/fixes.dart';
 export 'src/free_names.dart';
 export 'src/guarded_storage.dart';
