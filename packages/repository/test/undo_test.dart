@@ -315,9 +315,7 @@ void main() {
         journal,
         [
           line({'op': 'fixStart', 'fix': 1, 'kind': 'moveFolder', 'path': 'x'}),
-          // Source and target both present: the move threw.
-          line({'op': 'move', 'from': 'Band/Song', 'to': song}),
-          // Neither present.
+          // Neither source nor target present.
           line({'op': 'move', 'from': 'Band/Gone', 'to': 'Band/New'}),
         ].join(),
       );
@@ -482,6 +480,128 @@ void main() {
 
     expect(storage.text('$song/a.rpp'), before);
     expect(storage.text('${m.folder}/replaced/$song/a.rpp'), 'saved since');
+  });
+
+  test('a file already restored is not kept again', () async {
+    final m = await migration();
+    final before = storage.text('$song/a.rpp');
+    await m.journal.startFix('normalizeMedia', song);
+    await m.storage.write('$song/a.rpp', Stream.value(utf8.encode('fixed')));
+    // Restored by a first undo stopped before its end line.
+    storage.put('$song/a.rpp', before);
+
+    await undoUnfinishedFix(storage, hash: hash);
+
+    expect(storage.text('$song/a.rpp'), before);
+    expect(
+      storage.files.keys.where((k) => k.startsWith('${m.folder}/replaced/')),
+      isEmpty,
+    );
+  });
+
+  test('a journal naming a path outside the library is not undone', () async {
+    final m = await migration();
+    final journal = '${m.folder}/${MigrationJournal.fileName}';
+    String line(Map<String, Object?> json) => '${jsonEncode(json)}\n';
+    Map<String, Object?> start(int fix) => {
+      'op': 'fixStart',
+      'fix': fix,
+      'kind': 'moveFolder',
+      'path': 'x',
+    };
+    final forged = <Map<String, Object?>>[
+      {'op': 'move', 'from': '../out.rpp', 'to': '$song/a.rpp'},
+      {'op': 'move', 'from': r'..\out.rpp', 'to': '$song/a.rpp'},
+      {'op': 'move', 'from': 'C:/out.rpp', 'to': '$song/a.rpp'},
+      {'op': 'move', 'from': '$song/b.rpp', 'to': '/out.rpp'},
+      {'op': 'create', 'path': '$song/../../out.rpp'},
+      {
+        'op': 'rewrite',
+        'path': '../out.rpp',
+        'modified': 0,
+        'copy': '${m.folder}/originals/$song/a.rpp',
+      },
+      // A copy outside the migration folder.
+      {
+        'op': 'rewrite',
+        'path': '$song/a.rpp',
+        'modified': 0,
+        'copy': '$song/b.rpp',
+      },
+    ];
+    final before = tree();
+    for (final op in forged) {
+      storage
+        ..put('${m.folder}/originals/$song/a.rpp', 'copy')
+        ..put(journal, [line(start(1)), line(op)].join());
+
+      await expectLater(
+        undoUnfinishedFix(storage, hash: hash),
+        throwsA(isA<StateError>()),
+        reason: '$op',
+      );
+      expect(tree(), before, reason: '$op');
+      expect(storage.text(journal), isNot(contains('undoStart')));
+    }
+  });
+
+  test('a move whose source exists again stops the undo', () async {
+    final m = await migration();
+    final fix = await m.journal.startFix('moveFolder', 'Band/Song');
+    await m.storage.move('Band/Song', 'Band/Other');
+    // Created again since, by REAPER or a sync client.
+    storage.put('Band/Song/a.rpp', 'again');
+
+    await expectLater(
+      undoUnfinishedFix(storage, hash: hash),
+      throwsA(isA<StateError>()),
+    );
+    expect((await unfinishedFixIn(storage))?.fix, fix);
+    expect(tree().keys, contains('Band/Other/a.rpp'));
+
+    // Set aside by the user: the undo goes through.
+    storage.files.remove('Band/Song/a.rpp');
+    storage.dirs.remove('Band/Song');
+    final report = await undoUnfinishedFix(storage, hash: hash);
+    expect(report.items[ReportKind.fileLost], isNull);
+    expect(await unfinishedFixIn(storage), isNull);
+    expect(tree().keys, contains('Band/Song/a.rpp'));
+    expect(tree().keys, isNot(contains('Band/Other/a.rpp')));
+  });
+
+  test(
+    'a resumed undo leaves a file moved back where one was created',
+    () async {
+      final m = await migration();
+      final original = storage.text('$song/a.rpp');
+      await m.journal.startFix('normalizeMedia', song);
+      await m.storage.move('$song/a.rpp', '$song/old/a.rpp');
+      await m.storage.write(
+        '$song/a.rpp',
+        Stream.value(utf8.encode('created')),
+      );
+      // A first undo stopped before its end line: the created file set
+      // aside, the move made back.
+      await storage.move('$song/a.rpp', '${m.folder}/undone/$song/a.rpp');
+      await storage.move('$song/old/a.rpp', '$song/a.rpp');
+
+      await undoUnfinishedFix(storage, hash: hash);
+
+      expect(storage.text('$song/a.rpp'), original);
+      expect(
+        storage.files.keys,
+        isNot(contains('${m.folder}/undone/$song/a (2).rpp')),
+      );
+      expect(await unfinishedFixIn(storage), isNull);
+    },
+  );
+
+  test('a fix left to undo is found without reading the inventory', () async {
+    final m = await migration();
+    await m.journal.startFix('moveFolder', 'Band/Song');
+    storage.put('${m.folder}/${Inventory.fileName}', 'not json\n');
+
+    expect((await unfinishedFixIn(storage))?.path, 'Band/Song');
   });
 
   test('in an isolate, on a library folder', () async {

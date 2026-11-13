@@ -54,11 +54,17 @@ class LibraryService {
   /// End of the last change of each library ([_exclusive]).
   final _changes = <LibraryId, Future<void>>{};
 
+  /// Number of changes of each library running or waiting.
+  final _pending = <LibraryId, int>{};
+
   /// Runs [change] once the previous changes of [library] have ended: a
   /// batch of fixes, an undo and the search for a fix left to undo never
   /// run together on a library (a fix being applied looks interrupted).
   Future<T> _exclusive<T>(LibraryId library, Future<T> Function() change) {
-    final done = (_changes[library] ?? Future.value()).then((_) => change());
+    _pending[library] = (_pending[library] ?? 0) + 1;
+    final done = (_changes[library] ?? Future.value())
+        .then((_) => change())
+        .whenComplete(() => _pending[library] = _pending[library]! - 1);
     _changes[library] = done.then((_) {}, onError: (_) {});
     return done;
   }
@@ -320,52 +326,76 @@ class LibraryService {
   /// A cancelled batch ends the task with the report of what was done.
   /// While a fix of the library is left to undo, runs nothing and offers
   /// to undo it instead ([_offerUndo]). Waits for the changes of the
-  /// library already running ([_exclusive]).
+  /// library already running ([_exclusive]): its task is then shown at
+  /// once, waiting, and ends cancelled if a fix is left to undo.
   Future<Report?> _fix(
     LibraryEntry entry,
     List<MigrationFix> fixes,
     String Function(AppLocalizations l10n) label,
-  ) => _exclusive(entry.id, () async {
-    if (await _offerUndo(entry)) return null;
-    final root = entry.libraryRoot;
-    return ref.read(tasksProvider.notifier).run(label, (task) async {
-      // From the index: stale for the titles changed by the previous fixes
-      // of the batch, which can only block more (SPEC §5.8).
-      final usage = mediaUsage(
-        ref.read(localIndexProvider).scanResult(entry.id) ?? const ScanResult(),
-      );
-      BatchResult? result;
-      try {
-        result = await runMigrationBatchOn(
-          root,
-          fixes,
-          usage: usage,
-          hasherOf: xxh3Hasher,
-          reporter: _TaskReporter(task, entry.displayName),
+  ) {
+    final tasks = ref.read(tasksProvider.notifier);
+    if ((_pending[entry.id] ?? 0) == 0) {
+      return _exclusive(entry.id, () async {
+        if (await _offerUndo(entry)) return null;
+        return tasks.run(
+          label,
+          (task) => _batch(entry, fixes, task),
+          openReport: true,
         );
-      } finally {
-        // Also after a cancellation: the library shows what was moved.
-        task.step((l10n) => l10n.taskStepScan);
-        if (result != null) {
-          final added = await addKnownPaths(
-            MountedFolderStorage(root),
-            result.knownPaths,
-          );
-          if (added.isNotEmpty) {
-            _log.info(
-              'Known values of ${entry.displayName} added: '
-              '${added.join(', ')}',
-            );
-          }
-        }
-        await scan(entry);
-      }
-      final report = _rooted(root, result.report);
-      // What was done before stopping is kept: the report tells it.
-      if (result.cancelled) throw TaskCancelled(report);
-      return report;
+      });
+    }
+    return tasks.run(label, (task) {
+      task.step((l10n) => l10n.taskStepWaiting);
+      return _exclusive(entry.id, () async {
+        if (await _offerUndo(entry)) throw const TaskCancelled();
+        return _batch(entry, fixes, task);
+      });
     }, openReport: true);
-  });
+  }
+
+  /// The batch of [_fix], under its [task].
+  Future<Report> _batch(
+    LibraryEntry entry,
+    List<MigrationFix> fixes,
+    TaskControl task,
+  ) async {
+    final root = entry.libraryRoot;
+    // From the index: stale for the titles changed by the previous fixes
+    // of the batch, which can only block more (SPEC §5.8).
+    final usage = mediaUsage(
+      ref.read(localIndexProvider).scanResult(entry.id) ?? const ScanResult(),
+    );
+    BatchResult? result;
+    try {
+      result = await runMigrationBatchOn(
+        root,
+        fixes,
+        usage: usage,
+        hasherOf: xxh3Hasher,
+        reporter: _TaskReporter(task, entry.displayName),
+      );
+    } finally {
+      // Also after a cancellation: the library shows what was moved.
+      task.step((l10n) => l10n.taskStepScan);
+      if (result != null) {
+        final added = await addKnownPaths(
+          MountedFolderStorage(root),
+          result.knownPaths,
+        );
+        if (added.isNotEmpty) {
+          _log.info(
+            'Known values of ${entry.displayName} added: '
+            '${added.join(', ')}',
+          );
+        }
+      }
+      await scan(entry);
+    }
+    final report = _rooted(root, result.report);
+    // What was done before stopping is kept: the report tells it.
+    if (result.cancelled) throw TaskCancelled(report);
+    return report;
+  }
 
   /// Offers to undo the fix left to undo in [entry], if any (SPEC §5.8 step
   /// 5, #94): the dialog of [interruptedFixesProvider]. Returns whether

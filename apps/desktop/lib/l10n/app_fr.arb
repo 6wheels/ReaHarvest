@@ -233,6 +233,7 @@
   "taskStepFix": "Correction {index} sur {count}",
   "@taskStepFix": {"placeholders": {"index": {"type": "int"}, "count": {"type": "int"}}},
   "taskStepCheck": "Vérification qu'aucun fichier n'est perdu",
+  "taskStepWaiting": "En attente de la tâche en cours sur la bibliothèque",
   "taskStepScan": "Mise à jour de la bibliothèque",
   "reportFolderMerged": "Dossiers fusionnés avec un dossier existant",
   "reportFileRenamed": "Renommés à la fusion : le nom était pris",

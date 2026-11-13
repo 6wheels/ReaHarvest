@@ -86,6 +86,17 @@ final class Migration {
     );
   }
 
+  /// Folder of the latest migration of [storage] ([latest]), or null,
+  /// found without reading its inventory.
+  static Future<String?> latestFolder(RepositoryStorage storage) async {
+    for (final folder in (await _folders(storage)).reversed) {
+      if (await storage.stat('$folder/${Inventory.fileName}') != null) {
+        return folder;
+      }
+    }
+    return null;
+  }
+
   /// The latest migration of [storage], with its inventory complete or not,
   /// or null if there is none.
   static Future<Migration?> latest(RepositoryStorage storage) async {

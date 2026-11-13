@@ -821,9 +821,16 @@ void main() {
           .copySync(p.join(dir.path, '$name.rpp'));
     }
     final entry = container.read(settingsProvider).libraries.single;
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final steps = <String>{};
+    container.listen(tasksProvider, (_, tasks) {
+      for (final task in tasks) {
+        if (task.step case final step?) steps.add(step(l10n));
+      }
+    });
 
     // The second is asked while the first runs: it is not taken for an
-    // interrupted fix.
+    // interrupted fix, and its task is shown waiting.
     final reports = await Future.wait([
       service().fix(entry.id, const [
         MoveFolder('Artist/One', 'Artist/New/One'),
@@ -838,6 +845,7 @@ void main() {
     expect((reports[0]! as Report).hasErrors, isFalse);
     expect((reports[1]! as Report).hasErrors, isFalse);
     expect(container.read(interruptedFixesProvider), isEmpty);
+    expect(steps, contains('Waiting for the running task of the library'));
     expect(
       Directory(p.join(band, 'Artist', 'New', 'One')).existsSync(),
       isTrue,

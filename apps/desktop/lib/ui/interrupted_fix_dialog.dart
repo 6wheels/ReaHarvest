@@ -4,11 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../state/libraries.dart';
 import 'tasks_zone.dart' show appNavigatorKey;
+import 'widgets.dart';
 
 /// Shows, one after the other, the fixes offered to be undone
 /// ([interruptedFixesProvider], SPEC §5.8 step 5): "Undo" runs the undo as
-/// a task whose report opens at the end, "Later" runs nothing. Takes no
-/// room.
+/// a task whose report opens at the end, after the REAPER warning (SPEC
+/// §5.7); "Later" runs nothing. Takes no room.
 class InterruptedFixPrompt extends ConsumerStatefulWidget {
   const InterruptedFixPrompt({super.key});
 
@@ -49,8 +50,13 @@ class _InterruptedFixPromptState extends ConsumerState<InterruptedFixPrompt> {
     if (!mounted) return;
     // The next offer, if any, is shown by the listener.
     ref.read(interruptedFixesProvider.notifier).answered(fix.library);
-    if (undo ?? false) {
-      await ref.read(libraryServiceProvider).undoInterruptedFix(fix.library);
+    final navigator = appNavigatorKey.currentContext;
+    if ((undo ?? false) && navigator != null && navigator.mounted) {
+      await runProjectChange(
+        navigator,
+        ref,
+        () => ref.read(libraryServiceProvider).undoInterruptedFix(fix.library),
+      );
     }
   }
 

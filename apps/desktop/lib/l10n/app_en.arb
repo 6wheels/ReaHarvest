@@ -292,6 +292,7 @@
   "taskStepFix": "Fix {index} of {count}",
   "@taskStepFix": {"placeholders": {"index": {"type": "int"}, "count": {"type": "int"}}},
   "taskStepCheck": "Checking that no file is lost",
+  "taskStepWaiting": "Waiting for the running task of the library",
   "taskStepScan": "Updating the library",
   "reportFolderMerged": "Folders merged into an existing folder",
   "reportFileRenamed": "Renamed on merge: the name was taken",

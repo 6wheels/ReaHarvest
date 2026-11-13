@@ -81,8 +81,14 @@ void main() {
     expect(h.tasks.length, tasks);
     expect(File(h.path('Band/Live/Ballad/v1.rpp')).existsSync(), isTrue);
 
-    // Undone: the project back in its member subfolder, nothing lost.
+    // Undone, after the warning that REAPER is open: the project back in
+    // its member subfolder, nothing lost.
+    h.reaperRunning = true;
     await tapText(tester, 'Undo');
+    await waitForText(tester, 'REAPER is open');
+    expect(h.tasks.length, tasks);
+    h.reaperRunning = false;
+    await tapText(tester, 'Continue anyway');
     await waitFor(
       tester,
       () => h.tasks.length > tasks && !h.tasks.last.isRunning,

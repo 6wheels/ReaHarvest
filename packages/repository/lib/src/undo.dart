@@ -4,6 +4,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import 'content_hash.dart';
 import 'free_names.dart';
+import 'library_path.dart';
 import 'migration.dart';
 import 'migration_journal.dart';
 import 'mounted_folder_storage.dart';
@@ -25,16 +26,39 @@ final class FixToUndo implements Exception {
 }
 
 /// The fix left to undo in the latest migration of [storage], or null. A
-/// batch refuses to run while there is one: it can only be there.
+/// batch refuses to run while there is one: it can only be there. Reads
+/// the journal only, not the inventory.
 Future<UnfinishedFix?> unfinishedFixIn(RepositoryStorage storage) async {
-  final migration = await Migration.latest(storage);
-  final fix = migration?.journal.unfinishedFix;
+  final folder = await Migration.latestFolder(storage);
+  if (folder == null) return null;
+  final journal = await MigrationJournal.read(storage, folder);
+  final fix = journal.unfinishedFix;
   if (fix == null) return null;
-  return (
-    folder: migration!.folder,
-    fix: fix,
-    path: migration.journal.pathOf(fix) ?? '',
-  );
+  return (folder: folder, fix: fix, path: journal.pathOf(fix) ?? '');
+}
+
+/// Throws unless [path], read from a journal, is a path inside the library:
+/// a journal in a shared folder is not trusted to name any file.
+void _checkInLibrary(String path) {
+  if (path.isEmpty ||
+      isAbsoluteReference(path) ||
+      path.replaceAll(r'\', '/').split('/').contains('..')) {
+    throw StateError('Path outside the library in the journal: $path');
+  }
+}
+
+/// Whether the files [a] and [b] have the same content.
+Future<bool> _sameContent(RepositoryStorage storage, String a, String b) async {
+  if ((await storage.stat(a))?.size != (await storage.stat(b))?.size) {
+    return false;
+  }
+  final bytesA = await storage.read(a).expand((c) => c).toList();
+  final bytesB = await storage.read(b).expand((c) => c).toList();
+  if (bytesA.length != bytesB.length) return false;
+  for (var i = 0; i < bytesA.length; i++) {
+    if (bytesA[i] != bytesB[i]) return false;
+  }
+  return true;
 }
 
 /// Undoes the fix [fix] of [migration] (SPEC §5.8 step 5, #94), on the
@@ -43,16 +67,19 @@ Future<UnfinishedFix?> unfinishedFixIn(RepositoryStorage storage) async {
 /// operations, read again from the journal (an append that threw may have
 /// reached the disk), are reversed from the last one:
 /// - a move is moved back when its target exists and its source does not;
-///   otherwise it was not made, or is already undone;
+///   with no target, it was not made or is already undone; with both, the
+///   source came back since (REAPER, a sync client) and the undo stops;
 /// - a rewritten file still there gets back the copy named by its line,
-///   with the date of the line; the content it had is kept first under
-///   `<migration>/replaced/`;
-/// - a created file still there is moved to `<migration>/undone/`.
+///   with the date of the line; the content it had, unless it is already
+///   the one of the copy, is kept first under `<migration>/replaced/`;
+/// - a created file still there is moved to `<migration>/undone/`, unless
+///   an earlier move of the fix, already undone, put a file back there.
 ///
 /// Nothing is deleted. Each step can be repeated: an interrupted undo is
 /// run again from the start. Throws before any change if a rewrite has no
-/// copy; throws, leaving the fix to undo, if a step fails. Returns the fix
-/// as [ReportKind.fixUndone].
+/// copy or a line names a path outside the library (a copy outside the
+/// migration folder); throws, leaving the fix to undo, if a step fails.
+/// Returns the fix as [ReportKind.fixUndone].
 Future<Report> undoFix(
   RepositoryStorage storage,
   Migration migration,
@@ -63,11 +90,21 @@ Future<Report> undoFix(
   // Checked before the first change: no undo stopped halfway for good.
   for (final op in operations) {
     switch (op) {
+      case {'op': 'move', 'from': final String from, 'to': final String to}:
+        _checkInLibrary(from);
+        _checkInLibrary(to);
+      case {'op': 'create', 'path': final String path}:
+        _checkInLibrary(path);
       case {
         'op': 'rewrite',
         'path': final String path,
         'copy': final String copy,
       }:
+        _checkInLibrary(path);
+        _checkInLibrary(copy);
+        if (!isWithin(copy, migration.folder, caseSensitive: true)) {
+          throw StateError('Copy of $path outside the migration: $copy');
+        }
         if (await storage.stat(copy) == null) {
           throw StateError('Copy of $path missing: $copy');
         }
@@ -76,13 +113,14 @@ Future<Report> undoFix(
     }
   }
   await journal.startUndo(fix);
-  for (final op in operations.reversed) {
+  for (final (i, op) in operations.indexed.toList().reversed) {
     switch (op) {
       case {'op': 'move', 'from': final String from, 'to': final String to}:
-        if (await storage.stat(to) != null &&
-            await storage.stat(from) == null) {
-          await storage.move(to, from);
+        if (await storage.stat(to) == null) continue;
+        if (await storage.stat(from) != null) {
+          throw StateError('Cannot move $to back: $from exists again');
         }
+        await storage.move(to, from);
       case {
         'op': 'rewrite',
         'path': final String path,
@@ -92,16 +130,33 @@ Future<Report> undoFix(
         // Absent: moved back already by an interrupted undo.
         if (await storage.stat(path) == null) continue;
         // What the copy replaces may hold work saved since the fix.
-        await storage.write(
-          await freePath(storage, '${migration.folder}/replaced/$path'),
-          storage.read(path),
-        );
-        await storage.write(path, storage.read(copy));
+        if (!await _sameContent(storage, path, copy)) {
+          await storage.write(
+            await freePath(storage, '${migration.folder}/replaced/$path'),
+            storage.read(path),
+          );
+          await storage.write(path, storage.read(copy));
+        }
         await storage.setModified(
           path,
           DateTime.fromMicrosecondsSinceEpoch(modified),
         );
       case {'op': 'create', 'path': final String path}:
+        // On a resumed undo, the file there may be the one a move of the
+        // fix took away, already moved back.
+        var movedBack = false;
+        for (final before in operations.take(i)) {
+          if (before
+              case {
+                'op': 'move',
+                'from': final String from,
+                'to': final String to,
+              }
+              when from == path && await storage.stat(to) == null) {
+            movedBack = true;
+          }
+        }
+        if (movedBack) continue;
         if (await storage.stat(path) case StorageEntry(isDirectory: false)) {
           await storage.move(
             path,
