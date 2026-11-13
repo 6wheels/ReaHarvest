@@ -222,7 +222,9 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   /// Asks the running task [id] to stop at its next step. A queued task
   /// leaves the queue and ends cancelled at once.
   void cancel(int id) {
-    if (_queued[id] case final left? when !left.isCompleted) {
+    if (_queued[id] case final left?) {
+      // Already left the queue: nothing more to stop.
+      if (left.isCompleted) return;
       _update(id, (t) => t._with(state: TaskState.cancelled));
       _cancels.remove(id);
       left.complete();

@@ -208,18 +208,19 @@ class MigrationActions {
 
   /// Deletes the `.node.json` file [path] of [library], found in a folder
   /// without project (#54). Then rescans, in the turn of the library.
-  /// Throws [ArgumentError] for any other file.
+  /// Throws [ArgumentError] for any other file, checked in the turn: a
+  /// change of the library asked before may have given it a project.
   Future<void> deleteOrphanNode(LibraryId library, String path) async {
     if (p.posix.basename(path) != nodeFileName) {
       throw ArgumentError.value(path, 'path', 'Not a node file');
     }
     final entry = ref.libraryEntry(library);
     final root = entry.libraryRoot;
-    final known = ref.read(localIndexProvider).scanResult(library);
-    if (!(known?.orphanNodes.contains(path) ?? false)) {
-      throw ArgumentError.value(path, 'path', 'Not an orphan node file');
-    }
     await _turns.run(library, () async {
+      final known = ref.read(localIndexProvider).scanResult(library);
+      if (!(known?.orphanNodes.contains(path) ?? false)) {
+        throw ArgumentError.value(path, 'path', 'Not an orphan node file');
+      }
       await MountedFolderStorage(root).delete(path);
       _log.info('Orphan node file $path of ${entry.displayName} deleted');
       await ref.scanLibrary(entry);

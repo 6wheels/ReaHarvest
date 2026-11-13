@@ -167,6 +167,7 @@ void main() {
         ..cancel(id)
         ..cancel(id);
       expect(await two, isNull);
+      expect(container.read(tasksProvider)[1].cancelling, isFalse);
       expect(states(), [
         TaskState.running,
         TaskState.cancelled,

@@ -57,6 +57,39 @@ void main() {
     expect(File(p.join(song, '.node.json')).existsSync(), isTrue);
   });
 
+  test('checks an orphan node file again in the turn of its library', () async {
+    final band = folder('Band');
+    File(p.join(band, 'Artist', 'Album', 'Song', '.node.json'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('{"nodeId": "01X", "level": "title"}');
+    await catalog.addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    final entry = container.read(settingsProvider).libraries.single;
+    const path = 'Artist/Album/Song/.node.json';
+    expect(index.issues(kind: ReportKind.orphanNode).map((i) => i.item.path), [
+      path,
+    ]);
+
+    // A change asked before gives its folder a project: not deleted.
+    final hold = Completer<void>();
+    final turns = container.read(libraryTurnsProvider);
+    final holding = turns.run(entry.id, () async {
+      await hold.future;
+      File('../../test/fixtures/tracks.rpp')
+          .copySync(p.join(band, 'Artist', 'Album', 'Song', 'v1.rpp'));
+      await scans.scan(entry);
+    });
+    final deleting = migration.deleteOrphanNode(entry.id, path);
+    hold.complete();
+    await holding;
+
+    await expectLater(deleting, throwsArgumentError);
+    expect(File(p.join(band, path)).existsSync(), isTrue);
+  });
+
   test('normalizes a title, keeping the date of its projects', () async {
     final song = await bandWithSong();
     final other = p.join(p.dirname(song), 'Other');
