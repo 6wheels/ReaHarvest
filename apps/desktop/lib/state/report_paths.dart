@@ -6,11 +6,6 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 String _absolute(String root, String path) =>
     p.joinAll([root, ...path.split('/')]);
 
-/// Items for [paths] of the library at [root], as absolute paths.
-List<ReportItem> absoluteItems(String root, List<String> paths) => [
-  for (final path in paths) ReportItem(_absolute(root, path)),
-];
-
 /// Kinds whose detail is a path of the library, one per line.
 const _pathDetails = {
   ReportKind.targetExists,

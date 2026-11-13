@@ -18,7 +18,15 @@ final initialSettingsProvider = Provider<AppSettings>(
   (ref) => throw UnimplementedError('Overridden in main()'),
 );
 
+/// Read-only connection to the index ([LocalIndex.open]): the index is
+/// written in background isolates only ([scanIntoIndex]), which bump
+/// [indexRevisionProvider] once done.
 final localIndexProvider = Provider<LocalIndex>(
+  (ref) => throw UnimplementedError('Overridden in main()'),
+);
+
+/// Path of the index database, for the background isolates that write it.
+final indexPathProvider = Provider<String>(
   (ref) => throw UnimplementedError('Overridden in main()'),
 );
 

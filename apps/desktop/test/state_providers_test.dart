@@ -58,6 +58,7 @@ void main() {
     expect(() => bare.read(settingsFileProvider), throwsA(anything));
     expect(() => bare.read(initialSettingsProvider), throwsA(anything));
     expect(() => bare.read(localIndexProvider), throwsA(anything));
+    expect(() => bare.read(indexPathProvider), throwsA(anything));
     expect(() => bare.read(logFolderProvider), throwsA(anything));
     expect(bare.read(openFolderProvider), openFolder);
   });

@@ -46,13 +46,18 @@ Future<void> main() async {
   Logger('app').info('Started; settings: $settingsPath, index: $indexPath');
   final settingsFile = SettingsFile(settingsPath);
   final settings = await loadSettingsOrRecover(settingsFile, show: runApp);
+  // Written in background isolates only; read here, read-only (SPEC §7.1).
+  await createIndex(indexPath);
 
   final container = ProviderContainer(
     overrides: [
       logFolderProvider.overrideWithValue(logFolder),
       settingsFileProvider.overrideWithValue(settingsFile),
       initialSettingsProvider.overrideWithValue(settings),
-      localIndexProvider.overrideWithValue(LocalIndex.open(indexPath)),
+      indexPathProvider.overrideWithValue(indexPath),
+      localIndexProvider.overrideWithValue(
+        LocalIndex.open(indexPath, readOnly: true),
+      ),
       if (_demo) ...[
         titlesProvider.overrideWithValue(demoTitles()),
         indexedLibrariesProvider.overrideWithValue({

@@ -33,18 +33,22 @@ String folder(String name) {
 }
 
 /// Registers the set up and tear down of a test file over real services: a
-/// temporary root, an in-memory index and a recording REAPER launcher.
+/// temporary root, an index file in it (written by background isolates,
+/// read-only here, like the app) and a recording REAPER launcher.
 void setUpLibraryEnv() {
-  setUp(() {
+  setUp(() async {
     launched = [];
     root = Directory.systemTemp.createTempSync('reaharvest_app_');
-    index = LocalIndex.inMemory();
+    final indexPath = p.join(root.path, 'index.sqlite');
+    await createIndex(indexPath);
+    index = LocalIndex.open(indexPath, readOnly: true);
     container = ProviderContainer(
       overrides: [
         initialSettingsProvider.overrideWithValue(
           AppSettings(identity: const LocalIdentity(MemberId('M'), 'Alice')),
         ),
         settingsProvider.overrideWith(MemorySettings.new),
+        indexPathProvider.overrideWithValue(indexPath),
         localIndexProvider.overrideWithValue(index),
         defaultReaperResourcesProvider.overrideWithValue(
           p.join(root.path, 'resources'),

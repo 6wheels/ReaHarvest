@@ -16,6 +16,19 @@ import 'library_env.dart';
 void main() {
   setUpLibraryEnv();
 
+  test('the index is written in the background, read-only here', () async {
+    final revision = container.read(indexRevisionProvider);
+    await bandWithSong();
+    expect(title().path, 'Artist/Album/Song');
+    expect(container.read(indexRevisionProvider), greaterThan(revision));
+    final ui = container.read(localIndexProvider);
+    expect(
+      () => ui.update(ui.libraries().single, ScanResult()),
+      throwsA(anything),
+    );
+    expect(title().path, 'Artist/Album/Song');
+  });
+
   test('scan skips unavailable libraries', () async {
     final settings = container.read(settingsProvider.notifier);
     await settings.change(

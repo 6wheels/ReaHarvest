@@ -75,6 +75,8 @@ void main() {
     final data = p.join(root.path, 'data');
     Directory(data).createSync();
     final settingsFile = SettingsFile(p.join(data, 'settings.json'));
+    final indexPath = p.join(data, 'index.sqlite');
+    await createIndex(indexPath);
     container = ProviderContainer(
       overrides: [
         settingsFileProvider.overrideWithValue(settingsFile),
@@ -84,8 +86,9 @@ void main() {
             language: 'en',
           ),
         ),
+        indexPathProvider.overrideWithValue(indexPath),
         localIndexProvider.overrideWithValue(
-          LocalIndex.open(p.join(data, 'index.sqlite')),
+          LocalIndex.open(indexPath, readOnly: true),
         ),
         defaultReaperResourcesProvider.overrideWithValue(
           p.join(root.path, 'resources'),
