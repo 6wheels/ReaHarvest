@@ -173,6 +173,10 @@ final class LocalIndex {
     final prefix = titlePath.isEmpty ? '' : '$titlePath/';
     const below = 'library_id = ?1 AND substr(path, 1, length(?2)) = ?2';
     _transaction(() {
+      _db.execute('UPDATE libraries SET json = ? WHERE id = ?', [
+        jsonEncode(library.toJson()),
+        id,
+      ]);
       for (final t in ['nodes', 'titles']) {
         _db.execute('DELETE FROM $t WHERE library_id = ? AND path = ?', [
           id,
@@ -199,10 +203,17 @@ final class LocalIndex {
         id,
         Report({
           ReportKind.duplicateVersionId: [
-            for (final MapEntry(key: versionId, value: versions)
-                in duplicateVersions(titles(library: id)).entries)
-              for (final (t, v) in versions)
-                ReportItem(joinPath(t.path, v.fileName), versionId),
+            for (final r in _db.select(
+              'SELECT title_path, file_name, version_id FROM versions '
+              'WHERE library_id = ?1 AND version_id IN (SELECT version_id '
+              'FROM versions WHERE library_id = ?1 AND version_id IS NOT NULL '
+              'GROUP BY version_id HAVING count(*) > 1)',
+              [id],
+            ))
+              ReportItem(
+                joinPath(r['title_path'] as String, r['file_name'] as String),
+                r['version_id'] as String,
+              ),
           ],
         }),
         const [],
@@ -310,17 +321,7 @@ final class LocalIndex {
     Map<String, FileStamp> stamps, {
     String prefix = '',
   }) {
-    final existing = {
-      for (final r in _db.select(
-        'SELECT path, size, modified FROM files WHERE library_id = ?1 '
-        'AND substr(path, 1, length(?2)) = ?2',
-        [id, prefix],
-      ))
-        r['path'] as String: (
-          size: r['size'] as int,
-          modified: DateTime.fromMicrosecondsSinceEpoch(r['modified'] as int),
-        ),
-    };
+    final existing = _stamps(id, prefix: prefix);
     final upsert = _db.prepare(
       'INSERT INTO files (library_id, path, size, modified) VALUES (?, ?, ?, ?) '
       'ON CONFLICT (library_id, path) DO UPDATE SET size = excluded.size, '
@@ -374,12 +375,16 @@ final class LocalIndex {
 
   /// Titles of all libraries (or of [library]), sorted by library then path,
   /// with their versions: the startup view (SPEC §8).
-  List<Title> titles({LibraryId? library}) {
-    final where = library == null ? '' : 'WHERE library_id = ?';
-    final args = [?library];
+  List<Title> titles({LibraryId? library}) => _titles(library: library);
+
+  /// [titles], only the one at [path] when set (with [library]).
+  List<Title> _titles({LibraryId? library, String? path}) {
+    const where = 'WHERE (?1 IS NULL OR library_id = ?1)';
+    final args = [library, path];
     final versions = <(String, String), List<Version>>{};
     for (final r in _db.select(
-      'SELECT * FROM versions $where ORDER BY file_name',
+      'SELECT * FROM versions $where AND (?2 IS NULL OR title_path = ?2) '
+      'ORDER BY file_name',
       args,
     )) {
       final key = (r['library_id'] as String, r['title_path'] as String);
@@ -387,7 +392,8 @@ final class LocalIndex {
     }
     return [
       for (final r in _db.select(
-        'SELECT * FROM titles $where ORDER BY library_id, path',
+        'SELECT * FROM titles $where AND (?2 IS NULL OR path = ?2) '
+        'ORDER BY library_id, path',
         args,
       ))
         Title(
@@ -416,33 +422,9 @@ final class LocalIndex {
         if (i.kind == kind) i.item.path,
     ];
     final restored = titles(library: id);
-    final byPath = {for (final t in restored) t.path: t};
-    final entries = {
-      for (final r in _db.select(
-        'SELECT path, version_labels, version_owners FROM titles '
-        'WHERE library_id = ?',
-        [id],
-      ))
-        r['path'] as String: (
-          labels: _stringMap(r['version_labels'] as String),
-          owners: _stringMap(r['version_owners'] as String),
-        ),
-    };
     return ScanResult(
       titles: restored,
-      nodes: {
-        for (final r in _db.select('SELECT * FROM nodes WHERE library_id = ?', [
-          id,
-        ]))
-          r['path'] as String: NodeFile(
-            NodeId(r['node_id'] as String),
-            r['level'] as String,
-            status: byPath[r['path']]?.status,
-            versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
-            versionLabels: entries[r['path']]?.labels ?? const {},
-            versionOwners: entries[r['path']]?.owners ?? const {},
-          ),
-      },
+      nodes: _nodes(id, restored),
       issues: Report({
         for (final kind in {
           for (final i in stored) i.kind,
@@ -454,18 +436,88 @@ final class LocalIndex {
       }),
       corrupted: paths(ReportKind.corrupted),
       orphanNodes: paths(ReportKind.orphanNode),
-      stamps: {for (final f in files(id)) f.path: f.stamp},
-      subprojects: {
-        for (final r in _db.select(
-          'SELECT path, media FROM subprojects WHERE library_id = ?',
-          [id],
-        ))
-          r['path'] as String: (jsonDecode(r['media'] as String) as List)
-              .cast(),
-      },
+      stamps: _stamps(id),
+      subprojects: _subprojects(id),
       freeTree: library.isFreeTree,
     );
   }
+
+  /// The stored rows that [scanTitle] reuses for the title [titlePath] of
+  /// [id]: the title, its node, and the stamps and subprojects below its
+  /// folder, without loading the rest of the library (SPEC §8). Null if no
+  /// such title is indexed.
+  ScanResult? storedTitle(LibraryId id, String titlePath) {
+    final title = _titles(library: id, path: titlePath).firstOrNull;
+    if (title == null) return null;
+    final prefix = titlePath.isEmpty ? '' : '$titlePath/';
+    return ScanResult(
+      titles: [title],
+      nodes: _nodes(id, [title], path: titlePath),
+      stamps: _stamps(id, prefix: prefix),
+      subprojects: _subprojects(id, prefix: prefix),
+    );
+  }
+
+  /// Stored node files of [id] (only the one at [path] when set), with the
+  /// statuses of [titles] and the raw label and owner entries.
+  Map<String, NodeFile> _nodes(
+    LibraryId id,
+    List<Title> titles, {
+    String? path,
+  }) {
+    final byPath = {for (final t in titles) t.path: t};
+    final entries = {
+      for (final r in _db.select(
+        'SELECT path, version_labels, version_owners FROM titles '
+        'WHERE library_id = ?1 AND (?2 IS NULL OR path = ?2)',
+        [id, path],
+      ))
+        r['path'] as String: (
+          labels: _stringMap(r['version_labels'] as String),
+          owners: _stringMap(r['version_owners'] as String),
+        ),
+    };
+    return {
+      for (final r in _db.select(
+        'SELECT * FROM nodes WHERE library_id = ?1 AND (?2 IS NULL OR path = ?2)',
+        [id, path],
+      ))
+        r['path'] as String: NodeFile(
+          NodeId(r['node_id'] as String),
+          r['level'] as String,
+          status: byPath[r['path']]?.status,
+          versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
+          versionLabels: entries[r['path']]?.labels ?? const {},
+          versionOwners: entries[r['path']]?.owners ?? const {},
+        ),
+    };
+  }
+
+  /// Stored stamps of the files of [id] whose path starts with [prefix].
+  Map<String, FileStamp> _stamps(LibraryId id, {String prefix = ''}) => {
+    for (final r in _db.select(
+      'SELECT path, size, modified FROM files WHERE library_id = ?1 '
+      'AND substr(path, 1, length(?2)) = ?2',
+      [id, prefix],
+    ))
+      r['path'] as String: (
+        size: r['size'] as int,
+        modified: DateTime.fromMicrosecondsSinceEpoch(r['modified'] as int),
+      ),
+  };
+
+  /// Stored subprojects of [id] whose path starts with [prefix].
+  Map<String, List<String>> _subprojects(
+    LibraryId id, {
+    String prefix = '',
+  }) => {
+    for (final r in _db.select(
+      'SELECT path, media FROM subprojects WHERE library_id = ?1 '
+      'AND substr(path, 1, length(?2)) = ?2',
+      [id, prefix],
+    ))
+      r['path'] as String: (jsonDecode(r['media'] as String) as List).cast(),
+  };
 
   /// Issues ("To sort", SPEC §5.2) of [library], or of all libraries, of
   /// [kind] if set; sorted by library, kind (display order) then path.

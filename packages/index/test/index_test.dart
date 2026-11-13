@@ -564,10 +564,18 @@ void main() {
     /// stores it, and checks the index against a full scan in another one.
     Future<void> rescanAndCompare(Library lib, String path) async {
       final stored = index.scanResult(lib.id)!;
-      final previous = stored.titles.singleWhere((t) => t.path == path);
-      storage.listed.clear();
-      final result = await scanTitle(storage, lib, previous, stored: stored);
+      // Only the stored rows of the title are loaded for its rescan.
+      final slice = index.storedTitle(lib.id, path)!;
+      expect(slice.titles.map((t) => t.path), [path]);
+      expect(slice.nodes.keys, [path]);
+      expect(slice.stamps.keys.every((k) => k.startsWith('$path/')), isTrue);
+      final previous = slice.titles.single;
+      storage
+        ..listed.clear()
+        ..reads.clear();
+      final result = await scanTitle(storage, lib, previous, stored: slice);
       expect(storage.listed, ['$path/**']);
+      expect(storage.reads, isNot(contains('$path/.node.json')));
       index.updateTitle(lib, path, result);
 
       final full = LocalIndex.inMemory();
@@ -681,6 +689,28 @@ void main() {
         index.files(lib.id).map((f) => f.path),
         isNot(contains('$song/v.rpp')),
       );
+    });
+
+    test('stores the library, keeps the journal position', () {
+      final lib = library();
+      const position = (folder: '.migration/2026-11-12_000000_000', line: 7);
+      index.update(lib, const ScanResult(journalPosition: position));
+      expect(index.storedTitle(lib.id, 'A/B/C'), isNull);
+      expect(index.storedTitle(LibraryId.generate(), 'A/B/C'), isNull);
+      final changed = lib.withKnownValues(const [KnownValue('A')]);
+
+      index.updateTitle(changed, 'A/B/C', (
+        title: null,
+        node: null,
+        stamps: const {},
+        subprojects: const {},
+        issues: const Report(),
+        corrupted: const [],
+        orphanNodes: const [],
+      ));
+
+      expect(index.libraries().single.knownValues, changed.knownValues);
+      expect(index.journalPosition(lib.id), position);
     });
 
     test('changes nothing when it fails', () {
