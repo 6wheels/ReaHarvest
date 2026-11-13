@@ -286,17 +286,21 @@ void main() {
       logs,
       containsAllInOrder([
         'tasks Fix 3 items: started',
-        'library $name: folder Artist/Live kept in place',
+        'library.migration $name: folder Artist/Live kept in place',
         'tasks Fix 3 items: Inventory of the files',
         'tasks Fix 3 items: Fix 1 of 2',
-        startsWith('library $name: Move folder Artist/One to Artist/New/One'),
+        startsWith(
+          'library.migration $name: Move folder Artist/One to Artist/New/One',
+        ),
         'tasks Fix 3 items: Fix 2 of 2',
-        startsWith('library $name: Move folder Artist/Two to Artist/New/Two'),
+        startsWith(
+          'library.migration $name: Move folder Artist/Two to Artist/New/Two',
+        ),
         'tasks Fix 3 items: Checking that no file is lost',
-        'library $name: inventory checked, no file lost',
+        'library.migration $name: inventory checked, no file lost',
         'tasks Fix 3 items: Updating the library',
-        'library Known values of $name added: Artist/Live, Artist/New',
-        startsWith('library Scanned $name: '),
+        'library.migration Known values of $name added: Artist/Live, Artist/New',
+        startsWith('library.scans Scanned $name: '),
         startsWith('tasks Fix 3 items: done'),
       ]),
     );

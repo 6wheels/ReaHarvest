@@ -1,5 +1,6 @@
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_library/reaharvest_library.dart';
 
 /// Absolute path of [path], relative to the library at [root].
 String _absolute(String root, String path) =>
@@ -38,3 +39,12 @@ Report rootedReport(String root, Report report) => Report({
         },
     ],
 });
+
+/// Absolute path of the project file of [version] of [title], in the
+/// library [entry].
+String versionPath(LibraryEntry entry, Title title, Version version) =>
+    p.joinAll([
+      entry.libraryRoot,
+      ...title.path.split('/'),
+      ...version.fileName.split('/'),
+    ]);

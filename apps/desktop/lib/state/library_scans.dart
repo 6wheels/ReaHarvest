@@ -8,7 +8,7 @@ import 'providers.dart';
 import 'report_paths.dart';
 import 'tasks.dart';
 
-final _log = Logger('library');
+final _log = Logger('library.scans');
 
 /// Scans of the libraries into the local index (SPEC §5.1, §5.2, §8).
 class LibraryScans {
@@ -30,7 +30,7 @@ class LibraryScans {
         for (final (i, entry) in entries.indexed) {
           task.checkCancelled();
           try {
-            report += await scanReport(entry, full: full);
+            report += await _scanReport(entry, full: full);
           } on Object catch (error) {
             report += Report({
               ReportKind.scanFailed: [ReportItem(entry.libraryRoot, '$error')],
@@ -47,18 +47,27 @@ class LibraryScans {
   /// and is scanned again on next start.
   Future<void> scan(LibraryEntry entry) async {
     try {
-      await scanReport(entry);
+      await _scanReport(entry);
     } on Object catch (error) {
       _log.warning('Scan of ${entry.displayName} failed', error);
     }
   }
+
+  /// Scans [entry] as a task whose report is shown at the end.
+  Future<void> scanTask(LibraryEntry entry) => ref
+      .read(tasksProvider.notifier)
+      .run(
+        (l10n) => l10n.taskScan(entry.displayName),
+        (_) => _scanReport(entry),
+        openReport: true,
+      );
 
   /// Scans [entry] in an isolate, incrementally from the stored scan unless
   /// [full] (the files rewritten by a migration since read again), and
   /// updates the index.
   /// Unavailable libraries are skipped. Reports the problems found (SPEC
   /// §5.2).
-  Future<Report> scanReport(LibraryEntry entry, {bool full = false}) async {
+  Future<Report> _scanReport(LibraryEntry entry, {bool full = false}) async {
     final root = entry.libraryRoot;
     final storage = MountedFolderStorage(root);
     final library = await readLibrary(storage);
@@ -92,3 +101,9 @@ class LibraryScans {
 }
 
 final libraryScansProvider = Provider<LibraryScans>(LibraryScans.new);
+
+extension LibraryScan on Ref {
+  /// Scans [entry], failures only logged ([LibraryScans.scan]).
+  Future<void> scanLibrary(LibraryEntry entry) =>
+      read(libraryScansProvider).scan(entry);
+}

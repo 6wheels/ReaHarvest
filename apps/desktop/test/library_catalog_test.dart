@@ -43,7 +43,7 @@ void main() {
     ]);
     expect(index.titles().single.tags['title'], 'Song');
     // Frozen as soon as a title exists (SPEC §3.1).
-    expect(await catalog.isLayoutLocked(band), isTrue);
+    expect(await catalog.hasProjects(band), isTrue);
     expect(container.read(indexRevisionProvider), greaterThan(revision));
   });
 
@@ -127,7 +127,7 @@ void main() {
     final id = container.read(settingsProvider).libraries.single.id;
     await catalog.remove(id);
     expect(await catalog.existing(band), isNotNull);
-    expect(await catalog.isLayoutLocked(band), isTrue);
+    expect(await catalog.hasProjects(band), isTrue);
 
     await expectLater(
       catalog.addLocal(folder: band, displayName: '', layout: Layout.film()),
@@ -159,10 +159,10 @@ void main() {
     await writeLibrary(MountedFolderStorage(solo), library);
     Directory(p.join(solo, 'Backups')).createSync();
     File(p.join(solo, 'Backups', 'old.rpp')).writeAsStringSync('');
-    expect(await catalog.isLayoutLocked(solo), isFalse);
+    expect(await catalog.hasProjects(solo), isFalse);
 
     File(p.join(solo, 'Demo.RPP')).writeAsStringSync('');
-    expect(await catalog.isLayoutLocked(solo), isTrue);
+    expect(await catalog.hasProjects(solo), isTrue);
   });
 
   test('rejects cloud libraries, overlaps and invalid files', () async {

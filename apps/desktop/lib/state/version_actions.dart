@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
-import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
@@ -14,7 +13,7 @@ import 'library_scans.dart';
 import 'providers.dart';
 import 'reaper.dart';
 
-final _log = Logger('library');
+final _log = Logger('library.versions');
 
 /// Actions on the versions of a title: adopt, separate a duplicate, create,
 /// edit, status, trash, purge, backup and restore (SPEC §4.2, §5.4, §5.9).
@@ -22,12 +21,6 @@ class VersionActions {
   VersionActions(this.ref);
 
   final Ref ref;
-
-  LibraryEntry _entry(LibraryId id) =>
-      ref.read(libraryCatalogProvider).entry(id);
-
-  Future<void> _scan(LibraryEntry entry) =>
-      ref.read(libraryScansProvider).scan(entry);
 
   /// Adopts [version] of [title] ("To adopt", SPEC §4.2): writes a new
   /// version id into the project, [label] and [owner] (none when the library
@@ -38,7 +31,7 @@ class VersionActions {
     String label, {
     MemberId? owner,
   }) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     final name = version.fileName;
@@ -54,7 +47,7 @@ class VersionActions {
       'Version ${_at(title, version)} adopted: id ${metadata.id}, '
       'owner ${metadata.owner}, label "${metadata.label}"',
     );
-    await _scan(entry);
+    await ref.scanLibrary(entry);
   }
 
   /// Makes the manual duplicate [version] of [title] a new version (SPEC
@@ -63,7 +56,7 @@ class VersionActions {
   /// another title), owned by the local member when the library declares
   /// it. Then rescans.
   Future<void> separateDuplicate(Title title, Version version) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     final name = version.fileName;
@@ -86,13 +79,13 @@ class VersionActions {
       ),
     );
     _log.info('Version ${_at(title, version)} separated: id $id');
-    await _scan(entry);
+    await ref.scanLibrary(entry);
   }
 
   /// Backs up [version] of [title] into its `.history/` (UI: « Créer un
   /// point de sauvegarde », SPEC §5.4); the version is unchanged.
   Future<void> backup(Title title, Version version) async {
-    final root = _entry(title.libraryId).libraryRoot;
+    final root = ref.libraryEntry(title.libraryId).libraryRoot;
     await Isolate.run(
       () => backupVersion(
         MountedFolderStorage(root),
@@ -107,7 +100,7 @@ class VersionActions {
   /// Restores [backup] into [version] of [title], after backing up its
   /// current state (SPEC §5.4). Then rescans.
   Future<void> restore(Title title, Version version, Backup backup) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final path = backup.path;
     await Isolate.run(
@@ -120,7 +113,7 @@ class VersionActions {
     );
     _log.info('Version ${_at(title, version)} restored from $path');
     ref.invalidate(historyProvider(title.id));
-    await _scan(entry);
+    await ref.scanLibrary(entry);
   }
 
   /// Creates the version [fileName] of [title] with [label], owned by the
@@ -135,7 +128,7 @@ class VersionActions {
     Version? source,
     String? template,
   }) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     final metadata = VersionMetadata(
@@ -174,7 +167,7 @@ class VersionActions {
       '${template != null ? ' from template $template' : ''}'
       ', label "${metadata.label}"',
     );
-    await _scan(entry);
+    await ref.scanLibrary(entry);
     return p.posix.basename(path);
   }
 
@@ -193,7 +186,7 @@ class VersionActions {
     required String fileName,
     required String label,
   }) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     final old = version.fileName;
@@ -214,14 +207,14 @@ class VersionActions {
       '${relabel ? ', label "${label.trim()}"' : ''}'
       '${name != old ? ', renamed to $name' : ''}',
     );
-    await _scan(entry);
+    await ref.scanLibrary(entry);
     return name;
   }
 
   /// Sets the [status] of [version] of [title] (null clears it), in the
   /// title's `.node.json` (SPEC §5.9). Then rescans.
   Future<void> setStatusOf(Title title, Version version, String? status) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     final key = version.key;
@@ -229,12 +222,12 @@ class VersionActions {
       () => setVersionStatus(MountedFolderStorage(root), dir, key, status),
     );
     _log.info('Status of version ${_at(title, version)} set to $status');
-    await _scan(entry);
+    await ref.scanLibrary(entry);
   }
 
   /// Moves [version] of [title] to the trash (SPEC §5.4). Then rescans.
   Future<void> trashVersion(Title title, Version version) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     final name = version.fileName;
@@ -243,7 +236,7 @@ class VersionActions {
     );
     _log.info('Version ${_at(title, version)} moved to the trash');
     ref.invalidate(trashProvider(title.id));
-    await _scan(entry);
+    await ref.scanLibrary(entry);
   }
 
   /// Permanently deletes the trash files [paths] of [title] (SPEC §5.4).
@@ -251,7 +244,7 @@ class VersionActions {
   /// offer their purge; empty in a free tree, which has no pool. Throws
   /// [FormatException] if a project cannot be read.
   Future<List<StorageEntry>> purge(Title title, List<String> paths) async {
-    final root = _entry(title.libraryId).libraryRoot;
+    final root = ref.libraryEntry(title.libraryId).libraryRoot;
     final dir = title.path;
     final freeTree = _isFreeTree(title);
     await Isolate.run(() => purgeTrash(MountedFolderStorage(root), dir, paths));
@@ -266,18 +259,18 @@ class VersionActions {
   /// Permanently deletes the media [paths] of the pool of [title], as
   /// returned by [purge]. Then rescans.
   Future<void> purgeUnusedMedia(Title title, List<String> paths) async {
-    final entry = _entry(title.libraryId);
+    final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     await Isolate.run(() => purgeMedia(MountedFolderStorage(root), dir, paths));
     _log.info('Unused media of $dir in $root purged: ${paths.join(', ')}');
-    await _scan(entry);
+    await ref.scanLibrary(entry);
   }
 
   /// [version] of [title], with its library, for the logs.
   String _at(Title title, Version version) =>
       '${title.path}/${version.fileName} of '
-      '${_entry(title.libraryId).displayName}';
+      '${ref.libraryEntry(title.libraryId).displayName}';
 
   bool _isFreeTree(Title title) =>
       ref.read(indexedLibrariesProvider)[title.libraryId]?.isFreeTree ?? true;
@@ -298,10 +291,10 @@ final historyProvider = FutureProvider.autoDispose
               false) {
         return const {};
       }
-      final root = ref
-          .watch(settingsProvider.select((s) => s.libraries))
-          .firstWhere((l) => l.id == title.libraryId)
-          .libraryRoot;
+      final root = ref.watch(
+        settingsProvider.select((s) => s.library(title.libraryId)?.libraryRoot),
+      );
+      if (root == null) return const {};
       final dir = title.path;
       return Isolate.run(() => readHistory(MountedFolderStorage(root), dir));
     });
@@ -314,10 +307,10 @@ final trashProvider = FutureProvider.autoDispose
           .where((t) => t.id == id)
           .firstOrNull;
       if (title == null) return const [];
-      final root = ref
-          .watch(settingsProvider.select((s) => s.libraries))
-          .firstWhere((l) => l.id == title.libraryId)
-          .libraryRoot;
+      final root = ref.watch(
+        settingsProvider.select((s) => s.library(title.libraryId)?.libraryRoot),
+      );
+      if (root == null) return const [];
       final dir = title.path;
       return Isolate.run(() => readTrash(MountedFolderStorage(root), dir));
     });
@@ -326,11 +319,9 @@ final trashProvider = FutureProvider.autoDispose
 /// its own templates folder, else of the configured one (SPEC §5.1).
 final projectTemplatesProvider = FutureProvider.autoDispose
     .family<List<String>, LibraryId>((ref, id) async {
-      final own = ref
-          .watch(settingsProvider.select((s) => s.libraries))
-          .where((l) => l.id == id)
-          .firstOrNull
-          ?.templatesFolder;
+      final own = ref.watch(
+        settingsProvider.select((s) => s.library(id)?.templatesFolder),
+      );
       final folder = own ?? ref.watch(templatesFolderProvider);
       return folder == null ? const [] : listProjectTemplates(folder);
     });

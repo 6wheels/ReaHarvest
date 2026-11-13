@@ -47,9 +47,6 @@ class FakePickers extends Pickers {
 /// Library found in any chosen folder.
 Library? existingLibrary;
 
-/// Whether [existingLibrary] holds titles.
-var existingLocked = false;
-
 /// Whether the folder picked in the library form holds projects.
 var existingProjects = false;
 
@@ -87,9 +84,6 @@ class FakeLibraryCatalog extends LibraryCatalog {
 
   @override
   Future<Library?> existing(String folder) async => existingLibrary;
-
-  @override
-  Future<bool> isLayoutLocked(String folder) async => existingLocked;
 
   @override
   Future<bool> hasProjects(String folder) async => existingProjects;
@@ -341,7 +335,6 @@ void main() {
     previewPlans = const {};
     previewErrors = const {};
     previewPending = null;
-    existingLocked = false;
     existingProjects = false;
     backupOpening = true;
     await tester.pumpWidget(
@@ -594,8 +587,8 @@ void main() {
       id: LibraryId.generate(),
       mode: LibraryMode.local,
       layout: Layout.projectOriented(),
-    );
-    existingLocked = true;
+    ).withKnownValues([KnownValue('Band')]);
+    existingProjects = true;
     await tester.tap(find.text('Choose…'));
     await tester.pumpAndSettle();
     expect(find.textContaining('organization is fixed'), findsOneWidget);

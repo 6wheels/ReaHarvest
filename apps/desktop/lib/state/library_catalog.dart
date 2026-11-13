@@ -12,9 +12,8 @@ import 'package:reaharvest_repository/reaharvest_repository.dart';
 import 'library_scans.dart';
 import 'navigation.dart';
 import 'providers.dart';
-import 'tasks.dart';
 
-final _log = Logger('library');
+final _log = Logger('library.catalog');
 
 /// Why a folder cannot become a library.
 enum LibraryProblem {
@@ -48,10 +47,6 @@ class LibraryCatalog {
 
   final Ref ref;
 
-  /// The configured library [id].
-  LibraryEntry entry(LibraryId id) =>
-      ref.read(settingsProvider).libraries.firstWhere((l) => l.id == id);
-
   /// Library already described in [folder] (`.library.json`), or null.
   /// Throws [LibraryException] if the file is unreadable.
   Future<Library?> existing(String folder) async {
@@ -64,13 +59,22 @@ class LibraryCatalog {
     }
   }
 
-  /// Whether the layout of the library at [folder] can no longer change:
-  /// the folder already holds projects (SPEC §3.1).
-  Future<bool> isLayoutLocked(String folder) => hasProjects(folder);
-
   /// Whether [folder] holds a REAPER project (backups, history and trash
-  /// left out).
-  Future<bool> hasProjects(String folder) => _hasProjects(folder);
+  /// left out), listed in an isolate. The layout of a library holding
+  /// projects can no longer change (SPEC §3.1).
+  Future<bool> hasProjects(String folder) => Isolate.run(() async {
+    for (final e in await MountedFolderStorage(
+      folder,
+    ).list('', recursive: true)) {
+      final segments = e.path.split('/');
+      if (!e.isDirectory &&
+          isProjectFile(segments.last) &&
+          !segments.any(isExcludedFolder)) {
+        return true;
+      }
+    }
+    return false;
+  });
 
   /// Known values to offer for [layout] in [folder] (SPEC §3.1).
   Future<List<KnownValue>> prefillKnownValues(String folder, Layout layout) =>
@@ -92,7 +96,7 @@ class LibraryCatalog {
       throw const LibraryException(LibraryProblem.unsupportedMode);
     }
     final changed = found == null || !sameLayout(found.layout, layout);
-    if (found != null && changed && await isLayoutLocked(folder)) {
+    if (found != null && changed && await hasProjects(folder)) {
       throw const LibraryException(LibraryProblem.layoutLocked);
     }
     final kept = changed
@@ -129,13 +133,7 @@ class LibraryCatalog {
       '${changed && found != null ? ', layout replaced' : ''}'
       '${knownValues.isEmpty ? '' : ', ${knownValues.paths.length} known values'}',
     );
-    await ref
-        .read(tasksProvider.notifier)
-        .run(
-          (l10n) => l10n.taskScan(entry.displayName),
-          (_) => ref.read(libraryScansProvider).scanReport(entry),
-          openReport: true,
-        );
+    await ref.read(libraryScansProvider).scanTask(entry);
   }
 
   /// Known values of the library [entry], and those still used by a folder
@@ -169,13 +167,7 @@ class LibraryCatalog {
       'Known values of ${entry.displayName} set: '
       '${values.paths.map((v) => v.join('/')).join(', ')}',
     );
-    await ref
-        .read(tasksProvider.notifier)
-        .run(
-          (l10n) => l10n.taskScan(entry.displayName),
-          (_) => ref.read(libraryScansProvider).scanReport(entry),
-          openReport: true,
-        );
+    await ref.read(libraryScansProvider).scanTask(entry);
   }
 
   /// Declared members of the library [entry] (SPEC §6.5).
@@ -210,27 +202,18 @@ class LibraryCatalog {
   }
 }
 
-/// Whether [folder] holds a REAPER project (backups, history and trash left
-/// out), listed in an isolate.
-Future<bool> _hasProjects(String folder) => Isolate.run(() async {
-  for (final e in await MountedFolderStorage(
-    folder,
-  ).list('', recursive: true)) {
-    final segments = e.path.split('/');
-    if (!e.isDirectory &&
-        isProjectFile(segments.last) &&
-        !segments.any(isExcludedFolder)) {
-      return true;
-    }
-  }
-  return false;
-});
-
 /// Same layout levels and render mapping.
 bool sameLayout(Layout? a, Layout? b) =>
     jsonEncode(a?.toJson()) == jsonEncode(b?.toJson());
 
 final libraryCatalogProvider = Provider<LibraryCatalog>(LibraryCatalog.new);
+
+extension LibraryLookup on Ref {
+  /// The configured library [id]. Throws [StateError] if it was removed.
+  LibraryEntry libraryEntry(LibraryId id) =>
+      read(settingsProvider).library(id) ??
+      (throw StateError('Library $id is not configured'));
+}
 
 /// Owner of the versions the local member creates in a library (SPEC
 /// §4.2): the local member if the library declares it, else none.

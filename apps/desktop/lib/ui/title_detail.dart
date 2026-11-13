@@ -13,11 +13,12 @@ import '../state/version_actions.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../state/reaper.dart';
+import '../state/report_paths.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
 import 'status_trail.dart';
-import 'version_actions.dart';
+import 'version_dialogs.dart';
 import 'widgets.dart';
 
 /// Route of a page shown over the library (title detail, "To sort").

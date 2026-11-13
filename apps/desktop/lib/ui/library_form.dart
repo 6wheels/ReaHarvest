@@ -71,7 +71,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
         problem = LibraryProblem.unsupportedMode;
       } else {
         hasProjects = await service.hasProjects(folder);
-        if (existing != null) locked = await service.isLayoutLocked(folder);
+        locked = existing != null && hasProjects;
       }
     } on LibraryException catch (e) {
       problem = e.problem;

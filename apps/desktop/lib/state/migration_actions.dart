@@ -13,7 +13,7 @@ import 'providers.dart';
 import 'report_paths.dart';
 import 'tasks.dart';
 
-final _log = Logger('library');
+final _log = Logger('library.migration');
 
 /// Migration of a library: fixes, guided move, orphan node deletion and
 /// undo of an interrupted fix (SPEC §5.8).
@@ -27,12 +27,6 @@ class MigrationActions {
 
   /// Number of changes of each library running or waiting.
   final _pending = <LibraryId, int>{};
-
-  LibraryEntry _entry(LibraryId id) =>
-      ref.read(libraryCatalogProvider).entry(id);
-
-  Future<void> _scan(LibraryEntry entry) =>
-      ref.read(libraryScansProvider).scan(entry);
 
   /// Runs [change] once the previous changes of [library] have ended: a
   /// batch of fixes, an undo and the search for a fix left to undo never
@@ -55,7 +49,7 @@ class MigrationActions {
     String path,
     List<String> folders,
   ) {
-    return _fix(_entry(library), [
+    return _fix(ref.libraryEntry(library), [
       MoveProject(path, folders.join('/')),
     ], (l10n) => l10n.taskMove(p.posix.basename(path)));
   }
@@ -64,7 +58,7 @@ class MigrationActions {
   /// run of the fix, SPEC §5.8 step 4), by title, computed in an isolate
   /// that can be cancelled ([planNormalizationOn]).
   PlanPreview previewNormalization(LibraryId library, List<String> titles) {
-    final entry = _entry(library);
+    final entry = ref.libraryEntry(library);
     return planNormalizationOn(
       entry.libraryRoot,
       titles,
@@ -76,8 +70,11 @@ class MigrationActions {
 
   /// Applies the migration [fixes] to [library] (SPEC §5.8 step 4), as a
   /// task whose report is shown at the end. Then rescans.
-  Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) =>
-      _fix(_entry(library), fixes, (l10n) => l10n.taskFix(fixes.length));
+  Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) => _fix(
+    ref.libraryEntry(library),
+    fixes,
+    (l10n) => l10n.taskFix(fixes.length),
+  );
 
   /// Runs [fixes] on [entry] as a batch in one isolate, so that no file is
   /// lost (SPEC §5.8 step 5, [runMigrationBatchOn]), its steps shown under
@@ -149,7 +146,7 @@ class MigrationActions {
           );
         }
       }
-      await _scan(entry);
+      await ref.scanLibrary(entry);
     }
     final report = rootedReport(root, result.report);
     // What was done before stopping is kept: the report tells it.
@@ -196,7 +193,7 @@ class MigrationActions {
   /// [undoUnfinishedFixOn]), as a task whose report opens at the end. Then
   /// rescans. Waits for the changes of the library already running.
   Future<Report?> undoInterruptedFix(LibraryId library) {
-    final entry = _entry(library);
+    final entry = ref.libraryEntry(library);
     final root = entry.libraryRoot;
     return _exclusive(
       library,
@@ -210,7 +207,7 @@ class MigrationActions {
           );
         } finally {
           task.step((l10n) => l10n.taskStepScan);
-          await _scan(entry);
+          await ref.scanLibrary(entry);
         }
       }, openReport: true),
     );
@@ -223,7 +220,7 @@ class MigrationActions {
     if (p.posix.basename(path) != nodeFileName) {
       throw ArgumentError.value(path, 'path', 'Not a node file');
     }
-    final entry = _entry(library);
+    final entry = ref.libraryEntry(library);
     final root = entry.libraryRoot;
     final known = ref.read(localIndexProvider).scanResult(library);
     if (!(known?.orphanNodes.contains(path) ?? false)) {
@@ -231,7 +228,7 @@ class MigrationActions {
     }
     await MountedFolderStorage(root).delete(path);
     _log.info('Orphan node file $path of ${entry.displayName} deleted');
-    await _scan(entry);
+    await ref.scanLibrary(entry);
   }
 }
 
