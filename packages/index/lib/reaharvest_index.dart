@@ -2,5 +2,6 @@
 library;
 
 export 'src/file_hasher.dart';
+export 'src/index_tasks.dart';
 export 'src/local_index.dart';
 export 'src/title_search.dart';
