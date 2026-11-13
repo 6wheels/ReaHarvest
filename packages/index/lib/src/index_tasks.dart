@@ -26,11 +26,12 @@ Future<Report> scanIntoIndex(
   bool full = false,
   bool writeNodes = true,
 }) => _withIndex(indexPath, (index) async {
+  final previous = full ? null : index.scanResult(library.id);
   final result = await scan(
     MountedFolderStorage(root),
     library,
-    previous: full ? null : index.scanResult(library.id),
-    journalPosition: full ? null : index.journalPosition(library.id),
+    previous: previous,
+    journalPosition: previous?.journalPosition,
     writeNodes: writeNodes,
   );
   index.update(library, result);

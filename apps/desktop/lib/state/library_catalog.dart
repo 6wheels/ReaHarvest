@@ -200,15 +200,19 @@ class LibraryCatalog {
         await ref.read(libraryScansProvider).scan(entry);
       });
 
-  /// Forgets [id]: settings and index only, files are left untouched.
+  /// Forgets [id]: settings and index only, files are left untouched. The
+  /// index is cleared in the turn of the library, after a scan of it still
+  /// running, which would store it again.
   Future<void> remove(LibraryId id) async {
     await ref
         .read(settingsProvider.notifier)
         .change((s) => s.removeLibrary(id));
+    await ref
+        .read(libraryTurnsProvider)
+        .run(id, () => removeLibraryFromIndex(ref.read(indexPathProvider), id));
+    ref.read(indexRevisionProvider.notifier).bump();
     // Reload the filter and views, cleared of the library.
     ref.invalidate(navigationProvider);
-    await removeLibraryFromIndex(ref.read(indexPathProvider), id);
-    ref.read(indexRevisionProvider.notifier).bump();
     _log.info('Removed library $id (files left untouched)');
   }
 }

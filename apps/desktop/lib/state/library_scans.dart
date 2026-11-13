@@ -130,10 +130,13 @@ class LibraryScans {
       full: full,
     );
     ref.read(indexRevisionProvider.notifier).bump();
+    int count(ReportKind kind) => issues.items[kind]?.length ?? 0;
+    final corrupted = count(ReportKind.corrupted);
+    final total = issues.items.values.fold(0, (n, i) => n + i.length);
     _log.info(
       'Scanned ${entry.displayName}: '
-      '${issues.items.values.fold(0, (n, i) => n + i.length)} to sort, '
-      '${issues.items[ReportKind.corrupted]?.length ?? 0} corrupted',
+      '${total - corrupted - count(ReportKind.orphanNode)} to sort, '
+      '$corrupted corrupted',
     );
     return Report({
           ReportKind.libraryScanned: [ReportItem(root)],

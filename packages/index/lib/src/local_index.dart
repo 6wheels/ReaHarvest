@@ -428,8 +428,9 @@ final class LocalIndex {
     ];
   }
 
-  /// Last scan stored for [id], to rescan incrementally after a restart;
-  /// null if the library was never indexed.
+  /// Last scan stored for [id], with its journal position (read together),
+  /// to rescan incrementally after a restart; null if the library was never
+  /// indexed.
   ScanResult? scanResult(LibraryId id) => _snapshot(() => _scanResult(id));
 
   ScanResult? _scanResult(LibraryId id) {
@@ -461,6 +462,7 @@ final class LocalIndex {
       stamps: _stamps(id),
       subprojects: _subprojects(id),
       freeTree: library.isFreeTree,
+      journalPosition: journalPosition(id),
     );
   }
 

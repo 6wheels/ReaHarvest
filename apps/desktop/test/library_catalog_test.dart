@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -89,6 +90,24 @@ void main() {
     final entry = container.read(settingsProvider).libraries.single;
     expect((entry.id, entry.displayName), (library.id, 'Solo work'));
     expect((await readLibrary(MountedFolderStorage(solo)))!.isFreeTree, isTrue);
+  });
+
+  test('a removal waits for the scan running on the library', () async {
+    await bandWithSong();
+    final entry = container.read(settingsProvider).libraries.single;
+    final hold = Completer<void>();
+    final scanning = container.read(libraryTurnsProvider).run(
+      entry.id,
+      () async {
+        await hold.future;
+        await scans.scan(entry);
+      },
+    );
+    final removing = catalog.remove(entry.id);
+    hold.complete();
+    await Future.wait([scanning, removing]);
+    expect(index.libraries(), isEmpty);
+    expect(index.titles(), isEmpty);
   });
 
   test('re-adding a removed library can change its layout', () async {
