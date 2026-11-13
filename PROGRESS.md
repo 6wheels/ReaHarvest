@@ -228,4 +228,4 @@ Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## Next step
 Done: #90, #91 and both lots of #59 (the integration harness now sizes the native window to 1024x768, so the app stays visible during the tests, #119).
-Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is merged (PR #128): #96 and #99 can start. #94 is merged (PR #136, reviewed, its ten findings fixed). After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.
+Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is merged (PR #128): #96 and #99 can start. #96 is done, PR #137 open (not merged yet). #94 is merged (PR #136, reviewed, its ten findings fixed). After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.
