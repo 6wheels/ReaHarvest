@@ -19,7 +19,8 @@ final _log = Logger('library.versions');
 
 /// Actions on the versions of a title: adopt, separate a duplicate, create,
 /// edit, status, trash, purge, backup and restore (SPEC §4.2, §5.4, §5.9),
-/// each in the turn of its library ([_turn]).
+/// each in the turn of its library ([_turn]). "Then rescans": the folder of
+/// the title only ([LibraryScans.rescanTitle], SPEC §8).
 class VersionActions {
   VersionActions(this.ref);
 
@@ -57,7 +58,7 @@ class VersionActions {
       'Version ${_at(title, version)} adopted: id ${metadata.id}, '
       'owner ${metadata.owner}, label "${metadata.label}"',
     );
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
   }
 
   /// Makes the manual duplicate [version] of [title] a new version (SPEC
@@ -92,7 +93,7 @@ class VersionActions {
       ),
     );
     _log.info('Version ${_at(title, version)} separated: id $id');
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
   }
 
   /// Backs up [version] of [title] into its `.history/` (UI: « Créer un
@@ -132,7 +133,7 @@ class VersionActions {
     );
     _log.info('Version ${_at(title, version)} restored from $path');
     ref.invalidate(historyProvider(title.id));
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
   }
 
   /// Creates the version [fileName] of [title] with [label], owned by the
@@ -198,7 +199,7 @@ class VersionActions {
       '${template != null ? ' from template $template' : ''}'
       ', label "${metadata.label}"',
     );
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
     return p.posix.basename(path);
   }
 
@@ -248,7 +249,7 @@ class VersionActions {
       '${relabel ? ', label "${label.trim()}"' : ''}'
       '${name != old ? ', renamed to $name' : ''}',
     );
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
     return name;
   }
 
@@ -270,7 +271,7 @@ class VersionActions {
       () => setVersionStatus(MountedFolderStorage(root), dir, key, status),
     );
     _log.info('Status of version ${_at(title, version)} set to $status');
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
   }
 
   /// Moves [version] of [title] to the trash (SPEC §5.4). Then rescans.
@@ -287,7 +288,7 @@ class VersionActions {
     );
     _log.info('Version ${_at(title, version)} moved to the trash');
     ref.invalidate(trashProvider(title.id));
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
   }
 
   /// Permanently deletes the trash files [paths] of [title] (SPEC §5.4).
@@ -321,7 +322,7 @@ class VersionActions {
     final dir = title.path;
     await Isolate.run(() => purgeMedia(MountedFolderStorage(root), dir, paths));
     _log.info('Unused media of $dir in $root purged: ${paths.join(', ')}');
-    await ref.scanLibrary(entry);
+    await ref.rescanTitle(entry, title);
   }
 
   /// Runs [change] of [title] in the turn of its library ([LibraryTurns]):
