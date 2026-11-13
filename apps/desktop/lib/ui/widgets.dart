@@ -4,7 +4,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/reaper_actions.dart';
 import '../state/reaper.dart';
 import '../theme/app_theme.dart';
 
@@ -120,7 +120,7 @@ Future<void> openVersionInReaper(
   final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
   try {
-    if (!await ref.read(libraryServiceProvider).openVersion(title, version)) {
+    if (!await ref.read(reaperActionsProvider).openVersion(title, version)) {
       messenger.showSnackBar(SnackBar(content: Text(l10n.reaperNotFound)));
     }
   } on Object catch (error) {

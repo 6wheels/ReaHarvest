@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/migration_actions.dart';
 import 'tasks_zone.dart' show appNavigatorKey;
 import 'widgets.dart';
 
@@ -55,7 +55,8 @@ class _InterruptedFixPromptState extends ConsumerState<InterruptedFixPrompt> {
       await runProjectChange(
         navigator,
         ref,
-        () => ref.read(libraryServiceProvider).undoInterruptedFix(fix.library),
+        () =>
+            ref.read(migrationActionsProvider).undoInterruptedFix(fix.library),
       );
     }
   }

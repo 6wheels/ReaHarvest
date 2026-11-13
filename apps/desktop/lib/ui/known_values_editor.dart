@@ -6,7 +6,7 @@ import 'package:reaharvest_repository/reaharvest_repository.dart'
     show isValidFolderName;
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/library_catalog.dart';
 import '../theme/app_theme.dart';
 import 'layout_labels.dart';
 
@@ -220,7 +220,7 @@ class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
   @override
   void initState() {
     super.initState();
-    ref.read(libraryServiceProvider).knownValuesOf(widget.entry).then((r) {
+    ref.read(libraryCatalogProvider).knownValuesOf(widget.entry).then((r) {
       if (mounted) {
         setState(() {
           _values = r.values;
@@ -276,7 +276,7 @@ class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
               ? () {
                   Navigator.of(context).pop();
                   ref
-                      .read(libraryServiceProvider)
+                      .read(libraryCatalogProvider)
                       .setKnownValues(widget.entry, values);
                 }
               : null,

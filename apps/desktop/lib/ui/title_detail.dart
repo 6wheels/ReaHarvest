@@ -8,15 +8,17 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/reaper_actions.dart';
+import '../state/version_actions.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../state/reaper.dart';
+import '../state/report_paths.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
 import 'status_trail.dart';
-import 'version_actions.dart';
+import 'version_dialogs.dart';
 import 'widgets.dart';
 
 /// Route of a page shown over the library (title detail, "To sort").
@@ -630,7 +632,7 @@ class _AdoptState extends ConsumerState<_Adopt> {
       await runProjectChange(context, ref, () {
         setState(() => _busy = true);
         return ref
-            .read(libraryServiceProvider)
+            .read(versionActionsProvider)
             .adopt(widget.title, widget.version, _label.text, owner: owner);
       });
     } finally {
@@ -728,7 +730,7 @@ class _VersionPane extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(libraryServiceProvider).backup(title, version);
+      await ref.read(versionActionsProvider).backup(title, version);
       messenger.showSnackBar(SnackBar(content: Text(l10n.backupCreated)));
     } on Object catch (error) {
       messenger.showSnackBar(
@@ -947,7 +949,7 @@ class _VersionPane extends ConsumerWidget {
                 context,
                 ref,
                 () => ref
-                    .read(libraryServiceProvider)
+                    .read(versionActionsProvider)
                     .separateDuplicate(title, version),
               ),
               label: Text(l10n.separateDuplicate),
@@ -1002,7 +1004,7 @@ class _History extends ConsumerWidget {
     final done = await runProjectChange(
       context,
       ref,
-      () => ref.read(libraryServiceProvider).restore(title, version, backup),
+      () => ref.read(versionActionsProvider).restore(title, version, backup),
     );
     if (done) {
       messenger.showSnackBar(SnackBar(content: Text(l10n.backupRestored)));
@@ -1014,7 +1016,7 @@ class _History extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final opened = await ref
-          .read(libraryServiceProvider)
+          .read(reaperActionsProvider)
           .openBackup(title, backup);
       if (!opened) {
         messenger.showSnackBar(SnackBar(content: Text(l10n.reaperNotFound)));

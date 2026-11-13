@@ -5,7 +5,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/library_catalog.dart';
 import '../state/pickers.dart';
 import '../theme/app_theme.dart';
 import 'known_values_editor.dart';
@@ -60,7 +60,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
   Future<void> _chooseFolder() async {
     final folder = await ref.read(pickersProvider).folder(initial: _folder);
     if (folder == null) return;
-    final service = ref.read(libraryServiceProvider);
+    final service = ref.read(libraryCatalogProvider);
     Library? existing;
     var locked = false;
     LibraryProblem? problem;
@@ -71,7 +71,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
         problem = LibraryProblem.unsupportedMode;
       } else {
         hasProjects = await service.hasProjects(folder);
-        if (existing != null) locked = await service.isLayoutLocked(folder);
+        locked = existing != null && hasProjects;
       }
     } on LibraryException catch (e) {
       problem = e.problem;
@@ -128,7 +128,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
     }
     final choice = _choice;
     final values = await ref
-        .read(libraryServiceProvider)
+        .read(libraryCatalogProvider)
         .prefillKnownValues(_folder!, layout);
     // Ignore a pre-fill outdated by another choice meanwhile.
     if (mounted && choice == _choice) setState(() => _values = values);
@@ -143,7 +143,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
     setState(() => _busy = true);
     try {
       await ref
-          .read(libraryServiceProvider)
+          .read(libraryCatalogProvider)
           .addLocal(
             folder: _folder!,
             displayName: _name.text,

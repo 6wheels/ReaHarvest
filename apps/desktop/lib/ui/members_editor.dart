@@ -4,7 +4,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/library_catalog.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 
@@ -28,7 +28,7 @@ class _MembersDialogState extends ConsumerState<_MembersDialog> {
   @override
   void initState() {
     super.initState();
-    ref.read(libraryServiceProvider).membersOf(widget.entry).then((members) {
+    ref.read(libraryCatalogProvider).membersOf(widget.entry).then((members) {
       if (!mounted) return;
       // The person preparing the library is proposed as the first member.
       final identity = ref.read(settingsProvider).identity;
@@ -74,7 +74,7 @@ class _MembersDialogState extends ConsumerState<_MembersDialog> {
       for (final (id, name) in _members!) Member(id, name.text.trim()),
     ];
     Navigator.of(context).pop();
-    ref.read(libraryServiceProvider).setMembers(widget.entry, members);
+    ref.read(libraryCatalogProvider).setMembers(widget.entry, members);
   }
 
   @override

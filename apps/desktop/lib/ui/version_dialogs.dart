@@ -6,7 +6,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/library_catalog.dart';
+import '../state/version_actions.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
@@ -140,7 +141,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
     setState(() => _busy = true);
     try {
       final name = await ref
-          .read(libraryServiceProvider)
+          .read(versionActionsProvider)
           .addVersion(
             widget.title,
             withProjectExtension(_name.text),
@@ -309,7 +310,7 @@ Future<String?> showEditVersionDialog(
     return null;
   }
   Future<String> edit() => ref
-      .read(libraryServiceProvider)
+      .read(versionActionsProvider)
       .editVersion(title, version, fileName: name, label: label);
   if (name != version.fileName) {
     String? result;
@@ -430,7 +431,7 @@ Future<void> setVersionStatusFromUi(
   final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
   try {
-    await ref.read(libraryServiceProvider).setStatusOf(title, version, status);
+    await ref.read(versionActionsProvider).setStatusOf(title, version, status);
   } on Object catch (e) {
     _fail(messenger, l10n, e);
   }
@@ -456,7 +457,7 @@ Future<void> deleteVersionFromUi(
   final done = await runProjectChange(
     context,
     ref,
-    () => ref.read(libraryServiceProvider).trashVersion(title, version),
+    () => ref.read(versionActionsProvider).trashVersion(title, version),
   );
   if (done) {
     messenger.showSnackBar(SnackBar(content: Text(l10n.versionDeleted)));
@@ -484,7 +485,7 @@ class TrashView extends ConsumerWidget {
       action: l10n.deleteForever,
     );
     if (confirmed != true || !context.mounted) return;
-    final service = ref.read(libraryServiceProvider);
+    final service = ref.read(versionActionsProvider);
     final List<StorageEntry> unused;
     try {
       unused = await service.purge(title, [for (final f in files) f.path]);

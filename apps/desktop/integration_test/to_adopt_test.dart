@@ -138,7 +138,7 @@ void main() {
     File(song).copySync(h.path('Band/Artist/Album/Song/v1 copy.rpp'));
     final copy = h.path('Band/Artist/Album/Song/v1 copy.rpp');
     final before = h.tasks.length;
-    final scanning = h.service.scanAll();
+    final scanning = h.scans.scanAll();
     await waitFor(
       tester,
       () => h.tasks.length > before && !h.tasks.last.isRunning,

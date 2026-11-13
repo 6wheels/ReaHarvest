@@ -130,7 +130,7 @@ void main() {
       }
     });
     addTearDown(cancelling.close);
-    final fixing = h.service.fix(library, [
+    final fixing = h.migration.fix(library, [
       const MoveFolder('Live', 'Artist/Live'),
     ]);
     await waitFor(tester, () => h.tasks.length > before, reason: 'started');

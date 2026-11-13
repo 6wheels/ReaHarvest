@@ -318,6 +318,10 @@ final class AppSettings {
   static String? _path(Object? value, String? current) =>
       identical(value, _keep) ? current : value as String?;
 
+  /// The configured library [id], or null.
+  LibraryEntry? library(LibraryId id) =>
+      libraries.where((l) => l.id == id).firstOrNull;
+
   /// Adds [entry]. Throws [ArgumentError] if the id is already configured or
   /// if one of its folders is, contains or is inside a folder of another
   /// library (SPEC §3.0).

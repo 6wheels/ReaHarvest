@@ -6,7 +6,8 @@ import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/library_scans.dart';
+import '../state/migration_actions.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
@@ -58,9 +59,8 @@ class ToSortPage extends StatelessWidget {
                     builder: (context, ref, _) => Tooltip(
                       message: l10n.fullScanTooltip,
                       child: TextButton.icon(
-                        onPressed: () => ref
-                            .read(libraryServiceProvider)
-                            .scanAll(full: true),
+                        onPressed: () =>
+                            ref.read(libraryScansProvider).scanAll(full: true),
                         icon: const Icon(Icons.refresh_rounded),
                         label: Text(l10n.fullScan),
                       ),
@@ -306,7 +306,7 @@ class _ToSortListState extends ConsumerState<_ToSortList> {
     if (fixes == null || !context.mounted) return;
     await runProjectChange(context, ref, () async {
       for (final MapEntry(key: library, value: list) in fixes.entries) {
-        await ref.read(libraryServiceProvider).fix(library, list);
+        await ref.read(migrationActionsProvider).fix(library, list);
       }
     });
   }
@@ -339,7 +339,7 @@ class _ToSortListState extends ConsumerState<_ToSortList> {
     if (confirmed != true) return;
     try {
       await ref
-          .read(libraryServiceProvider)
+          .read(migrationActionsProvider)
           .deleteOrphanNode(issue.library, path);
     } on Object catch (error) {
       messenger.showSnackBar(
@@ -525,7 +525,7 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
   Future<void> _move() async {
     final navigator = Navigator.of(context);
     final values = [for (final c in _values) c.text.trim()];
-    final service = ref.read(libraryServiceProvider);
+    final service = ref.read(migrationActionsProvider);
     final library = widget.library;
     final path = widget.path;
     final folder = widget.folderLevel != null;

@@ -7,7 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest/app.dart';
-import 'package:reaharvest/state/libraries.dart';
+import 'package:reaharvest/state/library_catalog.dart';
+import 'package:reaharvest/state/library_scans.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
@@ -90,7 +91,7 @@ void main() {
       ],
     );
     await container
-        .read(libraryServiceProvider)
+        .read(libraryCatalogProvider)
         .addLocal(folder: band, displayName: 'Band', layout: Layout.classic());
   });
 
@@ -181,8 +182,7 @@ void main() {
 
     // Normalization: the media is moved, the reference rewritten in
     // Windows-1252.
-    final service = container.read(libraryServiceProvider);
-    final scanning = service.scanAll();
+    final scanning = container.read(libraryScansProvider).scanAll();
     await waitFor(
       tester,
       () => !container.read(tasksProvider).last.isRunning,

@@ -14,7 +14,7 @@ import 'app.dart';
 import 'app_paths.dart';
 import 'demo_titles.dart';
 import 'logs.dart';
-import 'state/libraries.dart';
+import 'state/migration_actions.dart';
 import 'state/navigation.dart';
 import 'state/providers.dart';
 import 'ui/settings_recovery.dart';
@@ -70,5 +70,5 @@ Future<void> main() async {
   );
   // Indexed titles are shown at once; the scan then refreshes them, then
   // the fixes left to undo are offered.
-  if (!_demo) unawaited(container.read(libraryServiceProvider).startup());
+  if (!_demo) unawaited(container.read(migrationActionsProvider).startup());
 }

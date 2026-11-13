@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest/app.dart';
-import 'package:reaharvest/state/libraries.dart';
+import 'package:reaharvest/state/library_catalog.dart';
+import 'package:reaharvest/state/library_scans.dart';
+import 'package:reaharvest/state/migration_actions.dart';
 import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
@@ -67,7 +69,9 @@ class Harness {
   late ProviderContainer container;
   LocalIndex? _index;
 
-  LibraryService get service => container.read(libraryServiceProvider);
+  LibraryCatalog get catalog => container.read(libraryCatalogProvider);
+  LibraryScans get scans => container.read(libraryScansProvider);
+  MigrationActions get migration => container.read(migrationActionsProvider);
   AppSettings get settings => container.read(settingsProvider);
   List<BackgroundTask> get tasks => container.read(tasksProvider);
 
@@ -175,7 +179,7 @@ class Harness {
     List<KnownValue> knownValues = const [],
   }) async {
     final before = tasks.length;
-    final adding = service.addLocal(
+    final adding = catalog.addLocal(
       folder: folder ?? p.join(root.path, name),
       displayName: name,
       layout: layout,
