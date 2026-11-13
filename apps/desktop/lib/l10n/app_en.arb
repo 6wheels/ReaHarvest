@@ -267,6 +267,8 @@
   "reportRecordPathNotMedia": "Record path other than Media",
   "reportRenderFileForm": "Render target outside Renders",
   "reportMediaUsedElsewhere": "Title left as is: media used by another title, fix that title first",
+  "reportReferencedByPlugin": "Named by a plugin",
+  "reportReferencedByPluginHint": "A plugin of these projects names this file: move it by hand if needed.",
   "reportMediaTrashed": "Duplicate media moved to the trash",
   "reportMediaNormalized": "Projects normalized",
   "reportFixUndone": "Fix undone",

@@ -41,6 +41,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.recordPathNotMedia => l10n.reportRecordPathNotMedia,
       ReportKind.renderFileForm => l10n.reportRenderFileForm,
       ReportKind.mediaUsedElsewhere => l10n.reportMediaUsedElsewhere,
+      ReportKind.referencedByPlugin => l10n.reportReferencedByPlugin,
       ReportKind.libraryUnavailable => l10n.reportLibraryUnavailable,
       ReportKind.libraryScanned => l10n.reportLibraryScanned,
       ReportKind.projectMoved => l10n.reportProjectMoved,
@@ -110,6 +111,14 @@ class _ReportDialog extends StatelessWidget {
                           '${reportKindLabel(l10n, kind)} · ${items.length}',
                         ),
                         children: [
+                          if (kind == ReportKind.referencedByPlugin)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: Space.xs),
+                              child: Text(
+                                l10n.reportReferencedByPluginHint,
+                                style: muted,
+                              ),
+                            ),
                           for (final item in items)
                             Padding(
                               padding: const EdgeInsets.only(bottom: Space.xs),

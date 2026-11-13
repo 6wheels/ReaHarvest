@@ -194,6 +194,9 @@ void main() {
       (l10n) => 'Move',
       (_) async => const Report({
         ReportKind.missingMedia: [ReportItem('/lib/a.rpp', 'gone.wav')],
+        ReportKind.referencedByPlugin: [
+          ReportItem('/lib/hat.wav', '/lib/a.rpp'),
+        ],
         ReportKind.libraryUnavailable: [ReportItem('/other')],
         ReportKind.mediaMoved: [ReportItem('/lib/Media/kick.wav')],
         ReportKind.scanFailed: [ReportItem('/broken', 'boom')],
@@ -213,6 +216,14 @@ void main() {
     expect(find.text('Move'), findsNWidgets(2));
     expect(find.text('Scan failed · 1'), findsOneWidget);
     expect(find.text('Media not found · 1'), findsOneWidget);
+    expect(find.text('Named by a plugin · 1'), findsOneWidget);
+    expect(
+      find.text(
+        'A plugin of these projects names this file: move it by hand if '
+        'needed.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Libraries not available · 1'), findsOneWidget);
     expect(find.text('Media moved · 1'), findsOneWidget);
     expect(find.textContaining('gone.wav'), findsOneWidget);

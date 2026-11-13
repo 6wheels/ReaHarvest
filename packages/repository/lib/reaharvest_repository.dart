@@ -18,6 +18,7 @@ export 'src/migration_batch.dart';
 export 'src/migration_journal.dart';
 export 'src/mounted_folder_storage.dart';
 export 'src/node_file.dart';
+export 'src/plugin_names.dart';
 export 'src/project_file.dart';
 export 'src/scaffold.dart';
 export 'src/scanner.dart';

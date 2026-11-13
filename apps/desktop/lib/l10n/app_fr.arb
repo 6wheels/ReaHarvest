@@ -209,6 +209,8 @@
   "reportRecordPathNotMedia": "Dossier d'enregistrement autre que Media",
   "reportRenderFileForm": "Cible de rendu hors de Renders",
   "reportMediaUsedElsewhere": "Titre laissé tel quel : médias utilisés par un autre titre, corrigez d'abord ce titre",
+  "reportReferencedByPlugin": "Nommé par un plugin",
+  "reportReferencedByPluginHint": "Un plugin de ces projets nomme ce fichier : déplacez-le à la main si besoin.",
   "reportMediaTrashed": "Médias en double mis à la corbeille",
   "reportMediaNormalized": "Projets normalisés",
   "reportFixUndone": "Correction annulée",

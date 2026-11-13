@@ -831,6 +831,7 @@ const _pathDetails = {
   ReportKind.mediaCopied,
   ReportKind.mediaTrashed,
   ReportKind.mediaUsedElsewhere,
+  ReportKind.referencedByPlugin,
 };
 
 /// [report] of the library at [root], with absolute paths, details

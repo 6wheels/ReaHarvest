@@ -12,6 +12,7 @@ import 'library_path.dart';
 import 'media_plan.dart';
 import 'migration.dart';
 import 'mounted_folder_storage.dart';
+import 'plugin_names.dart';
 import 'project_file.dart';
 import 'scaffold.dart';
 import 'scanner.dart' show ScanResult;
@@ -185,10 +186,19 @@ Future<TitleFacts> gatherTitle(
   final projects = <String, ProjectFacts>{};
   final unreadable = <String, String>{};
   final read = <String>{};
+  // Names a plugin state may hold: the media of the title outside its
+  // reserved folders and pool.
+  final mediaNames = {
+    for (final e in entries)
+      if (!e.isDirectory &&
+          isMediaFile(e.path) &&
+          !_inReservedFolder(titleDir, e.path))
+        p.posix.basename(e.path),
+  };
   Future<void> gather(String path) async {
     read.add(path.toLowerCase());
     try {
-      projects[path] = await _readFacts(storage, path);
+      projects[path] = await _readFacts(storage, path, mediaNames);
     } on FormatException catch (error) {
       unreadable[path] = error.message;
     }
@@ -270,14 +280,20 @@ bool _inReservedFolder(String titleDir, String path) {
       segments.any(isExcludedFolder);
 }
 
-/// References and record path of the project [path]. Throws
-/// [FormatException] if it cannot be read.
-Future<ProjectFacts> _readFacts(RepositoryStorage storage, String path) async {
+/// References and record path of the project [path], and which of
+/// [names] it names outside its `FILE` lines. Throws [FormatException] if
+/// it cannot be read.
+Future<ProjectFacts> _readFacts(
+  RepositoryStorage storage,
+  String path, [
+  Iterable<String> names = const [],
+]) async {
   final (:text, encoding: _) = await readProject(storage, path);
   final project = RppProject.parse(text);
   return ProjectFacts(
     project.mediaFiles,
     project.document.root.line('RECORD_PATH')?.params,
+    namedOutsideSources(text, names),
   );
 }
 
