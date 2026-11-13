@@ -154,88 +154,173 @@ final class LocalIndex {
       ]) {
         _db.execute('DELETE FROM $t WHERE library_id = ?', [id]);
       }
-      _insertAll(
-        'INSERT INTO nodes (library_id, path, node_id, level) '
-        'VALUES (?, ?, ?, ?)',
-        [
-          for (final e in scan.nodes.entries)
-            [id, e.key, e.value.id, e.value.level],
-        ],
-      );
-      _insertAll(
-        'INSERT INTO titles (library_id, path, id, tags, status, '
-        'version_statuses, version_labels, version_owners) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          for (final t in scan.titles)
-            [
-              id,
-              t.path,
-              t.id,
-              jsonEncode(t.tags),
-              t.status,
-              jsonEncode(t.versionStatuses),
-              // Raw node entries: the next scan reuses them while the node
-              // file is unchanged (SPEC §4.2).
-              jsonEncode(scan.nodes[t.path]?.versionLabels ?? const {}),
-              jsonEncode(scan.nodes[t.path]?.versionOwners ?? const {}),
-            ],
-        ],
-      );
-      _insertAll(
-        'INSERT INTO versions (library_id, title_path, file_name, size, '
-        'modified, version_id, owner, label, tempo, length, track_count, '
-        'item_count, plugins, media, record_path, render_file) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          for (final t in scan.titles)
-            for (final v in t.versions)
-              [
-                id,
-                t.path,
-                v.fileName,
-                v.size,
-                v.modified.microsecondsSinceEpoch,
-                v.metadata?.id,
-                v.metadata?.owner,
-                v.metadata?.label,
-                v.tempo,
-                v.length,
-                v.trackCount,
-                v.itemCount,
-                jsonEncode([for (final p in v.plugins) p.toJson()]),
-                jsonEncode(v.media),
-                v.recordPath,
-                v.renderFile,
-              ],
-        ],
-      );
-      _insertAll(
-        'INSERT INTO subprojects (library_id, path, media) VALUES (?, ?, ?)',
-        [
-          for (final MapEntry(:key, :value) in scan.subprojects.entries)
-            [id, key, jsonEncode(value)],
-        ],
-      );
-      _insertAll(
-        'INSERT INTO issues (library_id, kind, path, detail, level, target) '
-        'VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          for (final (kind, items) in scan.issues.sections)
-            for (final i in items)
-              [id, kind.name, i.path, i.detail, i.level?.key, i.target],
-          for (final p in scan.corrupted)
-            [id, ReportKind.corrupted.name, p, null, null, null],
-          for (final p in scan.orphanNodes)
-            [id, ReportKind.orphanNode.name, p, null, null, null],
-        ],
-      );
+      _insertNodes(id, scan.nodes);
+      _insertTitles(id, scan.titles, scan.nodes);
+      _insertSubprojects(id, scan.subprojects);
+      _insertIssues(id, scan.issues, scan.corrupted, scan.orphanNodes);
       _updateFiles(id, scan.stamps);
     });
   }
 
-  void _updateFiles(LibraryId id, Map<String, FileStamp> stamps) {
-    final existing = {for (final f in files(id)) f.path: f.stamp};
+  /// Stores the result of [scanTitle] for the title folder [titlePath] of
+  /// [library] (SPEC §8): its node, title and versions, and the files,
+  /// subprojects and issues below its folder replace the stored ones; the
+  /// issues of the folder itself (its level) are left. Duplicated version
+  /// identifiers, which span titles, are then found again from the indexed
+  /// versions. File hashes are kept for files whose stamp did not change.
+  void updateTitle(Library library, String titlePath, TitleScan scan) {
+    final id = library.id;
+    final prefix = titlePath.isEmpty ? '' : '$titlePath/';
+    const below = 'library_id = ?1 AND substr(path, 1, length(?2)) = ?2';
+    _transaction(() {
+      for (final t in ['nodes', 'titles']) {
+        _db.execute('DELETE FROM $t WHERE library_id = ? AND path = ?', [
+          id,
+          titlePath,
+        ]);
+      }
+      _db.execute(
+        'DELETE FROM versions WHERE library_id = ? AND title_path = ?',
+        [id, titlePath],
+      );
+      _db.execute('DELETE FROM subprojects WHERE $below', [id, prefix]);
+      _db.execute('DELETE FROM issues WHERE $below', [id, prefix]);
+      final nodes = {titlePath: ?scan.node};
+      _insertNodes(id, nodes);
+      _insertTitles(id, [?scan.title], nodes);
+      _insertSubprojects(id, scan.subprojects);
+      _insertIssues(id, scan.issues, scan.corrupted, scan.orphanNodes);
+      _updateFiles(id, scan.stamps, prefix: prefix);
+      _db.execute('DELETE FROM issues WHERE library_id = ? AND kind = ?', [
+        id,
+        ReportKind.duplicateVersionId.name,
+      ]);
+      _insertIssues(
+        id,
+        Report({
+          ReportKind.duplicateVersionId: [
+            for (final MapEntry(key: versionId, value: versions)
+                in duplicateVersions(titles(library: id)).entries)
+              for (final (t, v) in versions)
+                ReportItem(joinPath(t.path, v.fileName), versionId),
+          ],
+        }),
+        const [],
+        const [],
+      );
+    });
+  }
+
+  void _insertNodes(LibraryId id, Map<String, NodeFile> nodes) => _insertAll(
+    'INSERT INTO nodes (library_id, path, node_id, level) VALUES (?, ?, ?, ?)',
+    [
+      for (final e in nodes.entries) [id, e.key, e.value.id, e.value.level],
+    ],
+  );
+
+  void _insertTitles(
+    LibraryId id,
+    List<Title> titles,
+    Map<String, NodeFile> nodes,
+  ) {
+    _insertAll(
+      'INSERT INTO titles (library_id, path, id, tags, status, '
+      'version_statuses, version_labels, version_owners) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        for (final t in titles)
+          [
+            id,
+            t.path,
+            t.id,
+            jsonEncode(t.tags),
+            t.status,
+            jsonEncode(t.versionStatuses),
+            // Raw node entries: the next scan reuses them while the node
+            // file is unchanged (SPEC §4.2).
+            jsonEncode(nodes[t.path]?.versionLabels ?? const {}),
+            jsonEncode(nodes[t.path]?.versionOwners ?? const {}),
+          ],
+      ],
+    );
+    _insertAll(
+      'INSERT INTO versions (library_id, title_path, file_name, size, '
+      'modified, version_id, owner, label, tempo, length, track_count, '
+      'item_count, plugins, media, record_path, render_file) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        for (final t in titles)
+          for (final v in t.versions)
+            [
+              id,
+              t.path,
+              v.fileName,
+              v.size,
+              v.modified.microsecondsSinceEpoch,
+              v.metadata?.id,
+              v.metadata?.owner,
+              v.metadata?.label,
+              v.tempo,
+              v.length,
+              v.trackCount,
+              v.itemCount,
+              jsonEncode([for (final p in v.plugins) p.toJson()]),
+              jsonEncode(v.media),
+              v.recordPath,
+              v.renderFile,
+            ],
+      ],
+    );
+  }
+
+  void _insertSubprojects(
+    LibraryId id,
+    Map<String, List<String>> subprojects,
+  ) => _insertAll(
+    'INSERT INTO subprojects (library_id, path, media) VALUES (?, ?, ?)',
+    [
+      for (final MapEntry(:key, :value) in subprojects.entries)
+        [id, key, jsonEncode(value)],
+    ],
+  );
+
+  void _insertIssues(
+    LibraryId id,
+    Report issues,
+    List<String> corrupted,
+    List<String> orphanNodes,
+  ) => _insertAll(
+    'INSERT INTO issues (library_id, kind, path, detail, level, target) '
+    'VALUES (?, ?, ?, ?, ?, ?)',
+    [
+      for (final (kind, items) in issues.sections)
+        for (final i in items)
+          [id, kind.name, i.path, i.detail, i.level?.key, i.target],
+      for (final p in corrupted)
+        [id, ReportKind.corrupted.name, p, null, null, null],
+      for (final p in orphanNodes)
+        [id, ReportKind.orphanNode.name, p, null, null, null],
+    ],
+  );
+
+  /// Replaces the stamps of the files of [id] whose path starts with
+  /// [prefix] by [stamps].
+  void _updateFiles(
+    LibraryId id,
+    Map<String, FileStamp> stamps, {
+    String prefix = '',
+  }) {
+    final existing = {
+      for (final r in _db.select(
+        'SELECT path, size, modified FROM files WHERE library_id = ?1 '
+        'AND substr(path, 1, length(?2)) = ?2',
+        [id, prefix],
+      ))
+        r['path'] as String: (
+          size: r['size'] as int,
+          modified: DateTime.fromMicrosecondsSinceEpoch(r['modified'] as int),
+        ),
+    };
     final upsert = _db.prepare(
       'INSERT INTO files (library_id, path, size, modified) VALUES (?, ?, ?, ?) '
       'ON CONFLICT (library_id, path) DO UPDATE SET size = excluded.size, '
