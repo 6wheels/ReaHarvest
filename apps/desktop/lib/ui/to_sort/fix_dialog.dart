@@ -4,14 +4,14 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
-import '../l10n/app_localizations.dart';
-import '../state/migration_actions.dart';
-import '../state/providers.dart';
-import '../theme/app_theme.dart';
-import 'labels.dart';
-import 'layout_labels.dart';
-import 'media_plan_preview.dart';
-import 'report_dialog.dart';
+import '../../l10n/app_localizations.dart';
+import '../../state/migration_actions.dart';
+import '../../state/providers.dart';
+import '../../theme/app_theme.dart';
+import '../labels.dart';
+import '../layout_labels.dart';
+import '../media_plan_preview.dart';
+import '../report_dialog.dart';
 
 /// Previews the batch fix of [issues], all of [kind] (dry run): each item
 /// with its target, checked by default. Folders get optional values for
@@ -249,7 +249,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
     ].join(' · ');
   }
 
-  void _confirm() {
+  void confirm() {
     final proposals = _proposals!;
     Navigator.of(context).pop(
       buildFixes(widget.kind, proposals, (
@@ -372,7 +372,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           // The operations are shown before they are confirmed.
           onPressed: _checked.isEmpty || !_valid || _waitingPreview
               ? null
-              : _confirm,
+              : confirm,
           child: Text(l10n.taskFix(_checked.length)),
         ),
       ],

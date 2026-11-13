@@ -8,7 +8,7 @@ import 'package:reaharvest/ui/filter_bar.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/ui/title_card.dart';
-import 'package:reaharvest/ui/title_detail.dart';
+import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import 'harness.dart';

@@ -12,7 +12,7 @@ import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
-import 'package:reaharvest/ui/to_sort_page.dart';
+import 'package:reaharvest/ui/to_sort/to_sort_page.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';

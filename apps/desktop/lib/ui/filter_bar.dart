@@ -8,7 +8,7 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
-import 'to_sort_page.dart';
+import 'to_sort/to_sort_page.dart';
 
 /// Filter chips, saved views, "To sort" / "To adopt" and display mode, below
 /// the search bar (SPEC §5.2). Chips offering a single value are hidden.
