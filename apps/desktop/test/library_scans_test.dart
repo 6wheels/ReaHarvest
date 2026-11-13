@@ -134,6 +134,18 @@ void main() {
     expect(index.titles().single.path, 'A/B');
   });
 
+  test('scans the whole library when the title scan fails', () async {
+    final song = await bandWithSong();
+    final entry = container.read(settingsProvider).libraries.single;
+    final stale = title();
+    // Renamed outside the application: its folder cannot be listed.
+    Directory(song).renameSync(p.join(p.dirname(song), 'Renamed'));
+
+    await scans.rescanTitle(entry, stale);
+
+    expect(title().path, 'Artist/Album/Renamed');
+  });
+
   test('a failed title rescan is only logged', () async {
     final song = await bandWithSong();
     final entry = container.read(settingsProvider).libraries.single;
