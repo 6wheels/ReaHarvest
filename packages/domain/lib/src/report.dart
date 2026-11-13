@@ -10,6 +10,7 @@ enum ReportKind {
   corrupted(ReportLevel.error),
   fileLost(ReportLevel.error),
   fixFailed(ReportLevel.error),
+  undoFailed(ReportLevel.error),
   titleTooHigh(ReportLevel.warning),
   misplacedLevel(ReportLevel.warning),
   unknownValue(ReportLevel.warning),
@@ -37,7 +38,8 @@ enum ReportKind {
   mediaMoved(ReportLevel.done),
   mediaCopied(ReportLevel.done),
   mediaTrashed(ReportLevel.done),
-  mediaNormalized(ReportLevel.done);
+  mediaNormalized(ReportLevel.done),
+  fixUndone(ReportLevel.done);
 
   const ReportKind(this.level);
 

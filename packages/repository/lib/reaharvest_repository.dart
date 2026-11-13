@@ -21,4 +21,5 @@ export 'src/node_file.dart';
 export 'src/project_file.dart';
 export 'src/scaffold.dart';
 export 'src/scanner.dart';
+export 'src/undo.dart';
 export 'src/versions.dart';

@@ -62,8 +62,14 @@ void main() {
       'op': 'rewrite',
       'path': 'song/a.rpp',
       'modified': date.microsecondsSinceEpoch,
+      'copy': '$folder/originals/a.rpp',
     });
+    // Later rewrites, and those of a file the migration created, get a
+    // copy of their own (outside a fix: fix 0).
+    expect(lines()[2]['copy'], '$folder/fixes/0/song/a.rpp');
+    expect(storage.text('$folder/fixes/0/song/a.rpp'), 'rewritten');
     expect(lines()[3], {'op': 'create', 'path': 'new.txt'});
+    expect(storage.text(lines()[4]['copy'] as String), 'new');
     expect(lines()[5]['path'], 'notes.txt');
     // The first original only, under its inventory path.
     expect(storage.text('$folder/originals/a.rpp'), 'original');

@@ -12,15 +12,18 @@ typedef _Op = ({int line, int? fix, Map<String, dynamic> json});
 /// ```
 /// {"op":"fixStart","fix":1,"kind":"normalizeMedia","path":"Band/Song"}
 /// {"op":"move","from":"Band/Song/audio/a.wav","to":"Band/Song/Media/a.wav"}
-/// {"op":"rewrite","path":"Band/Song/Song.rpp","modified":1731300000000000}
+/// {"op":"rewrite","path":"Band/Song/Song.rpp","modified":1731300000000000,"copy":".migration/<stamp>/originals/Band/Song/Song.rpp"}
 /// {"op":"create","path":"Band/Song/Media/b.wav"}
 /// {"op":"fixEnd","fix":1,"ok":true}
+/// {"op":"undoStart","fix":2}
+/// {"op":"undoEnd","fix":2}
 /// ```
 /// `fix` numbers the fixes of the journal from 1; `rewrite` is an existing
 /// file about to be overwritten, `modified` its date before (microseconds
-/// since the epoch); `create` a file about to be written where none was.
-/// The operations of a fix followed by `{"op":"undoEnd","fix":n}` (#94) are
-/// ignored by [locate], [origin] and [rewrittenAfter].
+/// since the epoch), `copy` the raw copy of its content before; `create` a
+/// file about to be written where none was. An undo of a fix (#94) is
+/// between `undoStart` and `undoEnd`; the operations of a fix followed by
+/// its `undoEnd` are ignored by [locate], [origin] and [rewrittenAfter].
 final class MigrationJournal {
   /// An empty journal in the migration [folder]; nothing is written before
   /// the first operation.
@@ -34,6 +37,7 @@ final class MigrationJournal {
   final JsonLinesFile _file;
   final _ops = <_Op>[];
   final _fixes = <int>[];
+  final _paths = <int, String>{};
   final _succeeded = <int>{};
   final _undone = <({int line, int fix})>[];
   int? _openFix;
@@ -76,11 +80,14 @@ final class MigrationJournal {
     _keptCache = null;
     _movesCache = null;
     switch (json) {
-      case {'op': 'fixStart', 'fix': final int fix}:
+      case {'op': 'fixStart', 'fix': final int fix, 'path': final String path}:
         _fixes.add(fix);
+        _paths[fix] = path;
         _openFix = fix;
       case {'op': 'fixEnd', 'fix': final int fix, 'ok': final bool ok}:
         if (ok) _succeeded.add(fix);
+        _openFix = null;
+      case {'op': 'undoStart'}:
         _openFix = null;
       case {'op': 'undoEnd', 'fix': final int fix}:
         _undone.add((line: line, fix: fix));
@@ -99,6 +106,30 @@ final class MigrationJournal {
     return fix;
   }
 
+  /// The last fix started, or null.
+  int? get lastFix => _fixes.lastOrNull;
+
+  /// The fix started and not ended yet, whose operations are being
+  /// recorded, or null.
+  int? get openFix => _openFix;
+
+  /// Library path given to the fix [fix] when it started, or null.
+  String? pathOf(int fix) => _paths[fix];
+
+  /// Operations recorded during the fix [fix], in order: `move`, `rewrite`
+  /// and `create` lines.
+  List<Map<String, dynamic>> operationsOf(int fix) => [
+    for (final op in _ops)
+      if (op.fix == fix) op.json,
+  ];
+
+  /// Records the start of the undo of the fix [fix].
+  Future<void> startUndo(int fix) => _append({'op': 'undoStart', 'fix': fix});
+
+  /// Records the end of the undo of the fix [fix]: its operations no longer
+  /// count.
+  Future<void> endUndo(int fix) => _append({'op': 'undoEnd', 'fix': fix});
+
   /// Records the end of the fix [fix], [ok] if it completed.
   Future<void> endFix(int fix, {required bool ok}) =>
       _append({'op': 'fixEnd', 'fix': fix, 'ok': ok});
@@ -107,12 +138,15 @@ final class MigrationJournal {
   Future<void> recordMove(String from, String to) =>
       _append({'op': 'move', 'from': from, 'to': to});
 
-  /// Records the rewrite of the existing file [path], dated [modified].
-  Future<void> recordRewrite(String path, DateTime modified) => _append({
-    'op': 'rewrite',
-    'path': path,
-    'modified': modified.microsecondsSinceEpoch,
-  });
+  /// Records the rewrite of the existing file [path], dated [modified],
+  /// whose content before is kept in the file [copy].
+  Future<void> recordRewrite(String path, DateTime modified, String copy) =>
+      _append({
+        'op': 'rewrite',
+        'path': path,
+        'modified': modified.microsecondsSinceEpoch,
+        'copy': copy,
+      });
 
   /// Records the creation of the file [path].
   Future<void> recordCreate(String path) =>

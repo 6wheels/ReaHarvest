@@ -27,6 +27,7 @@ void main() {
     await journal.recordRewrite(
       'Band/Song/Song.rpp',
       DateTime.fromMicrosecondsSinceEpoch(1731300000000000),
+      '$folder/originals/Band/Song/Song.rpp',
     );
     await journal.recordCreate('Band/Song/Media/b.wav');
     await journal.endFix(fix, ok: true);
@@ -49,6 +50,7 @@ void main() {
         'op': 'rewrite',
         'path': 'Band/Song/Song.rpp',
         'modified': 1731300000000000,
+        'copy': '$folder/originals/Band/Song/Song.rpp',
       },
       {'op': 'create', 'path': 'Band/Song/Media/b.wav'},
       {'op': 'fixEnd', 'fix': 1, 'ok': true},
@@ -121,7 +123,7 @@ void main() {
     final journal = MigrationJournal(storage, folder);
     final fix = await journal.startFix('moveProject', 'x/a.rpp');
     await journal.recordMove('x/a.rpp', 'song/a.rpp');
-    await journal.recordRewrite('song/a.rpp', DateTime(2020));
+    await journal.recordRewrite('song/a.rpp', DateTime(2020), 'copy');
     await journal.endFix(fix, ok: false);
     final before = journal.length;
     storage
@@ -138,12 +140,12 @@ void main() {
 
   test('gives the current paths of the files rewritten after a line', () async {
     final journal = MigrationJournal(storage, folder);
-    await journal.recordRewrite('a.rpp', DateTime(2020));
+    await journal.recordRewrite('a.rpp', DateTime(2020), 'copy');
     final position = journal.length;
-    await journal.recordRewrite('b.rpp', DateTime(2020));
+    await journal.recordRewrite('b.rpp', DateTime(2020), 'copy');
     await journal.recordMove('b.rpp', 'song/b.rpp');
     await journal.recordMove('a.rpp', 'song/a.rpp');
-    await journal.recordRewrite('c.rpp', DateTime(2020));
+    await journal.recordRewrite('c.rpp', DateTime(2020), 'copy');
 
     expect(journal.rewrittenAfter(0), {'song/a.rpp', 'song/b.rpp', 'c.rpp'});
     expect(journal.rewrittenAfter(position), {'song/b.rpp', 'c.rpp'});

@@ -92,7 +92,7 @@ void main() {
       {'op': 'move', 'from': 'a', 'to': 'b'},
       {'op': 'fixEnd', 'fix': 1, 'ok': true},
       {'op': 'fixStart', 'fix': 2, 'kind': 'moveFolder', 'path': 'missing'},
-      {'op': 'move', 'from': 'missing', 'to': 'c'},
+      // A move without source is refused before its line (#94).
       {'op': 'fixEnd', 'fix': 2, 'ok': false},
     ]);
     expect(m.journal.unfinishedFix, 2);

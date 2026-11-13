@@ -38,6 +38,15 @@ final class MemoryStorage implements RepositoryStorage {
   /// instead of being made; null for none.
   int? failAt;
 
+  /// Whether every change from [failAt] on throws: the drive is gone, or
+  /// the application stopped (no line written after the failure).
+  bool failAfter = false;
+
+  /// Share of its bytes (0.5: the first half, 1: all) that a failing
+  /// [append] writes before throwing, as a write cut by the failure or one
+  /// failing at its flush; null: none.
+  double? appendedOnFailure;
+
   var _changes = 0;
 
   /// Number of changes asked so far, the failed one included.
@@ -58,10 +67,19 @@ final class MemoryStorage implements RepositoryStorage {
   /// Text of the file [path].
   String text(String path) => utf8.decode(files[path]!.bytes);
 
+  /// The first change that threw (cleared by the tests).
+  String? failed;
+
   void _change(String operation) {
-    if (++_changes == failAt) throw InjectedFailure(operation);
+    if (_fails(++_changes)) {
+      failed ??= operation;
+      throw InjectedFailure(operation);
+    }
     log.add(operation);
   }
+
+  bool _fails(int change) =>
+      failAt != null && (change == failAt || (failAfter && change > failAt!));
 
   void _addParents(String path) {
     final segments = path.split('/');
@@ -146,6 +164,16 @@ final class MemoryStorage implements RepositoryStorage {
 
   @override
   Future<void> append(String path, List<int> bytes) async {
+    if (appendedOnFailure case final share? when _fails(_changes + 1)) {
+      _addParents(path);
+      files[path] = (
+        bytes: [
+          ...?files[path]?.bytes,
+          ...bytes.take((bytes.length * share).floor()),
+        ],
+        modified: _now,
+      );
+    }
     _change('append $path');
     bytesWritten += bytes.length;
     _addParents(path);

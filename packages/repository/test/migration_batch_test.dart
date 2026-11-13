@@ -140,7 +140,7 @@ void main() {
     expect(storage.log, isEmpty);
   });
 
-  test('a failed fix is reported, the others go on', () async {
+  test('a failed fix is reported and undone, the others go on', () async {
     final reporter = Reporter();
 
     final result = await run([
@@ -155,7 +155,11 @@ void main() {
     ]);
     expect(reporter.logs[0], startsWith('W Move folder Gone to New/Gone\n'));
     expect(reporter.logs[1], startsWith('I Move folder One to New/One\n'));
-    expect(result.knownPaths, ['New/Gone', 'New/One']);
+    expect(result.report.items[ReportKind.fixUndone], [
+      const ReportItem('Gone'),
+    ]);
+    // An undone fix gives no known value.
+    expect(result.knownPaths, ['New/One']);
   });
 
   test('a file changed during the batch is reported by the check', () async {
