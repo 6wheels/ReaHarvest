@@ -147,6 +147,54 @@ Future<ScanResult> scan(
   ).run();
 }
 
+/// Result of the scan of one title folder ([scanTitle]): what a full scan
+/// finds in it.
+typedef TitleScan = ({
+  /// Null if the folder is no longer a title.
+  Title? title,
+  NodeFile? node,
+
+  /// Stamps of the files of the title folder.
+  Map<String, FileStamp> stamps,
+  Map<String, List<String>> subprojects,
+
+  /// Issues whose path is below the title folder, duplicated version
+  /// identifiers aside (they span titles).
+  Report issues,
+  List<String> corrupted,
+  List<String> orphanNodes,
+});
+
+/// Scans the folder of [previous] in a background isolate (see
+/// [scanTitle]).
+Future<TitleScan> scanTitleFolder(
+  String root,
+  Library library,
+  Title previous, {
+  ScanResult stored = const ScanResult(),
+}) => Isolate.run(
+  () =>
+      scanTitle(MountedFolderStorage(root), library, previous, stored: stored),
+);
+
+/// Scans again the folder of the title [previous] only, after an action on
+/// one of its versions (SPEC §8): lists that folder, and reports for it
+/// what [scan] reports below it. The title keeps the tags of [previous] (a
+/// title placed too high keeps those of its target). Files whose stamp did
+/// not change since [stored], the last scan of the library, are not read
+/// again; a reference leaving the folder is checked with one `stat`.
+///
+/// Writes nothing: a title whose node file is missing or unreadable is no
+/// longer a title, nor is a folder without a project in it or below it (a
+/// free tree title: without a project directly in it). Duplicated version
+/// identifiers span titles: they are left to the caller.
+Future<TitleScan> scanTitle(
+  RepositoryStorage storage,
+  Library library,
+  Title previous, {
+  ScanResult stored = const ScanResult(),
+}) => _Scanner(storage, library, stored, null, false).runTitle(previous);
+
 final class _Scanner {
   _Scanner(
     this.storage,
@@ -162,7 +210,7 @@ final class _Scanner {
   final RepositoryStorage storage;
   final Library library;
   final ScanResult previous;
-  final JournalPosition journalPosition;
+  final JournalPosition? journalPosition;
   final bool writeNodes;
   final Map<String, Version> previousVersions;
 
@@ -183,30 +231,7 @@ final class _Scanner {
   final traces = <String>{};
 
   Future<ScanResult> run() async {
-    for (final e in await storage.list('', recursive: true)) {
-      final segments = e.path.split('/');
-      final parents = segments.sublist(0, segments.length - 1);
-      if (!e.isDirectory) existing.add(e.path.toLowerCase());
-      if (segments.first == collabFolderName ||
-          segments.first == migrationFolderName) {
-        continue;
-      }
-      if (parents.any(isExcludedFolder)) {
-        final last = parents.lastOrNull?.toLowerCase();
-        if (!e.isDirectory &&
-            (last == trashFolderName || last == historyFolderName) &&
-            isProjectFile(e.path)) {
-          traces.add(parentOf(parentOf(e.path)));
-        }
-        continue;
-      }
-      if (e.isDirectory) {
-        if (!isExcludedFolder(segments.last)) dirs.add(e.path);
-      } else if (!isExcludedFile(segments.last)) {
-        files.putIfAbsent(parentOf(e.path), () => []).add(e);
-        stamps[e.path] = _stamp(e);
-      }
-    }
+    (await storage.list('', recursive: true)).forEach(_add);
     final ordered = dirs.toList()
       ..sort((a, b) => _depth(a).compareTo(_depth(b)));
     final layout = library.layout;
@@ -215,14 +240,7 @@ final class _Scanner {
     } else {
       await _scanLayout(ordered, layout);
     }
-    final orphanNodes = [
-      for (final MapEntry(key: dir, value: entries) in files.entries)
-        if (!nodes.containsKey(dir))
-          for (final e in entries)
-            if (p.posix.basename(e.path) == nodeFileName &&
-                !corrupted.contains(e.path))
-              e.path,
-    ]..sort();
+    final orphanNodes = _orphanNodes();
     titles.sort((a, b) => a.path.compareTo(b.path));
     _findDuplicates();
     if (layout != null) {
@@ -231,10 +249,7 @@ final class _Scanner {
       }
       titles.forEach(_checkMedia);
     }
-    corrupted.sort();
-    for (final list in issues.values) {
-      list.sort((a, b) => a.path.compareTo(b.path));
-    }
+    _sort();
     return ScanResult(
       titles: titles,
       nodes: nodes,
@@ -246,6 +261,142 @@ final class _Scanner {
       freeTree: layout == null,
       journalPosition: journalPosition,
     );
+  }
+
+  /// Scans the folder of [previous] only, as [run] would see it (SPEC §8):
+  /// its tags are kept, the references leaving it are checked with one
+  /// `stat` each, and nothing is written ([writeNodes] is false).
+  Future<TitleScan> runTitle(Title previous) async {
+    final dir = previous.path;
+    (await storage.list(dir, recursive: true)).forEach(_add);
+    final layout = library.layout;
+    final title = layout == null
+        ? await _freeTreeTitle(previous)
+        : await _layoutTitle(previous, layout);
+    if (title != null) titles.add(title);
+    if (title != null && layout != null) {
+      await _readSubprojects(dir);
+      await _statOutside(title);
+      _checkMedia(title);
+    }
+    final orphanNodes = _orphanNodes();
+    _sort();
+    return (
+      title: title,
+      node: nodes[dir],
+      stamps: stamps,
+      subprojects: subprojects,
+      issues: Report(issues),
+      corrupted: corrupted,
+      orphanNodes: orphanNodes,
+    );
+  }
+
+  /// The free tree title [previous] scanned again: still a title while a
+  /// project lies directly in its folder; every project below it is one of
+  /// its versions (SPEC §3.3).
+  Future<Title?> _freeTreeTitle(Title previous) async {
+    final dir = previous.path;
+    if (_projects(dir).isEmpty) return null;
+    final node = await _node(dir, freeTreeLevel);
+    if (node == null) return null;
+    return _title(dir, node, previous.tags, [
+      for (final entries in files.values)
+        for (final e in entries.where(_isProject)) _version(dir, e),
+    ]);
+  }
+
+  /// The layout title [previous] scanned again: null if its folder is no
+  /// longer a node of the title level. A title placed too high reports no
+  /// project below it, like [_scanLayout].
+  Future<Title?> _layoutTitle(Title previous, Layout layout) async {
+    final dir = previous.path;
+    final depth = layout.levels.length;
+    final tooHigh = _depth(dir) < depth;
+    if (!_qualified(depth).contains(dir) ||
+        (tooHigh && _projects(dir).isEmpty)) {
+      return null;
+    }
+    final node = await _node(dir, layout.leaf.key);
+    if (node == null || node.level != layout.leaf.key) return null;
+    if (!tooHigh) {
+      for (final folder in files.keys) {
+        final segments = folder.split('/');
+        if (segments.length > depth) _reportTooDeep(folder, segments, layout);
+      }
+    }
+    return _title(dir, node, previous.tags, await _readVersions(dir));
+  }
+
+  /// Adds to [existing] the files outside the folder of [title] that its
+  /// versions and subprojects refer to, one `stat` per reference.
+  Future<void> _statOutside(Title title) async {
+    final inside = '${title.path}/'.toLowerCase();
+    final checked = <String>{};
+    Future<void> check(String path, List<String> refs) async {
+      for (final ref in refs) {
+        final file = resolveReference(parentOf(path), ref);
+        final lower = file?.toLowerCase();
+        if (file == null || lower!.startsWith(inside) || !checked.add(lower)) {
+          continue;
+        }
+        if (await storage.stat(file) case final e? when !e.isDirectory) {
+          existing.add(lower);
+        }
+      }
+    }
+
+    for (final v in title.versions) {
+      await check(joinPath(title.path, v.fileName), v.media);
+    }
+    for (final MapEntry(:key, :value) in subprojects.entries) {
+      await check(key, value);
+    }
+  }
+
+  /// Records the listed entry [e]: every file in [existing]; folders,
+  /// files and stamps outside the excluded ones; traces of projects kept
+  /// in a trash or history.
+  void _add(StorageEntry e) {
+    final segments = e.path.split('/');
+    final parents = segments.sublist(0, segments.length - 1);
+    if (!e.isDirectory) existing.add(e.path.toLowerCase());
+    if (segments.first == collabFolderName ||
+        segments.first == migrationFolderName) {
+      return;
+    }
+    if (parents.any(isExcludedFolder)) {
+      final last = parents.lastOrNull?.toLowerCase();
+      if (!e.isDirectory &&
+          (last == trashFolderName || last == historyFolderName) &&
+          isProjectFile(e.path)) {
+        traces.add(parentOf(parentOf(e.path)));
+      }
+      return;
+    }
+    if (e.isDirectory) {
+      if (!isExcludedFolder(segments.last)) dirs.add(e.path);
+    } else if (!isExcludedFile(segments.last)) {
+      files.putIfAbsent(parentOf(e.path), () => []).add(e);
+      stamps[e.path] = _stamp(e);
+    }
+  }
+
+  /// Node files of folders that are not nodes, sorted.
+  List<String> _orphanNodes() => [
+    for (final MapEntry(key: dir, value: entries) in files.entries)
+      if (!nodes.containsKey(dir))
+        for (final e in entries)
+          if (p.posix.basename(e.path) == nodeFileName &&
+              !corrupted.contains(e.path))
+            e.path,
+  ]..sort();
+
+  void _sort() {
+    corrupted.sort();
+    for (final list in issues.values) {
+      list.sort((a, b) => a.path.compareTo(b.path));
+    }
   }
 
   /// Titles are the topmost folders holding a project; every project below
@@ -274,7 +425,7 @@ final class _Scanner {
           'folder${i + 1}': segments[i],
         if (segments.isNotEmpty) 'title': segments.last,
       };
-      _addTitle(dir, node, tags, titleVersions);
+      titles.add(_title(dir, node, tags, titleVersions));
     }
   }
 
@@ -304,21 +455,7 @@ final class _Scanner {
         continue;
       }
       if (d > depth) {
-        // Inside a title (member or status subfolder…): its projects belong
-        // to the title.
-        if (isReservedTitleFolder(segments[depth])) {
-          continue;
-        }
-        for (final e in _projects(dir)) {
-          _issue(
-            ReportKind.projectTooDeep,
-            ReportItem.misplaced(
-              e.path,
-              level: layout.leaf,
-              target: segments.take(depth).join('/'),
-            ),
-          );
-        }
+        _reportTooDeep(dir, segments, layout);
         continue;
       }
       if (d > 0 && d < depth && !_isKnown(segments)) {
@@ -331,7 +468,7 @@ final class _Scanner {
           final node = await _node(dir, layout.leaf.key);
           if (node != null && node.level == layout.leaf.key) {
             final tags = layout.tagsOf(item.target!.split('/'))!;
-            _addTitle(dir, node, tags, await _readVersions(dir));
+            titles.add(_title(dir, node, tags, await _readVersions(dir)));
           }
         }
         continue;
@@ -360,11 +497,8 @@ final class _Scanner {
         continue;
       }
       if (d == depth) {
-        _addTitle(
-          dir,
-          node,
-          layout.tagsOf(segments)!,
-          await _readVersions(dir),
+        titles.add(
+          _title(dir, node, layout.tagsOf(segments)!, await _readVersions(dir)),
         );
       }
     }
@@ -372,6 +506,24 @@ final class _Scanner {
 
   void _issue(ReportKind kind, ReportItem item) =>
       issues.putIfAbsent(kind, () => []).add(item);
+
+  /// Reports the projects of [dir], a folder inside a title (member or
+  /// status subfolder…), as too deep, their title as target; nothing in a
+  /// reserved title folder (`Media/`…).
+  void _reportTooDeep(String dir, List<String> segments, Layout layout) {
+    final depth = layout.levels.length;
+    if (isReservedTitleFolder(segments[depth])) return;
+    for (final e in _projects(dir)) {
+      _issue(
+        ReportKind.projectTooDeep,
+        ReportItem.misplaced(
+          e.path,
+          level: layout.leaf,
+          target: segments.take(depth).join('/'),
+        ),
+      );
+    }
+  }
 
   /// Reports the versions sharing a version identifier with another one
   /// (manual duplication, SPEC §4.2), the identifier as detail.
@@ -562,40 +714,38 @@ final class _Scanner {
     size: e.size,
   );
 
-  /// Adds the title [dir]; the label and owner of its adopted versions are
-  /// read from [node] at every scan, the label falling back to the file
-  /// name without its extension (SPEC §4.2).
-  void _addTitle(
+  /// The title [dir]; the label and owner of its adopted versions are read
+  /// from [node] at every scan, the label falling back to the file name
+  /// without its extension (SPEC §4.2).
+  Title _title(
     String dir,
     NodeFile node,
     Map<String, String> tags,
     List<Version> versions,
   ) {
     versions.sort((a, b) => a.fileName.compareTo(b.fileName));
-    titles.add(
-      Title(
-        id: node.id,
-        libraryId: library.id,
-        path: dir,
-        tags: tags,
-        versions: [
-          for (final v in versions)
-            if (v.metadata case final m?)
-              v.withMetadata(
-                VersionMetadata(
-                  id: m.id,
-                  label:
-                      node.versionLabels[m.id] ??
-                      p.posix.basenameWithoutExtension(v.fileName),
-                  owner: node.versionOwners[m.id] as MemberId?,
-                ),
-              )
-            else
-              v,
-        ],
-        status: node.status,
-        versionStatuses: node.versionStatuses,
-      ),
+    return Title(
+      id: node.id,
+      libraryId: library.id,
+      path: dir,
+      tags: tags,
+      versions: [
+        for (final v in versions)
+          if (v.metadata case final m?)
+            v.withMetadata(
+              VersionMetadata(
+                id: m.id,
+                label:
+                    node.versionLabels[m.id] ??
+                    p.posix.basenameWithoutExtension(v.fileName),
+                owner: node.versionOwners[m.id] as MemberId?,
+              ),
+            )
+          else
+            v,
+      ],
+      status: node.status,
+      versionStatuses: node.versionStatuses,
     );
   }
 

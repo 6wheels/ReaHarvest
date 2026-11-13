@@ -29,6 +29,12 @@ final class MemoryStorage implements RepositoryStorage {
   /// Paths read, in order (when their reading starts).
   final reads = <String>[];
 
+  /// Folders listed, in order, recursive ones suffixed with `/**`.
+  final listed = <String>[];
+
+  /// Paths passed to [stat], in order.
+  final stats = <String>[];
+
   /// Largest number of project files read at the same time.
   int maxOpenProjectReads = 0;
 
@@ -93,6 +99,7 @@ final class MemoryStorage implements RepositoryStorage {
 
   @override
   Future<List<StorageEntry>> list(String dir, {bool recursive = false}) async {
+    this.listed.add(recursive ? '$dir/**' : dir);
     bool listed(String path) =>
         _below(path, dir) &&
         (recursive ||
@@ -119,6 +126,7 @@ final class MemoryStorage implements RepositoryStorage {
 
   @override
   Future<StorageEntry?> stat(String path) async {
+    stats.add(path);
     if (dirs.contains(path)) {
       return StorageEntry(
         path: path,
