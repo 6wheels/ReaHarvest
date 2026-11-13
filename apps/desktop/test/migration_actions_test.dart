@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart' show Locale;
@@ -17,6 +18,7 @@ import 'library_env.dart';
 
 void main() {
   setUpLibraryEnv();
+  final en = lookupAppLocalizations(const Locale('en'));
 
   test('deletes only node files of folders without project', () async {
     final band = folder('Band');
@@ -53,6 +55,39 @@ void main() {
     expect(orphan.existsSync(), isFalse);
     expect(index.issues(kind: ReportKind.orphanNode), isEmpty);
     expect(File(p.join(song, '.node.json')).existsSync(), isTrue);
+  });
+
+  test('checks an orphan node file again in the turn of its library', () async {
+    final band = folder('Band');
+    File(p.join(band, 'Artist', 'Album', 'Song', '.node.json'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('{"nodeId": "01X", "level": "title"}');
+    await catalog.addLocal(
+      folder: band,
+      displayName: '',
+      layout: Layout.classic(),
+    );
+    final entry = container.read(settingsProvider).libraries.single;
+    const path = 'Artist/Album/Song/.node.json';
+    expect(index.issues(kind: ReportKind.orphanNode).map((i) => i.item.path), [
+      path,
+    ]);
+
+    // A change asked before gives its folder a project: not deleted.
+    final hold = Completer<void>();
+    final turns = container.read(libraryTurnsProvider);
+    final holding = turns.run(entry.id, () async {
+      await hold.future;
+      File('../../test/fixtures/tracks.rpp')
+          .copySync(p.join(band, 'Artist', 'Album', 'Song', 'v1.rpp'));
+      await scans.scan(entry);
+    });
+    final deleting = migration.deleteOrphanNode(entry.id, path);
+    hold.complete();
+    await holding;
+
+    await expectLater(deleting, throwsArgumentError);
+    expect(File(p.join(band, path)).existsSync(), isTrue);
   });
 
   test('normalizes a title, keeping the date of its projects', () async {
@@ -315,16 +350,15 @@ void main() {
           .copySync(p.join(dir.path, '$name.rpp'));
     }
     final entry = container.read(settingsProvider).libraries.single;
-    final l10n = lookupAppLocalizations(const Locale('en'));
-    final steps = <String>{};
+    final states = <TaskState>{};
     container.listen(tasksProvider, (_, tasks) {
       for (final task in tasks) {
-        if (task.step case final step?) steps.add(step(l10n));
+        states.add(task.state);
       }
     });
 
     // The second is asked while the first runs: it is not taken for an
-    // interrupted fix, and its task is shown waiting.
+    // interrupted fix, and its task is shown queued.
     final reports = await Future.wait([
       migration.fix(entry.id, const [
         MoveFolder('Artist/One', 'Artist/New/One'),
@@ -339,7 +373,7 @@ void main() {
     expect((reports[0]! as Report).hasErrors, isFalse);
     expect((reports[1]! as Report).hasErrors, isFalse);
     expect(container.read(interruptedFixesProvider), isEmpty);
-    expect(steps, contains('Waiting for the running task of the library'));
+    expect(states, contains(TaskState.queued));
     expect(
       Directory(p.join(band, 'Artist', 'New', 'One')).existsSync(),
       isTrue,
@@ -348,6 +382,72 @@ void main() {
       Directory(p.join(band, 'Artist', 'New', 'Two')).existsSync(),
       isTrue,
     );
+  });
+
+  test('a batch asked during the startup scan waits for it', () async {
+    final song = await bandWithSong();
+    final band = p.dirname(p.dirname(p.dirname(song)));
+    Directory(p.join(band, 'Artist', 'One')).createSync();
+    File('../../test/fixtures/tracks.rpp')
+        .copySync(p.join(band, 'Artist', 'One', 'One.rpp'));
+    final entry = container.read(settingsProvider).libraries.single;
+    final logs = <String>[];
+    final sub = Logger.root.onRecord.listen(
+      (r) => logs.add('${r.loggerName} ${r.message}'),
+    );
+    addTearDown(sub.cancel);
+
+    final starting = migration.startup();
+    final report = await migration.fix(entry.id, const [
+      MoveFolder('Artist/One', 'Artist/New/One'),
+    ]);
+    await starting;
+
+    expect(report!.hasErrors, isFalse);
+    // Queued until the scan of its library ended.
+    expect(
+      logs,
+      containsAllInOrder([
+        'tasks Scan of the libraries: started',
+        allOf(startsWith('tasks Fix'), endsWith(': queued')),
+        startsWith('library.scans Scanned ${entry.displayName}: '),
+        allOf(startsWith('tasks Fix'), endsWith(': started')),
+        allOf(startsWith('tasks Fix'), contains(': done')),
+      ]),
+    );
+    expect(
+      Directory(p.join(band, 'Artist', 'New', 'One')).existsSync(),
+      isTrue,
+    );
+  });
+
+  test('tasks of two libraries run together', () async {
+    await bandWithSong();
+    final other = folder('Other');
+    await catalog.addLocal(
+      folder: other,
+      displayName: 'Other',
+      layout: Layout.classic(),
+    );
+    final [band, second] = container.read(settingsProvider).libraries;
+    final tasks = container.read(tasksProvider.notifier);
+    final hold = Completer<void>();
+    final running = tasks.run(
+      (l10n) => 'Hold',
+      (_) => hold.future,
+      library: band.id,
+    );
+
+    // The scan of the other library does not wait for the first one.
+    await scans.scanTask(second);
+
+    expect(container.read(tasksProvider).last.state, TaskState.done);
+    expect(
+      container.read(tasksProvider).firstWhere((t) => t.label(en) == 'Hold'),
+      isA<BackgroundTask>().having((t) => t.state, 'state', TaskState.running),
+    );
+    hold.complete();
+    await running;
   });
 
   test('a cancelled fix stops before the next one, library updated', () async {

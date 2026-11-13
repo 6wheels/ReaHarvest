@@ -105,6 +105,84 @@ void main() {
     });
   });
 
+  group('tasks of a library', () {
+    const band = LibraryId('band');
+    const other = LibraryId('other');
+
+    test('wait, queued, for the turn of their library, in order', () async {
+      final first = Completer<void>();
+      final log = <String>[];
+      final one = tasks().run((l10n) => 'A', (_) async {
+        log.add('A');
+        await first.future;
+        return 1;
+      }, library: band);
+      final two = tasks().run((l10n) => 'B', (_) async {
+        log.add('B');
+        return 2;
+      }, library: band);
+      expect(states(), [TaskState.queued, TaskState.queued]);
+      await pumpEventQueue();
+      expect(states(), [TaskState.running, TaskState.queued]);
+      expect(log, ['A']);
+
+      first.complete();
+      expect(await one, 1);
+      expect(await two, 2);
+      expect(log, ['A', 'B']);
+      expect(states(), [TaskState.done, TaskState.done]);
+    });
+
+    test('of different libraries run together', () async {
+      final first = Completer<void>();
+      final one = tasks().run(
+        (l10n) => 'A',
+        (_) => first.future,
+        library: band,
+      );
+      expect(
+        await tasks().run((l10n) => 'B', (_) async => 2, library: other),
+        2,
+      );
+      expect(states(), [TaskState.running, TaskState.done]);
+      first.complete();
+      await one;
+    });
+
+    test('cancelled while queued, end at once and never run', () async {
+      final first = Completer<void>();
+      var ran = false;
+      final one = tasks().run(
+        (l10n) => 'A',
+        (_) => first.future,
+        library: band,
+      );
+      final two = tasks().run((l10n) => 'B', (_) async {
+        ran = true;
+      }, library: band);
+      final three = tasks().run((l10n) => 'C', (_) async => 3, library: band);
+      await pumpEventQueue();
+      final id = container.read(tasksProvider)[1].id;
+      tasks()
+        ..cancel(id)
+        ..cancel(id);
+      expect(await two, isNull);
+      expect(container.read(tasksProvider)[1].cancelling, isFalse);
+      expect(states(), [
+        TaskState.running,
+        TaskState.cancelled,
+        TaskState.queued,
+      ]);
+      tasks().clearFinished();
+      expect(states(), [TaskState.running, TaskState.queued]);
+
+      first.complete();
+      await one;
+      expect(await three, 3, reason: 'the queue goes on');
+      expect(ran, isFalse);
+    });
+  });
+
   Future<void> pumpZone(WidgetTester tester) => tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -175,6 +253,33 @@ void main() {
     await tester.tap(find.text('Tasks · 1'));
     await tester.pumpAndSettle();
     expect(find.text('Last'), findsOneWidget);
+  });
+
+  testWidgets('a queued task shows that it waits, cancellable', (tester) async {
+    await pumpZone(tester);
+    const band = LibraryId('band');
+    final step = Completer<void>();
+    final running = tasks().run((l10n) => 'Fix', (task) async {
+      task.step((l10n) => 'Fix 1 of 2');
+      await step.future;
+    }, library: band);
+    final queued = tasks().run((l10n) => 'Scan', (_) async {}, library: band);
+    await tester.pump();
+    await tester.pump(Motion.medium);
+    await tester.tap(find.text('Tasks · 2'));
+    await tester.pump();
+    await tester.pump(Motion.medium);
+    expect(find.text('Waiting'), findsOneWidget);
+    expect(find.text('Cancel'), findsNWidgets(2));
+
+    await tester.tap(find.text('Cancel').first);
+    await tester.pump();
+    expect(await queued, isNull);
+    expect(find.text('Waiting'), findsNothing);
+    expect(find.text('Cancelled'), findsOneWidget);
+    step.complete();
+    await running;
+    await tester.pumpAndSettle();
   });
 
   test('a report with errors fails its task', () async {

@@ -9,6 +9,7 @@ import 'package:reaharvest_repository/reaharvest_repository.dart';
 import '../l10n/app_localizations.dart';
 import 'library_catalog.dart';
 import 'library_scans.dart';
+import 'library_turns.dart';
 import 'providers.dart';
 import 'report_paths.dart';
 import 'tasks.dart';
@@ -22,23 +23,10 @@ class MigrationActions {
 
   final Ref ref;
 
-  /// End of the last change of each library ([_exclusive]).
-  final _changes = <LibraryId, Future<void>>{};
-
-  /// Number of changes of each library running or waiting.
-  final _pending = <LibraryId, int>{};
-
-  /// Runs [change] once the previous changes of [library] have ended: a
-  /// batch of fixes, an undo and the search for a fix left to undo never
-  /// run together on a library (a fix being applied looks interrupted).
-  Future<T> _exclusive<T>(LibraryId library, Future<T> Function() change) {
-    _pending[library] = (_pending[library] ?? 0) + 1;
-    final done = (_changes[library] ?? Future.value())
-        .then((_) => change())
-        .whenComplete(() => _pending[library] = _pending[library]! - 1);
-    _changes[library] = done.then((_) {}, onError: (_) {});
-    return done;
-  }
+  /// The turns of the libraries: a batch of fixes, an undo and the search
+  /// for a fix left to undo never run together on a library (a fix being
+  /// applied looks interrupted), nor with another writer.
+  LibraryTurns get _turns => ref.read(libraryTurnsProvider);
 
   /// Moves the misplaced project [path] of [library] into the title at
   /// [folders] (one folder name per layout level), with its media ("To
@@ -82,17 +70,18 @@ class MigrationActions {
   /// moved or declared join the known values and the library is rescanned.
   /// A cancelled batch ends the task with the report of what was done.
   /// While a fix of the library is left to undo, runs nothing and offers
-  /// to undo it instead ([_offerUndo]). Waits for the changes of the
-  /// library already running ([_exclusive]): its task is then shown at
-  /// once, waiting, and ends cancelled if a fix is left to undo.
+  /// to undo it instead ([_offerUndo]). Runs in the turn of the library
+  /// ([LibraryTurns]): while it is taken, its task is shown at once,
+  /// queued, and ends cancelled if a fix is left to undo.
   Future<Report?> _fix(
     LibraryEntry entry,
     List<MigrationFix> fixes,
     String Function(AppLocalizations l10n) label,
   ) {
     final tasks = ref.read(tasksProvider.notifier);
-    if ((_pending[entry.id] ?? 0) == 0) {
-      return _exclusive(entry.id, () async {
+    // Free turn: a fix left to undo is offered before any task is shown.
+    if (!_turns.isBusy(entry.id)) {
+      return _turns.run(entry.id, () async {
         if (await _offerUndo(entry)) return null;
         return tasks.run(
           label,
@@ -101,13 +90,15 @@ class MigrationActions {
         );
       });
     }
-    return tasks.run(label, (task) {
-      task.step((l10n) => l10n.taskStepWaiting);
-      return _exclusive(entry.id, () async {
+    return tasks.run(
+      label,
+      (task) async {
         if (await _offerUndo(entry)) throw const TaskCancelled();
         return _batch(entry, fixes, task);
-      });
-    }, openReport: true);
+      },
+      openReport: true,
+      library: entry.id,
+    );
   }
 
   /// The batch of [_fix], under its [task].
@@ -156,11 +147,11 @@ class MigrationActions {
 
   /// Offers to undo the fix left to undo in [entry], if any (SPEC §5.8 step
   /// 5, #94): the dialog of [interruptedFixesProvider]. Returns whether
-  /// there is one. Waits for the changes of the library already running.
+  /// there is one. Runs in the turn of the library.
   Future<bool> offerUndo(LibraryEntry entry) =>
-      _exclusive(entry.id, () => _offerUndo(entry));
+      _turns.run(entry.id, () => _offerUndo(entry));
 
-  /// [offerUndo], for a change of the library already running.
+  /// [offerUndo], inside the turn of the library.
   Future<bool> _offerUndo(LibraryEntry entry) async {
     final fix = await unfinishedFixOn(entry.libraryRoot);
     if (fix == null) return false;
@@ -191,44 +182,49 @@ class MigrationActions {
 
   /// Undoes the fix left to undo in [library] (SPEC §5.8 step 5,
   /// [undoUnfinishedFixOn]), as a task whose report opens at the end. Then
-  /// rescans. Waits for the changes of the library already running.
+  /// rescans. Runs in the turn of the library.
   Future<Report?> undoInterruptedFix(LibraryId library) {
     final entry = ref.libraryEntry(library);
     final root = entry.libraryRoot;
-    return _exclusive(
-      library,
-      () => ref.read(tasksProvider.notifier).run((l10n) => l10n.taskUndoFix, (
-        task,
-      ) async {
-        try {
-          return rootedReport(
-            root,
-            await undoUnfinishedFixOn(root, hasherOf: xxh3Hasher),
-          );
-        } finally {
-          task.step((l10n) => l10n.taskStepScan);
-          await ref.scanLibrary(entry);
-        }
-      }, openReport: true),
-    );
+    return ref
+        .read(tasksProvider.notifier)
+        .run(
+          (l10n) => l10n.taskUndoFix,
+          (task) async {
+            try {
+              return rootedReport(
+                root,
+                await undoUnfinishedFixOn(root, hasherOf: xxh3Hasher),
+              );
+            } finally {
+              task.step((l10n) => l10n.taskStepScan);
+              await ref.scanLibrary(entry);
+            }
+          },
+          openReport: true,
+          library: library,
+        );
   }
 
   /// Deletes the `.node.json` file [path] of [library], found in a folder
-  /// without project (#54). Then rescans. Throws [ArgumentError] for any
-  /// other file.
+  /// without project (#54). Then rescans, in the turn of the library.
+  /// Throws [ArgumentError] for any other file, checked in the turn: a
+  /// change of the library asked before may have given it a project.
   Future<void> deleteOrphanNode(LibraryId library, String path) async {
     if (p.posix.basename(path) != nodeFileName) {
       throw ArgumentError.value(path, 'path', 'Not a node file');
     }
     final entry = ref.libraryEntry(library);
     final root = entry.libraryRoot;
-    final known = ref.read(localIndexProvider).scanResult(library);
-    if (!(known?.orphanNodes.contains(path) ?? false)) {
-      throw ArgumentError.value(path, 'path', 'Not an orphan node file');
-    }
-    await MountedFolderStorage(root).delete(path);
-    _log.info('Orphan node file $path of ${entry.displayName} deleted');
-    await ref.scanLibrary(entry);
+    await _turns.run(library, () async {
+      final known = ref.read(localIndexProvider).scanResult(library);
+      if (!(known?.orphanNodes.contains(path) ?? false)) {
+        throw ArgumentError.value(path, 'path', 'Not an orphan node file');
+      }
+      await MountedFolderStorage(root).delete(path);
+      _log.info('Orphan node file $path of ${entry.displayName} deleted');
+      await ref.scanLibrary(entry);
+    });
   }
 }
 

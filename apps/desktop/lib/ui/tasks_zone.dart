@@ -82,7 +82,7 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
                     Row(
                       children: [
                         const Spacer(),
-                        if (tasks.any((t) => !t.isRunning))
+                        if (tasks.any((t) => t.isFinished))
                           TextButton(
                             onPressed: ref
                                 .read(tasksProvider.notifier)
@@ -139,8 +139,18 @@ class _TaskRow extends ConsumerWidget {
     final text = Theme.of(context).textTheme;
     final muted = text.bodySmall?.copyWith(color: c.muted);
     final error = Theme.of(context).colorScheme.error;
-    final step = task.isRunning ? task.step?.call(l10n) : null;
+    // A queued task shows that it waits in place of its step.
+    final step = task.isQueued
+        ? l10n.taskWaiting
+        : task.isRunning
+        ? task.step?.call(l10n)
+        : null;
     final icon = switch (task.state) {
+      TaskState.queued => Icon(
+        Icons.schedule_rounded,
+        size: 16,
+        color: c.muted,
+      ),
       TaskState.running => SizedBox.square(
         dimension: 14,
         child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
@@ -166,7 +176,7 @@ class _TaskRow extends ConsumerWidget {
         l10n.taskCancelling,
         style: muted,
       ),
-      TaskState.running => TextButton(
+      TaskState.queued || TaskState.running => TextButton(
         onPressed: () => ref.read(tasksProvider.notifier).cancel(task.id),
         child: Text(l10n.cancel),
       ),

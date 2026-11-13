@@ -80,10 +80,11 @@ Core hardening, before the remaining features (listed in the order of the steps 
 - [x] #96 files named by a plugin state never moved nor purged (`namedOutsideSources`: plain text and base64 plugin states, UTF-8 and UTF-16LE; normalization leaves such a file and reports `referencedByPlugin`; the purge never lists it, versions and backups count, the trash does not)
 - [x] #99 fix proposals computed outside the interface (`proposeFixes` and `buildFixes` in `repository`; the dialog shows and collects; the lift preview shows the final label; PR #138)
 - [x] #100 LibraryService split into one service per role (`LibraryCatalog`, `LibraryScans`, `VersionActions`, `MigrationActions`, `ReaperActions` in `state/`, each with its provider and tests; `libraryServiceProvider` removed; PR #139)
-- [ ] #101 one writing task per library at a time
+- [x] #101 one writing task per library at a time (`LibraryTurns` in `state/`: fixes, guided move, undo and the scan of one library are tasks of their library, queued in the zone ("Waiting") and cancellable; the scan of every library takes each turn; version actions, known values, members and the opening of a backup take the turn without a task; a fix asked on an idle library still checks for a fix to undo before showing a task; integration test `library_turns_test.dart`; PR #140)
 - [ ] #102 rescan of the title changed by an action only
 - [ ] #103 index written outside the UI isolate
 - [ ] #105 one interface file per page or component
+- [ ] #141 known values merged and unused media checked again in the library turn (from the review of #101)
 
 ### Hardening plan for the agents (2026-11-11)
 
@@ -108,6 +109,7 @@ Steps. A ticket starts when the tickets named before it are merged; at most 3 ag
 | 7 | #102 | beside #101 | #100 |
 | 8 | #103 | beside #105 | #102 |
 | 8 | #105 | beside #103 | #101, #102 |
+| 8 | #141 | beside #103 and #105 | #101, #102 |
 | any | #104 | beside any step | now |
 
 - #90, #91 and #100 run alone: the first two touch every file of `packages/repository`, the last moves the whole of `state/libraries.dart`.
@@ -118,7 +120,7 @@ Smallest model advised per ticket (a judgment from the tickets and the code, not
 
 | Model | Tickets | Why |
 |---|---|---|
-| Sonnet | #90, #91, #96, #97, #99, #100, #101, #104, #105 | Moves, splits and bounded rules, fully specified, with the existing tests as a net |
+| Sonnet | #90, #91, #96, #97, #99, #100, #101, #104, #105, #141 | Moves, splits and bounded rules, fully specified, with the existing tests as a net |
 | Opus | #59, #92, #93, #95, #102, #103, #114 | Tests driving the real application, formats and crash safety, isolates, rewrite of subtle rules, consistency of the index, change across every package |
 | Opus, then a review by the largest model before merge | #94 | Undo after a failure or a crash: data safety |
 
