@@ -58,7 +58,7 @@ void main() {
     await h.restart(tester);
 
     // Offered at the end of the startup scan.
-    final starting = h.service.startup();
+    final starting = h.migration.startup();
     await waitForText(tester, title);
     await starting;
     expect(
@@ -73,7 +73,7 @@ void main() {
 
     // Offered again instead of a new batch.
     final tasks = h.tasks.length;
-    final fixing = h.service.fix(library, [
+    final fixing = h.migration.fix(library, [
       const MoveFolder('Live', 'Artist/Live'),
     ]);
     await waitForText(tester, title);

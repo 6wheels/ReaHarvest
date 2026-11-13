@@ -10,7 +10,8 @@ import 'package:path/path.dart' as p;
 import 'package:reaharvest/app.dart';
 import 'package:reaharvest/app_paths.dart';
 import 'package:reaharvest/logs.dart';
-import 'package:reaharvest/state/libraries.dart';
+import 'package:reaharvest/state/library_catalog.dart';
+import 'package:reaharvest/state/library_scans.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
@@ -94,7 +95,7 @@ void main() {
       ],
     );
     await container
-        .read(libraryServiceProvider)
+        .read(libraryCatalogProvider)
         .addLocal(folder: band, displayName: 'Band', layout: Layout.classic());
   });
 
@@ -326,14 +327,14 @@ void main() {
       Directory(folder).createSync(recursive: true);
       File(fixture('tracks.rpp')).copySync(p.join(folder, 'v.rpp'));
     }
-    final service = container.read(libraryServiceProvider);
+    final catalog = container.read(libraryCatalogProvider);
     final values = await tester.runAsync(
-      () => service.prefillKnownValues(mess, Layout.classic()),
+      () => catalog.prefillKnownValues(mess, Layout.classic()),
     );
     expect(values, const [
       KnownValue('Artist', [KnownValue('Album')]),
     ]);
-    final adding = service.addLocal(
+    final adding = catalog.addLocal(
       folder: mess,
       displayName: 'Mess',
       layout: Layout.classic(),
@@ -392,8 +393,9 @@ void main() {
     final other = p.join(root.path, 'Other', 'Artist', 'Album', 'Song');
     Directory(other).createSync(recursive: true);
     File(fixture('render-file.rpp')).copySync(p.join(other, 'v.rpp'));
-    final service = container.read(libraryServiceProvider);
-    final adding = service.addLocal(
+    final catalog = container.read(libraryCatalogProvider);
+    final scans = container.read(libraryScansProvider);
+    final adding = catalog.addLocal(
       folder: p.join(root.path, 'Other'),
       displayName: 'Other',
       layout: Layout.classic(),
@@ -408,7 +410,7 @@ void main() {
     expect(find.text('Libraries scanned · 1'), findsOne);
     await tapText(tester, 'Close');
 
-    final cancelled = service.scanAll();
+    final cancelled = scans.scanAll();
     container.read(tasksProvider.notifier).cancel(tasks().last.id);
     await waitFor(
       tester,
@@ -419,7 +421,7 @@ void main() {
     expect(tasks().last.state, TaskState.cancelled);
     expect(find.text('Cancelled'), findsOne);
 
-    final scanning = service.scanAll();
+    final scanning = scans.scanAll();
     await waitFor(tester, () => !tasks().last.isRunning, reason: 'scan done');
     await scanning;
     expect(tasks().last.state, TaskState.done);
@@ -485,8 +487,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     List<BackgroundTask> tasks() => container.read(tasksProvider);
-    final service = container.read(libraryServiceProvider);
-    final scanning = service.scanAll();
+    final scans = container.read(libraryScansProvider);
+    final scanning = scans.scanAll();
     await waitFor(tester, () => !tasks().last.isRunning, reason: 'scan done');
     await scanning;
 

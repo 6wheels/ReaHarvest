@@ -8,7 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/app.dart';
 import 'package:reaharvest/demo_titles.dart';
-import 'package:reaharvest/state/libraries.dart';
+import 'package:reaharvest/state/library_catalog.dart';
+import 'package:reaharvest/state/migration_actions.dart';
+import 'package:reaharvest/state/reaper_actions.dart';
+import 'package:reaharvest/state/version_actions.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/pickers.dart';
@@ -69,150 +72,18 @@ Map<LibraryId, Object> previewErrors = const {};
 Completer<void>? previewPending;
 bool previewCancelled = false;
 
-/// Library service recording calls, without file system access.
-class FakeLibraryService extends LibraryService {
-  FakeLibraryService(super.ref);
+/// Library catalog recording calls, without file system access.
+class FakeLibraryCatalog extends LibraryCatalog {
+  FakeLibraryCatalog(super.ref);
 
   final added = <(String, String, Layout?)>[];
   final removed = <LibraryId>[];
-  final adopted = <(String, String)>[];
-  final adoptedOwners = <MemberId?>[];
-  final separated = <String>[];
-  final opened = <String>[];
-  final created = <(String, String, String?)>[];
-  final edited = <(String, String, String)>[];
-  final statuses = <(String, String?)>[];
-  final trashed = <String>[];
-  final orphansDeleted = <String>[];
-  final restored = <String>[];
-  final moved = <(String, List<String>)>[];
-  final fixed = <(LibraryId, List<MigrationFix>)>[];
 
   /// Known values given to addLocal or setKnownValues.
   List<KnownValue>? knownValues;
 
   /// Members returned by membersOf, then given to setMembers.
   List<Member> members = const [];
-
-  @override
-  Future<bool> openBackup(Title title, Backup backup) async {
-    if (backupOpening case final Error error) throw error;
-    return backupOpening as bool;
-  }
-
-  @override
-  Future<void> restore(Title title, Version version, Backup backup) async =>
-      restored.add(version.fileName);
-
-  @override
-  Future<void> deleteOrphanNode(LibraryId library, String path) async {
-    if (path.startsWith('locked/')) throw StateError('locked');
-    orphansDeleted.add(path);
-  }
-
-  @override
-  PlanPreview previewNormalization(LibraryId library, List<String> titles) {
-    previewCancelled = false;
-    return (
-      plans: () async {
-        if (previewErrors[library] case final error?) throw error;
-        if (previewPending case final pending?) await pending.future;
-        return {
-          for (final title in titles)
-            title:
-                previewPlans[title] ??
-                (operations: const <MediaOperation>[], blocked: const Report()),
-        };
-      }(),
-      cancel: () async => previewCancelled = true,
-    );
-  }
-
-  /// Whether [fix] runs as a task whose report opens at the end, like the
-  /// real one.
-  bool fixAsTask = false;
-
-  @override
-  Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) async {
-    fixed.add((library, fixes));
-    if (!fixAsTask) return const Report();
-    return ref
-        .read(tasksProvider.notifier)
-        .run(
-          (l10n) => l10n.taskFix(fixes.length),
-          (_) async => Report({
-            ReportKind.folderMoved: [ReportItem(fixes.first.path)],
-          }),
-          openReport: true,
-        );
-  }
-
-  @override
-  Future<Report?> moveToTitle(
-    LibraryId library,
-    String path,
-    List<String> folders,
-  ) async {
-    moved.add((path, folders));
-    return const Report();
-  }
-
-  @override
-  Future<String> addVersion(
-    Title title,
-    String fileName,
-    String label, {
-    Version? source,
-    String? template,
-  }) async {
-    await pending?.future;
-    created.add((fileName, label, source?.fileName));
-    return fileName;
-  }
-
-  @override
-  Future<String> editVersion(
-    Title title,
-    Version version, {
-    required String fileName,
-    required String label,
-  }) async {
-    edited.add((version.fileName, fileName, label));
-    return fileName;
-  }
-
-  @override
-  Future<void> setStatusOf(
-    Title title,
-    Version version,
-    String? status,
-  ) async => statuses.add((version.fileName, status));
-
-  @override
-  Future<void> trashVersion(Title title, Version version) async =>
-      trashed.add(version.fileName);
-
-  @override
-  Future<bool> openVersion(Title title, Version version) async {
-    opened.add(version.fileName);
-    return true;
-  }
-
-  @override
-  Future<void> adopt(
-    Title title,
-    Version version,
-    String label, {
-    MemberId? owner,
-  }) async {
-    await pending?.future;
-    adopted.add((version.fileName, label));
-    adoptedOwners.add(owner);
-  }
-
-  @override
-  Future<void> separateDuplicate(Title title, Version version) async =>
-      separated.add(version.fileName);
 
   @override
   Future<Library?> existing(String folder) async => existingLibrary;
@@ -282,9 +153,162 @@ class FakeLibraryService extends LibraryService {
   }
 }
 
+/// Version actions recording calls, without file system access.
+class FakeVersionActions extends VersionActions {
+  FakeVersionActions(super.ref);
+
+  final adopted = <(String, String)>[];
+  final adoptedOwners = <MemberId?>[];
+  final separated = <String>[];
+  final created = <(String, String, String?)>[];
+  final edited = <(String, String, String)>[];
+  final statuses = <(String, String?)>[];
+  final trashed = <String>[];
+  final restored = <String>[];
+
+  @override
+  Future<void> restore(Title title, Version version, Backup backup) async =>
+      restored.add(version.fileName);
+
+  @override
+  Future<String> addVersion(
+    Title title,
+    String fileName,
+    String label, {
+    Version? source,
+    String? template,
+  }) async {
+    await pending?.future;
+    created.add((fileName, label, source?.fileName));
+    return fileName;
+  }
+
+  @override
+  Future<String> editVersion(
+    Title title,
+    Version version, {
+    required String fileName,
+    required String label,
+  }) async {
+    edited.add((version.fileName, fileName, label));
+    return fileName;
+  }
+
+  @override
+  Future<void> setStatusOf(
+    Title title,
+    Version version,
+    String? status,
+  ) async => statuses.add((version.fileName, status));
+
+  @override
+  Future<void> trashVersion(Title title, Version version) async =>
+      trashed.add(version.fileName);
+
+  @override
+  Future<void> adopt(
+    Title title,
+    Version version,
+    String label, {
+    MemberId? owner,
+  }) async {
+    await pending?.future;
+    adopted.add((version.fileName, label));
+    adoptedOwners.add(owner);
+  }
+
+  @override
+  Future<void> separateDuplicate(Title title, Version version) async =>
+      separated.add(version.fileName);
+}
+
+/// Migration actions recording calls, without file system access.
+class FakeMigrationActions extends MigrationActions {
+  FakeMigrationActions(super.ref);
+
+  final orphansDeleted = <String>[];
+  final moved = <(String, List<String>)>[];
+  final fixed = <(LibraryId, List<MigrationFix>)>[];
+
+  @override
+  Future<void> deleteOrphanNode(LibraryId library, String path) async {
+    if (path.startsWith('locked/')) throw StateError('locked');
+    orphansDeleted.add(path);
+  }
+
+  @override
+  PlanPreview previewNormalization(LibraryId library, List<String> titles) {
+    previewCancelled = false;
+    return (
+      plans: () async {
+        if (previewErrors[library] case final error?) throw error;
+        if (previewPending case final pending?) await pending.future;
+        return {
+          for (final title in titles)
+            title:
+                previewPlans[title] ??
+                (operations: const <MediaOperation>[], blocked: const Report()),
+        };
+      }(),
+      cancel: () async => previewCancelled = true,
+    );
+  }
+
+  /// Whether [fix] runs as a task whose report opens at the end, like the
+  /// real one.
+  bool fixAsTask = false;
+
+  @override
+  Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) async {
+    fixed.add((library, fixes));
+    if (!fixAsTask) return const Report();
+    return ref
+        .read(tasksProvider.notifier)
+        .run(
+          (l10n) => l10n.taskFix(fixes.length),
+          (_) async => Report({
+            ReportKind.folderMoved: [ReportItem(fixes.first.path)],
+          }),
+          openReport: true,
+        );
+  }
+
+  @override
+  Future<Report?> moveToTitle(
+    LibraryId library,
+    String path,
+    List<String> folders,
+  ) async {
+    moved.add((path, folders));
+    return const Report();
+  }
+}
+
+/// REAPER actions recording calls, without launching REAPER.
+class FakeReaperActions extends ReaperActions {
+  FakeReaperActions(super.ref);
+
+  final opened = <String>[];
+
+  @override
+  Future<bool> openBackup(Title title, Backup backup) async {
+    if (backupOpening case final Error error) throw error;
+    return backupOpening as bool;
+  }
+
+  @override
+  Future<bool> openVersion(Title title, Version version) async {
+    opened.add(version.fileName);
+    return true;
+  }
+}
+
 void main() {
   late MemorySettings settings;
-  late FakeLibraryService libraries;
+  late FakeLibraryCatalog catalog;
+  late FakeVersionActions versions;
+  late FakeMigrationActions migration;
+  late FakeReaperActions reaper;
 
   const band = LibraryEntry(
     id: LibraryId('L1'),
@@ -358,8 +382,17 @@ void main() {
           fileRevealerProvider.overrideWithValue(
             (file) async => revealed.add(file),
           ),
-          libraryServiceProvider.overrideWith(
-            (ref) => libraries = FakeLibraryService(ref),
+          libraryCatalogProvider.overrideWith(
+            (ref) => catalog = FakeLibraryCatalog(ref),
+          ),
+          versionActionsProvider.overrideWith(
+            (ref) => versions = FakeVersionActions(ref),
+          ),
+          migrationActionsProvider.overrideWith(
+            (ref) => migration = FakeMigrationActions(ref),
+          ),
+          reaperActionsProvider.overrideWith(
+            (ref) => reaper = FakeReaperActions(ref),
           ),
           pickersProvider.overrideWithValue(const FakePickers()),
           detectedReaperProvider.overrideWith(
@@ -442,7 +475,7 @@ void main() {
     await tester.ensureVisible(find.text('Create library'));
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
-    final (folder, name, layout) = libraries.added.single;
+    final (folder, name, layout) = catalog.added.single;
     expect((folder, name), ('/music/Band', 'Band'));
     expect(layout!.levels.first.key, 'project');
 
@@ -483,13 +516,13 @@ void main() {
     expect(find.text('Remove “Band”?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(libraries.removed, isEmpty);
+    expect(catalog.removed, isEmpty);
 
     await tester.tap(find.text('Remove'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove').last);
     await tester.pumpAndSettle();
-    expect(libraries.removed, [band.id]);
+    expect(catalog.removed, [band.id]);
     expect(find.text('No library yet.'), findsOneWidget);
   });
 
@@ -508,7 +541,7 @@ void main() {
     await tester.tap(find.text('Free tree'));
     await tester.tap(find.widgetWithText(FilledButton, 'Add a library'));
     await tester.pumpAndSettle();
-    expect(libraries.added.single.$3, isNull);
+    expect(catalog.added.single.$3, isNull);
     expect(find.text('/music/Band'), findsOneWidget);
   });
 
@@ -532,7 +565,7 @@ void main() {
     await tester.ensureVisible(find.text('Create library'));
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
-    expect(libraries.added.single.$3, same(custom));
+    expect(catalog.added.single.$3, same(custom));
   });
 
   testWidgets('an existing template library is preselected', (tester) async {
@@ -550,7 +583,7 @@ void main() {
     await tester.ensureVisible(find.text('Create library'));
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
-    expect(libraries.added.single.$3!.leaf.key, 'scene');
+    expect(catalog.added.single.$3!.leaf.key, 'scene');
   });
 
   testWidgets('a library holding titles shows its layout only', (tester) async {
@@ -573,7 +606,7 @@ void main() {
     await tester.ensureVisible(find.text('Create library'));
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
-    expect(libraries.added.single.$3!.levels, hasLength(2));
+    expect(catalog.added.single.$3!.levels, hasLength(2));
   });
 
   testWidgets('a folder holding projects asks its known values', (
@@ -634,7 +667,7 @@ void main() {
     await tester.ensureVisible(find.text('Create library'));
     await tester.tap(find.text('Create library'));
     await tester.pumpAndSettle();
-    expect(libraries.knownValues, const [
+    expect(catalog.knownValues, const [
       KnownValue('Band', [KnownValue(Layout.unassigned)]),
       KnownValue('Solo', [KnownValue('Live')]),
     ]);
@@ -724,7 +757,7 @@ void main() {
 
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
-    expect(libraries.knownValues, const [
+    expect(catalog.knownValues, const [
       KnownValue('Band', [KnownValue('First album')]),
     ]);
   });
@@ -763,7 +796,7 @@ void main() {
 
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
-    expect(libraries.members, [
+    expect(catalog.members, [
       const Member(MemberId('M'), 'Alice'),
       isA<Member>().having((m) => m.name, 'name', 'Bob'),
     ]);
@@ -987,7 +1020,7 @@ void main() {
     await open();
     await tester.tap(find.text('Open anyway'));
     await tester.pumpAndSettle();
-    expect(libraries.opened, ['Midnight Ferry v1.rpp']);
+    expect(reaper.opened, ['Midnight Ferry v1.rpp']);
   });
 
   testWidgets('opens and restores the backup points of a version', (
@@ -1060,7 +1093,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Restore'));
     await expectSnack('Backup point restored');
-    expect(libraries.restored, hasLength(1));
+    expect(versions.restored, hasLength(1));
   });
 
   testWidgets('restores the search query', (tester) async {
@@ -1180,7 +1213,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(libraries.opened, ['Midnight Ferry v1.rpp']);
+    expect(reaper.opened, ['Midnight Ferry v1.rpp']);
 
     await tester.tap(
       find.descendant(
@@ -1270,7 +1303,7 @@ void main() {
     slow.complete();
     await tester.pumpAndSettle();
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(libraries.adopted, [('Glass Garden v1.rpp', 'intro')]);
+    expect(versions.adopted, [('Glass Garden v1.rpp', 'intro')]);
   });
 
   testWidgets('shows the absolute path of the selected version', (
@@ -1416,7 +1449,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Adopt'));
     await tester.pumpAndSettle();
-    expect(libraries.adoptedOwners, [const MemberId('demo-member')]);
+    expect(versions.adoptedOwners, [const MemberId('demo-member')]);
   });
 
   testWidgets('offers to make a duplicate a new version', (tester) async {
@@ -1451,7 +1484,7 @@ void main() {
 
     await tester.tap(find.text('Make it a new version'));
     await tester.pumpAndSettle();
-    expect(libraries.separated, hasLength(1));
+    expect(versions.separated, hasLength(1));
   });
 
   Future<void> openMidnightFerry(WidgetTester tester) async {
@@ -1493,7 +1526,7 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     slow.complete();
     await tester.pumpAndSettle();
-    expect(libraries.created, [
+    expect(versions.created, [
       ('Midnight Ferry - bridge.RPP', 'bridge', 'Midnight Ferry v1.rpp'),
     ]);
   });
@@ -1530,7 +1563,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
-    expect(libraries.edited, [('Midnight Ferry v1.rpp', 'intro.RPP', 'first')]);
+    expect(versions.edited, [('Midnight Ferry v1.rpp', 'intro.RPP', 'first')]);
   });
 
   testWidgets('sets the status and deletes a version', (tester) async {
@@ -1542,7 +1575,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mixing').last);
     await tester.pumpAndSettle();
-    expect(libraries.statuses, [('Midnight Ferry v1.rpp', 'mixing')]);
+    expect(versions.statuses, [('Midnight Ferry v1.rpp', 'mixing')]);
 
     await tester.tap(find.byTooltip('More actions').last);
     await tester.pumpAndSettle();
@@ -1554,7 +1587,7 @@ void main() {
     expect(find.text('REAPER is open'), findsOne);
     await tester.tap(find.text('Continue anyway'));
     await tester.pumpAndSettle();
-    expect(libraries.trashed, ['Midnight Ferry v1.rpp']);
+    expect(versions.trashed, ['Midnight Ferry v1.rpp']);
   });
 
   testWidgets('shows the trash of a title', (tester) async {
@@ -1647,7 +1680,7 @@ void main() {
     expect(find.widgetWithText(TextField, 'Song'), findsOne);
     await tester.tap(find.text('Move').last);
     await tester.pumpAndSettle();
-    final (movedPath, folders) = libraries.moved.single;
+    final (movedPath, folders) = migration.moved.single;
     expect(movedPath, 'Artist/Album/Song/Alice/mix/a.rpp');
     expect(folders, ['Artist', 'Album', 'Song']);
 
@@ -1668,7 +1701,7 @@ void main() {
     expect(find.text('Invalid folder name'), findsNothing);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(libraries.moved, hasLength(1));
+    expect(migration.moved, hasLength(1));
 
     final hint = find.text('Open the title to make each copy a new version.');
     await tester.scrollUntilVisible(hint, 200);
@@ -1740,7 +1773,7 @@ void main() {
     await tester.tap(find.text('Fix 3 items'));
     await tester.pumpAndSettle();
 
-    final (library, fixes) = libraries.fixed.single;
+    final (library, fixes) = migration.fixed.single;
     expect(library, band.id);
     expect(
       [
@@ -1826,7 +1859,7 @@ void main() {
 
     expect(
       {
-        for (final (library, fixes) in libraries.fixed)
+        for (final (library, fixes) in migration.fixed)
           library: [for (final f in fixes.cast<LiftProject>()) f.owner],
       },
       {
@@ -1873,7 +1906,7 @@ void main() {
     await tester.tap(find.text('Fix 4 items'));
     await tester.pumpAndSettle();
 
-    final (library, fixes) = libraries.fixed.single;
+    final (library, fixes) = migration.fixed.single;
     expect(library, band.id);
     expect(fixes.cast<NormalizeMedia>().map((f) => f.path), [
       'Artist/Album/Song',
@@ -2107,7 +2140,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix 1 item'));
     await tester.pumpAndSettle();
-    final batch = libraries.fixed.single.$2.single as MoveFolder;
+    final batch = migration.fixed.single.$2.single as MoveFolder;
     expect((batch.path, batch.target), ('Old', 'Sample Artist/Live/Old'));
 
     // Unknown folders: their level is chosen; at their own level, an
@@ -2120,7 +2153,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix 1 item'));
     await tester.pumpAndSettle();
-    final declared = libraries.fixed.last.$2.single as MoveFolder;
+    final declared = migration.fixed.last.$2.single as MoveFolder;
     expect((declared.path, declared.target), ('Stranger', 'Stranger'));
 
     await tester.tap(find.text('Fix…').last);
@@ -2136,7 +2169,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       [
-        for (final f in libraries.fixed.last.$2.cast<MoveFolder>())
+        for (final f in migration.fixed.last.$2.cast<MoveFolder>())
           (f.path, f.target),
       ],
       [
@@ -2147,7 +2180,7 @@ void main() {
 
     // One unknown folder anywhere: one level to type. The dialog closes
     // when the move starts; its report opens over the page.
-    libraries.fixAsTask = true;
+    migration.fixAsTask = true;
     await tester.ensureVisible(find.text('Move…').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move…').at(2));
@@ -2162,13 +2195,13 @@ void main() {
     expect(find.textContaining('both are merged'), findsOne);
     await tester.tap(find.text('Move').last);
     await tester.pumpAndSettle();
-    final moved = libraries.fixed.last.$2.single as MoveFolder;
+    final moved = migration.fixed.last.$2.single as MoveFolder;
     expect((moved.path, moved.target), ('Stranger', 'Sample Artist'));
     expect(find.text('Move “Stranger”'), findsNothing);
     expect(find.text('Folders moved · 1'), findsOne);
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
-    libraries.fixAsTask = false;
+    migration.fixAsTask = false;
 
     // Or at another level: the levels above it are proposed.
     await tester.ensureVisible(find.text('Move…').at(2));
@@ -2182,7 +2215,7 @@ void main() {
     expect(find.byType(TextField), findsNWidgets(3));
     await tester.tap(find.text('Move').last);
     await tester.pumpAndSettle();
-    final title = libraries.fixed.last.$2.single as MoveFolder;
+    final title = migration.fixed.last.$2.single as MoveFolder;
     expect(
       (title.path, title.target),
       ('Stranger', '_Unassigned/_Unassigned/Stranger'),
@@ -2230,7 +2263,7 @@ void main() {
     expect(find.text('C'), findsOne);
     await tester.tap(find.text('Fix 1 item'));
     await tester.pumpAndSettle();
-    expect([for (final f in libraries.fixed.single.$2) f.path], ['B']);
+    expect([for (final f in migration.fixed.single.$2) f.path], ['B']);
 
     // Select all, then none: "Fix…" applies to the whole section again.
     await tester.tap(find.byType(Checkbox).first);
@@ -2267,13 +2300,13 @@ void main() {
     expect(find.text('Delete this ReaHarvest file?'), findsOne);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(libraries.orphansDeleted, isEmpty);
+    expect(migration.orphansDeleted, isEmpty);
 
     await tester.tap(find.text('Delete this file').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete this file').last);
     await tester.pumpAndSettle();
-    expect(libraries.orphansDeleted, ['Artist/render/.node.json']);
+    expect(migration.orphansDeleted, ['Artist/render/.node.json']);
 
     await tester.tap(find.text('Delete this file').last);
     await tester.pumpAndSettle();

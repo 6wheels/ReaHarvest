@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/library_catalog.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'known_values_editor.dart';
@@ -383,7 +383,7 @@ class _Libraries extends ConsumerWidget {
       ),
     );
     if (confirmed ?? false) {
-      await ref.read(libraryServiceProvider).remove(library.id);
+      await ref.read(libraryCatalogProvider).remove(library.id);
     }
   }
 

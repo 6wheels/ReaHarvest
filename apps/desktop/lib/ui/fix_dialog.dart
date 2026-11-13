@@ -5,7 +5,7 @@ import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/libraries.dart';
+import '../state/migration_actions.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'labels.dart';
@@ -150,7 +150,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           .putIfAbsent(issue.library, () => {})
           .add(mediaTitleOf(issue.item.path));
     }
-    final service = ref.read(libraryServiceProvider);
+    final service = ref.read(migrationActionsProvider);
     await Future.wait([
       for (final MapEntry(key: library, value: paths) in titles.entries)
         () async {

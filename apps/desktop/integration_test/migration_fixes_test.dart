@@ -85,7 +85,7 @@ void main() {
     final library = h.settings.libraries.single;
     final me = h.settings.identity;
     await tester.runAsync(
-      () => h.service.setMembers(library, [
+      () => h.catalog.setMembers(library, [
         Member(me.memberId, me.displayName),
         Member(MemberId.generate(), 'Alice'),
         Member(MemberId.generate(), 'Bob'),
@@ -125,7 +125,7 @@ void main() {
     expect(find.text('Expected: Album'), findsOne);
     // Both values joined the known values.
     final known = (await tester.runAsync(
-      () => h.service.knownValuesOf(library),
+      () => h.catalog.knownValuesOf(library),
     ))!.values;
     expect(known.map((v) => v.value), containsAll(['Artist', 'Stranger']));
     expect(
