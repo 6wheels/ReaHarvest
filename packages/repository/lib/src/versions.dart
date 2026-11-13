@@ -5,6 +5,7 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 import 'adoption.dart';
 import 'free_names.dart';
 import 'library_path.dart';
+import 'plugin_names.dart';
 import 'project_file.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
@@ -133,7 +134,8 @@ Future<void> purgeTrash(
 /// Files of the title's `Media/` referenced by none of its projects:
 /// versions and backups, trash excluded (SPEC §5.4). Paths are resolved
 /// from the project folder and from its record path; a file whose name
-/// matches an absolute reference is kept. Throws [FormatException] if a
+/// matches an absolute reference, or that a project names outside its `FILE`
+/// lines (a plugin state, [namedOutsideSources]), is kept. Throws [FormatException] if a
 /// project cannot be read, so that nothing is purged blindly.
 Future<List<StorageEntry>> unreferencedMedia(
   RepositoryStorage storage,
@@ -143,11 +145,30 @@ Future<List<StorageEntry>> unreferencedMedia(
   if (await storage.stat(pool) == null) return const [];
   final referenced = <String>{};
   final absoluteNames = <String>{};
-  for (final e in await storage.list(titleDir, recursive: true)) {
-    if (e.isDirectory || !isProjectFile(e.path) || _isInTrash(e.path)) {
+  final entries = await storage.list(titleDir, recursive: true);
+  final names = {
+    for (final e in await storage.list(pool, recursive: true))
+      if (!e.isDirectory) p.posix.basename(e.path),
+  };
+  final named = <String>{};
+  for (final e in entries) {
+    if (e.isDirectory || _isInTrash(e.path)) continue;
+    if (e.path.toLowerCase().endsWith('.rpp-bak')) {
+      // A backup only counts for the names its plugin states hold.
+      named.addAll(
+        namedOutsideSources(
+          (await readProject(storage, e.path)).text,
+          names,
+        ).map((name) => name.toLowerCase()),
+      );
       continue;
     }
-    final project = RppProject.parse((await readProject(storage, e.path)).text);
+    if (!isProjectFile(e.path)) continue;
+    final text = (await readProject(storage, e.path)).text;
+    final project = RppProject.parse(text);
+    named.addAll(
+      namedOutsideSources(text, names).map((name) => name.toLowerCase()),
+    );
     final dir = parentOf(e.path);
     final record = project.document.root.line('RECORD_PATH')?.params;
     final dirs = {
@@ -171,7 +192,8 @@ Future<List<StorageEntry>> unreferencedMedia(
       if (!e.isDirectory &&
           !isExcludedFile(p.posix.basename(e.path)) &&
           !referenced.contains(e.path.toLowerCase()) &&
-          !absoluteNames.contains(p.posix.basename(e.path).toLowerCase()))
+          !absoluteNames.contains(p.posix.basename(e.path).toLowerCase()) &&
+          !named.contains(p.posix.basename(e.path).toLowerCase()))
         e,
   ];
 }

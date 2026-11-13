@@ -15,7 +15,11 @@ const proxySuffix = '-PROX';
 
 /// What gathering keeps of a project: its text is not kept.
 final class ProjectFacts {
-  const ProjectFacts(this.references, [this.recordPath]);
+  const ProjectFacts(
+    this.references, [
+    this.recordPath,
+    this.namedFiles = const {},
+  ]);
 
   /// Media references (`FILE` of `SOURCE` chunks), deduplicated, as
   /// written.
@@ -23,6 +27,10 @@ final class ProjectFacts {
 
   /// Parameters of its `RECORD_PATH` line; null without one.
   final List<String>? recordPath;
+
+  /// Names, among the media of the title, that appear in the project
+  /// outside its `FILE` lines (`namedOutsideSources`): plugin states.
+  final Set<String> namedFiles;
 }
 
 /// Role of a project of a title in its normalization.
@@ -183,7 +191,8 @@ final class RewriteProject extends MediaOperation {
 
 /// Operations of a normalization, in order, and what is left intact with
 /// its reason ([ReportKind.missingMedia], [ReportKind.externalMedia],
-/// [ReportKind.mediaUsedElsewhere], [ReportKind.fixFailed]).
+/// [ReportKind.mediaUsedElsewhere], [ReportKind.referencedByPlugin],
+/// [ReportKind.fixFailed]).
 typedef MediaPlan = ({List<MediaOperation> operations, Report blocked});
 
 /// Counts of a [MediaPlan], for its preview.
@@ -254,6 +263,9 @@ MediaPlanCounts countPlan(MediaPlan plan) {
 ///   (member or status subfolder, not lifted yet).
 /// - The media found in the title outside its reserved folders and used by
 ///   no project (e.g. in a member subfolder) are merged into the pool too.
+/// - A file used by no project but named by one outside its `FILE` lines
+///   (a plugin state) is left where it is and reported
+///   ([ReportKind.referencedByPlugin]).
 /// - A record path already resolving to the pool (`.\Media`) is left as
 ///   written.
 ///
@@ -401,7 +413,14 @@ final class _Planner {
         recordPath: now == path && parentOf(path) == titleDir,
       );
     }
-    // Media used by no project, e.g. left in a member subfolder.
+    // Media used by no project, e.g. left in a member subfolder, unless a
+    // plugin state names it.
+    final named = <String, List<String>>{};
+    for (final MapEntry(key: path, value: project) in facts.projects.entries) {
+      for (final name in project.namedFiles) {
+        named.putIfAbsent(name.toLowerCase(), () => []).add(path);
+      }
+    }
     for (final e in facts.entries) {
       final key = e.path.toLowerCase();
       final segments = relativeTo(titleDir, e.path).split('/');
@@ -411,6 +430,13 @@ final class _Planner {
           segments.any(isExcludedFolder) ||
           targets.containsKey(key) ||
           kept.contains(key)) {
+        continue;
+      }
+      if (named[p.posix.basename(e.path).toLowerCase()] case final by?) {
+        _block(
+          ReportKind.referencedByPlugin,
+          ReportItem(e.path, by.join('\n')),
+        );
         continue;
       }
       _bring(e.path, keep: false);
