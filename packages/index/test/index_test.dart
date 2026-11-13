@@ -326,6 +326,7 @@ void main() {
       const position = (folder: '.migration/2026-11-12_000000_000', line: 7);
       index.update(lib, const ScanResult(journalPosition: position));
       expect(index.journalPosition(lib.id), position);
+      expect(index.scanResult(lib.id)!.journalPosition, position);
       index.update(lib, const ScanResult());
       expect(index.journalPosition(lib.id), isNull);
     });

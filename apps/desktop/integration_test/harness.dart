@@ -95,11 +95,14 @@ class Harness {
     final settings = (await tester.runAsync(
       () => SettingsFile(settingsPath).load(),
     ))!;
-    _index = LocalIndex.open(p.join(data, 'index.sqlite'));
+    final indexPath = p.join(data, 'index.sqlite');
+    await tester.runAsync(() => createIndex(indexPath));
+    _index = LocalIndex.open(indexPath, readOnly: true);
     container = ProviderContainer(
       overrides: [
         settingsFileProvider.overrideWithValue(SettingsFile(settingsPath)),
         initialSettingsProvider.overrideWithValue(settings),
+        indexPathProvider.overrideWithValue(indexPath),
         localIndexProvider.overrideWithValue(_index!),
         logFolderProvider.overrideWithValue(logs),
         defaultReaperResourcesProvider.overrideWithValue(resources),

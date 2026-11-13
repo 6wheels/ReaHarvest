@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
@@ -77,24 +78,20 @@ class LibraryScans {
     await scan(entry);
   }
 
-  /// Rescans the folder of [title] from its stored rows only; false when
-  /// the whole library must be scanned instead.
+  /// Rescans the folder of [title] from its stored rows only, in an
+  /// isolate that writes the index; false when the whole library must be
+  /// scanned instead.
   Future<bool> _rescanTitle(LibraryEntry entry, Title title) async {
     final root = entry.libraryRoot;
     final library = await readLibrary(MountedFolderStorage(root));
     if (library == null) return false;
-    final index = ref.read(localIndexProvider);
-    final stored = index.storedTitle(library.id, title.path);
-    if (stored == null) return false;
-    final previous = stored.titles.single;
-    final result = await scanTitleFolder(
+    final stored = await scanTitleIntoIndex(
+      ref.read(indexPathProvider),
       root,
       library,
-      previous,
-      stored: stored,
+      title.path,
     );
-    if (result.title == null) return false;
-    index.updateTitle(library, title.path, result);
+    if (!stored) return false;
     ref.read(indexRevisionProvider.notifier).bump();
     _log.info('Rescanned ${title.path} of ${entry.displayName}');
     return true;
@@ -111,9 +108,9 @@ class LibraryScans {
         library: entry.id,
       );
 
-  /// Scans [entry] in an isolate, incrementally from the stored scan unless
-  /// [full] (the files rewritten by a migration since read again), and
-  /// updates the index.
+  /// Scans [entry] in an isolate that writes the index ([scanIntoIndex]),
+  /// incrementally from the stored scan unless [full] (the files rewritten
+  /// by a migration since read again).
   /// Unavailable libraries are skipped. Reports the problems found (SPEC
   /// §5.2).
   Future<Report> _scanReport(LibraryEntry entry, {bool full = false}) async {
@@ -126,26 +123,25 @@ class LibraryScans {
         ReportKind.libraryUnavailable: [ReportItem(root)],
       });
     }
-    final index = ref.read(localIndexProvider);
-    final result = await scanFolder(
+    final issues = await scanIntoIndex(
+      ref.read(indexPathProvider),
       root,
       library,
-      previous: full ? null : index.scanResult(library.id),
-      journalPosition: full ? null : index.journalPosition(library.id),
+      full: full,
     );
-    index.update(library, result);
     ref.read(indexRevisionProvider.notifier).bump();
+    int count(ReportKind kind) => issues.items[kind]?.length ?? 0;
+    final corrupted = count(ReportKind.corrupted);
+    final total = issues.items.values.fold(0, (n, i) => n + i.length);
     _log.info(
-      'Scanned ${entry.displayName}: ${result.titles.length} titles, '
-      '${result.issues.items.values.fold(0, (n, i) => n + i.length)} '
-      'to sort, ${result.corrupted.length} corrupted',
+      'Scanned ${entry.displayName}: '
+      '${total - corrupted - count(ReportKind.orphanNode)} to sort, '
+      '$corrupted corrupted',
     );
     return Report({
           ReportKind.libraryScanned: [ReportItem(root)],
-          ReportKind.corrupted: absoluteItems(root, result.corrupted),
-          ReportKind.orphanNode: absoluteItems(root, result.orphanNodes),
         }) +
-        rootedReport(root, result.issues);
+        rootedReport(root, issues);
   }
 }
 

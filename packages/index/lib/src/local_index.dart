@@ -17,6 +17,10 @@ typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
 const _schemaVersion = 10;
 
+/// Milliseconds a writing connection waits for another writer: a library
+/// write lasts a few seconds at most.
+const _busyTimeout = 60000;
+
 const _schema = '''
 CREATE TABLE libraries (
   id TEXT PRIMARY KEY,
@@ -100,9 +104,9 @@ const _tables = [
 /// (SPEC §7.1, §8). It is a cache of the file system: it is rebuilt from
 /// scratch when its schema changes.
 final class LocalIndex {
-  LocalIndex._(this._db) {
+  LocalIndex._(this._db, {bool readOnly = false}) {
     _db.execute('PRAGMA foreign_keys = ON');
-    if (_db.userVersion != _schemaVersion) {
+    if (!readOnly && _db.userVersion != _schemaVersion) {
       _transaction(() {
         for (final t in _tables) {
           _db.execute('DROP TABLE IF EXISTS $t');
@@ -113,10 +117,25 @@ final class LocalIndex {
     }
   }
 
-  /// Opens (or creates) the index database at [path].
-  factory LocalIndex.open(String path) {
+  /// Opens (or creates) the index database at [path], rebuilt if its schema
+  /// changed. A writing connection waits for the others to finish their
+  /// writes; one per isolate that writes ([scanIntoIndex]).
+  ///
+  /// A [readOnly] connection (the UI isolate) neither creates nor rebuilds
+  /// the database ([createIndex] does it first) and fails on any write
+  /// instead of blocking. Thanks to WAL, its reads never wait for a writer
+  /// and see each write whole.
+  factory LocalIndex.open(String path, {bool readOnly = false}) {
+    if (readOnly) {
+      return LocalIndex._(
+        sqlite3.open(path, mode: OpenMode.readOnly),
+        readOnly: true,
+      );
+    }
     final db = sqlite3.open(path);
-    db.execute('PRAGMA journal_mode = WAL');
+    db
+      ..execute('PRAGMA busy_timeout = $_busyTimeout')
+      ..execute('PRAGMA journal_mode = WAL');
     return LocalIndex._(db);
   }
 
@@ -375,7 +394,8 @@ final class LocalIndex {
 
   /// Titles of all libraries (or of [library]), sorted by library then path,
   /// with their versions: the startup view (SPEC §8).
-  List<Title> titles({LibraryId? library}) => _titles(library: library);
+  List<Title> titles({LibraryId? library}) =>
+      _snapshot(() => _titles(library: library));
 
   /// [titles], only the one at [path] when set (with [library]).
   List<Title> _titles({LibraryId? library, String? path}) {
@@ -408,9 +428,12 @@ final class LocalIndex {
     ];
   }
 
-  /// Last scan stored for [id], to rescan incrementally after a restart;
-  /// null if the library was never indexed.
-  ScanResult? scanResult(LibraryId id) {
+  /// Last scan stored for [id], with its journal position (read together),
+  /// to rescan incrementally after a restart; null if the library was never
+  /// indexed.
+  ScanResult? scanResult(LibraryId id) => _snapshot(() => _scanResult(id));
+
+  ScanResult? _scanResult(LibraryId id) {
     final known = _db.select('SELECT json FROM libraries WHERE id = ?', [id]);
     if (known.isEmpty) return null;
     final library = Library.fromJson(
@@ -439,6 +462,7 @@ final class LocalIndex {
       stamps: _stamps(id),
       subprojects: _subprojects(id),
       freeTree: library.isFreeTree,
+      journalPosition: journalPosition(id),
     );
   }
 
@@ -446,7 +470,10 @@ final class LocalIndex {
   /// [id]: the title, its node, and the stamps and subprojects below its
   /// folder, without loading the rest of the library (SPEC §8). Null if no
   /// such title is indexed.
-  ScanResult? storedTitle(LibraryId id, String titlePath) {
+  ScanResult? storedTitle(LibraryId id, String titlePath) =>
+      _snapshot(() => _storedTitle(id, titlePath));
+
+  ScanResult? _storedTitle(LibraryId id, String titlePath) {
     final title = _titles(library: id, path: titlePath).firstOrNull;
     if (title == null) return null;
     final prefix = titlePath.isEmpty ? '' : '$titlePath/';
@@ -522,7 +549,10 @@ final class LocalIndex {
   /// Issues ("To sort", SPEC §5.2) of [library], or of all libraries, of
   /// [kind] if set; sorted by library, kind (display order) then path.
   /// Expected levels carry the labels of their library's layout.
-  List<LibraryIssue> issues({LibraryId? library, ReportKind? kind}) {
+  List<LibraryIssue> issues({LibraryId? library, ReportKind? kind}) =>
+      _snapshot(() => _issues(library: library, kind: kind));
+
+  List<LibraryIssue> _issues({LibraryId? library, ReportKind? kind}) {
     final layouts = {
       for (final r in _db.select('SELECT id, json FROM libraries'))
         r['id'] as String: Library.fromJson(
@@ -659,8 +689,22 @@ final class LocalIndex {
     }
   }
 
-  void _transaction(void Function() body) {
+  /// Runs the reads of [body] on one state of the database: never a mix of
+  /// the states before and after a write of another connection.
+  T _snapshot<T>(T Function() body) {
+    if (!_db.autocommit) return body();
     _db.execute('BEGIN');
+    try {
+      return body();
+    } finally {
+      _db.execute('COMMIT');
+    }
+  }
+
+  /// Runs [body] as one write transaction, taking the write lock first (a
+  /// read-then-write transaction could not wait for another writer).
+  void _transaction(void Function() body) {
+    _db.execute('BEGIN IMMEDIATE');
     try {
       body();
       _db.execute('COMMIT');
