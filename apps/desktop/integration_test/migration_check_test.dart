@@ -114,13 +114,27 @@ void main() {
     await start(tester);
     final library = h.settings.libraries.single.id;
 
-    // Cancelled as soon as started: during its inventory, before any fix.
-    // Driven through the service, as the cancel button would be tapped too
-    // late for a library this small.
+    // Cancelled as soon as its task starts (after the check for a fix to
+    // undo): during its inventory, before any fix. Driven through the
+    // service, as the cancel button would be tapped too late for a library
+    // this small.
+    final before = h.tasks.length;
+    final cancelling = h.container.listen<List<BackgroundTask>>(tasksProvider, (
+      _,
+      tasks,
+    ) {
+      if (tasks.length > before && tasks.last.isRunning) {
+        if (!tasks.last.cancelling) {
+          h.container.read(tasksProvider.notifier).cancel(tasks.last.id);
+        }
+      }
+    });
+    addTearDown(cancelling.close);
     final fixing = h.service.fix(library, [
       const MoveFolder('Live', 'Artist/Live'),
     ]);
-    h.container.read(tasksProvider.notifier).cancel(h.tasks.last.id);
+    await waitFor(tester, () => h.tasks.length > before, reason: 'started');
+    cancelling.close();
     await waitFor(tester, () => !h.tasks.last.isRunning, reason: 'cancelled');
     await fixing;
     expect(h.tasks.last.state, TaskState.cancelled);

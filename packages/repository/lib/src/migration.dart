@@ -52,6 +52,14 @@ final class Migration {
     return hash(path);
   };
 
+  /// This migration, its journal read again from the storage: a line whose
+  /// append threw may be on disk.
+  Future<Migration> reread() async => Migration._(
+    _storage,
+    inventory,
+    await MigrationJournal.read(_storage, folder),
+  );
+
   /// A new migration, stamped with [now]; nothing is written before its
   /// inventory is taken. The inventory of a [previous] migration seeds it,
   /// at the current paths of its files: those unchanged since are not
@@ -76,6 +84,17 @@ final class Migration {
       ),
       MigrationJournal(storage, folder),
     );
+  }
+
+  /// Folder of the latest migration of [storage] ([latest]), or null,
+  /// found without reading its inventory.
+  static Future<String?> latestFolder(RepositoryStorage storage) async {
+    for (final folder in (await _folders(storage)).reversed) {
+      if (await storage.stat('$folder/${Inventory.fileName}') != null) {
+        return folder;
+      }
+    }
+    return null;
   }
 
   /// The latest migration of [storage], with its inventory complete or not,

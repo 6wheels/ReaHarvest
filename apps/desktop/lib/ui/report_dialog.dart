@@ -19,6 +19,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.corrupted => l10n.corruptedTitle,
       ReportKind.fileLost => l10n.reportFileLost,
       ReportKind.fixFailed => l10n.reportFixFailed,
+      ReportKind.undoFailed => l10n.reportUndoFailed,
       ReportKind.statusFolderUnmatched => l10n.reportStatusFolderUnmatched,
       ReportKind.targetExists => l10n.reportTargetExists,
       ReportKind.folderMoved => l10n.reportFolderMoved,
@@ -47,6 +48,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.mediaCopied => l10n.reportMediaCopied,
       ReportKind.mediaTrashed => l10n.reportMediaTrashed,
       ReportKind.mediaNormalized => l10n.reportMediaNormalized,
+      ReportKind.fixUndone => l10n.reportFixUndone,
     };
 
 /// Warning color, between the accent and the error.

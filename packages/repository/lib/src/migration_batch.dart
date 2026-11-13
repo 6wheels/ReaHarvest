@@ -6,6 +6,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'fixes.dart';
 import 'migration.dart';
 import 'mounted_folder_storage.dart';
+import 'undo.dart';
 
 /// Outcome of a batch of migration fixes: its [report] (library paths), the
 /// folders to add to the known values, and whether it was cancelled.
@@ -29,6 +30,13 @@ final class _Cancelled implements Exception {
 /// two files and between two fixes: the result then tells what was done,
 /// with `cancelled: true`. [usage] tells the projects referencing each
 /// media ([mediaUsage]). Runs in the calling isolate.
+///
+/// A fix that fails is undone at once ([undoFix], SPEC §5.8 step 5) and
+/// reported under [ReportKind.fixFailed] and [ReportKind.fixUndone]; the
+/// batch goes on, and the fix gives no known value. If its undo fails too,
+/// it is reported under [ReportKind.undoFailed] and the batch stops there,
+/// without check: the fix stays to undo. Throws [FixToUndo] before any
+/// change while a fix of the library is left to undo.
 Future<BatchResult> runMigrationBatch(
   RepositoryStorage storage,
   List<MigrationFix> fixes, {
@@ -71,7 +79,10 @@ Future<BatchResult> runMigrationBatch(
     // A fresh inventory for each batch, unless one was interrupted: files
     // changed or added since the previous one are covered.
     final previous = await Migration.latest(storage);
-    final migration = previous != null && !previous.inventory.isComplete
+    if (previous?.journal.unfinishedFix case final fix?) {
+      throw FixToUndo(previous!.journal.pathOf(fix) ?? '');
+    }
+    var migration = previous != null && !previous.inventory.isComplete
         ? previous
         : Migration.start(storage, now: now, previous: previous);
     reporter.step(TaskStep.inventory);
@@ -84,8 +95,40 @@ Future<BatchResult> runMigrationBatch(
       checkCancelled();
       reporter.step(TaskStep.fix, index: i + 1, total: moves.length);
       reporter.progress(i / moves.length);
-      final done = await applyFixes(migration, [fix], usage: usage, hash: hash);
-      applied.add(fix);
+      final previousFix = migration.journal.lastFix;
+      Report done;
+      var threw = false;
+      try {
+        done = await applyFixes(migration, [fix], usage: usage, hash: hash);
+      } on Object catch (error) {
+        // A line of its journal could not be written.
+        threw = true;
+        done = Report({
+          ReportKind.fixFailed: [ReportItem(fix.path, '$error')],
+        });
+      }
+      if (!threw && migration.journal.unfinishedFix == null) {
+        applied.add(fix);
+      } else {
+        try {
+          // Read again: a line whose append threw may be on disk (#92),
+          // its end line included. This fix is undone if its start line
+          // is there, whether it ended or not.
+          migration = await migration.reread();
+          final failed = migration.journal.lastFix;
+          if (failed != null && failed != previousFix) {
+            done += await undoFix(storage, migration, failed);
+            migration = await migration.reread();
+          }
+        } on Object catch (error) {
+          done += Report({
+            ReportKind.undoFailed: [ReportItem(fix.path, '$error')],
+          });
+          reporter.log('$fix\n$done', warning: true);
+          report += done;
+          return result(cancelled: false);
+        }
+      }
       reporter.log('$fix\n$done', warning: done.hasErrors);
       report += done;
     }

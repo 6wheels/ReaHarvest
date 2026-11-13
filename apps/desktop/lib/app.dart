@@ -7,6 +7,7 @@ import 'l10n/app_localizations.dart';
 import 'state/providers.dart';
 import 'theme/app_theme.dart';
 import 'ui/first_run_wizard.dart';
+import 'ui/interrupted_fix_dialog.dart';
 import 'ui/library_page.dart';
 import 'ui/tasks_zone.dart';
 
@@ -50,6 +51,7 @@ class ReaHarvestApp extends ConsumerWidget {
           children: [
             Expanded(child: child!),
             const TasksZone(),
+            const InterruptedFixPrompt(),
           ],
         ),
       ),

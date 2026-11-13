@@ -68,6 +68,7 @@ Future<void> main() async {
       child: const ReaHarvestApp(),
     ),
   );
-  // Indexed titles are shown at once; the scan then refreshes them.
-  if (!_demo) unawaited(container.read(libraryServiceProvider).scanAll());
+  // Indexed titles are shown at once; the scan then refreshes them, then
+  // the fixes left to undo are offered.
+  if (!_demo) unawaited(container.read(libraryServiceProvider).startup());
 }
