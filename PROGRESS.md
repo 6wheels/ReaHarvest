@@ -7,7 +7,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 ## Decisions (2026-11-09)
 - Preparation (migration) works **in place** on the Drive folder (first a copy holding a sample, then the real one), through `RepositoryStorage`; the same code will later organize local folders.
 - Members are declared in `.library.json` (`members`) during preparation; joining writes a client folder in `.collab/<memberId>/` (revised on 2026-11-10, #108).
-- No file is ever deleted: inventory (path, size, XXH3) before and after, raw `.rpp` originals in `.migration/<timestamp>/`, duplicates moved to `.trash/`.
+- No file is ever deleted: inventory (path, size, XXH3) before and after, raw `.rpp` originals in `.migration/<timestamp>/`.
 - Non-project, non-media, non-REAPER files go to `Assets/`, unless a project references them (plain text or base64 plugin state): then reported.
 - Joining requires an **empty** workspace. Windows only; macOS best effort.
 - Statuses and activity are in the MVP through a minimal `JournalStore`.
@@ -23,7 +23,7 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - Assets: a link opening the `Assets/` folder is enough until M3 (#106); the assets view comes in M3, right after the statuses and before the activity (#52, #28).
 - Distribution: the members are not technical, so M2 delivers a Windows installer with auto-update (#31); the zip shared by hand is dropped (#75 closed), a portable zip stays attached to each release. #31 starts with a study of the Microsoft Store as another route. Code signing (SignPath Foundation) is out of M2: Backlog, #113; the M2 installer is unsigned, with a guide for the SmartScreen warning.
 - Recovery: a failed fix is undone at once, an interrupted one is offered to be undone, a cancelled batch leaves only complete fixes (#94); a checkout or publish started again copies only what is missing (#18, #19).
-- The scan creates no folder and never writes in a repository (#97); a version adopted in batch takes its file name as label (#114, former #98); a file named by a plugin state is never moved nor purged (#96); purge is for `local` mode only in the MVP (#111).
+- The scan creates no folder and never writes in a repository (#97); a version adopted in batch takes its file name as label (#114, former #98); a file named by a plugin state is never moved nor purged (#96).
 - Identity: the installation keeps its own; a `collab` library stores the member it acts as, and each installation writes in its own client folder, so a member can join again from another computer (#108).
 
 ## Decisions (2026-11-11, hardening tickets review)
@@ -44,6 +44,16 @@ Deliver in order; each milestone is usable on its own. Coverage gate (95–100 %
 - Conversion (#72): the converted folder leaves the application; it is joined again in M2 (#73).
 - Repository folder without node file (#74): not a title, reported in "To sort".
 - Every open ticket of M1, M2 and M3 now holds its implementation details, order and advised model. The Backlog is not detailed: only #46 and #53 got a note about #114.
+
+## Decisions (2026-11-14, feedback after the first test)
+SPEC.md is updated with every point; the impacted tickets start with a "Rework (2026-11-14)" section that wins over their older text. No backward compatibility: nothing has shipped.
+- One self-contained folder per version (`<title>/<version>/<version>.RPP`, its own `Media/`, `Renders/`, `.history/`; the title keeps `.node.json`, `Assets/`, `.trash/`). No shared pool, no de-duplication, no collision rename, no unused-media purge: space is managed by hand (sizes shown, trash, purge in every mode) (SPEC §3.2, §4.3, §5.4; #145). This replaces the pool merge, dedup and lift delivered in #68, #69 and #81.
+- The application never changes the date of a `.RPP`: adoption, migration, checkout and backup keep it; only a new version takes the current date (§4.2; #146).
+- Title-oriented scan and To sort; each version gets its label and member in the fix (§5.8; #147, #148, #149). Organizing a band's library in place on the repository is confirmed (§3.0): clean up first, convert (#72), then members join a clean repository.
+- Synchronization version by version, one writer per version; "Recover as my version" (§5.5; #18, #19). Synchronization preference in M2, proposal to confirm (#161).
+- Title status derived from the versions, no longer stored (§5.9). Tags shared in `.node.json` (#132).
+- Long and sensitive actions in the foreground, library locked; only the scan in the background; one notification zone (§5.2; #150, #151).
+- Statistics (#129, #130), tags (#132), version detail view (#12) and tray (#135) move to M1. #109 and #111 are closed as obsolete.
 
 ## M0 — Foundations (closed)
 - [x] #61 portable mode
@@ -84,7 +94,7 @@ Core hardening, before the remaining features (listed in the order of the steps 
 - [x] #102 rescan of the title changed by an action only (`scanTitle` in `repository` lists the title folder only, one `stat` per reference leaving it, nothing written; `LocalIndex.updateTitle` replaces the rows below the folder in one transaction and finds the duplicated version ids again from the index; the version actions rescan their title in an isolate, and the whole library when the folder is no longer a title or its scan fails; only the stored rows of the title are loaded (`storedTitle`); PR #142, reviewed, four findings fixed, two gaps left to #141: media issues of other titles pointing into the rescanned one, migration journals arrived by sync)
 - [x] #103 index written outside the UI isolate (`scanIntoIndex`, `scanTitleIntoIndex` and `removeLibraryFromIndex` in `index` each write through their own connection in a background isolate, `BEGIN IMMEDIATE` and a busy timeout so that two writers wait for each other; the app opens the index read-only after `createIndex`, and multi-query reads run on one snapshot; integration test `index_background_test.dart` logs the longest gap between two frames while 1,000 titles and 50,000 files are indexed; PR #143, reviewed, four findings fixed, two follow-ups noted on #103: unused `scanFolder`/`scanTitleFolder`, a library removed during `scanAll` stored again)
 - [x] #105 one interface file per page or component (`title_detail/`, `to_sort/` and `versions/` folders in `apps/desktop/lib/ui/`, `over_library.dart`, `formats.dart` with unit tests; pure move, private widgets used across files made public under the same name)
-- [ ] #141 known values merged and unused media checked again in the library turn (from the review of #101); media issues of other titles refreshed and migration journals read by the title rescan (from the review of #102)
+- [ ] #141 known values merged in the library turn (from the review of #101; the purge and cross-title parts are obsolete since 2026-11-14, the journals in the title rescan moved to #147)
 
 ### Hardening plan for the agents (2026-11-11)
 
@@ -133,6 +143,43 @@ Brief common to every ticket:
 - No in-memory `RepositoryStorage` is shared today: #92 adds one to the tests of `packages/repository`, with injected failures; #93, #94 and #95 reuse it.
 - Not for an agent: the steps listed in "For the maintainer", the hand validation of each milestone.
 
+Rework after the first test (2026-11-14), before the remaining features:
+- [ ] #145 one folder per version
+- [ ] #146 the application never changes the date of a project
+- [ ] #147 title-oriented scan
+- [ ] #148 organize a title into version folders
+- [ ] #149 title-oriented To sort page (label and member per version; reports collapsed)
+- [ ] #150 long actions in the foreground, library locked
+- [ ] #151 one notification zone
+- [ ] #152 acrylic glass pane for every popup
+- [ ] #153 overview with one line per version, without pinning
+- [ ] #154 library page during a scan, cards, list and tree
+- [ ] #155 library form order, labels and folder discovery
+- [ ] #156 title and version detail rework
+- [ ] #157 settings pages and zoom from 75 to 150 %
+- [ ] #158 REAPER logo and attribution
+- [ ] #159 search shortcuts and clear button
+- [ ] #160 filters from the known data, shown with two values or more
+- [ ] #12 version detail view (tempo and signature changes, tracks and FX)
+- [ ] #132 free tags on titles, shared
+- [ ] #135 system tray and window behavior when opening a project
+- [ ] #129 figures of a title and of its versions
+- [ ] #130 statistics page
+
+Plan of the rework (at most 3 agents at once):
+
+| Step | Tickets | Model | Starts when merged |
+|---|---|---|---|
+| 1 | #145 beside #146; #151, #152, #155, #158, #159 one after the other in the third lane | Opus (#145, reviewed by the largest model before merge); Sonnet for #146, #151; Haiku for #152, #155, #158, #159 | now (after #141) |
+| 2 | #147 beside #153 beside #157 + #135 | Opus for #147; Sonnet for the others | #145 (#147); #152 (#153) |
+| 3 | #148 beside #150 beside #12 | Opus for #148 (reviewed by the largest model before merge); Sonnet for #150, #12 | #147, #146 (#148); #151, #152 (#150); #145 (#12) |
+| 4 | #149 beside #156 beside #132 | Sonnet | #148, #150 (#149); #150, #12 (#156); #145 (#132) |
+| 5 | #154, #160 beside #129, then #130 | Sonnet | #132 (#154, #160); #145 (#129); #129 (#130) |
+
+- #145 and #148 touch most of `packages/repository`: no other repository ticket runs beside them, except #146 beside #145 (small conflicts in `history.dart` and `adoption.dart`, the second to merge rebases).
+- #12 needs the tempo envelope format validated first (For the maintainer).
+- Shared files: `ReportKind` (#147, #148), both ARB files, `title_detail/*` (#145, #156, #12), `settings_dialog.dart` (#152, #157, #135, #158), `library_page.dart` (#153, #154, #159).
+
 Remaining features:
 - [ ] #84 issues in the detail view, render target fix
 - [ ] #70 other files to Assets with reference check (uses #96)
@@ -143,16 +190,16 @@ Remaining features:
 - [ ] #88 Retry and Cancel only in the REAPER running dialog (a change is refused while REAPER runs)
 - [ ] #72 convert to a collab repository
 
-Plan of the remaining features (after the core hardening; at most 3 agents at once):
+Plan of the remaining features (after the rework; at most 3 agents at once):
 
 | Step | Tickets | Model | Starts when merged |
 |---|---|---|---|
-| 9 | #84 beside #70 beside #23 | Sonnet | #105 (and #96, #99 for #70) |
-| 10 | #60 beside #88 beside #106 | Sonnet for #60; Haiku for #88 and #106 | #105 |
-| 11 | #89 beside #72 | Sonnet | #100 (and #94 for #72) |
+| 9 | #84 beside #70 beside #23 | Sonnet | #148 (and #156 for #84) |
+| 10 | #60 beside #88 beside #106 | Sonnet for #60; Haiku for #88 and #106 | #156 (#60, #106); now (#88) |
+| 11 | #89 beside #72 | Sonnet | #149 |
 | 12 | Validation of M1 | maintainer | everything above |
 
-Steps 9 to 11 only depend on the hardening: with more agents they can overlap. Shared files: `ReportKind`, both ARB files, `scanner.dart` (#70, #23), the title detail files (#84, #60, #106).
+Steps 9 to 11 only depend on the rework: with more agents they can overlap. Shared files: `ReportKind`, both ARB files, `scanner.dart` (#70, #23), the title detail files (#84, #60, #106).
 - [ ] Validation (quality of the product, not the state of the migrated folder): full preparation on the sample copy with no product defect (every fix behaves as specified, nothing lost, no crash); issues without an automatic fix (missing or external media, conflict copies…) stay listed in To sort for a manual decision; inventory check passes; every fixed project opens in REAPER with no new missing media
 
 ## M2 — Join and sync
@@ -169,7 +216,7 @@ Steps 9 to 11 only depend on the hardening: with more agents they can overlap. S
 - [ ] #21 sync states and actions
 - [ ] #26 members, ownership and forced publish
 - [ ] #83 repair of corrupted application files
-- [ ] #109 history of a title without parsing every backup again
+- [ ] #161 synchronization preference of the checked-out versions (proposal to confirm)
 - [ ] #31 Windows installer, GitHub Releases and auto-update (replaces #75; Microsoft Store study first, at the start of M2; unsigned)
 - [ ] #110 design direction (DAW, mixing console), typeface and own components
 
@@ -178,14 +225,13 @@ Plan of M2 (ticket details written on 2026-11-11; the names of existing code the
 | Step | Tickets | Model | Starts when merged |
 |---|---|---|---|
 | 1 | #107 beside #108 beside #83 | Sonnet | M1 |
-| 1 | #109 | Sonnet | #103 |
 | 1 | #31, Store study | maintainer (an agent prepares the MSIX build) | M1 |
 | 1 | #17 | none: closed when #92 is merged | #92 |
 | 2 | #74 | Opus | #107, #97, #103 |
 | 3 | #73 beside #18 | Sonnet for #73, Opus for #18 | #74 (and #108, #89 for #73) |
 | 4 | #19 beside #20 | Opus; #19 reviewed by the largest model before merge | #18 |
 | 5 | #21 | Sonnet | #18, #19, #20 |
-| 6 | #26 beside #38 | Sonnet for #26, Opus for #38 | #21 (and #108 for #26); #38 once its proposal is confirmed |
+| 6 | #26 beside #38 beside #161 | Sonnet for #26 and #161, Opus for #38 | #21 (and #108 for #26); #38 and #161 once their proposal is confirmed |
 | 7 | #31, delivery | Sonnet | step 6 |
 | 8 | #110 | largest model with the maintainer for the proposal, then Sonnet, alone | every interface ticket of M2 |
 | 9 | Validation of M2 | maintainer | everything above |
@@ -217,12 +263,15 @@ Plan of M3:
 #87 has no agent of its own: each ticket ticks its line.
 
 ## Parked (Backlog)
-#12, #14, #22, #32, #40, #43, #46, #47, #48, #53, #58, #78, #111, #112, #113, #121.
+#14, #22, #32, #40, #43, #46, #47, #48, #53, #58, #78, #112, #113, #121.
 Done outside the milestones: #126 CI time, ~5 min 20 instead of ~12.5 (parallel jobs, integration tests in three Windows batches run by `tool/coverage.dart`, app coverage gate on the merged reports; new integration test files join a batch on their own).
 Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## For the maintainer (not for an agent)
-- #38: confirm the proposed behavior of the two edge-case conflicts (in the ticket) before an agent starts.
+- #38: confirm the proposed behavior of the two edge-case conflicts (in the ticket, rewritten on 2026-11-14 for one writer per version) before an agent starts.
+- #161: confirm the proposed synchronization preference (in the ticket) before an agent starts.
+- #158: supply the REAPER logo (PNG) for `apps/desktop/assets/third_party/reaper/`.
+- #12: save in REAPER a fixture with tempo and time signature changes, to validate the tempo envelope format (SPEC §5.3).
 - #24: confirm the proposed rule for a timestamp far ahead of the local clock (in the ticket; SPEC §10 point 14).
 - #52: confirm that the built-in PDF preview is left out of the MVP (in the ticket; SPEC §5.9 asks for it).
 - #23: produce a real conflict on Google Drive for desktop to confirm its naming pattern (SPEC §3.0).
@@ -230,4 +279,4 @@ Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## Next step
 Done: #90, #91 and both lots of #59 (the integration harness now sizes the native window to 1024x768, so the app stays visible during the tests, #119).
-Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is merged (PR #128): #96 and #99 can start. #96 is merged (PR #137). #99 is merged (PR #138). #94 is merged (PR #136, reviewed, its ten findings fixed). #100 is merged (PR #139). #101 is merged (PR #140, reviewed, two findings fixed, two gaps left to #141). #102 is merged (PR #142, reviewed, four findings fixed, two gaps left to #141): #103, #105 and #141 can start. #103 is merged (PR #143, reviewed, four findings fixed, two follow-ups noted on #103). #105 is merged (PR #144, reviewed, no bug; two cleanup notes left as they are: `formats.dart` mixes pure and provider-aware helpers, `Choice` and `LevelField` stay in `to_sort/fix_dialog.dart`, as the ticket says). Only #141 is left of the hardening. After the hardening: the remaining features of M1 (steps 9 to 11), then the validation of M1.
+Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is merged (PR #128): #96 and #99 can start. #96 is merged (PR #137). #99 is merged (PR #138). #94 is merged (PR #136, reviewed, its ten findings fixed). #100 is merged (PR #139). #101 is merged (PR #140, reviewed, two findings fixed, two gaps left to #141). #102 is merged (PR #142, reviewed, four findings fixed, two gaps left to #141): #103, #105 and #141 can start. #103 is merged (PR #143, reviewed, four findings fixed, two follow-ups noted on #103). #105 is merged (PR #144, reviewed, no bug; two cleanup notes left as they are: `formats.dart` mixes pure and provider-aware helpers, `Choice` and `LevelField` stay in `to_sort/fix_dialog.dart`, as the ticket says). Only #141 is left of the hardening. On 2026-11-14 the feedback after the first test reworked SPEC.md and the tickets (Decisions 2026-11-14). Next: #141, then the rework of M1 (#145 to #160, #12, #132, #135, #129, #130, in the order of its plan), then the remaining features of M1 (steps 9 to 11), then the validation of M1.
