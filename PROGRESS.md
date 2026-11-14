@@ -158,6 +158,7 @@ Rework after the first test (2026-11-14), before the remaining features:
 - [ ] #156 title and version detail rework
 - [ ] #157 settings pages and zoom from 75 to 150 %
 - [ ] #158 REAPER logo and attribution
+- [ ] #163 ReaHarvest logo as application icon and in the interface
 - [ ] #159 search shortcuts and clear button
 - [ ] #160 filters from the known data, shown with two values or more
 - [ ] #12 version detail view (tempo and signature changes, tracks and FX)
@@ -174,11 +175,11 @@ Plan of the rework (at most 3 agents at once):
 | 2 | #147 beside #153 beside #157 + #135 | Opus for #147; Sonnet for the others | #145 (#147); #152 (#153) |
 | 3 | #148 beside #150 beside #12 | Opus for #148 (reviewed by the largest model before merge); Sonnet for #150, #12 | #147, #146 (#148); #151, #152 (#150); #145 (#12) |
 | 4 | #149 beside #156 beside #132 | Sonnet | #148, #150 (#149); #150, #12 (#156); #145 (#132) |
-| 5 | #154, #160 beside #129, then #130 | Sonnet | #132 (#154, #160); #145 (#129); #129 (#130) |
+| 5 | #154, #160 beside #129, then #130, beside #163 | Sonnet; Haiku for #163 | #132 (#154, #160); #145 (#129); #129 (#130); #157 (#163) |
 
 - #145 and #148 touch most of `packages/repository`: no other repository ticket runs beside them, except #146 beside #145 (small conflicts in `history.dart` and `adoption.dart`, the second to merge rebases).
 - #12: the tempo envelope format is validated (SPEC §5.3, `test/fixtures/tracks.rpp`); #158: the REAPER logo is supplied (`apps/desktop/assets/third_party/reaper/reaper.png`).
-- Shared files: `ReportKind` (#147, #148), both ARB files, `title_detail/*` (#145, #156, #12), `settings_dialog.dart` (#152, #157, #135, #158), `library_page.dart` (#153, #154, #159).
+- Shared files: `ReportKind` (#147, #148), both ARB files, `title_detail/*` (#145, #156, #12), `settings_dialog.dart` (#152, #157, #135, #158, #163), `library_page.dart` (#153, #154, #159).
 
 Remaining features:
 - [ ] #84 issues in the detail view, render target fix
@@ -276,4 +277,4 @@ Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## Next step
 Done: #90, #91 and both lots of #59 (the integration harness now sizes the native window to 1024x768, so the app stays visible during the tests, #119).
-Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is merged (PR #128): #96 and #99 can start. #96 is merged (PR #137). #99 is merged (PR #138). #94 is merged (PR #136, reviewed, its ten findings fixed). #100 is merged (PR #139). #101 is merged (PR #140, reviewed, two findings fixed, two gaps left to #141). #102 is merged (PR #142, reviewed, four findings fixed, two gaps left to #141): #103, #105 and #141 can start. #103 is merged (PR #143, reviewed, four findings fixed, two follow-ups noted on #103). #105 is merged (PR #144, reviewed, no bug; two cleanup notes left as they are: `formats.dart` mixes pure and provider-aware helpers, `Choice` and `LevelField` stay in `to_sort/fix_dialog.dart`, as the ticket says). Only #141 is left of the hardening. On 2026-11-14 the feedback after the first test reworked SPEC.md and the tickets (Decisions 2026-11-14). Next: #141, then the rework of M1 (#145 to #160, #12, #132, #135, #129, #130, in the order of its plan), then the remaining features of M1 (steps 9 to 11), then the validation of M1.
+Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is merged (PR #128): #96 and #99 can start. #96 is merged (PR #137). #99 is merged (PR #138). #94 is merged (PR #136, reviewed, its ten findings fixed). #100 is merged (PR #139). #101 is merged (PR #140, reviewed, two findings fixed, two gaps left to #141). #102 is merged (PR #142, reviewed, four findings fixed, two gaps left to #141): #103, #105 and #141 can start. #103 is merged (PR #143, reviewed, four findings fixed, two follow-ups noted on #103). #105 is merged (PR #144, reviewed, no bug; two cleanup notes left as they are: `formats.dart` mixes pure and provider-aware helpers, `Choice` and `LevelField` stay in `to_sort/fix_dialog.dart`, as the ticket says). Only #141 is left of the hardening. On 2026-11-14 the feedback after the first test reworked SPEC.md and the tickets (Decisions 2026-11-14). Next: #141, then the rework of M1 (#145 to #160, #163, #12, #132, #135, #129, #130, in the order of its plan), then the remaining features of M1 (steps 9 to 11), then the validation of M1.
