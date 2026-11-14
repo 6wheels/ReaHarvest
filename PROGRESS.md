@@ -50,7 +50,7 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 - One self-contained folder per version (`<title>/<version>/<version>.RPP`, its own `Media/`, `Renders/`, `.history/`; the title keeps `.node.json`, `Assets/`, `.trash/`). No shared pool, no de-duplication, no collision rename, no unused-media purge: space is managed by hand (sizes shown, trash, purge in every mode) (SPEC §3.2, §4.3, §5.4; #145). This replaces the pool merge, dedup and lift delivered in #68, #69 and #81.
 - The application never changes the date of a `.RPP`: adoption, migration, checkout and backup keep it; only a new version takes the current date (§4.2; #146).
 - Title-oriented scan and To sort; each version gets its label and member in the fix (§5.8; #147, #148, #149). Organizing a band's library in place on the repository is confirmed (§3.0): clean up first, convert (#72), then members join a clean repository.
-- Synchronization version by version, one writer per version; "Recover as my version" (§5.5; #18, #19). Synchronization preference in M2, proposal to confirm (#161).
+- Synchronization version by version, one writer per version; "Recover as my version" (§5.5; #18, #19). Synchronization preference in M2 (#161, confirmed on 2026-11-14). Edge cases (#38): a deletion by the owner is never a conflict; a creation clash renames the second version folder and tells its author.
 - Title status derived from the versions, no longer stored (§5.9). Tags shared in `.node.json` (#132).
 - Long and sensitive actions in the foreground, library locked; only the scan in the background; one notification zone (§5.2; #150, #151).
 - Statistics (#129, #130), tags (#132), version detail view (#12) and tray (#135) move to M1. #109 and #111 are closed as obsolete.
@@ -177,7 +177,7 @@ Plan of the rework (at most 3 agents at once):
 | 5 | #154, #160 beside #129, then #130 | Sonnet | #132 (#154, #160); #145 (#129); #129 (#130) |
 
 - #145 and #148 touch most of `packages/repository`: no other repository ticket runs beside them, except #146 beside #145 (small conflicts in `history.dart` and `adoption.dart`, the second to merge rebases).
-- #12 needs the tempo envelope format validated first (For the maintainer).
+- #12: the tempo envelope format is validated (SPEC §5.3, `test/fixtures/tracks.rpp`); #158: the REAPER logo is supplied (`apps/desktop/assets/third_party/reaper/reaper.png`).
 - Shared files: `ReportKind` (#147, #148), both ARB files, `title_detail/*` (#145, #156, #12), `settings_dialog.dart` (#152, #157, #135, #158), `library_page.dart` (#153, #154, #159).
 
 Remaining features:
@@ -216,7 +216,7 @@ Steps 9 to 11 only depend on the rework: with more agents they can overlap. Shar
 - [ ] #21 sync states and actions
 - [ ] #26 members, ownership and forced publish
 - [ ] #83 repair of corrupted application files
-- [ ] #161 synchronization preference of the checked-out versions (proposal to confirm)
+- [ ] #161 synchronization preference of the checked-out versions
 - [ ] #31 Windows installer, GitHub Releases and auto-update (replaces #75; Microsoft Store study first, at the start of M2; unsigned)
 - [ ] #110 design direction (DAW, mixing console), typeface and own components
 
@@ -231,7 +231,7 @@ Plan of M2 (ticket details written on 2026-11-11; the names of existing code the
 | 3 | #73 beside #18 | Sonnet for #73, Opus for #18 | #74 (and #108, #89 for #73) |
 | 4 | #19 beside #20 | Opus; #19 reviewed by the largest model before merge | #18 |
 | 5 | #21 | Sonnet | #18, #19, #20 |
-| 6 | #26 beside #38 beside #161 | Sonnet for #26 and #161, Opus for #38 | #21 (and #108 for #26); #38 and #161 once their proposal is confirmed |
+| 6 | #26 beside #38 beside #161 | Sonnet for #26 and #161, Opus for #38 | #21 (and #108 for #26) |
 | 7 | #31, delivery | Sonnet | step 6 |
 | 8 | #110 | largest model with the maintainer for the proposal, then Sonnet, alone | every interface ticket of M2 |
 | 9 | Validation of M2 | maintainer | everything above |
@@ -268,10 +268,7 @@ Done outside the milestones: #126 CI time, ~5 min 20 instead of ~12.5 (parallel 
 Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 
 ## For the maintainer (not for an agent)
-- #38: confirm the proposed behavior of the two edge-case conflicts (in the ticket, rewritten on 2026-11-14 for one writer per version) before an agent starts.
-- #161: confirm the proposed synchronization preference (in the ticket) before an agent starts.
-- #158: supply the REAPER logo (PNG) for `apps/desktop/assets/third_party/reaper/`.
-- #12: save in REAPER a fixture with tempo and time signature changes, to validate the tempo envelope format (SPEC §5.3).
+- #161: the synchronization preference is confirmed (2026-11-14); its implementation details are to write before an agent starts.
 - #24: confirm the proposed rule for a timestamp far ahead of the local clock (in the ticket; SPEC §10 point 14).
 - #52: confirm that the built-in PDF preview is left out of the MVP (in the ticket; SPEC §5.9 asks for it).
 - #23: produce a real conflict on Google Drive for desktop to confirm its naming pattern (SPEC §3.0).
