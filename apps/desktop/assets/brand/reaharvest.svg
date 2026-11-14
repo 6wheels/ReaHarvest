@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="1024mm"
+   height="1024mm"
+   viewBox="0 0 1024 1024"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   sodipodi:docname="reaharvest-icon.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     showgrid="true"
+     inkscape:zoom="0.11313708"
+     inkscape:cx="1723.5728"
+     inkscape:cy="1414.2136"
+     inkscape:window-width="1256"
+     inkscape:window-height="1194"
+     inkscape:window-x="1251"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg1"
+     inkscape:export-bgcolor="#ffffff00">
+    <inkscape:grid
+       id="grid1"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="0.26458333"
+       spacingy="0.26458333"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="5"
+       enabled="true"
+       visible="true" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <inkscape:path-effect
+       effect="bool_op"
+       operand-path=""
+       id="path-effect7"
+       is_visible="true"
+       lpeversion="1"
+       operation="diff"
+       swap-operands="false"
+       filltype-this="from-curve"
+       filter=""
+       filltype-operand="from-curve" />
+    <filter
+       id="selectable_hidder_filter"
+       width="1"
+       height="1"
+       x="0"
+       y="0"
+       style="color-interpolation-filters:sRGB;"
+       inkscape:label="LPE boolean visibility">
+      <feComposite
+         id="boolops_hidder_primitive"
+         result="composite1"
+         operator="arithmetic"
+         in2="SourceGraphic"
+         in="BackgroundImage" />
+    </filter>
+    <inkscape:path-effect
+       effect="bool_op"
+       operand-path=""
+       id="path-effect5"
+       is_visible="true"
+       lpeversion="1"
+       operation="diff"
+       swap-operands="false"
+       filltype-this="from-curve"
+       filter=""
+       filltype-operand="from-curve" />
+  </defs>
+  <path
+     d="m 749.79401,776.70967 a 355.83328,355.83328 0 0 1 -237.79427,91.12364 v 63.5 H 906.68055 A 418.04166,469.789 0 0 1 749.79401,776.70967 Z"
+     style="display:inline;stroke-width:0.246"
+     id="path12" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer4"
+     inkscape:label="Bottom bracket">
+    <g
+       inkscape:groupmode="layer"
+       id="layer6"
+       inkscape:label="originals"
+       style="display:none">
+      <path
+         style="display:inline;fill:#000000;fill-opacity:1;stroke-width:0.246;stroke-dasharray:none"
+         id="path5"
+         width="461.66663"
+         height="211.66669"
+         x="512"
+         y="719.66669"
+         inkscape:path-effect="#path-effect7"
+         sodipodi:type="rect"
+         d="M 512,719.66669 H 973.66663 V 931.33337 H 512 Z" />
+      <ellipse
+         style="display:inline;fill:#ffffff;fill-opacity:1;stroke-width:0.767782;stroke-dasharray:none"
+         id="ellipse5"
+         cx="1095.155"
+         cy="512"
+         rx="418.04166"
+         ry="469.789" />
+    </g>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="Circle circle"
+     style="display:inline">
+    <path
+       d="M 511.99974,92.666693 A 419.33328,419.33328 0 0 0 92.666693,511.99974 419.33328,419.33328 0 0 0 511.99974,931.33331 419.33328,419.33328 0 0 0 931.33331,511.99974 419.33328,419.33328 0 0 0 511.99974,92.666693 Z m 0,63.499997 A 355.83328,355.83328 0 0 1 867.83331,511.99974 355.83328,355.83328 0 0 1 511.99974,867.83331 355.83328,355.83328 0 0 1 156.16669,511.99974 355.83328,355.83328 0 0 1 511.99974,156.16669 Z"
+       style="display:inline;stroke-width:0.264583"
+       id="path11" />
+    <g
+       inkscape:groupmode="layer"
+       id="layer8"
+       inkscape:label="originals"
+       style="display:none">
+      <circle
+         style="display:inline;fill:#000000;stroke-width:0.264583"
+         id="circle10"
+         cx="512"
+         cy="512"
+         r="419.33328" />
+      <circle
+         style="display:inline;fill:#ffffff;fill-opacity:1;stroke-width:0.231794"
+         id="circle11"
+         cx="512"
+         cy="512"
+         r="355.83328" />
+    </g>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer5"
+     inkscape:label="Waves">
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke-width:0.381186;stroke-dasharray:none"
+       id="rect4"
+       width="76.666618"
+       height="521.16656"
+       x="473.66666"
+       y="251.4167" />
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke-width:0.261888;stroke-dasharray:none"
+       id="rect4-9"
+       width="76.666618"
+       height="245.99997"
+       x="322.0824"
+       y="389.00003" />
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke-width:0.225569;stroke-dasharray:none"
+       id="rect4-0"
+       width="76.666618"
+       height="182.49998"
+       x="625.25092"
+       y="420.75" />
+  </g>
+</svg>

@@ -2,19 +2,19 @@
 
 Collaborative project manager for [REAPER](https://www.reaper.fm/).
 
-ReaHarvest keeps REAPER projects organized, versioned and shared without
-duplicating media:
+ReaHarvest keeps REAPER projects organized, versioned and shared:
 
 - **Enforced organization**: projects live in a fixed folder layout
-  (e.g. `artist/album/title`), navigable by tags.
-- **Versions**: every `.rpp` of a title is a version with a stable id, an
-  owner and a label, stored in the project itself.
-- **Shared media pool**: all versions of a title use a single append-only
-  `Media/` folder. Media is never copied per person or per version.
+  (e.g. `artist/album/title`), navigable by search, filters and free tags.
+- **Self-contained versions**: each version of a title is its own folder
+  (project, media, renders and backup points), with a stable id stored in the
+  project, an owner and a label. Version sizes are shown; space is freed by
+  hand through the trash.
 - **Local work, cloud repository**: you always work on a local copy; a cloud
   folder (Google Drive, Dropbox, OneDrive, Nextcloud, NAS…) acts as the shared
-  repository, with checkout / publish / release and conflict detection.
-- **Collaboration**: members, version ownership, statuses, tasks, notes,
+  repository, with checkout / publish / release version by version, each
+  version having a single writer, its owner.
+- **Collaboration**: members, version ownership, statuses, tags, tasks, notes,
   lyrics and shared assets.
 
 Each library runs in one of three modes: `local` (personal projects on one
@@ -74,5 +74,6 @@ The full specification is in [SPEC.md](SPEC.md).
 
 ## Disclaimer
 
+REAPER is a registered trademark of Cockos Incorporated, used with permission.
 ReaHarvest is an independent project, not affiliated with or endorsed by
-Cockos Incorporated. REAPER is a trademark of Cockos Incorporated.
+Cockos Incorporated.
