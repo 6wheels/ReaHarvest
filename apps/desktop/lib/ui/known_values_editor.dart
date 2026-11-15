@@ -215,6 +215,7 @@ class _KnownValuesDialog extends ConsumerStatefulWidget {
 
 class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
   List<KnownValue>? _values;
+  var _read = const <KnownValue>[];
   var _used = const <String>{};
 
   @override
@@ -224,6 +225,7 @@ class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
       if (mounted) {
         setState(() {
           _values = r.values;
+          _read = r.values;
           _used = r.used;
         });
       }
@@ -277,7 +279,7 @@ class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
                   Navigator.of(context).pop();
                   ref
                       .read(libraryCatalogProvider)
-                      .setKnownValues(widget.entry, values);
+                      .setKnownValues(widget.entry, values, read: _read);
                 }
               : null,
           child: Text(l10n.save),

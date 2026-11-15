@@ -220,7 +220,7 @@ void main() {
         KnownValue('Album'),
         KnownValue(Layout.unassigned),
       ]),
-    ]);
+    ], read: const []);
     final id = entry.id;
 
     final report = await migration.fix(id, const [
@@ -269,7 +269,7 @@ void main() {
     final entry = container.read(settingsProvider).libraries.single;
     await catalog.setKnownValues(entry, const [
       KnownValue('Artist', [KnownValue('Album')]),
-    ]);
+    ], read: const []);
     List<String> unknown() => [
       for (final i in container.read(issuesProvider))
         if (i.item.level != null) i.item.path,
@@ -461,7 +461,7 @@ void main() {
     final entry = container.read(settingsProvider).libraries.single;
     await catalog.setKnownValues(entry, const [
       KnownValue('Artist', [KnownValue('Album')]),
-    ]);
+    ], read: const []);
     final l10n = lookupAppLocalizations(const Locale('en'));
     container.listen(tasksProvider, (_, tasks) {
       final task = tasks.last;

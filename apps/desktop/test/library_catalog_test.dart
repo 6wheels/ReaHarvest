@@ -273,7 +273,7 @@ void main() {
     final values = const [
       KnownValue('Artist', [KnownValue('Album'), KnownValue('Live')]),
     ];
-    await catalog.setKnownValues(entry, values);
+    await catalog.setKnownValues(entry, values, read: prefilled);
     expect((await readLibrary(storage))!.knownValues, values);
     expect(container.read(tasksProvider).last.openReport, isTrue);
     final known = await catalog.knownValuesOf(entry);
@@ -305,7 +305,42 @@ void main() {
         workspaceRoot: folder('None'),
       ),
       values,
+      read: const [],
     );
     expect(await readLibrary(MountedFolderStorage(folder('None'))), isNull);
+  });
+
+  test('saving known values keeps those added since the editor opened',
+      () async {
+    final band = folder('Merge');
+    Directory(band).createSync(recursive: true);
+    const opened = [
+      KnownValue('Artist', [KnownValue('Album'), KnownValue('Live')]),
+    ];
+    await catalog.addLocal(
+      folder: band,
+      displayName: 'Merge',
+      layout: Layout.classic(),
+      knownValues: opened,
+    );
+    final storage = MountedFolderStorage(band);
+    final entry = container.read(settingsProvider).libraries.single;
+
+    // A batch adds Artist/New while the editor is open.
+    final library = (await readLibrary(storage))!;
+    await writeLibrary(
+      storage,
+      library.withKnownValues(opened.withPath(['Artist', 'New'])),
+    );
+
+    // The user removes Live and saves.
+    await catalog.setKnownValues(
+      entry,
+      opened.withoutPath(['Artist', 'Live']),
+      read: opened,
+    );
+    expect((await readLibrary(storage))!.knownValues, const [
+      KnownValue('Artist', [KnownValue('Album'), KnownValue('New')]),
+    ]);
   });
 }

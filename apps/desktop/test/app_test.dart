@@ -116,8 +116,9 @@ class FakeLibraryCatalog extends LibraryCatalog {
   @override
   Future<void> setKnownValues(
     LibraryEntry entry,
-    List<KnownValue> values,
-  ) async => knownValues = values;
+    List<KnownValue> values, {
+    required List<KnownValue> read,
+  }) async => knownValues = values;
 
   @override
   Future<void> addLocal({
