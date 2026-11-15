@@ -157,9 +157,9 @@ class LibraryCatalog {
 
   /// Replaces the known values of the library [entry] (SPEC §3.1), in the
   /// turn of the library. [read] is the list the editor opened with: the
-  /// values added to the file since (by a batch) are kept, unless [values]
-  /// removed them. Then rescans it, as a task whose report is shown at the
-  /// end.
+  /// values added to the file since (by a batch), which [read] did not
+  /// know, are kept. A value of [read] absent from [values] stays removed.
+  /// Then rescans it, as a task whose report is shown at the end.
   Future<void> setKnownValues(
     LibraryEntry entry,
     List<KnownValue> values, {
