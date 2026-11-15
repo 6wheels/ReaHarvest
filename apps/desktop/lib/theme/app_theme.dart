@@ -188,6 +188,7 @@ ThemeData buildTheme(Brightness brightness) {
     fontFamily: Fonts.text,
     visualDensity: VisualDensity.compact,
     scaffoldBackgroundColor: c.background,
+    canvasColor: c.surface,
     splashFactory: NoSplash.splashFactory,
     hoverColor: c.text.withValues(alpha: 0.05),
     focusColor: c.accent.withValues(alpha: 0.14),
@@ -291,6 +292,47 @@ ThemeData buildTheme(Brightness brightness) {
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         elevation: const WidgetStatePropertyAll(6),
         shape: menuShape,
+        padding: const WidgetStatePropertyAll(EdgeInsets.all(Space.xs)),
+      ),
+    ),
+    // Menu entries: compact rows lit with the accent on hover.
+    menuButtonTheme: MenuButtonThemeData(
+      style: ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size(160, 30)),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 10),
+        ),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.xs)),
+        ),
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(
+            fontFamily: Fonts.text,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled) ? c.muted : c.text,
+        ),
+        iconColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.hovered) ||
+                  states.contains(WidgetState.focused)
+              ? c.accent
+              : c.muted,
+        ),
+        iconSize: const WidgetStatePropertyAll(16),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.hovered) ||
+                  states.contains(WidgetState.focused)
+              ? c.accent.withValues(alpha: 0.10)
+              : Colors.transparent,
+        ),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(

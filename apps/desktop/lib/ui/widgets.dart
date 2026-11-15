@@ -60,6 +60,48 @@ class Led extends StatelessWidget {
   );
 }
 
+/// Legend heading the entries of a menu; not an entry itself.
+class MenuLegend extends StatelessWidget {
+  const MenuLegend(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+    child: Text(
+      label.toUpperCase(),
+      style: context.legend.copyWith(fontSize: 9.5),
+    ),
+  );
+}
+
+/// Square light of a checkable menu entry, lit when [checked].
+class ChoiceLight extends StatelessWidget {
+  const ChoiceLight({super.key, required this.checked});
+
+  final bool checked;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AnimatedContainer(
+      duration: Motion.fast,
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: checked ? c.accent : Colors.transparent,
+        borderRadius: BorderRadius.circular(Radii.xs),
+        border: Border.all(color: checked ? c.accent : c.muted),
+        boxShadow: [
+          if (checked)
+            BoxShadow(color: c.accent.withValues(alpha: 0.5), blurRadius: 6),
+        ],
+      ),
+    );
+  }
+}
+
 /// Button label hidden behind a small spinner while [busy], keeping the
 /// button size.
 class BusyLabel extends StatelessWidget {

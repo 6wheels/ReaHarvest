@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
 import 'to_sort/to_sort_page.dart';
+import 'widgets.dart' show ChoiceLight, MenuLegend;
 
 /// Filter chips, saved views, "To sort" / "To adopt" and display mode, below
 /// the search bar (SPEC §5.2). Chips offering a single value are hidden.
@@ -134,27 +135,9 @@ class FilterBar extends ConsumerWidget {
             ),
             const SizedBox(width: Space.s),
           ],
-          SegmentedButton<DisplayMode>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(
-                value: DisplayMode.cards,
-                icon: const Icon(Icons.grid_view_rounded, size: 16),
-                tooltip: l10n.displayCards,
-              ),
-              ButtonSegment(
-                value: DisplayMode.list,
-                icon: const Icon(Icons.view_list_rounded, size: 16),
-                tooltip: l10n.displayList,
-              ),
-              ButtonSegment(
-                value: DisplayMode.tree,
-                icon: const Icon(Icons.account_tree_outlined, size: 16),
-                tooltip: l10n.displayTree,
-              ),
-            ],
-            selected: {navigation.displayMode},
-            onSelectionChanged: (s) => notifier.setDisplayMode(s.single),
+          _DisplaySwitch(
+            selected: navigation.displayMode,
+            onChanged: notifier.setDisplayMode,
           ),
         ],
       ),
@@ -236,6 +219,64 @@ class Pill extends StatelessWidget {
   }
 }
 
+/// Display mode selector: a row of square switches in one frame, as high
+/// as the filter switches; the selected one is lit.
+class _DisplaySwitch extends StatelessWidget {
+  const _DisplaySwitch({required this.selected, required this.onChanged});
+
+  final DisplayMode selected;
+  final ValueChanged<DisplayMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final l10n = AppLocalizations.of(context);
+    final modes = [
+      (DisplayMode.cards, Icons.grid_view_rounded, l10n.displayCards),
+      (DisplayMode.list, Icons.view_list_rounded, l10n.displayList),
+      (DisplayMode.tree, Icons.account_tree_outlined, l10n.displayTree),
+    ];
+    return Container(
+      height: 26,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: c.raised,
+        borderRadius: BorderRadius.circular(Radii.s),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 2,
+        children: [
+          for (final (mode, icon, tooltip) in modes)
+            Tooltip(
+              message: tooltip,
+              child: Material(
+                color: mode == selected
+                    ? c.accent.withValues(alpha: 0.16)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(Radii.xs),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(Radii.xs),
+                  onTap: () => onChanged(mode),
+                  child: SizedBox(
+                    width: 28,
+                    height: 20,
+                    child: Icon(
+                      icon,
+                      size: 14,
+                      color: mode == selected ? c.accent : c.muted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Chip opening a menu of checkable values.
 class _MultiChoiceChip<T> extends StatelessWidget {
   const _MultiChoiceChip({
@@ -263,13 +304,17 @@ class _MultiChoiceChip<T> extends StatelessWidget {
       final n => '$label$labelSeparator$n',
     };
     return MenuAnchor(
+      alignmentOffset: const Offset(0, Space.xs),
       menuChildren: [
+        MenuLegend(label),
         for (final v in values)
-          CheckboxMenuButton(
-            value: selected.contains(v),
+          MenuItemButton(
             closeOnActivate: false,
-            onChanged: (checked) => onChanged(
-              checked == true ? {...selected, v} : ({...selected}..remove(v)),
+            leadingIcon: ChoiceLight(checked: selected.contains(v)),
+            onPressed: () => onChanged(
+              selected.contains(v)
+                  ? ({...selected}..remove(v))
+                  : {...selected, v},
             ),
             child: Text(labelOf(v)),
           ),
@@ -294,7 +339,9 @@ class _SavedViewsChip extends ConsumerWidget {
     final views = ref.watch(navigationProvider.select((n) => n.savedViews));
     final notifier = ref.read(navigationProvider.notifier);
     return MenuAnchor(
+      alignmentOffset: const Offset(0, Space.xs),
       menuChildren: [
+        MenuLegend(l10n.views),
         if (views.isEmpty)
           MenuItemButton(onPressed: null, child: Text(l10n.noSavedView)),
         for (final v in views)
@@ -302,16 +349,19 @@ class _SavedViewsChip extends ConsumerWidget {
             onPressed: () => notifier.applyView(v),
             trailingIcon: IconButton(
               tooltip: l10n.deleteView,
-              iconSize: 16,
+              iconSize: 14,
               visualDensity: VisualDensity.compact,
               onPressed: () => notifier.deleteView(v.name),
               icon: const Icon(Icons.close_rounded),
             ),
             child: Text(v.name),
           ),
-        const Divider(height: 1),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: Space.xs),
+          child: Divider(height: 1),
+        ),
         MenuItemButton(
-          leadingIcon: const Icon(Icons.bookmark_add_outlined, size: 18),
+          leadingIcon: const Icon(Icons.bookmark_add_outlined),
           onPressed: () async {
             final name = await _askViewName(context);
             if (name != null) notifier.saveView(name);
