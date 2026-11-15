@@ -48,7 +48,7 @@ void main() {
         KnownValue('Artist', [KnownValue('Album'), KnownValue('Live')]),
       ],
     );
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
   }
 

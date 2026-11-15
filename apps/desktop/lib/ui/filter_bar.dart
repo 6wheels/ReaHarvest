@@ -86,21 +86,30 @@ class FilterBar extends ConsumerWidget {
         ),
       const _SavedViewsChip(),
       if (!filter.isEmpty)
-        TextButton(
+        Pill(
+          label: l10n.clearFilters,
+          icon: Icons.close_rounded,
           onPressed: () => set(const TitleFilter()),
-          child: Text(l10n.clearFilters),
         ),
     ];
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.m),
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.m,
+        vertical: Space.s - 2,
+      ),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(bottom: BorderSide(color: c.border)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Wrap(
-              spacing: Space.s,
-              runSpacing: Space.s,
+              spacing: Space.xs + 2,
+              runSpacing: Space.xs + 2,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: chips,
             ),
@@ -108,7 +117,8 @@ class FilterBar extends ConsumerWidget {
           const SizedBox(width: Space.m),
           if (toSort > 0) ...[
             Pill(
-              label: '${l10n.toSort} · $toSort',
+              label: l10n.toSort,
+              count: toSort,
               icon: Icons.move_down_rounded,
               onPressed: () => openToSort(context),
             ),
@@ -116,7 +126,8 @@ class FilterBar extends ConsumerWidget {
           ],
           if (toAdopt > 0) ...[
             Pill(
-              label: '${l10n.toAdopt} · $toAdopt',
+              label: l10n.toAdopt,
+              count: toAdopt,
               icon: Icons.add_task_rounded,
               active: filter.toAdopt,
               onPressed: () => set(filter.copyWith(toAdopt: !filter.toAdopt)),
@@ -128,17 +139,17 @@ class FilterBar extends ConsumerWidget {
             segments: [
               ButtonSegment(
                 value: DisplayMode.cards,
-                icon: const Icon(Icons.grid_view_rounded, size: 18),
+                icon: const Icon(Icons.grid_view_rounded, size: 16),
                 tooltip: l10n.displayCards,
               ),
               ButtonSegment(
                 value: DisplayMode.list,
-                icon: const Icon(Icons.view_list_rounded, size: 18),
+                icon: const Icon(Icons.view_list_rounded, size: 16),
                 tooltip: l10n.displayList,
               ),
               ButtonSegment(
                 value: DisplayMode.tree,
-                icon: const Icon(Icons.account_tree_outlined, size: 18),
+                icon: const Icon(Icons.account_tree_outlined, size: 16),
                 tooltip: l10n.displayTree,
               ),
             ],
@@ -151,13 +162,15 @@ class FilterBar extends ConsumerWidget {
   }
 }
 
-/// Rounded chip of the filter bar.
+/// Console switch of the filter bar: a legend in a square frame, lit with
+/// the accent when [active]; an optional [count] readout at the end.
 class Pill extends StatelessWidget {
   const Pill({
     super.key,
     required this.label,
     this.icon,
     this.trailing,
+    this.count,
     this.active = false,
     this.onPressed,
   });
@@ -165,6 +178,7 @@ class Pill extends StatelessWidget {
   final String label;
   final IconData? icon;
   final IconData? trailing;
+  final int? count;
   final bool active;
   final VoidCallback? onPressed;
 
@@ -173,34 +187,48 @@ class Pill extends StatelessWidget {
     final c = context.colors;
     final color = active ? c.accent : c.muted;
     return Material(
-      color: active ? c.accent.withValues(alpha: 0.14) : c.raised,
-      shape: StadiumBorder(
+      color: active ? c.accent.withValues(alpha: 0.10) : c.raised,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.s),
         side: BorderSide(
-          color: active ? c.accent.withValues(alpha: 0.5) : c.border,
+          color: active ? c.accent.withValues(alpha: 0.55) : c.border,
         ),
       ),
       child: InkWell(
-        customBorder: const StadiumBorder(),
+        borderRadius: BorderRadius.circular(Radii.s),
         onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 15, color: color),
-                const SizedBox(width: 6),
+        child: SizedBox(
+          height: 26,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 14, color: color),
+                  const SizedBox(width: 6),
+                ],
+                Text.rich(
+                  TextSpan(
+                    text: label.toUpperCase(),
+                    children: [
+                      if (count != null)
+                        TextSpan(
+                          text: '$labelSeparator$count',
+                          style: TextStyle(color: c.accent),
+                        ),
+                    ],
+                  ),
+                  style: context.legend.copyWith(
+                    color: active ? c.text : c.muted,
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 2),
+                  Icon(trailing, size: 14, color: color),
+                ],
               ],
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge
-                    ?.copyWith(color: active ? c.text : c.muted),
-              ),
-              if (trailing != null) ...[
-                const SizedBox(width: 2),
-                Icon(trailing, size: 16, color: color),
-              ],
-            ],
+            ),
           ),
         ),
       ),
@@ -229,11 +257,10 @@ class _MultiChoiceChip<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     // Selected values no longer offered stay listed, to be cleared.
     final values = [...options, ...selected.where((s) => !options.contains(s))];
-    final l10n = AppLocalizations.of(context);
     final text = switch (selected.length) {
       0 => label,
-      1 => l10n.filterValue(label, labelOf(selected.single)),
-      final n => l10n.filterValue(label, '$n'),
+      1 => '$label$labelSeparator${labelOf(selected.single)}',
+      final n => '$label$labelSeparator$n',
     };
     return MenuAnchor(
       menuChildren: [

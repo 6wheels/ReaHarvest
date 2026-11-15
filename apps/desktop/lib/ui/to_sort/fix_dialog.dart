@@ -472,7 +472,7 @@ class _LevelFieldState extends State<LevelField> {
       child: Material(
         elevation: 4,
         color: context.colors.raised,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(Radii.s),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 200, maxWidth: 420),
           child: ListView(

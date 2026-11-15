@@ -218,11 +218,11 @@ void main() {
     // Collapsed: the running task, its sub-step on the same line.
     expect(find.text('Scan  ·  Reading the folders'), findsOneWidget);
     expect(find.text('Broken'), findsNothing);
-    expect(find.text('Tasks · 3'), findsOneWidget);
+    expect(find.text('TASKS // 3'), findsOneWidget);
 
     // Expanded: every task, the sub-step under the label, the error of the
     // failed one.
-    await tester.tap(find.text('Tasks · 3'));
+    await tester.tap(find.text('TASKS // 3'));
     await tester.pump();
     await tester.pump(Motion.medium);
     expect(find.text('Scan'), findsOneWidget);
@@ -250,7 +250,7 @@ void main() {
     // A finished task is shown when nothing runs, then the zone collapses.
     await tasks().run((l10n) => 'Last', (_) async {});
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tasks · 1'));
+    await tester.tap(find.text('TASKS // 1'));
     await tester.pumpAndSettle();
     expect(find.text('Last'), findsOneWidget);
   });
@@ -266,7 +266,7 @@ void main() {
     final queued = tasks().run((l10n) => 'Scan', (_) async {}, library: band);
     await tester.pump();
     await tester.pump(Motion.medium);
-    await tester.tap(find.text('Tasks · 2'));
+    await tester.tap(find.text('TASKS // 2'));
     await tester.pump();
     await tester.pump(Motion.medium);
     expect(find.text('Waiting'), findsOneWidget);

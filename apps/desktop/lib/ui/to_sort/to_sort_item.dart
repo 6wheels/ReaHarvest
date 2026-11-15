@@ -32,7 +32,7 @@ class Item extends StatelessWidget {
       padding: const EdgeInsets.all(Space.m),
       decoration: BoxDecoration(
         color: c.raised,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(color: c.border),
       ),
       child: Row(

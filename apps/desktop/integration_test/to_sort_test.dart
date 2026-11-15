@@ -87,7 +87,7 @@ void main() {
         KnownValue('Artist', [KnownValue('Album')]),
       ],
     );
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
 
     // One section per kind, with its counter; folders and projects with

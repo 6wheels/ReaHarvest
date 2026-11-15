@@ -6,6 +6,7 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'library_form.dart';
 import 'reaper_settings.dart';
+import 'studio_title_bar.dart';
 
 /// Whether the first-run wizard is shown: on start without any library,
 /// until it is finished or postponed.
@@ -103,53 +104,63 @@ class _FirstRunWizardState extends ConsumerState<FirstRunWizard> {
     };
 
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(Space.xl),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: AnimatedSwitcher(
-              duration: Motion.medium,
-              switchInCurve: Motion.curve,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween(
-                    begin: const Offset(0.03, 0),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              ),
-              child: Column(
-                key: ValueKey(_step),
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    l10n.stepOf(_step + 1, _steps).toUpperCase(),
-                    style: text.labelSmall?.copyWith(
-                      color: c.muted,
-                      letterSpacing: 1.2,
+      body: Column(
+        children: [
+          const StudioTitleBar(),
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(Space.xl),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: AnimatedSwitcher(
+                    duration: Motion.medium,
+                    switchInCurve: Motion.curve,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween(
+                          begin: const Offset(0.03, 0),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: Column(
+                      key: ValueKey(_step),
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          l10n.stepOf(_step + 1, _steps).toUpperCase(),
+                          style: text.labelSmall?.copyWith(
+                            color: c.muted,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: Space.s),
+                        Text(title, style: text.headlineSmall),
+                        const SizedBox(height: Space.s),
+                        Text(
+                          hint,
+                          style: text.bodyLarge?.copyWith(color: c.muted),
+                        ),
+                        const SizedBox(height: Space.l),
+                        body,
+                        const SizedBox(height: Space.l),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          spacing: Space.s,
+                          children: actions,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: Space.s),
-                  Text(title, style: text.headlineSmall),
-                  const SizedBox(height: Space.s),
-                  Text(hint, style: text.bodyLarge?.copyWith(color: c.muted)),
-                  const SizedBox(height: Space.l),
-                  body,
-                  const SizedBox(height: Space.l),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    spacing: Space.s,
-                    children: actions,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

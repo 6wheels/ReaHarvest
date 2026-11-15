@@ -219,7 +219,7 @@ Steps 9 to 11 only depend on the rework: with more agents they can overlap. Shar
 - [ ] #83 repair of corrupted application files
 - [ ] #161 synchronization preference of the checked-out versions
 - [ ] #31 Windows installer, GitHub Releases and auto-update (replaces #75; Microsoft Store study first, at the start of M2; unsigned)
-- [ ] #110 design direction (DAW, mixing console), typeface and own components
+- [ ] #110 design direction (DAW, mixing console), typeface and own components — started early on 2026-11-15 (branch `feat/daw-look`), to set the look before the rework: own title bar with the search, console tokens (colors, radii), JetBrains Mono for legends and readouts beside Inter, `//` separators, library screen restyled (filter strip, rack-module cards, channel-strip rows, lit status segments, tasks meter); title detail and "To sort" only get the title bar and the tokens. Still open: own icon set, dialogs and notifications as own components, the other screens, golden images.
 
 Plan of M2 (ticket details written on 2026-11-11; the names of existing code they give are to check after the hardening):
 

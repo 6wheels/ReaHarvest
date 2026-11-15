@@ -39,7 +39,7 @@ void main() {
         KnownValue('Artist', [KnownValue('Album'), KnownValue('Live')]),
       ],
     );
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     final library = h.settings.libraries.single.id;
     final moved = h.path('Band/Artist/Live/Ballad/v1.rpp');

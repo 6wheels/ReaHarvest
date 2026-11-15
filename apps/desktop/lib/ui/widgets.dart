@@ -11,7 +11,7 @@ import '../theme/app_theme.dart';
 /// Color of warnings (missing plugins, duplicates).
 const warningColor = Color(0xFFE5A04D);
 
-/// Small rounded label (status, alerts).
+/// Small console tag (status, alerts): mono capitals in a lit frame.
 class Pill extends StatelessWidget {
   const Pill(this.label, {super.key, required this.color});
 
@@ -20,14 +20,42 @@ class Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: Space.s, vertical: 2),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.14),
-      borderRadius: BorderRadius.circular(99),
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(Radii.xs),
+      border: Border.all(color: color.withValues(alpha: 0.45)),
     ),
     child: Text(
-      label,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
+      label.toUpperCase(),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: context.legend.copyWith(color: color, fontSize: 9.5),
+    ),
+  );
+}
+
+/// Status light: a small dot, glowing when [lit].
+class Led extends StatelessWidget {
+  const Led(this.color, {super.key, this.lit = true, this.size = 7});
+
+  final Color color;
+  final bool lit;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: Motion.medium,
+    curve: Motion.curve,
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: lit ? color : context.colors.border,
+      boxShadow: [
+        if (lit)
+          BoxShadow(color: color.withValues(alpha: 0.55), blurRadius: size),
+      ],
     ),
   );
 }
@@ -54,18 +82,15 @@ class BusyLabel extends StatelessWidget {
   );
 }
 
-/// Upper-case heading of a section.
+/// Upper-case legend heading a section.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.label, {super.key});
 
   final String label;
 
   @override
-  Widget build(BuildContext context) => Text(
-    label.toUpperCase(),
-    style: Theme.of(context).textTheme.labelSmall
-        ?.copyWith(color: context.colors.muted, letterSpacing: 1.2),
-  );
+  Widget build(BuildContext context) =>
+      Text(label.toUpperCase(), style: context.legend);
 }
 
 /// Runs [change] of a project file, after a confirmation when REAPER is

@@ -65,16 +65,16 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
           _expanded ? Icons.expand_more_rounded : Icons.expand_less_rounded,
           size: 18,
         ),
-        label: Text('${l10n.tasks} · ${tasks.length}'),
+        label: Text(
+          '${l10n.tasks.toUpperCase()}$labelSeparator${tasks.length}',
+          style: context.legend.copyWith(color: c.text),
+        ),
       );
       content = Material(
         color: c.surface,
         shape: Border(top: BorderSide(color: c.border)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Space.xl,
-            vertical: Space.xs,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: Space.m),
           child: _expanded
               ? Column(
                   mainAxisSize: MainAxisSize.min,
@@ -188,7 +188,7 @@ class _TaskRow extends ConsumerWidget {
       TaskState.cancelled => Text(l10n.taskCancelled, style: muted),
     };
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 40),
+      constraints: const BoxConstraints(minHeight: 34),
       child: Row(
         children: [
           SizedBox(width: 20, child: Center(child: icon)),
@@ -226,14 +226,16 @@ class _TaskRow extends ConsumerWidget {
           ),
           if (task.isRunning) ...[
             const SizedBox(width: Space.m),
+            SizedBox(width: 160, child: _Meter(task.progress)),
+            const SizedBox(width: Space.s),
             SizedBox(
-              width: 160,
-              child: LinearProgressIndicator(
-                value: task.progress,
-                minHeight: 3,
-                borderRadius: BorderRadius.circular(2),
-                color: c.accent,
-                backgroundColor: c.border,
+              width: 36,
+              child: Text(
+                task.progress == null
+                    ? '---'
+                    : '${(task.progress! * 100).round()}%'.padLeft(4),
+                textAlign: TextAlign.end,
+                style: context.readout.copyWith(color: c.text),
               ),
             ),
           ],
@@ -248,6 +250,46 @@ class _TaskRow extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Progress as a segmented meter, like a level meter; a sweeping light when
+/// the progress is unknown.
+class _Meter extends StatelessWidget {
+  const _Meter(this.value);
+
+  final double? value;
+
+  static const _segments = 20;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final value = this.value;
+    if (value == null) {
+      return LinearProgressIndicator(
+        minHeight: 4,
+        color: c.accent,
+        backgroundColor: c.border,
+      );
+    }
+    final lit = (value * _segments).round();
+    return Row(
+      children: [
+        for (var i = 0; i < _segments; i++) ...[
+          if (i > 0) const SizedBox(width: 2),
+          Expanded(
+            child: Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: i < lit ? c.accent : c.border,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

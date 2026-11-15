@@ -411,7 +411,7 @@ void main() {
     await pumpApp(tester, titles: demoTitles());
     expect(find.byType(TitleCard), findsWidgets);
     expect(find.text('Northern Lights'), findsOneWidget);
-    expect(find.text('Mixing'), findsWidgets);
+    expect(find.text('MIXING'), findsWidgets);
 
     await tester.enterText(find.byType(TextField), 'tide');
     await tester.pumpAndSettle();
@@ -688,17 +688,17 @@ void main() {
         title('Live', 'Other song'),
       ],
     );
-    expect(find.text('Artist'), findsNothing);
-    expect(find.text('To adopt · 2'), findsOneWidget);
+    expect(find.text('ARTIST'), findsNothing);
+    expect(find.text('TO ADOPT // 2'), findsOneWidget);
     // The card counts the versions to adopt of its title.
     expect(
       find.descendant(
         of: find.widgetWithText(TitleCard, 'First song'),
-        matching: find.textContaining('2 to adopt'),
+        matching: find.textContaining('2 TO ADOPT'),
       ),
       findsOneWidget,
     );
-    await tester.tap(find.text('Album'));
+    await tester.tap(find.text('ALBUM'));
     await tester.pumpAndSettle();
     expect(find.text('Unassigned'), findsOneWidget);
   });
@@ -716,7 +716,7 @@ void main() {
         ),
       ],
     );
-    expect(find.text('To sort · 1'), findsOneWidget);
+    expect(find.text('TO SORT // 1'), findsOneWidget);
   });
 
   testWidgets('settings edit the known values of a library', (tester) async {
@@ -808,7 +808,7 @@ void main() {
     await pumpApp(tester, titles: demoTitles());
     expect(find.byType(TitleCard), findsNWidgets(12));
 
-    await tester.tap(find.text('Artist'));
+    await tester.tap(find.text('ARTIST'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Other Artist'));
     await tester.pumpAndSettle();
@@ -817,12 +817,12 @@ void main() {
 
     expect(find.byType(CheckboxMenuButton), findsNothing);
     expect(find.byType(TitleCard), findsNWidgets(6));
-    expect(find.text('Artist: Other Artist'), findsOneWidget);
+    expect(find.text('ARTIST // OTHER ARTIST'), findsOneWidget);
     expect(settings.saved.last.navigation.filter.tags, {
       'artist': {'Other Artist'},
     });
 
-    await tester.tap(find.text('Clear filters'));
+    await tester.tap(find.text('CLEAR FILTERS'));
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsNWidgets(12));
   });
@@ -868,23 +868,23 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    await toggle('Library: 3', 'gone');
-    await toggle('Library: 2', 'Empty');
+    await toggle('LIBRARY // 3', 'gone');
+    await toggle('LIBRARY // 2', 'Empty');
     expect(filter().libraries, {const LibraryId('demo')});
-    await toggle('Library: Demo', 'Demo');
+    await toggle('LIBRARY // DEMO', 'Demo');
     expect(filter().libraries, isEmpty);
-    await toggle('Mode: Local', 'Local');
+    await toggle('MODE // LOCAL', 'Local');
     expect(filter().modes, isEmpty);
     // An owner without a known name is shown as unknown, never as an id.
-    await toggle('Owner: Unknown', 'Unknown');
+    await toggle('OWNER // UNKNOWN', 'Unknown');
     expect(filter().owners, isEmpty);
-    await toggle('Status', 'Mixing');
+    await toggle('STATUS', 'Mixing');
     expect(filter().statuses, {'mixing'});
 
-    await tester.tap(find.text('Missing plugins'));
+    await tester.tap(find.text('MISSING PLUGINS'));
     await tester.pumpAndSettle();
     expect(filter().missingPlugins, isFalse);
-    expect(find.text('Missing plugins'), findsNothing);
+    expect(find.text('MISSING PLUGINS'), findsNothing);
   });
 
   testWidgets('list view sorts by every column and opens the overview', (
@@ -1222,7 +1222,7 @@ void main() {
   testWidgets('saves and applies a view', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     await tester.enterText(find.byType(TextField), 'tide');
-    await tester.tap(find.text('Views'));
+    await tester.tap(find.text('VIEWS'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save current view…'));
     await tester.pumpAndSettle();
@@ -1234,7 +1234,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '');
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsNWidgets(12));
-    await tester.tap(find.text('Views'));
+    await tester.tap(find.text('VIEWS'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tide'));
     await tester.pumpAndSettle();
@@ -1245,15 +1245,15 @@ void main() {
   testWidgets('adopts a version after the REAPER warning', (tester) async {
     await pumpApp(tester, titles: demoTitles(), reaperRunning: true);
     // Hidden on the cards of titles without versions to adopt.
-    expect(find.textContaining('to adopt'), findsOneWidget);
+    expect(find.textContaining(' TO ADOPT'), findsOneWidget);
     expect(
       find.descendant(
         of: find.widgetWithText(TitleCard, 'Glass Garden'),
-        matching: find.textContaining('1 to adopt'),
+        matching: find.textContaining('1 TO ADOPT'),
       ),
       findsOneWidget,
     );
-    await tester.tap(find.text('To adopt · 1'));
+    await tester.tap(find.text('TO ADOPT // 1'));
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsOneWidget);
     await tester.tap(find.text('Glass Garden'));
@@ -1397,12 +1397,13 @@ void main() {
     expect(find.textContaining('· Opening raw.rpp'), findsNothing);
     expect(find.textContaining('· Opening old.rpp'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_outline_rounded), findsNWidgets(2));
-    expect(find.text('Mixing'), findsWidgets);
+    expect(find.text('MIXING'), findsWidgets);
 
     // Not adopted: list label and badge next to the version name.
     await tester.tap(find.textContaining('· Opening old.rpp'));
     await tester.pumpAndSettle();
-    expect(find.text('Not adopted'), findsNWidgets(2));
+    expect(find.text('Not adopted'), findsOneWidget);
+    expect(find.text('NOT ADOPTED'), findsOneWidget);
     // Pane heading: the file name with its extension, in italic.
     expect(
       tester.widget<Text>(find.text('Opening old.rpp')).style?.fontStyle,
@@ -1421,7 +1422,7 @@ void main() {
         ]),
       },
     );
-    await tester.tap(find.text('To adopt · 1'));
+    await tester.tap(find.text('TO ADOPT // 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Glass Garden'));
     await tester.pumpAndSettle();
@@ -1587,7 +1588,7 @@ void main() {
   testWidgets('shows the trash of a title', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     await openMidnightFerry(tester);
-    await tester.tap(find.text('Trash'));
+    await tester.tap(find.text('TRASH'));
     await tester.pumpAndSettle();
     expect(find.text('Empty the trash'), findsOne);
     expect(find.text('old.rpp'), findsOne);
@@ -1642,7 +1643,7 @@ void main() {
         issue(band.id, ReportKind.corrupted, const ReportItem('A/bad.rpp')),
       ],
     );
-    await tester.tap(find.text('To sort · 5'));
+    await tester.tap(find.text('TO SORT // 5'));
     await tester.pumpAndSettle();
 
     expect(
@@ -1739,7 +1740,7 @@ void main() {
         deep('Alice/d.rpp'),
       ],
     );
-    await tester.tap(find.text('To sort · 4'));
+    await tester.tap(find.text('TO SORT // 4'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Fix…'));
@@ -1841,7 +1842,7 @@ void main() {
         deep(const LibraryId('L3'), 'mix/c.rpp'),
       ],
     );
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
@@ -1884,7 +1885,7 @@ void main() {
         outside('Artist/Album/Other/Media/sub.rpp'),
       ],
     );
-    await tester.tap(find.text('To sort · 4'));
+    await tester.tap(find.text('TO SORT // 4'));
     await tester.pumpAndSettle();
     // The references are listed on the card.
     expect(find.text('audio-files\\snare.wav'), findsNWidgets(4));
@@ -1943,7 +1944,7 @@ void main() {
         }),
       ),
     };
-    await tester.tap(find.text('To sort · 3'));
+    await tester.tap(find.text('TO SORT // 3'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
@@ -1999,7 +2000,7 @@ void main() {
       ],
     );
     previewPending = Completer();
-    await tester.tap(find.text('To sort · 1'));
+    await tester.tap(find.text('TO SORT // 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pump();
@@ -2058,7 +2059,7 @@ void main() {
       ],
     );
     previewErrors = {other.id: StateError('unreadable')};
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
@@ -2103,7 +2104,7 @@ void main() {
         folder(ReportKind.unknownValue, 'Sample Artist/Odd', 'album'),
       ],
     );
-    await tester.tap(find.text('To sort · 4'));
+    await tester.tap(find.text('TO SORT // 4'));
     await tester.pumpAndSettle();
     Finder field(String label) => find.widgetWithText(TextField, label);
     String fieldText(String label) =>
@@ -2233,7 +2234,7 @@ void main() {
       titles: demoTitles(),
       issues: [high('A'), high('B'), high('C')],
     );
-    await tester.tap(find.text('To sort · 3'));
+    await tester.tap(find.text('TO SORT // 3'));
     await tester.pumpAndSettle();
     Checkbox box(int i) => tester.widget(find.byType(Checkbox).at(i));
 
@@ -2283,7 +2284,7 @@ void main() {
         orphan('locked/sub/.node.json'),
       ],
     );
-    await tester.tap(find.text('To sort · 2'));
+    await tester.tap(find.text('TO SORT // 2'));
     await tester.pumpAndSettle();
     expect(find.text('REAHARVEST FILES WITHOUT PROJECT · 2'), findsOne);
     expect(find.text('render'), findsOne);

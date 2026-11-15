@@ -177,9 +177,8 @@ class _HeaderCell extends StatelessWidget {
               child: Text(
                 label.toUpperCase(),
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                style: context.legend.copyWith(
                   color: sorted == null ? c.muted : c.text,
-                  letterSpacing: 0.8,
                 ),
               ),
             ),
@@ -234,10 +233,7 @@ class _Text extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: context.colors.muted,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
+      style: context.readout,
     ),
   );
 }
@@ -255,7 +251,7 @@ class _Swatch extends StatelessWidget {
       width: 18,
       height: 18,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(Radii.xs),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -295,15 +291,22 @@ class _TitleRowState extends ConsumerState<TitleRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: Material(
         color: widget.selected
-            ? c.accent.withValues(alpha: 0.12)
+            ? c.accent.withValues(alpha: 0.10)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(Radii.xs),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(Radii.xs),
           onTap: () =>
               ref.read(overviewProvider.notifier).toggle(widget.title.id),
           child: Row(
             children: [
+              // Lit edge of the selected strip.
+              AnimatedContainer(
+                duration: Motion.fast,
+                width: 2,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                color: widget.selected ? c.accent : Colors.transparent,
+              ),
               Expanded(child: widget.child),
               TitleActions(widget.title, visible: _hovered || widget.selected),
               const SizedBox(width: Space.s),
@@ -415,7 +418,7 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
         final collapsed = _collapsed.contains(row.key);
         return InkWell(
           key: ValueKey(row.key),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(Radii.xs),
           onTap: () => setState(
             () => collapsed
                 ? _collapsed.remove(row.key)
@@ -436,7 +439,7 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
                     row.group!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
+                    style: context.legend.copyWith(color: c.text),
                   ),
                 ),
               ],

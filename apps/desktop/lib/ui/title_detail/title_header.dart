@@ -34,23 +34,24 @@ class Header extends ConsumerWidget {
     final v = version;
     final toAdopt = t == null ? 0 : ref.watch(toAdoptCountsProvider)[t.id] ?? 0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.m, Space.m, Space.xl, Space.l),
+      padding: const EdgeInsets.fromLTRB(Space.l, Space.l, Space.xl, Space.l),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              IconButton(
-                tooltip: l10n.back,
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_rounded),
-              ),
               if (t != null) ...[
-                const SizedBox(width: Space.s),
-                SizedBox.square(
-                  dimension: 72,
+                Container(
+                  width: 72,
+                  height: 72,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: c.surface,
+                    borderRadius: BorderRadius.circular(Radii.s),
+                    border: Border.all(color: c.border),
+                  ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(Radii.xs),
                     child: CustomPaint(
                       painter: AuroraPainter(AuroraPalette.of(t.id), phase: 0),
                     ),
@@ -72,10 +73,9 @@ class Header extends ConsumerWidget {
                             ),
                             if (tags.isNotEmpty)
                               TextSpan(
-                                text: '   ${tags.first}',
-                                style: text.titleMedium?.copyWith(
-                                  color: c.muted,
-                                ),
+                                text:
+                                    '$labelSeparator${tags.first.toUpperCase()}',
+                                style: context.legend.copyWith(fontSize: 12),
                               ),
                           ],
                         ),
@@ -84,10 +84,10 @@ class Header extends ConsumerWidget {
                       ),
                       if (below.isNotEmpty)
                         Text(
-                          below,
+                          below.toUpperCase(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: text.bodyMedium?.copyWith(color: c.muted),
+                          style: context.legend,
                         ),
                       if (toAdopt > 0)
                         Row(
@@ -122,10 +122,7 @@ class Header extends ConsumerWidget {
           ),
           if (t != null) ...[
             const SizedBox(height: Space.m),
-            Padding(
-              padding: const EdgeInsets.only(left: 48 + Space.s),
-              child: StatusTrail(t.status, large: true),
-            ),
+            StatusTrail(t.status, large: true),
           ],
         ],
       ),
@@ -142,7 +139,6 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(left: Space.l),
       child: Column(
@@ -150,17 +146,13 @@ class _Stat extends StatelessWidget {
         children: [
           Text(
             value ?? '—',
-            style: text.titleLarge?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
+            style: context.readout.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: context.colors.text,
             ),
           ),
-          Text(
-            label.toUpperCase(),
-            style: text.labelSmall?.copyWith(
-              color: context.colors.muted,
-              letterSpacing: 1.2,
-            ),
-          ),
+          Text(label.toUpperCase(), style: context.legend),
         ],
       ),
     );

@@ -194,7 +194,7 @@ void main() {
     await scanning;
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Café.wav'), findsOne);
     await tapText(tester, 'Fix…');

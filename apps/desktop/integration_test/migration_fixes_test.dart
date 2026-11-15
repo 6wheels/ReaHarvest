@@ -54,7 +54,7 @@ void main() {
 
   /// Opens the "To sort" page.
   Future<void> openToSort(WidgetTester tester) async {
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
   }
 
@@ -204,7 +204,7 @@ void main() {
     for (final owner in ['Alice', 'Bob']) {
       expect(find.textContaining(owner), findsWidgets, reason: owner);
     }
-    expect(find.text('Mixing'), findsWidgets);
+    expect(find.text('MIXING'), findsWidgets);
   });
 
   testWidgets('merges a folder moved onto an existing one', (tester) async {

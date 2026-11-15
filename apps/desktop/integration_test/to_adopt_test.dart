@@ -98,9 +98,9 @@ void main() {
     // Adoption in the detail, on the selected version.
     await openDetail(tester, 'Ballad');
     expect(find.text('v1.rpp'), findsOne);
-    expect(find.text('Not adopted'), findsWidgets);
+    expect(find.text('NOT ADOPTED'), findsWidgets);
     await adopt(tester, 'first take');
-    expect(find.text('Not adopted'), findsNothing);
+    expect(find.text('NOT ADOPTED'), findsNothing);
     // Nothing left to adopt: no count in the header.
     expect(find.textContaining('not adopted'), findsNothing);
     expect(versionId(ballad), isNotNull);

@@ -496,7 +496,7 @@ void main() {
     await scanning;
 
     // Render targets are only reported here (#84).
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     expect(find.text("MEDIA OUTSIDE THE TITLE'S MEDIA FOLDER · 1"), findsOne);
     expect(find.text(r'Alice\audio\02-Kick-261108_1909.wav'), findsOne);

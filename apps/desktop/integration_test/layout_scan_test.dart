@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/state/navigation.dart';
+import 'package:reaharvest/theme/app_theme.dart';
 import 'package:reaharvest/ui/filter_bar.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_card.dart';
@@ -79,7 +80,7 @@ void main() {
     );
 
     // The misplaced project is to sort.
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     expect(find.text('PROJECTS ABOVE THE TITLE LEVEL · 1'), findsOne);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -87,7 +88,10 @@ void main() {
 
     // One filter per level, labelled by level; a common key is shared
     // across layouts.
-    Finder chip(String label) => find.widgetWithText(Pill, label);
+    Finder chip(String label) => find.widgetWithText(
+      Pill,
+      label.toUpperCase().replaceAll(': ', labelSeparator),
+    );
     for (final label in ['Artist', 'Album', 'Project', 'Chapter', 'Library']) {
       expect(chip(label), findsOne, reason: label);
     }

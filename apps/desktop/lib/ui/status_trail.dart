@@ -6,11 +6,9 @@ import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'widgets.dart';
 
-/// Color of the steps already passed.
-const passedColor = Color(0xFF5CC98A);
-
-/// Progress of a title through the statuses (SPEC §5.9): one segment per
-/// status, passed ones green, the current one orange, the next ones grey.
+/// Progress of a title through the statuses (SPEC §5.9), as a row of
+/// lights: one segment per status, passed ones green, the current one
+/// amber and glowing, the next ones off.
 /// Only the current status shows its label, free to run under the
 /// neighbouring segments; hovering reveals every label under its segment.
 /// The last status ("done") reached shows the whole trail green.
@@ -60,20 +58,19 @@ class _StatusTrailState extends State<StatusTrail> {
         : c.border;
     final nextLabel = widget.onDark ? Colors.white70 : c.muted;
     Color colorOf(int i) => i < current || done
-        ? passedColor
+        ? c.ledGreen
         : i == current
-        ? warningColor
+        ? c.ledAmber
         : next;
     Color labelColorOf(int i) => i <= current || done ? colorOf(i) : nextLabel;
-    final thickness = widget.large ? 6.0 : 3.0;
-    final gap = widget.large ? 6.0 : 3.0;
-    final base = widget.large
-        ? Theme.of(context).textTheme.labelMedium
-        : Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10);
-    TextStyle? styleOf(int i) => base?.copyWith(
+    final thickness = widget.large ? 6.0 : 4.0;
+    final gap = widget.large ? 4.0 : 2.0;
+    final base = context.legend.copyWith(fontSize: widget.large ? 10.5 : 9);
+    TextStyle styleOf(int i) => base.copyWith(
       color: labelColorOf(i),
-      fontWeight: i == current ? FontWeight.w600 : FontWeight.w400,
+      fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
     );
+    String labelOf(String step) => statusLabel(l10n, step).toUpperCase();
 
     Widget fade(bool visible, Widget child) => AnimatedSlide(
       offset: Offset(0, visible ? 0 : -0.4),
@@ -105,7 +102,14 @@ class _StatusTrailState extends State<StatusTrail> {
                     height: thickness,
                     decoration: BoxDecoration(
                       color: colorOf(i),
-                      borderRadius: BorderRadius.circular(thickness),
+                      borderRadius: BorderRadius.circular(1),
+                      boxShadow: [
+                        if (i == current && !done)
+                          BoxShadow(
+                            color: colorOf(i).withValues(alpha: 0.6),
+                            blurRadius: 6,
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -124,7 +128,7 @@ class _StatusTrailState extends State<StatusTrail> {
                       child: fade(
                         _hovered,
                         Text(
-                          statusLabel(l10n, step),
+                          labelOf(step),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: styleOf(i),
@@ -146,7 +150,7 @@ class _StatusTrailState extends State<StatusTrail> {
                     child: fade(
                       !_hovered,
                       Text(
-                        statusLabel(l10n, steps[current]),
+                        labelOf(steps[current]),
                         maxLines: 1,
                         style: styleOf(current),
                       ),

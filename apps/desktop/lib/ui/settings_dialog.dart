@@ -81,7 +81,7 @@ class _SettingsPanel extends ConsumerWidget {
         child: Material(
           color: c.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(Radii.m),
             side: BorderSide(color: c.border),
           ),
           elevation: 24,

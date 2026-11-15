@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:reaharvest/theme/app_theme.dart';
 import 'package:reaharvest/ui/filter_bar.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/overview.dart';
@@ -28,7 +29,10 @@ void main() {
 
   Finder search() =>
       find.widgetWithText(TextField, 'Search titles, tags, versions…');
-  Finder chip(String label) => find.widgetWithText(Pill, label);
+  Finder chip(String label) => find.widgetWithText(
+    Pill,
+    label.toUpperCase().replaceAll(': ', labelSeparator),
+  );
 
   /// Names of the title cards shown.
   Set<String> cards(WidgetTester tester) => {

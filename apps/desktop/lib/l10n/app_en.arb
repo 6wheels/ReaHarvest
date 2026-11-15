@@ -14,6 +14,7 @@
   "@versionCount": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "versionsUnit": "VER",
   "bpm": "{bpm} BPM",
   "@bpm": {
     "placeholders": { "bpm": { "type": "int" } }

@@ -8,8 +8,9 @@ import 'aurora.dart';
 import 'labels.dart';
 import 'status_trail.dart';
 import 'title_actions.dart';
+import 'widgets.dart';
 
-/// Square title card, like a record sleeve (SPEC §5.2).
+/// Square title card, like a rack module (SPEC §5.2).
 class TitleCard extends StatefulWidget {
   const TitleCard(
     this.title, {
@@ -42,21 +43,19 @@ class _TitleCardState extends State<TitleCard> {
   @override
   Widget build(BuildContext context) {
     final t = widget.title;
+    final c = context.colors;
     final l10n = AppLocalizations.of(context);
     final palette = AuroraPalette.of(t.id);
-    final name = titleName(t);
-    final subtitle = [for (final v in parentTags(t)) tagValueLabel(l10n, v)]
-        .join(' · ');
-    final meta = [
-      l10n.versionCount(t.versions.length),
-      if (widget.toAdopt > 0) l10n.toAdoptCount(widget.toAdopt),
-      if (tempoOf(t) case final bpm?) l10n.bpm(bpm),
-    ].join(' · ');
+    final tags = [
+      for (final v in parentTags(t)) tagValueLabel(l10n, v).toUpperCase(),
+    ].join(labelSeparator);
+    final bpm = tempoOf(t);
     final date = shortDate(l10n, lastModified(t));
-    final metaStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-      color: Colors.white60,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    final frame = widget.selected
+        ? c.accent
+        : _hovered
+        ? c.muted.withValues(alpha: 0.6)
+        : c.border;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -67,108 +66,162 @@ class _TitleCardState extends State<TitleCard> {
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _hovered ? 1.025 : 1,
-          duration: Motion.medium,
+        // Rack module: a header strip, the aurora as an inset screen, the
+        // readouts and the status lights below.
+        child: AnimatedContainer(
+          duration: Motion.fast,
           curve: Motion.curve,
-          child: AnimatedContainer(
-            duration: Motion.medium,
-            curve: Motion.curve,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: widget.selected
-                    ? context.colors.accent
-                    : Colors.transparent,
-                width: 2,
-              ),
-              boxShadow: [
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(Radii.s),
+            border: Border.all(color: frame),
+            boxShadow: [
+              if (widget.selected)
                 BoxShadow(
-                  color: palette.lights.first.withValues(
-                    alpha: _hovered ? 0.30 : 0.0,
-                  ),
-                  blurRadius: 28,
-                  offset: const Offset(0, 10),
+                  color: c.accent.withValues(alpha: 0.18),
+                  blurRadius: 12,
                 ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: _hovered ? 0.35 : 0.18),
-                  blurRadius: _hovered ? 18 : 8,
-                  offset: Offset(0, _hovered ? 8 : 3),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  RepaintBoundary(
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: _phase),
-                      duration: Motion.slow * 2,
-                      curve: Curves.easeInOut,
-                      builder: (_, phase, _) => CustomPaint(
-                        painter: AuroraPainter(palette, phase: phase),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(Space.m),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: TitleActions(
-                            t,
-                            visible: _hovered || widget.selected,
-                            onDark: true,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          name,
-                          maxLines: 2,
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 28,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      Led(c.accent, lit: widget.selected, size: 6),
+                      const SizedBox(width: Space.s),
+                      Expanded(
+                        child: Text(
+                          tags,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: Colors.white, height: 1.2),
+                          style: context.legend.copyWith(fontSize: 9.5),
                         ),
-                        if (subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: Colors.white70),
-                          ),
-                        ],
-                        const SizedBox(height: Space.s),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                meta,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: metaStyle,
-                              ),
+                      ),
+                      const SizedBox(width: Space.s),
+                      Text(date, style: context.readout.copyWith(fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(Radii.xs),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        RepaintBoundary(
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(end: _phase),
+                            duration: Motion.slow * 2,
+                            curve: Curves.easeInOut,
+                            builder: (_, phase, _) => CustomPaint(
+                              painter: AuroraPainter(palette, phase: phase),
                             ),
-                            const SizedBox(width: Space.s),
-                            Text(date, style: metaStyle),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: Space.s),
-                        StatusTrail(t.status, onDark: true),
+                        Padding(
+                          padding: const EdgeInsets.all(Space.s + 2),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Align(
+                                alignment: Alignment.topRight,
+                                child: TitleActions(
+                                  t,
+                                  visible: _hovered || widget.selected,
+                                  onDark: true,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                titleName(t),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      height: 1.2,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, Space.s, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        _Readout(l10n.versionsUnit, '${t.versions.length}'),
+                        if (bpm != null) _Readout('BPM', '$bpm'),
+                        Expanded(
+                          child: Text(
+                            widget.toAdopt > 0
+                                ? l10n
+                                      .toAdoptCount(widget.toAdopt)
+                                      .toUpperCase()
+                                : '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: context.legend.copyWith(
+                              fontSize: 9.5,
+                              color: c.ledAmber,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: Space.s),
+                    StatusTrail(t.status),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Figure with its unit, like a console readout: `VER 12`.
+class _Readout extends StatelessWidget {
+  const _Readout(this.unit, this.value);
+
+  final String unit;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: Space.m),
+    child: Text.rich(
+      TextSpan(
+        text: '$unit ',
+        style: context.legend.copyWith(fontSize: 9.5),
+        children: [
+          TextSpan(
+            text: value,
+            style: context.readout.copyWith(
+              color: context.colors.text,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

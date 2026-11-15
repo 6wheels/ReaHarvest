@@ -191,21 +191,22 @@ class _ActionButton extends StatelessWidget {
         message: tooltip,
         child: Material(
           color: onDark
-              ? Colors.white.withValues(alpha: 0.16)
+              ? Colors.black.withValues(alpha: 0.35)
               : Colors.transparent,
-          shape: CircleBorder(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Radii.s),
             side: onDark
                 ? BorderSide(color: Colors.white.withValues(alpha: 0.28))
                 : BorderSide.none,
           ),
           child: InkWell(
-            customBorder: const CircleBorder(),
+            borderRadius: BorderRadius.circular(Radii.s),
             onTap: onPressed,
             child: Padding(
               padding: const EdgeInsets.all(5),
               child: Icon(
                 icon,
-                size: 18,
+                size: 16,
                 color: onDark ? Colors.white : c.muted,
               ),
             ),

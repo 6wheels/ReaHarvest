@@ -9,6 +9,7 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'app_paths.dart';
@@ -28,10 +29,29 @@ const _dataDir = String.fromEnvironment('REAHARVEST_DATA_DIR');
 /// injected (SPEC §7.2).
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS)) {
+    await windowManager.ensureInitialized();
+    const options = WindowOptions(
+      minimumSize: Size(900, 600),
+      titleBarStyle: TitleBarStyle.hidden,
+    );
+    await windowManager.waitUntilReadyToShow(options, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
+
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
       'Inter',
     ], await rootBundle.loadString('assets/fonts/Inter-OFL.txt'));
+    yield LicenseEntryWithLineBreaks([
+      'JetBrains Mono',
+    ], await rootBundle.loadString('assets/fonts/JetBrainsMono-OFL.txt'));
   });
 
   final appData = _dataDir.isEmpty ? appDataDirectory() : _dataDir;

@@ -40,7 +40,7 @@ class Overview extends ConsumerWidget {
         .watch(titlesProvider)
         .where((t) => t.id == id)
         .firstOrNull;
-    final radius = BorderRadius.circular(18);
+    final radius = BorderRadius.circular(Radii.m);
 
     final Widget body = Padding(
       padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.s, Space.m),
@@ -98,9 +98,9 @@ class Overview extends ConsumerWidget {
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: pinned ? 0.10 : 0.25),
-            blurRadius: 32,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: pinned ? 0.08 : 0.30),
+            blurRadius: 24,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -172,10 +172,7 @@ class _Identity extends ConsumerWidget {
                   meta,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: text.bodySmall?.copyWith(
-                    color: c.muted,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: context.readout,
                 ),
               ),
               if (title.status case final status?) ...[
@@ -224,7 +221,7 @@ class _Alert extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-    borderRadius: BorderRadius.circular(8),
+    borderRadius: BorderRadius.circular(Radii.xs),
     onTap: onTap,
     child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -308,7 +305,7 @@ class _RecentVersion extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(Space.m, Space.s, Space.xs, Space.xs),
       decoration: BoxDecoration(
         color: c.raised.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(color: c.border),
       ),
       child: Row(
@@ -333,7 +330,7 @@ class _RecentVersion extends ConsumerWidget {
                       versionDetails(ref, l10n, version),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: text.bodySmall?.copyWith(color: c.muted),
+                      style: context.readout.copyWith(fontSize: 10.5),
                     ),
                   ),
                 ],

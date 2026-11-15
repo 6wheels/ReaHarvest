@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../state/library_scans.dart';
-import '../../theme/app_theme.dart';
 import '../over_library.dart';
+import '../studio_title_bar.dart';
 import 'to_sort_list.dart';
 
 /// Opens the "To sort" page over the library (SPEC §5.2).
@@ -25,41 +25,21 @@ class ToSortPage extends StatelessWidget {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.m,
-                Space.m,
-                Space.xl,
-                Space.m,
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: l10n.back,
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.arrow_back_rounded),
+            StudioTitleBar(
+              location: l10n.toSort,
+              onBack: () => Navigator.of(context).maybePop(),
+              trailing: Consumer(
+                builder: (context, ref, _) => Tooltip(
+                  message: l10n.fullScanTooltip,
+                  child: TextButton.icon(
+                    onPressed: () =>
+                        ref.read(libraryScansProvider).scanAll(full: true),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: Text(l10n.fullScan),
                   ),
-                  const SizedBox(width: Space.s),
-                  Text(
-                    l10n.toSort,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const Spacer(),
-                  Consumer(
-                    builder: (context, ref, _) => Tooltip(
-                      message: l10n.fullScanTooltip,
-                      child: TextButton.icon(
-                        onPressed: () =>
-                            ref.read(libraryScansProvider).scanAll(full: true),
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(l10n.fullScan),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-            Divider(height: 1, color: context.colors.border),
             Expanded(
               child: Align(
                 alignment: Alignment.topCenter,

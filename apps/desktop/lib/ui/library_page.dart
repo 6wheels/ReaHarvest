@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,20 +17,33 @@ import 'settings_dialog.dart';
 import 'overview.dart';
 import 'title_detail/title_detail_page.dart';
 import 'title_card.dart';
+import 'studio_title_bar.dart';
 import 'title_views.dart';
 
 /// Main window: the library (SPEC §5.2). Search bar at the top, filters
 /// below, then the titles as cards, list or tree, and the overview docked
 /// at the bottom.
-class LibraryPage extends ConsumerWidget {
+class LibraryPage extends ConsumerStatefulWidget {
   const LibraryPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryPage> createState() => _LibraryPageState();
+}
+
+class _LibraryPageState extends ConsumerState<LibraryPage> {
+  final _searchFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final titles = ref.watch(visibleTitlesProvider);
     final navigation = ref.watch(navigationProvider);
     final hasTitles = ref.watch(titlesProvider).isNotEmpty;
-    // Without titles, the filter bar still leads to the items to sort.
     final hasIssues = ref.watch(issuesProvider).isNotEmpty;
     final overview = ref.watch(overviewProvider);
     final pinned = navigation.overviewPinned;
@@ -64,12 +78,11 @@ class LibraryPage extends ConsumerWidget {
         bindings: {
           const SingleActivator(LogicalKeyboardKey.escape): () =>
               ref.read(overviewProvider.notifier).close(),
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+              _searchFocus.requestFocus(),
+          const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () =>
+              _searchFocus.requestFocus(),
         },
-        // The content takes its final size at once and the overview slides
-        // over it: no relayout of the titles during the animation. Pinned,
-        // the titles end above the overview; otherwise it floats over them
-        // and a click outside of it closes it (cards and controls win their
-        // own clicks).
         child: Stack(
           children: [
             Positioned.fill(
@@ -84,32 +97,12 @@ class LibraryPage extends ConsumerWidget {
                 child: RepaintBoundary(
                   child: Column(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          Space.xl,
-                          Space.l,
-                          Space.l,
-                          Space.m,
+                      StudioTitleBar(
+                        center: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 480),
+                          child: _SearchBar(focusNode: _searchFocus),
                         ),
-                        child: Row(
-                          children: [
-                            // Balances the gear so that the search bar stays
-                            // centered.
-                            const SizedBox(width: 40),
-                            Expanded(
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 560,
-                                  ),
-                                  child: const _SearchBar(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: Space.s),
-                            const _SettingsButton(),
-                          ],
-                        ),
+                        trailing: const _SettingsButton(),
                       ),
                       if (hasTitles || hasIssues) const FilterBar(),
                       Expanded(
@@ -178,7 +171,9 @@ class _OverviewHostState extends State<_OverviewHost> {
 
 /// Search bar, focused on startup; shows the restored or applied query.
 class _SearchBar extends ConsumerStatefulWidget {
-  const _SearchBar();
+  const _SearchBar({required this.focusNode});
+
+  final FocusNode focusNode;
 
   @override
   ConsumerState<_SearchBar> createState() => _SearchBarState();
@@ -201,32 +196,43 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
       if (query != _controller.text) _controller.text = query;
     });
     final c = context.colors;
-    OutlineInputBorder border(Color color) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: color),
-    );
-    return TextField(
-      controller: _controller,
-      autofocus: true,
-      onChanged: ref.read(navigationProvider.notifier).setQuery,
-      // Enter opens the detail of the title in the overview.
-      onSubmitted: (_) {
-        if (ref.read(overviewProvider) case final title?) {
-          openTitleDetail(context, title);
-        }
-      },
-      style: Theme.of(context).textTheme.bodyLarge,
-      cursorColor: c.accent,
-      decoration: InputDecoration(
-        hintText: AppLocalizations.of(context).searchHint,
-        hintStyle: TextStyle(color: c.muted),
-        prefixIcon: const Icon(Icons.search_rounded),
-        filled: true,
-        fillColor: c.raised,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        enabledBorder: border(c.border),
-        focusedBorder: border(c.accent.withValues(alpha: 0.7)),
+    final shortcut = defaultTargetPlatform == TargetPlatform.macOS
+        ? '⌘F'
+        : 'CTRL+F';
+    return SizedBox(
+      height: 28,
+      child: TextField(
+        controller: _controller,
+        focusNode: widget.focusNode,
+        autofocus: true,
+        onChanged: ref.read(navigationProvider.notifier).setQuery,
+        // Enter opens the detail of the title in the overview.
+        onSubmitted: (_) {
+          if (ref.read(overviewProvider) case final title?) {
+            openTitleDetail(context, title);
+          }
+        },
+        style: Theme.of(context).textTheme.bodyMedium,
+        cursorColor: c.accent,
+        decoration: InputDecoration(
+          hintText: AppLocalizations.of(context).searchHint,
+          hintStyle: TextStyle(color: c.muted, fontSize: 13),
+          prefixIcon: const Icon(Icons.search_rounded, size: 16),
+          prefixIconConstraints: const BoxConstraints(minWidth: 32),
+          suffixIcon: Padding(
+            padding: const EdgeInsets.only(right: Space.s),
+            child: Text(
+              shortcut,
+              style: context.legend.copyWith(fontSize: 9.5),
+            ),
+          ),
+          suffixIconConstraints: const BoxConstraints(),
+          fillColor: c.background,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 6,
+            horizontal: Space.s,
+          ),
+        ),
       ),
     );
   }
@@ -248,6 +254,7 @@ class _SettingsButtonState extends State<_SettingsButton> {
     onExit: (_) => setState(() => _hovered = false),
     child: IconButton(
       tooltip: AppLocalizations.of(context).settings,
+      iconSize: 16,
       onPressed: () => showSettings(context),
       icon: AnimatedRotation(
         turns: _hovered ? 0.125 : 0,
@@ -360,14 +367,14 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
         // Fixed card size: resizing only changes the column count, the
         // remaining width stays on the right.
         final available = constraints.maxWidth - 2 * Space.xl;
-        final columns = ((available + Space.l) / (_cardSize + Space.l))
+        final columns = ((available + Space.m) / (_cardSize + Space.m))
             .floor()
             .clamp(1, 1 << 10);
-        final used = columns * _cardSize + (columns - 1) * Space.l;
+        final used = columns * _cardSize + (columns - 1) * Space.m;
         return GridView.builder(
           padding: EdgeInsets.fromLTRB(
             Space.xl,
-            Space.s,
+            Space.l,
             (constraints.maxWidth - Space.xl - used).clamp(
               Space.xl,
               double.infinity,
@@ -376,8 +383,8 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            mainAxisSpacing: Space.l,
-            crossAxisSpacing: Space.l,
+            mainAxisSpacing: Space.m,
+            crossAxisSpacing: Space.m,
           ),
           itemCount: titles.length,
           itemBuilder: (_, i) => _Appear(

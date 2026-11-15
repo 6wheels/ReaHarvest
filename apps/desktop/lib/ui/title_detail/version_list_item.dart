@@ -50,9 +50,9 @@ class VersionItem extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
         color: selected ? c.accent.withValues(alpha: 0.12) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(Radii.s),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(Radii.s),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(
