@@ -156,26 +156,33 @@ class LibraryCatalog {
   }
 
   /// Replaces the known values of the library [entry] (SPEC §3.1), in the
-  /// turn of the library. Then rescans it, as a task whose report is shown
-  /// at the end.
+  /// turn of the library. [read] is the list the editor opened with: the
+  /// values added to the file since (by a batch) are kept, unless [values]
+  /// removed them. Then rescans it, as a task whose report is shown at the
+  /// end.
   Future<void> setKnownValues(
     LibraryEntry entry,
-    List<KnownValue> values,
-  ) async {
-    final written = await ref.read(libraryTurnsProvider).run(
+    List<KnownValue> values, {
+    required List<KnownValue> read,
+  }) async {
+    final merged = await ref.read(libraryTurnsProvider).run(
       entry.id,
       () async {
         final storage = MountedFolderStorage(entry.libraryRoot);
         final library = await readLibrary(storage);
-        if (library == null) return false;
-        await writeLibrary(storage, library.withKnownValues(values));
-        return true;
+        if (library == null) return null;
+        var result = values;
+        for (final path in library.knownValues.paths) {
+          if (!read.knows(path)) result = result.withPath(path);
+        }
+        await writeLibrary(storage, library.withKnownValues(result));
+        return result;
       },
     );
-    if (!written) return;
+    if (merged == null) return;
     _log.info(
       'Known values of ${entry.displayName} set: '
-      '${values.paths.map((v) => v.join('/')).join(', ')}',
+      '${merged.paths.map((v) => v.join('/')).join(', ')}',
     );
     await ref.read(libraryScansProvider).scanTask(entry);
   }
