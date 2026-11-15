@@ -9,6 +9,7 @@ import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../theme/app_theme.dart';
 import 'layout_labels.dart';
+import 'widgets.dart';
 
 /// Editor of the known values of the intermediate levels of [layout] (SPEC
 /// §3.1), as a tree: values can be removed, unless [used], and added at
@@ -244,7 +245,7 @@ class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
       content: SizedBox(
         width: 480,
         child: values == null
-            ? const Center(child: CircularProgressIndicator())
+            ? const BusyLight()
             : SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

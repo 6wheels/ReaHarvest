@@ -35,28 +35,205 @@ class Pill extends StatelessWidget {
   );
 }
 
-/// Status light: a small dot, glowing when [lit].
-class Led extends StatelessWidget {
-  const Led(this.color, {super.key, this.lit = true, this.size = 7});
+/// How a [Led] shines.
+enum LedMode {
+  /// Lit and still.
+  steady,
+
+  /// Breathes from off to its color (work in progress).
+  pulse,
+
+  /// Blinks on and off, slowly (failure).
+  blink,
+}
+
+/// Status light: a small dot, glowing when [lit], still, breathing or
+/// blinking according to [mode].
+class Led extends StatefulWidget {
+  const Led(
+    this.color, {
+    super.key,
+    this.lit = true,
+    this.size = 7,
+    this.mode = LedMode.steady,
+  });
 
   final Color color;
   final bool lit;
   final double size;
+  final LedMode mode;
 
   @override
-  Widget build(BuildContext context) => AnimatedContainer(
-    duration: Motion.medium,
-    curve: Motion.curve,
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: lit ? color : context.colors.border,
-      boxShadow: [
-        if (lit)
-          BoxShadow(color: color.withValues(alpha: 0.55), blurRadius: size),
-      ],
-    ),
+  State<Led> createState() => _LedState();
+}
+
+class _LedState extends State<Led> with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(vsync: this);
+
+  @override
+  void initState() {
+    super.initState();
+    _animate();
+  }
+
+  @override
+  void didUpdateWidget(Led old) {
+    super.didUpdateWidget(old);
+    if (old.mode != widget.mode || old.lit != widget.lit) _animate();
+  }
+
+  void _animate() {
+    switch (widget.lit ? widget.mode : LedMode.steady) {
+      case LedMode.steady:
+        _controller
+          ..stop()
+          ..value = 1;
+      case LedMode.pulse:
+        _controller
+          ..duration = const Duration(milliseconds: 1100)
+          ..repeat(reverse: true);
+      case LedMode.blink:
+        _controller
+          ..duration = const Duration(milliseconds: 1600)
+          ..repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final off = context.colors.border;
+    final size = widget.size;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        // Light level from 0 (off) to 1 (fully lit).
+        final level = !widget.lit
+            ? 0.0
+            : switch (widget.mode) {
+                LedMode.steady => 1.0,
+                LedMode.pulse => Curves.easeInOut.transform(t),
+                // On for the first half of the cycle, with soft edges.
+                LedMode.blink =>
+                  t < 0.5
+                      ? (t * 12).clamp(0.0, 1.0)
+                      : (1 - (t - 0.5) * 12).clamp(0.0, 1.0),
+              };
+        return Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color.lerp(off, widget.color, level),
+            boxShadow: [
+              if (level > 0)
+                BoxShadow(
+                  color: widget.color.withValues(alpha: 0.6 * level),
+                  blurRadius: size * (0.6 + level),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Progress as a segmented level meter; an unknown [value] sweeps a few
+/// lit segments across.
+class Meter extends StatefulWidget {
+  const Meter(this.value, {super.key, this.height = 6});
+
+  /// From 0 to 1; null when unknown.
+  final double? value;
+  final double height;
+
+  @override
+  State<Meter> createState() => _MeterState();
+}
+
+class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
+  static const _segments = 20;
+
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(Meter old) {
+    super.didUpdateWidget(old);
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.value == null) {
+      if (!_controller.isAnimating) _controller.repeat();
+    } else {
+      _controller.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final value = widget.value;
+        // Lit range of segments: from the start to the value, or a moving
+        // window of 4 segments.
+        final (from, to) = value == null
+            ? (
+                (_controller.value * (_segments + 4)).floor() - 4,
+                (_controller.value * (_segments + 4)).floor(),
+              )
+            : (0, (value * _segments).round());
+        return Row(
+          spacing: 2,
+          children: [
+            for (var i = 0; i < _segments; i++)
+              Expanded(
+                child: Container(
+                  height: widget.height,
+                  decoration: BoxDecoration(
+                    color: i >= from && i < to ? c.accent : c.border,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Waiting for content: an amber light breathing in the middle.
+class BusyLight extends StatelessWidget {
+  const BusyLight({super.key});
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Led(context.colors.ledAmber, size: 10, mode: LedMode.pulse),
   );
 }
 
@@ -102,7 +279,7 @@ class ChoiceLight extends StatelessWidget {
   }
 }
 
-/// Button label hidden behind a small spinner while [busy], keeping the
+/// Button label hidden behind a breathing light while [busy], keeping the
 /// button size.
 class BusyLabel extends StatelessWidget {
   const BusyLabel(this.label, {super.key, required this.busy});
@@ -115,11 +292,7 @@ class BusyLabel extends StatelessWidget {
     alignment: Alignment.center,
     children: [
       Opacity(opacity: busy ? 0 : 1, child: Text(label)),
-      if (busy)
-        const SizedBox.square(
-          dimension: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
+      if (busy) Led(context.colors.ledAmber, size: 8, mode: LedMode.pulse),
     ],
   );
 }

@@ -269,8 +269,34 @@ ThemeData buildTheme(Brightness brightness) {
         side: hairline,
       ),
     ),
+    // Validation: a lit console key (SSL style), a translucent square of
+    // the accent glowing brighter on hover and on press.
     filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(shape: square, textStyle: buttonText),
+      style: ButtonStyle(
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.xs)),
+        ),
+        textStyle: WidgetStatePropertyAll(buttonText),
+        minimumSize: const WidgetStatePropertyAll(Size(64, 32)),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: Space.m),
+        ),
+        elevation: const WidgetStatePropertyAll(0),
+        backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return c.muted;
+          final lit =
+              states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.pressed);
+          return lit ? Color.lerp(c.accent, c.text, 0.45)! : c.accent;
+        }),
+        iconColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled) ? c.muted : null,
+        ),
+        backgroundBuilder: (context, states, child) =>
+            _LitKey(c, states, child),
+      ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
@@ -280,8 +306,20 @@ ThemeData buildTheme(Brightness brightness) {
         textStyle: buttonText,
       ),
     ),
+    // Secondary actions (cancel): discreet, lit only by the hover.
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(shape: square, textStyle: buttonText),
+      style: ButtonStyle(
+        shape: WidgetStatePropertyAll(square),
+        textStyle: WidgetStatePropertyAll(buttonText),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.hovered) ||
+                  states.contains(WidgetState.pressed)
+              ? c.text
+              : c.muted,
+        ),
+        overlayColor: WidgetStatePropertyAll(c.text.withValues(alpha: 0.05)),
+      ),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(shape: square),
@@ -406,4 +444,58 @@ ThemeData buildTheme(Brightness brightness) {
       tickMarkShape: SliderTickMarkShape.noTickMark,
     ),
   );
+}
+
+/// Background of a lit console key for [states]: light level from idle to
+/// hover to press; off when disabled.
+class _LitKey extends StatelessWidget {
+  const _LitKey(this.c, this.states, this.child);
+
+  final AppColors c;
+  final Set<WidgetState> states;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = states.contains(WidgetState.disabled);
+    final level = disabled
+        ? 0.0
+        : states.contains(WidgetState.pressed)
+        ? 1.0
+        : states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.focused)
+        ? 0.7
+        : 0.4;
+    final light = c.accent;
+    return AnimatedContainer(
+      duration: Motion.fast,
+      curve: Motion.curve,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Radii.xs),
+        border: Border.all(
+          color: disabled
+              ? c.border
+              : light.withValues(alpha: 0.35 + 0.6 * level),
+        ),
+        // Light spread from the middle of the key, like a lamp behind a
+        // translucent cap.
+        gradient: RadialGradient(
+          radius: 1.4,
+          colors: [
+            light.withValues(alpha: disabled ? 0.0 : 0.08 + 0.32 * level),
+            light.withValues(alpha: disabled ? 0.0 : 0.03 + 0.12 * level),
+          ],
+        ),
+        color: disabled ? c.raised : null,
+        boxShadow: [
+          BoxShadow(
+            color: light.withValues(alpha: 0.45 * level),
+            blurRadius: 2 + 12 * level,
+            spreadRadius: -1,
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
 }

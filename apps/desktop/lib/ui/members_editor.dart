@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'widgets.dart';
 
 /// Edits the declared members of the library [entry] (SPEC §6.5).
 Future<void> showMembers(BuildContext context, LibraryEntry entry) =>
@@ -90,7 +91,7 @@ class _MembersDialogState extends ConsumerState<_MembersDialog> {
       content: SizedBox(
         width: 420,
         child: members == null
-            ? const Center(child: CircularProgressIndicator())
+            ? const BusyLight()
             : SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

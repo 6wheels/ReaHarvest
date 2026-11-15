@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../state/tasks.dart';
 import '../theme/app_theme.dart';
 import 'report_dialog.dart';
+import 'widgets.dart';
 
 /// Background tasks zone at the bottom of the application (SPEC §5.2): the
 /// latest task, expandable into the list of all of them. Hidden when there
@@ -145,31 +146,13 @@ class _TaskRow extends ConsumerWidget {
         : task.isRunning
         ? task.step?.call(l10n)
         : null;
-    final icon = switch (task.state) {
-      TaskState.queued => Icon(
-        Icons.schedule_rounded,
-        size: 16,
-        color: c.muted,
-      ),
-      TaskState.running => SizedBox.square(
-        dimension: 14,
-        child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
-      ),
-      TaskState.done => Icon(
-        Icons.check_circle_outline_rounded,
-        size: 16,
-        color: c.accent,
-      ),
-      TaskState.failed => Icon(
-        Icons.error_outline_rounded,
-        size: 16,
-        color: error,
-      ),
-      TaskState.cancelled => Icon(
-        Icons.block_rounded,
-        size: 16,
-        color: c.muted,
-      ),
+    // Status light: off while waiting, breathing amber while running,
+    // green once done, blinking red on failure.
+    final light = switch (task.state) {
+      TaskState.queued || TaskState.cancelled => Led(c.muted, lit: false),
+      TaskState.running => Led(c.ledAmber, mode: LedMode.pulse),
+      TaskState.done => Led(c.ledGreen),
+      TaskState.failed => Led(c.ledRed, mode: LedMode.blink),
     };
     final Widget trailing = switch (task.state) {
       TaskState.running when task.cancelling => Text(
@@ -191,7 +174,7 @@ class _TaskRow extends ConsumerWidget {
       constraints: const BoxConstraints(minHeight: 34),
       child: Row(
         children: [
-          SizedBox(width: 20, child: Center(child: icon)),
+          SizedBox(width: 20, child: Center(child: light)),
           const SizedBox(width: Space.s),
           Expanded(
             child: Column(
@@ -226,7 +209,7 @@ class _TaskRow extends ConsumerWidget {
           ),
           if (task.isRunning) ...[
             const SizedBox(width: Space.m),
-            SizedBox(width: 160, child: _Meter(task.progress)),
+            SizedBox(width: 160, child: Meter(task.progress)),
             const SizedBox(width: Space.s),
             SizedBox(
               width: 36,
@@ -250,46 +233,6 @@ class _TaskRow extends ConsumerWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-/// Progress as a segmented meter, like a level meter; a sweeping light when
-/// the progress is unknown.
-class _Meter extends StatelessWidget {
-  const _Meter(this.value);
-
-  final double? value;
-
-  static const _segments = 20;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final value = this.value;
-    if (value == null) {
-      return LinearProgressIndicator(
-        minHeight: 4,
-        color: c.accent,
-        backgroundColor: c.border,
-      );
-    }
-    final lit = (value * _segments).round();
-    return Row(
-      children: [
-        for (var i = 0; i < _segments; i++) ...[
-          if (i > 0) const SizedBox(width: 2),
-          Expanded(
-            child: Container(
-              height: 6,
-              decoration: BoxDecoration(
-                color: i < lit ? c.accent : c.border,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

@@ -12,6 +12,7 @@ import '../labels.dart';
 import '../layout_labels.dart';
 import '../media_plan_preview.dart';
 import '../report_dialog.dart';
+import '../widgets.dart';
 
 /// Previews the batch fix of [issues], all of [kind] (dry run): each item
 /// with its target, checked by default. Folders get optional values for
@@ -177,7 +178,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
       return [
         Text(l10n.fixPreviewLoading, style: muted),
         const SizedBox(height: Space.s),
-        const LinearProgressIndicator(),
+        const Meter(null, height: 4),
       ];
     }
     final checked = {
