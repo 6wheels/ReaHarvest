@@ -154,10 +154,9 @@ extension AppColorsX on BuildContext {
 /// Material theme built on the design tokens. Material is only the
 /// foundation: no splash, flat surfaces, hairlines, nearly square corners.
 ThemeData buildTheme(Brightness brightness) {
-  final c = brightness == Brightness.dark ? AppColors.dark : AppColors.light;
-  final onAccent = brightness == Brightness.dark
-      ? const Color(0xFF07211A)
-      : Colors.white;
+  final dark = brightness == Brightness.dark;
+  final c = dark ? AppColors.dark : AppColors.light;
+  final onAccent = dark ? const Color(0xFF07211A) : Colors.white;
   final scheme = ColorScheme(
     brightness: brightness,
     primary: c.accent,
@@ -289,13 +288,19 @@ ThemeData buildTheme(Brightness brightness) {
           final lit =
               states.contains(WidgetState.hovered) ||
               states.contains(WidgetState.pressed);
-          return lit ? Color.lerp(c.accent, c.text, 0.45)! : c.accent;
+          // On the light theme the label is darker, to stay crisp on the
+          // stronger cap.
+          return Color.lerp(
+            c.accent,
+            c.text,
+            (lit ? 0.45 : 0.0) + (dark ? 0.0 : 0.25),
+          )!;
         }),
         iconColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled) ? c.muted : null,
         ),
         backgroundBuilder: (context, states, child) =>
-            _LitKey(c, states, child),
+            _LitKey(c, states, child, dark: dark),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -449,11 +454,14 @@ ThemeData buildTheme(Brightness brightness) {
 /// Background of a lit console key for [states]: light level from idle to
 /// hover to press; off when disabled.
 class _LitKey extends StatelessWidget {
-  const _LitKey(this.c, this.states, this.child);
+  const _LitKey(this.c, this.states, this.child, {required this.dark});
 
   final AppColors c;
   final Set<WidgetState> states;
   final Widget? child;
+
+  /// On a light background the cap needs more color to read as lit.
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
@@ -466,7 +474,12 @@ class _LitKey extends StatelessWidget {
               states.contains(WidgetState.focused)
         ? 0.7
         : 0.4;
-    final light = c.accent;
+    // On the light theme, a brighter tint keeps the cap from turning grey
+    // over the warm background.
+    final light = dark
+        ? c.accent
+        : Color.lerp(c.accent, const Color(0xFF2FD9A6), 0.45)!;
+    final cap = dark ? 1.0 : 2.4;
     return AnimatedContainer(
       duration: Motion.fast,
       curve: Motion.curve,
@@ -475,15 +488,21 @@ class _LitKey extends StatelessWidget {
         border: Border.all(
           color: disabled
               ? c.border
-              : light.withValues(alpha: 0.35 + 0.6 * level),
+              : light.withValues(
+                  alpha: (dark ? 0.35 : 0.6) + (dark ? 0.6 : 0.4) * level,
+                ),
         ),
         // Light spread from the middle of the key, like a lamp behind a
         // translucent cap.
         gradient: RadialGradient(
           radius: 1.4,
           colors: [
-            light.withValues(alpha: disabled ? 0.0 : 0.08 + 0.32 * level),
-            light.withValues(alpha: disabled ? 0.0 : 0.03 + 0.12 * level),
+            light.withValues(
+              alpha: disabled ? 0.0 : cap * (0.08 + 0.32 * level),
+            ),
+            light.withValues(
+              alpha: disabled ? 0.0 : cap * (0.03 + 0.12 * level),
+            ),
           ],
         ),
         color: disabled ? c.raised : null,

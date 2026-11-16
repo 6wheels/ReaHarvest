@@ -209,7 +209,7 @@ class _TaskRow extends ConsumerWidget {
           ),
           if (task.isRunning) ...[
             const SizedBox(width: Space.m),
-            SizedBox(width: 160, child: Meter(task.progress)),
+            SizedBox(width: 120, child: Meter(task.progress)),
             const SizedBox(width: Space.s),
             SizedBox(
               width: 36,

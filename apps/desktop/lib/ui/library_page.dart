@@ -199,11 +199,12 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
     final shortcut = defaultTargetPlatform == TargetPlatform.macOS
         ? '⌘F'
         : 'CTRL+F';
-    return SizedBox(
-      height: 28,
+    // Natural height, centered in the title bar.
+    return Center(
       child: TextField(
         controller: _controller,
         focusNode: widget.focusNode,
+        textAlignVertical: TextAlignVertical.center,
         autofocus: true,
         onChanged: ref.read(navigationProvider.notifier).setQuery,
         // Enter opens the detail of the title in the overview.

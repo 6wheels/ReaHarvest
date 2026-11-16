@@ -145,10 +145,12 @@ class _LedState extends State<Led> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Progress as a segmented level meter; an unknown [value] sweeps a few
-/// lit segments across.
+/// Progress as a segmented level meter: narrow upright LEDs, green then
+/// amber then red along the scale like a VU meter, the unlit ones faintly
+/// tinted. An unknown [value] sweeps a few lit LEDs across, dimmer at both
+/// ends.
 class Meter extends StatefulWidget {
-  const Meter(this.value, {super.key, this.height = 6});
+  const Meter(this.value, {super.key, this.height = 10});
 
   /// From 0 to 1; null when unknown.
   final double? value;
@@ -159,7 +161,10 @@ class Meter extends StatefulWidget {
 }
 
 class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
-  static const _segments = 20;
+  static const _segments = 24;
+
+  /// Width of the window lit while the progress is unknown.
+  static const _window = 5;
 
   late final _controller = AnimationController(
     vsync: this,
@@ -192,6 +197,16 @@ class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  /// Color of the LED at [i] on the scale.
+  Color _colorAt(AppColors c, int i) {
+    final position = i / (_segments - 1);
+    return position < 0.7
+        ? c.ledGreen
+        : position < 0.9
+        ? c.ledAmber
+        : c.ledRed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -199,32 +214,66 @@ class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
       animation: _controller,
       builder: (context, _) {
         final value = widget.value;
-        // Lit range of segments: from the start to the value, or a moving
-        // window of 4 segments.
-        final (from, to) = value == null
-            ? (
-                (_controller.value * (_segments + 4)).floor() - 4,
-                (_controller.value * (_segments + 4)).floor(),
-              )
-            : (0, (value * _segments).round());
+        // Light level of the LED at [i], from 0 (off) to 1.
+        double level(int i) {
+          if (value != null) return i < (value * _segments).round() ? 1 : 0;
+          final head = (_controller.value * (_segments + _window)).floor();
+          final offset = head - i;
+          if (offset < 0 || offset >= _window) return 0;
+          return offset == 0 || offset == _window - 1 ? 0.45 : 1;
+        }
+
         return Row(
           spacing: 2,
           children: [
             for (var i = 0; i < _segments; i++)
               Expanded(
-                child: Container(
-                  height: widget.height,
-                  decoration: BoxDecoration(
-                    color: i >= from && i < to ? c.accent : c.border,
-                    borderRadius: BorderRadius.circular(1),
-                  ),
-                ),
+                child: _MeterLed(_colorAt(c, i), level(i), widget.height),
               ),
           ],
         );
       },
     );
   }
+}
+
+/// One LED of a [Meter].
+class _MeterLed extends StatelessWidget {
+  const _MeterLed(this.color, this.level, this.height);
+
+  final Color color;
+  final double level;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: height,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(1),
+      // Brighter core, like the lens of a lit LED.
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: level == 0
+            ? [color.withValues(alpha: 0.14), color.withValues(alpha: 0.10)]
+            : [
+                Color.lerp(
+                  color,
+                  Colors.white,
+                  0.35 * level,
+                )!.withValues(alpha: 0.4 + 0.6 * level),
+                color.withValues(alpha: 0.35 + 0.65 * level),
+              ],
+      ),
+      boxShadow: [
+        if (level > 0)
+          BoxShadow(
+            color: color.withValues(alpha: 0.5 * level),
+            blurRadius: 4 * level,
+          ),
+      ],
+    ),
+  );
 }
 
 /// Waiting for content: an amber light breathing in the middle.

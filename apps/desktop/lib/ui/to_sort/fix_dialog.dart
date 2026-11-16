@@ -178,7 +178,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
       return [
         Text(l10n.fixPreviewLoading, style: muted),
         const SizedBox(height: Space.s),
-        const Meter(null, height: 4),
+        const Meter(null, height: 8),
       ];
     }
     final checked = {
