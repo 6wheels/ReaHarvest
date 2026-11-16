@@ -53,7 +53,14 @@ class Header extends ConsumerWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(Radii.xs),
                     child: CustomPaint(
-                      painter: AuroraPainter(AuroraPalette.of(t.id), phase: 0),
+                      painter: AuroraPainter(
+                        AuroraPalette.of(
+                          t.id,
+                          light:
+                              Theme.of(context).brightness == Brightness.light,
+                        ),
+                        phase: 0,
+                      ),
                     ),
                   ),
                 ),

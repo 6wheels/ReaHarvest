@@ -151,10 +151,16 @@ class VersionPane extends ConsumerWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             FilledButton.icon(
-              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              icon: const ReaperIcon(),
               onPressed: () =>
                   openVersionInReaper(context, ref, title, version),
               label: Text(l10n.openInReaper),
+            ),
+            // Not wired yet: renders are played from phase 3 (SPEC §5).
+            OutlinedButton.icon(
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              onPressed: null,
+              label: Text(l10n.playRender),
             ),
             if (hasHistory)
               OutlinedButton.icon(

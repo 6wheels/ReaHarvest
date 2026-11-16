@@ -83,6 +83,8 @@ class PathRow extends StatelessWidget {
           if (onReset case final reset?)
             IconButton(
               tooltip: l10n.resetToDefault,
+              // As high as the "Choose…" button next to it.
+              style: IconButton.styleFrom(fixedSize: const Size.square(32)),
               icon: const Icon(Icons.restart_alt_rounded),
               onPressed: reset,
             ),

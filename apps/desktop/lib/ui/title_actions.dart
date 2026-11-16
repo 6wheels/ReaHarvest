@@ -66,7 +66,7 @@ Future<void> openLatestInReaper(
 }
 
 /// Width taken by [TitleActions].
-const titleActionsWidth = 3 * 32.0;
+const titleActionsWidth = 4 * (IconAction.size + 4);
 
 /// Quick actions of a title, on its card or row: open its latest version
 /// in REAPER, open its detail, and a menu of other actions. Shown on hover
@@ -76,14 +76,14 @@ class TitleActions extends ConsumerStatefulWidget {
     this.title, {
     super.key,
     required this.visible,
-    this.onDark = false,
+    this.onAurora = false,
   });
 
   final Title title;
   final bool visible;
 
   /// Drawn over the aurora of a card.
-  final bool onDark;
+  final bool onAurora;
 
   @override
   ConsumerState<TitleActions> createState() => _TitleActionsState();
@@ -97,18 +97,6 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
     final l10n = AppLocalizations.of(context);
     final visible = widget.visible || _menuOpen;
     final t = widget.title;
-    Widget button(
-      IconData icon,
-      String tooltip,
-      VoidCallback? onPressed, {
-      Key? key,
-    }) => _ActionButton(
-      key: key,
-      icon: icon,
-      tooltip: tooltip,
-      onDark: widget.onDark,
-      onPressed: onPressed,
-    );
     return IgnorePointer(
       ignoring: !visible,
       child: AnimatedOpacity(
@@ -117,17 +105,30 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (t.versions.isNotEmpty)
-              button(
-                Icons.play_arrow_rounded,
-                l10n.openInReaper,
-                () => openLatestInReaper(context, ref, t),
+            if (t.versions.isNotEmpty) ...[
+              _gap,
+              IconAction(
+                icon: const ReaperIcon(),
+                tooltip: l10n.openInReaper,
+                onAurora: widget.onAurora,
+                onPressed: () => openLatestInReaper(context, ref, t),
               ),
-            button(
-              Icons.open_in_full_rounded,
-              l10n.openDetail,
-              () => openTitleDetail(context, t.id),
+              _gap,
+              // Not wired yet: renders are played from phase 3 (SPEC §5).
+              IconAction(
+                icon: const Icon(Icons.play_arrow_rounded),
+                tooltip: l10n.playRender,
+                onAurora: widget.onAurora,
+                onPressed: null,
+              ),
+            ],
+            _gap,
+            OpenDetailAction(
+              tooltip: l10n.openDetail,
+              onAurora: widget.onAurora,
+              onPressed: () => openTitleDetail(context, t.id),
             ),
+            _gap,
             MenuAnchor(
               onOpen: () => setState(() => _menuOpen = true),
               onClose: () => setState(() => _menuOpen = false),
@@ -154,10 +155,11 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
                   child: Text(l10n.showInExplorer),
                 ),
               ],
-              builder: (context, controller, _) => button(
-                Icons.more_horiz_rounded,
-                l10n.moreActions,
-                () =>
+              builder: (context, controller, _) => IconAction(
+                icon: const Icon(Icons.more_horiz_rounded),
+                tooltip: l10n.moreActions,
+                onAurora: widget.onAurora,
+                onPressed: () =>
                     controller.isOpen ? controller.close() : controller.open(),
               ),
             ),
@@ -168,51 +170,5 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    super.key,
-    required this.icon,
-    required this.tooltip,
-    required this.onDark,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final bool onDark;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Tooltip(
-        message: tooltip,
-        child: Material(
-          color: onDark
-              ? Colors.black.withValues(alpha: 0.35)
-              : Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(Radii.s),
-            side: onDark
-                ? BorderSide(color: Colors.white.withValues(alpha: 0.28))
-                : BorderSide.none,
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(Radii.s),
-            onTap: onPressed,
-            child: Padding(
-              padding: const EdgeInsets.all(5),
-              child: Icon(
-                icon,
-                size: 16,
-                color: onDark ? Colors.white : c.muted,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+/// Space between two actions.
+const _gap = SizedBox(width: 4);

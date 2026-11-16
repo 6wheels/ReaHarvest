@@ -25,6 +25,7 @@ import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest/ui/title_card.dart';
+import 'package:reaharvest/ui/widgets.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -421,6 +422,15 @@ void main() {
     await tester.enterText(find.byType(TextField), 'zzzz');
     await tester.pumpAndSettle();
     expect(find.text('No title matches “zzzz”'), findsOneWidget);
+
+    // The button clears the search, and so does Escape.
+    await tester.tap(find.byTooltip('Clear the search (Esc)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Northern Lights'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'tide');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Northern Lights'), findsOneWidget);
   });
 
   testWidgets('settings popup changes and saves the theme', (tester) async {
@@ -432,6 +442,9 @@ void main() {
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
     expect(settings.saved.last.theme, ThemePreference.dark);
+    await tester.tap(find.text('Neutral'));
+    await tester.pumpAndSettle();
+    expect(settings.saved.last.accent, AccentPreference.neutral);
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.dark);
 
@@ -1125,35 +1138,26 @@ void main() {
     await tester.tap(find.text('Midnight Ferry'));
     await tester.pumpAndSettle();
     expect(find.byType(Overview), findsOneWidget);
-    expect(find.text('Midnight Ferry v1'), findsOneWidget);
-    expect(find.text('Midnight Ferry v3'), findsOneWidget);
-    expect(find.text('Midnight Ferry v4'), findsNothing);
+    // One line per version, named by its label.
+    expect(find.textContaining('take 1'), findsOneWidget);
+    expect(find.textContaining('take 4'), findsOneWidget);
+    expect(find.textContaining('take 5'), findsNothing);
     expect(find.text('All 5 versions'), findsOneWidget);
     expect(find.text('Create a backup point'), findsNothing);
 
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
-    expect(find.text('Midnight Ferry v1'), findsNothing);
+    expect(find.textContaining('take 1'), findsNothing);
   });
 
-  testWidgets('floating overview closes on a click outside, pinned stays', (
-    tester,
-  ) async {
+  testWidgets('overview closes on a click outside', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     await tester.tap(find.text('Midnight Ferry'));
     await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsOneWidget);
     await tester.tapAt(const Offset(20, 300));
     await tester.pumpAndSettle();
     expect(find.byType(Overview), findsNothing);
-
-    await tester.tap(find.text('Midnight Ferry').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Pin below the titles'));
-    await tester.pumpAndSettle();
-    expect(settings.saved.last.navigation.overviewPinned, isTrue);
-    await tester.tapAt(const Offset(20, 300));
-    await tester.pumpAndSettle();
-    expect(find.byType(Overview), findsOneWidget);
   });
 
   testWidgets('opens the title detail over the library and goes back', (
@@ -2203,7 +2207,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move…').at(2));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButton<int>));
+    await tester.tap(find.byType(Dropdown<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Title').last);
     await tester.pumpAndSettle();
@@ -2237,10 +2241,12 @@ void main() {
     await tester.tap(find.text('TO SORT // 3'));
     await tester.pumpAndSettle();
     Checkbox box(int i) => tester.widget(find.byType(Checkbox).at(i));
+    bool light(int i) =>
+        tester.widget<ChoiceLight>(find.byType(ChoiceLight).at(i)).checked;
 
-    // Box 0 selects the section, then one box per card.
-    await tester.tap(find.byType(Checkbox).at(1));
-    await tester.tap(find.byType(Checkbox).at(2));
+    // The box selects the section, then one light per card.
+    await tester.tap(find.byType(ChoiceLight).at(0));
+    await tester.tap(find.byType(ChoiceLight).at(1));
     await tester.pump();
     expect(find.text('2 selected'), findsOne);
     expect(box(0).value, isNull);
@@ -2250,7 +2256,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining(' · 2'), findsOne);
     expect(find.text('1 selected'), findsOne);
-    expect([box(1).value, box(2).value], [true, false]);
+    expect([light(0), light(1)], [true, false]);
 
     // "Fix…" previews the selected items only.
     await tester.tap(find.text('Fix…'));

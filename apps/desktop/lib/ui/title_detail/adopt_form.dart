@@ -103,17 +103,10 @@ class _AdoptState extends ConsumerState<Adopt> {
                 const SizedBox(width: Space.s),
                 SizedBox(
                   width: 160,
-                  child: DropdownButtonFormField<MemberId>(
-                    initialValue: owner,
-                    isDense: true,
-                    decoration: InputDecoration(
-                      labelText: l10n.filterOwner,
-                      isDense: true,
-                    ),
-                    items: [
-                      for (final m in members)
-                        DropdownMenuItem(value: m.id, child: Text(m.name)),
-                    ],
+                  child: Dropdown<MemberId>(
+                    value: owner,
+                    label: l10n.filterOwner,
+                    options: {for (final m in members) m.id: m.name},
                     onChanged: (id) => setState(() => _picked = id),
                   ),
                 ),

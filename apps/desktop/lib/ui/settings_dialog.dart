@@ -142,6 +142,31 @@ class _SettingsPanel extends ConsumerWidget {
                           ),
                         ),
                         FormRow(
+                          label: l10n.accentColor,
+                          child: SegmentedButton<AccentPreference>(
+                            showSelectedIcon: false,
+                            segments: [
+                              for (final (value, label) in [
+                                (AccentPreference.teal, l10n.accentTeal),
+                                (AccentPreference.blue, l10n.accentBlue),
+                                (AccentPreference.neutral, l10n.accentNeutral),
+                              ])
+                                ButtonSegment(
+                                  value: value,
+                                  icon: _Swatch(
+                                    accentOf(value)
+                                        .on(Theme.of(context).brightness),
+                                  ),
+                                  label: Text(label),
+                                ),
+                            ],
+                            selected: {settings.accent},
+                            onSelectionChanged: (s) => notifier.change(
+                              (a) => a.copyWith(accent: s.first),
+                            ),
+                          ),
+                        ),
+                        FormRow(
                           label: l10n.textSize,
                           child: Row(
                             children: [
@@ -413,5 +438,23 @@ class _Libraries extends ConsumerWidget {
         ],
       );
     },
+  );
+}
+
+/// Small square of an accent color.
+class _Swatch extends StatelessWidget {
+  const _Swatch(this.color);
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 10,
+    height: 10,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(Radii.xs),
+      border: Border.all(color: context.colors.border),
+    ),
   );
 }

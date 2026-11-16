@@ -94,7 +94,10 @@ class KnownValuesEditor extends StatelessWidget {
         if (!last) ..._level(context, v.children, [...parent, v.value]),
       ],
       Padding(
-        padding: indent,
+        // Apart from the tree above it at the first level.
+        padding: indent.copyWith(
+          top: depth == 0 && level.isNotEmpty ? Space.s : 0,
+        ),
         child: Row(
           children: [
             Expanded(
@@ -178,14 +181,17 @@ class _AddValueState extends State<_AddValue> {
     decoration: InputDecoration(
       isDense: true,
       hintText: widget.label,
+      errorText: _controller.text.trim().isEmpty || _valid
+          ? null
+          : AppLocalizations.of(context).invalidLevelName,
       prefixIcon: const Icon(Icons.add_rounded, size: 16),
       prefixIconConstraints: const BoxConstraints(minWidth: 28),
       border: InputBorder.none,
-      suffixIcon: _controller.text.trim().isEmpty
+      suffixIcon: !_valid
           ? null
-          : IconButton(
+          // Smaller than the field, so that it keeps its height.
+          : IconAction(
               tooltip: widget.label,
-              iconSize: 16,
               icon: const Icon(Icons.check_rounded),
               onPressed: _valid ? _add : null,
             ),

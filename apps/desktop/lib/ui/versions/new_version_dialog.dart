@@ -148,23 +148,12 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
               ),
             ),
             if (_source == _Source.template)
-              DropdownButtonFormField<String>(
-                initialValue: _template,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: l10n.versionSourceTemplate,
-                  isDense: true,
-                ),
-                items: [
-                  for (final t in templates)
-                    DropdownMenuItem(
-                      value: t,
-                      child: Text(
-                        p.basenameWithoutExtension(t),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
+              Dropdown<String>(
+                value: _template,
+                label: l10n.versionSourceTemplate,
+                options: {
+                  for (final t in templates) t: p.basenameWithoutExtension(t),
+                },
                 onChanged: (v) => setState(() => _template = v),
               ),
             const SizedBox(height: Space.m),

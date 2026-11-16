@@ -9,7 +9,7 @@ import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
 import 'to_sort/to_sort_page.dart';
-import 'widgets.dart' show ChoiceLight, MenuLegend;
+import 'widgets.dart' show ChoiceLight, Disclosure, MenuLegend;
 
 /// Filter chips, saved views, "To sort" / "To adopt" and display mode, below
 /// the search bar (SPEC §5.2). Chips offering a single value are hidden.
@@ -152,7 +152,7 @@ class Pill extends StatelessWidget {
     super.key,
     required this.label,
     this.icon,
-    this.trailing,
+    this.menuOpen,
     this.count,
     this.active = false,
     this.onPressed,
@@ -160,7 +160,9 @@ class Pill extends StatelessWidget {
 
   final String label;
   final IconData? icon;
-  final IconData? trailing;
+
+  /// Whether the menu it opens is open; null when it opens none.
+  final bool? menuOpen;
   final int? count;
   final bool active;
   final VoidCallback? onPressed;
@@ -206,9 +208,13 @@ class Pill extends StatelessWidget {
                     color: active ? c.text : c.muted,
                   ),
                 ),
-                if (trailing != null) ...[
+                if (menuOpen case final open?) ...[
                   const SizedBox(width: 2),
-                  Icon(trailing, size: 14, color: color),
+                  Disclosure(
+                    open ? Disclosure.up : Disclosure.down,
+                    size: 20,
+                    color: color,
+                  ),
                 ],
               ],
             ),
@@ -321,7 +327,7 @@ class _MultiChoiceChip<T> extends StatelessWidget {
       ],
       builder: (context, controller, _) => Pill(
         label: text,
-        trailing: Icons.expand_more_rounded,
+        menuOpen: controller.isOpen,
         active: selected.isNotEmpty,
         onPressed: () =>
             controller.isOpen ? controller.close() : controller.open(),
@@ -372,7 +378,7 @@ class _SavedViewsChip extends ConsumerWidget {
       builder: (context, controller, _) => Pill(
         label: l10n.views,
         icon: Icons.bookmark_outline_rounded,
-        trailing: Icons.expand_more_rounded,
+        menuOpen: controller.isOpen,
         onPressed: () =>
             controller.isOpen ? controller.close() : controller.open(),
       ),

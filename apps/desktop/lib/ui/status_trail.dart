@@ -72,16 +72,12 @@ class _StatusTrailState extends State<StatusTrail> {
     );
     String labelOf(String step) => statusLabel(l10n, step).toUpperCase();
 
-    Widget fade(bool visible, Widget child) => AnimatedSlide(
-      offset: Offset(0, visible ? 0 : -0.4),
+    // Labels only fade: any move would make them jump on hover.
+    Widget fade(bool visible, Widget child) => AnimatedOpacity(
+      opacity: visible ? 1 : 0,
       duration: Motion.medium,
       curve: Motion.curve,
-      child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
-        duration: Motion.medium,
-        curve: Motion.curve,
-        child: child,
-      ),
+      child: child,
     );
 
     return MouseRegion(
@@ -117,47 +113,68 @@ class _StatusTrailState extends State<StatusTrail> {
             ],
           ),
           SizedBox(height: widget.large ? 6 : 3),
-          Stack(
-            children: [
-              // Every label under its segment, revealed on hover.
-              Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final segment = (width - gap * (steps.length - 1)) / steps.length;
+              // The current label starts where its segment starts, like the
+              // revealed one, and is pushed back at the end of the trail.
+              double currentLeft() {
+                final text = TextPainter(
+                  text: TextSpan(
+                    text: labelOf(steps[current]),
+                    style: styleOf(current),
+                  ),
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                  maxLines: 1,
+                )..layout();
+                final left = current * (segment + gap);
+                final max = width - text.width;
+                text.dispose();
+                return left.clamp(0.0, max < 0 ? 0.0 : max);
+              }
+
+              return Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  for (final (i, step) in steps.indexed) ...[
-                    if (i > 0) SizedBox(width: gap),
-                    Expanded(
+                  // Every label under its segment, revealed on hover.
+                  Row(
+                    children: [
+                      for (final (i, step) in steps.indexed) ...[
+                        if (i > 0) SizedBox(width: gap),
+                        Expanded(
+                          child: fade(
+                            _hovered,
+                            Text(
+                              labelOf(step),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: styleOf(i),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  // The current label alone, not clipped to its segment.
+                  if (current >= 0)
+                    Positioned(
+                      left: currentLeft(),
+                      top: 0,
                       child: fade(
-                        _hovered,
+                        !_hovered,
                         Text(
-                          labelOf(step),
+                          labelOf(steps[current]),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: styleOf(i),
+                          softWrap: false,
+                          style: styleOf(current),
                         ),
                       ),
                     ),
-                  ],
                 ],
-              ),
-              // The current label alone, placed along the trail like its
-              // segment, but not clipped to the segment width.
-              if (current >= 0)
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment(
-                      -1 + 2 * current / (steps.length - 1),
-                      0,
-                    ),
-                    child: fade(
-                      !_hovered,
-                      Text(
-                        labelOf(steps[current]),
-                        maxLines: 1,
-                        style: styleOf(current),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+              );
+            },
           ),
         ],
       ),

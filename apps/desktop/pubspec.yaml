@@ -44,6 +44,7 @@ flutter:
   assets:
     - assets/fonts/Inter-OFL.txt
     - assets/fonts/JetBrainsMono-OFL.txt
+    - assets/third_party/reaper/reaper.png
   fonts:
     - family: Inter
       fonts:

@@ -10,6 +10,7 @@ import 'aurora.dart';
 import 'labels.dart';
 import 'status_trail.dart';
 import 'title_actions.dart';
+import 'widgets.dart';
 
 enum _Column { name, tags, versions, tempo, status, modified }
 
@@ -246,7 +247,10 @@ class _Swatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lights = AuroraPalette.of(id).lights;
+    final lights = AuroraPalette.of(
+      id,
+      light: Theme.of(context).brightness == Brightness.light,
+    ).lights;
     return Container(
       width: 18,
       height: 18,
@@ -428,11 +432,7 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
             padding: EdgeInsets.only(left: indent),
             child: Row(
               children: [
-                AnimatedRotation(
-                  turns: collapsed ? -0.25 : 0,
-                  duration: Motion.fast,
-                  child: Icon(Icons.expand_more_rounded, color: c.muted),
-                ),
+                Disclosure(collapsed ? Disclosure.right : Disclosure.down),
                 const SizedBox(width: Space.xs),
                 Expanded(
                   child: Text(

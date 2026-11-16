@@ -402,13 +402,13 @@ class Choice<T> extends StatelessWidget {
     child: Row(
       children: [
         Expanded(child: Text(label)),
-        DropdownButton<T>(
-          value: value,
-          items: [
-            for (final MapEntry(:key, value: text) in options.entries)
-              DropdownMenuItem(value: key, child: Text(text)),
-          ],
-          onChanged: (v) => onChanged(v as T),
+        SizedBox(
+          width: 200,
+          child: Dropdown<T>(
+            value: value,
+            options: options,
+            onChanged: onChanged,
+          ),
         ),
       ],
     ),
@@ -468,25 +468,40 @@ class _LevelFieldState extends State<LevelField> {
         errorText: widget.error,
       ),
     ),
+    // A console menu, like the other ones of the application.
     optionsViewBuilder: (context, onSelected, options) => Align(
       alignment: Alignment.topLeft,
-      child: Material(
-        elevation: 4,
-        color: context.colors.raised,
-        borderRadius: BorderRadius.circular(Radii.s),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 420),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            children: [
-              for (final o in options)
-                ListTile(
-                  dense: true,
-                  title: Text(o),
-                  onTap: () => onSelected(o),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Material(
+          color: context.colors.surface,
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Radii.s),
+            side: BorderSide(color: context.colors.border),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 160,
+              maxWidth: 360,
+              maxHeight: 200,
+            ),
+            child: IntrinsicWidth(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(Space.xs),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final o in options)
+                      MenuItemButton(
+                        onPressed: () => onSelected(o),
+                        child: Text(o),
+                      ),
+                  ],
                 ),
-            ],
+              ),
+            ),
           ),
         ),
       ),

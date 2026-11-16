@@ -18,12 +18,14 @@ import 'widgets.dart';
 const overviewHeight = 196.0;
 
 /// Number of versions listed in the overview.
-const _recentCount = 3;
+const _recentCount = 4;
+
+/// Width of the recent versions.
+const _recentWidth = 460.0;
 
 /// Overview of a title, docked at the bottom of the library (SPEC §5.2):
-/// crucial data only, the rest being in the title detail. Unpinned, it
-/// floats over the titles with a blurred, translucent (acrylic)
-/// background; pinned, it is opaque and the titles end above it.
+/// crucial data only, the rest being in the title detail. It floats over
+/// the titles with a blurred, translucent (acrylic) background.
 class Overview extends ConsumerWidget {
   const Overview(this.id, {super.key});
 
@@ -33,9 +35,6 @@ class Overview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
     final l10n = AppLocalizations.of(context);
-    final pinned = ref.watch(
-      navigationProvider.select((n) => n.overviewPinned),
-    );
     final title = ref
         .watch(titlesProvider)
         .where((t) => t.id == id)
@@ -48,35 +47,23 @@ class Overview extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (title != null) ...[
-            Expanded(flex: 2, child: _Identity(title)),
+            Expanded(child: _Identity(title)),
             const SizedBox(width: Space.l),
-            Expanded(flex: 3, child: _Recent(title)),
+            SizedBox(width: _recentWidth, child: _Recent(title)),
           ] else
             const Spacer(),
+          const SizedBox(width: Space.s),
           Column(
+            spacing: Space.xs,
             children: [
-              IconButton(
+              IconAction(
+                icon: const Icon(Icons.close_rounded),
                 tooltip: l10n.close,
                 onPressed: ref.read(overviewProvider.notifier).close,
-                icon: const Icon(Icons.close_rounded, size: 20),
               ),
-              IconButton(
-                tooltip: pinned ? l10n.unpin : l10n.pin,
-                isSelected: pinned,
-                onPressed: () => ref
-                    .read(navigationProvider.notifier)
-                    .setOverviewPinned(!pinned),
-                icon: const Icon(Icons.push_pin_outlined, size: 20),
-                selectedIcon: Icon(
-                  Icons.push_pin_rounded,
-                  size: 20,
-                  color: c.accent,
-                ),
-              ),
-              IconButton(
+              OpenDetailAction(
                 tooltip: l10n.openDetail,
                 onPressed: () => openTitleDetail(context, id),
-                icon: const Icon(Icons.open_in_full_rounded, size: 20),
               ),
             ],
           ),
@@ -84,36 +71,31 @@ class Overview extends ConsumerWidget {
       ),
     );
 
-    final panel = DecoratedBox(
-      decoration: BoxDecoration(
-        color: c.surface.withValues(alpha: pinned ? 1 : 0.72),
-        borderRadius: radius,
-        border: Border.all(color: c.border),
-      ),
-      child: Material(type: MaterialType.transparency, child: body),
-    );
-
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: pinned ? 0.08 : 0.30),
+            color: Colors.black.withValues(alpha: 0.30),
             blurRadius: 24,
             offset: const Offset(0, 6),
           ),
         ],
       ),
-      // A single blur, clipped to the panel; none when pinned since
-      // nothing is behind it.
+      // A single blur, clipped to the panel.
       child: ClipRRect(
         borderRadius: radius,
-        child: pinned
-            ? panel
-            : BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: panel,
-              ),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: c.surface.withValues(alpha: 0.72),
+              borderRadius: radius,
+              border: Border.all(color: c.border),
+            ),
+            child: Material(type: MaterialType.transparency, child: body),
+          ),
+        ),
       ),
     );
   }
@@ -175,7 +157,7 @@ class _Identity extends ConsumerWidget {
                   style: context.readout,
                 ),
               ),
-              if (title.status case final status?) ...[
+              if (leadStatus(title) case final status?) ...[
                 const SizedBox(width: Space.s),
                 Pill(statusLabel(l10n, status), color: c.accent),
               ],
@@ -238,14 +220,14 @@ class _Alert extends StatelessWidget {
                   ?.copyWith(color: color),
             ),
           ),
-          Icon(Icons.chevron_right_rounded, size: 16, color: color),
+          Disclosure(Disclosure.right, size: 20, color: color),
         ],
       ),
     ),
   );
 }
 
-/// Most recent versions, side by side.
+/// Most recent versions, one line each, the latest on top.
 class _Recent extends StatelessWidget {
   const _Recent(this.title);
 
@@ -256,40 +238,47 @@ class _Recent extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final versions = recentVersions(title);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(child: SectionLabel(l10n.recentVersions)),
-            if (versions.length > _recentCount)
-              TextButton(
-                onPressed: () => openTitleDetail(context, title.id),
-                child: Text(l10n.allVersions(versions.length)),
-              ),
-          ],
-        ),
-        const SizedBox(height: Space.xs),
-        Expanded(
+        SizedBox(
+          height: 24,
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final (i, v) in versions.take(_recentCount).indexed) ...[
-                if (i > 0) const SizedBox(width: Space.s),
-                Expanded(child: _RecentVersion(title, v)),
-              ],
-              // Keeps the tiles at the same width with fewer versions.
-              for (var i = versions.length; i < _recentCount; i++) ...[
-                const SizedBox(width: Space.s),
-                const Spacer(),
-              ],
+              Expanded(child: SectionLabel(l10n.recentVersions)),
+              if (versions.length > _recentCount)
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: Space.s),
+                  ),
+                  onPressed: () => openTitleDetail(context, title.id),
+                  child: Text(l10n.allVersions(versions.length)),
+                ),
             ],
           ),
         ),
+        const SizedBox(height: Space.xs),
+        for (final (i, v) in versions.take(_recentCount).indexed) ...[
+          if (i > 0) const SizedBox(height: 3),
+          _RecentVersion(title, v),
+        ],
       ],
     );
   }
 }
 
+/// Most advanced status of the versions of [t] along the trail, else a
+/// custom one, else the status of the title itself.
+String? leadStatus(Title t) {
+  const steps = Title.defaultStatuses;
+  final statuses = [for (final v in t.versions) ?t.statusOf(v)];
+  final known = statuses.where(steps.contains);
+  if (known.isEmpty) return statuses.firstOrNull ?? t.status;
+  return known.reduce((a, b) => steps.indexOf(a) >= steps.indexOf(b) ? a : b);
+}
+
+/// Line of a recent version: its label and owner, date and tempo, icons
+/// of what needs attention, its status and its actions.
 class _RecentVersion extends ConsumerWidget {
   const _RecentVersion(this.title, this.version);
 
@@ -300,47 +289,92 @@ class _RecentVersion extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
-    final text = Theme.of(context).textTheme;
+    final m = version.metadata;
+    final label = m?.label ?? '';
+    final owner = switch (m?.owner) {
+      final id? => ref.watch(ownerNamesProvider)[id] ?? l10n.unknownOwner,
+      null => null,
+    };
+    final status = title.statusOf(version);
+    final alerts = versionAlerts(ref, title, version);
+    final readout = [
+      shortDate(l10n, version.modified),
+      if (version.tempo case final bpm?) l10n.bpm(bpm.round()),
+    ].join(' · ');
+    Widget alert(IconData icon, String tooltip, Color color) => Padding(
+      padding: const EdgeInsets.only(left: Space.xs),
+      child: Tooltip(
+        message: tooltip,
+        child: Icon(icon, size: 14, color: color),
+      ),
+    );
     return Container(
-      padding: const EdgeInsets.fromLTRB(Space.m, Space.s, Space.xs, Space.xs),
+      height: 30,
+      padding: const EdgeInsets.only(left: Space.s + 2, right: 1),
       decoration: BoxDecoration(
         color: c.raised.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(color: c.border),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ClipRect(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: Text.rich(
+              TextSpan(
                 children: [
-                  Text(
-                    p.posix.withoutExtension(version.fileName),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  // The file name stands for a version without label.
+                  label.isEmpty
+                      ? TextSpan(
+                          text: p.posix.withoutExtension(version.fileName),
+                          style: TextStyle(color: c.muted),
+                        )
+                      : TextSpan(
+                          text: label,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                  if (owner != null)
+                    TextSpan(
+                      text: '  $owner',
+                      style: TextStyle(color: c.muted),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Flexible(
-                    child: Text(
-                      versionDetails(ref, l10n, version),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.readout.copyWith(fontSize: 10.5),
-                    ),
-                  ),
+                  TextSpan(text: '   $readout', style: context.readout),
                 ],
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(fontSize: 12.5),
             ),
           ),
-          IconButton(
+          if (alerts.missing.isNotEmpty)
+            alert(
+              Icons.extension_off_outlined,
+              l10n.missingPluginCount(alerts.missing.length),
+              warningColor,
+            ),
+          if (alerts.duplicates.isNotEmpty)
+            alert(
+              Icons.content_copy_rounded,
+              l10n.duplicateCount(1),
+              warningColor,
+            ),
+          if (alerts.notAdopted)
+            alert(Icons.help_outline_rounded, l10n.notAdopted, c.muted),
+          if (status != null) ...[
+            const SizedBox(width: Space.s),
+            Pill(statusLabel(l10n, status), color: c.accent),
+          ],
+          const SizedBox(width: Space.xs),
+          IconAction(
+            icon: const ReaperIcon(),
             tooltip: l10n.openInReaper,
             onPressed: () => openVersionInReaper(context, ref, title, version),
-            icon: const Icon(Icons.play_arrow_rounded, size: 20),
+          ),
+          // Not wired yet: renders are played from phase 3 (SPEC §5).
+          IconAction(
+            icon: const Icon(Icons.play_arrow_rounded),
+            tooltip: l10n.playRender,
+            onPressed: null,
           ),
         ],
       ),

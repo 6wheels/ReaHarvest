@@ -62,10 +62,8 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
       final toggle = TextButton.icon(
         onPressed: () => setState(() => _expanded = !_expanded),
         iconAlignment: IconAlignment.end,
-        icon: Icon(
-          _expanded ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-          size: 18,
-        ),
+        // The zone unfolds upwards.
+        icon: Disclosure(_expanded ? Disclosure.down : Disclosure.up),
         label: Text(
           '${l10n.tasks.toUpperCase()}$labelSeparator${tasks.length}',
           style: context.legend.copyWith(color: c.text),

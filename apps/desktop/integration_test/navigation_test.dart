@@ -89,14 +89,12 @@ void main() {
     await tapText(tester, 'Clear filters');
     await showsCards(tester, {'Song', 'Ballad', 'Encore'});
 
-    // List: a click on a row opens the overview, pinned below the titles.
+    // List: a click on a row opens the overview.
     await tapTooltip(tester, 'List');
     expect(find.byType(TitleList), findsOne);
     await tapText(tester, 'Song');
     expect(find.byType(Overview), findsOne);
     expect(find.text('RECENT VERSIONS'), findsOne);
-    await tapTooltip(tester, 'Pin below the titles');
-    expect(h.settings.navigation.overviewPinned, isTrue);
 
     // Title detail, and back with Escape, the back button or the mouse.
     Future<void> openDetail() async {
@@ -154,7 +152,6 @@ void main() {
     expect(find.text('Ballad'), findsNothing);
     final navigation = h.settings.navigation;
     expect(navigation.displayMode, DisplayMode.list);
-    expect(navigation.overviewPinned, isTrue);
     await tester.tap(chip('Views'));
     await tester.pumpAndSettle();
     await tapText(tester, 'Live');

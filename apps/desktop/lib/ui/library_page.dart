@@ -46,7 +46,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final hasTitles = ref.watch(titlesProvider).isNotEmpty;
     final hasIssues = ref.watch(issuesProvider).isNotEmpty;
     final overview = ref.watch(overviewProvider);
-    final pinned = navigation.overviewPinned;
     final l10n = AppLocalizations.of(context);
 
     final Widget content;
@@ -86,12 +85,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         child: Stack(
           children: [
             Positioned.fill(
-              bottom: overview == null || !pinned
-                  ? 0
-                  : overviewHeight + Space.l,
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: pinned || overview == null
+                onTap: overview == null
                     ? null
                     : ref.read(overviewProvider.notifier).close,
                 child: RepaintBoundary(
@@ -100,7 +96,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       StudioTitleBar(
                         center: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 480),
-                          child: _SearchBar(focusNode: _searchFocus),
+                          child: LibrarySearchField(focusNode: _searchFocus),
                         ),
                         trailing: const _SettingsButton(),
                       ),
@@ -170,16 +166,18 @@ class _OverviewHostState extends State<_OverviewHost> {
 }
 
 /// Search bar, focused on startup; shows the restored or applied query.
-class _SearchBar extends ConsumerStatefulWidget {
-  const _SearchBar({required this.focusNode});
+/// Search field of the library title bar: filters the titles as one types;
+/// a discreet button or Escape clears it.
+class LibrarySearchField extends ConsumerStatefulWidget {
+  const LibrarySearchField({super.key, required this.focusNode});
 
   final FocusNode focusNode;
 
   @override
-  ConsumerState<_SearchBar> createState() => _SearchBarState();
+  ConsumerState<LibrarySearchField> createState() => _LibrarySearchFieldState();
 }
 
-class _SearchBarState extends ConsumerState<_SearchBar> {
+class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
   late final _controller = TextEditingController(
     text: ref.read(navigationProvider).query,
   );
@@ -190,48 +188,84 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
     super.dispose();
   }
 
+  void _clear() {
+    _controller.clear();
+    ref.read(navigationProvider.notifier).setQuery('');
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(navigationProvider.select((n) => n.query), (_, query) {
       if (query != _controller.text) _controller.text = query;
     });
+    final l10n = AppLocalizations.of(context);
+    final empty = ref.watch(navigationProvider.select((n) => n.query.isEmpty));
     final c = context.colors;
     final shortcut = defaultTargetPlatform == TargetPlatform.macOS
         ? '⌘F'
         : 'CTRL+F';
     // Natural height, centered in the title bar.
     return Center(
-      child: TextField(
-        controller: _controller,
-        focusNode: widget.focusNode,
-        textAlignVertical: TextAlignVertical.center,
-        autofocus: true,
-        onChanged: ref.read(navigationProvider.notifier).setQuery,
-        // Enter opens the detail of the title in the overview.
-        onSubmitted: (_) {
-          if (ref.read(overviewProvider) case final title?) {
-            openTitleDetail(context, title);
+      // Escape clears the search; once empty, it goes on to the page
+      // (closes the overview).
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent ||
+              event.logicalKey != LogicalKeyboardKey.escape ||
+              _controller.text.isEmpty) {
+            return KeyEventResult.ignored;
           }
+          _clear();
+          return KeyEventResult.handled;
         },
-        style: Theme.of(context).textTheme.bodyMedium,
-        cursorColor: c.accent,
-        decoration: InputDecoration(
-          hintText: AppLocalizations.of(context).searchHint,
-          hintStyle: TextStyle(color: c.muted, fontSize: 13),
-          prefixIcon: const Icon(Icons.search_rounded, size: 16),
-          prefixIconConstraints: const BoxConstraints(minWidth: 32),
-          suffixIcon: Padding(
-            padding: const EdgeInsets.only(right: Space.s),
-            child: Text(
-              shortcut,
-              style: context.legend.copyWith(fontSize: 9.5),
+        child: TextField(
+          controller: _controller,
+          focusNode: widget.focusNode,
+          textAlignVertical: TextAlignVertical.center,
+          autofocus: true,
+          onChanged: ref.read(navigationProvider.notifier).setQuery,
+          // Enter opens the detail of the title in the overview.
+          onSubmitted: (_) {
+            if (ref.read(overviewProvider) case final title?) {
+              openTitleDetail(context, title);
+            }
+          },
+          style: Theme.of(context).textTheme.bodyMedium,
+          cursorColor: c.accent,
+          decoration: InputDecoration(
+            hintText: l10n.searchHint,
+            hintStyle: TextStyle(color: c.muted, fontSize: 13),
+            prefixIcon: const Icon(Icons.search_rounded, size: 16),
+            prefixIconConstraints: const BoxConstraints(minWidth: 32),
+            // The shortcut while empty, then a discreet button clearing it.
+            suffixIcon: empty
+                ? Padding(
+                    padding: const EdgeInsets.only(right: Space.s),
+                    child: Text(
+                      shortcut,
+                      style: context.legend.copyWith(fontSize: 9.5),
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(right: 2),
+                    child: IconButton(
+                      tooltip: l10n.clearSearch,
+                      onPressed: _clear,
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size.square(22),
+                        iconSize: 14,
+                      ),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
+            suffixIconConstraints: const BoxConstraints(),
+            fillColor: c.background,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 6,
+              horizontal: Space.s,
             ),
-          ),
-          suffixIconConstraints: const BoxConstraints(),
-          fillColor: c.background,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 6,
-            horizontal: Space.s,
           ),
         ),
       ),

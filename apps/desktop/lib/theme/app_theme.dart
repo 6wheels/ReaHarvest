@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:reaharvest_library/reaharvest_library.dart'
+    show AccentPreference;
 
 /// Spacing scale (logical pixels).
 abstract final class Space {
@@ -94,8 +96,8 @@ final class AppColors extends ThemeExtension<AppColors> {
     surface: Color(0xFFF7F6F3),
     raised: Color(0xFFFFFFFF),
     border: Color(0xFFD3D1CA),
-    text: Color(0xFF17181C),
-    muted: Color(0xFF656974),
+    text: Color(0xFF0F1013),
+    muted: Color(0xFF4F535C),
     accent: Color(0xFF177E65),
     scrim: Color(0xFFE9E7E1),
     ledAmber: Color(0xFFE07B00),
@@ -104,7 +106,19 @@ final class AppColors extends ThemeExtension<AppColors> {
   );
 
   @override
-  AppColors copyWith() => this;
+  AppColors copyWith({Color? accent}) => AppColors(
+    background: background,
+    surface: surface,
+    raised: raised,
+    border: border,
+    text: text,
+    muted: muted,
+    accent: accent ?? this.accent,
+    scrim: scrim,
+    ledAmber: ledAmber,
+    ledGreen: ledGreen,
+    ledRed: ledRed,
+  );
 
   @override
   AppColors lerp(AppColors? other, double t) {
@@ -151,12 +165,58 @@ extension AppColorsX on BuildContext {
   );
 }
 
+/// Accent color of the interface: a hue and a saturation, as light as the
+/// default accent on each theme. A neutral one (no saturation) is near white
+/// on the dark theme and near black on the light one, like the keys of a
+/// console.
+@immutable
+final class Accent {
+  const Accent(this.hue, this.saturation);
+
+  /// Default accent; [buildTheme] uses the exact design tokens for it.
+  static const teal = Accent(163, 0.63);
+  static const blue = Accent(199, 0.63);
+  static const neutral = Accent(230, 0);
+
+  final double hue;
+  final double saturation;
+
+  Color on(Brightness brightness) {
+    final chroma = (saturation / 0.65).clamp(0.0, 1.0);
+    final lightness = brightness == Brightness.dark
+        ? 0.94 - 0.25 * chroma
+        : 0.12 + 0.17 * chroma;
+    return HSLColor.fromAHSL(1, hue, saturation, lightness).toColor();
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is Accent && other.hue == hue && other.saturation == saturation;
+
+  @override
+  int get hashCode => Object.hash(hue, saturation);
+}
+
+/// Accent of the [preference].
+Accent accentOf(AccentPreference preference) => switch (preference) {
+  AccentPreference.teal => Accent.teal,
+  AccentPreference.blue => Accent.blue,
+  AccentPreference.neutral => Accent.neutral,
+};
+
 /// Material theme built on the design tokens. Material is only the
 /// foundation: no splash, flat surfaces, hairlines, nearly square corners.
-ThemeData buildTheme(Brightness brightness) {
+/// The accent is [accent] (default: teal).
+ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.teal}) {
   final dark = brightness == Brightness.dark;
-  final c = dark ? AppColors.dark : AppColors.light;
-  final onAccent = dark ? const Color(0xFF07211A) : Colors.white;
+  final tokens = dark ? AppColors.dark : AppColors.light;
+  final c = accent == Accent.teal
+      ? tokens
+      : tokens.copyWith(accent: accent.on(brightness));
+  // Labels on a solid accent: a deep shade of the accent on dark.
+  final onAccent = dark
+      ? Color.lerp(c.accent, Colors.black, 0.88)!
+      : Colors.white;
   final scheme = ColorScheme(
     brightness: brightness,
     primary: c.accent,
@@ -205,6 +265,29 @@ ThemeData buildTheme(Brightness brightness) {
     fontWeight: FontWeight.w600,
     letterSpacing: 0.1,
   );
+  bool lit(Set<WidgetState> states) =>
+      states.contains(WidgetState.hovered) ||
+      states.contains(WidgetState.pressed) ||
+      states.contains(WidgetState.focused);
+  // Shared hover of the secondary buttons: the label brightens and a faint
+  // fill appears.
+  final litOnHover = WidgetStateProperty.resolveWith<Color>(
+    (states) => states.contains(WidgetState.disabled)
+        ? c.muted.withValues(alpha: 0.45)
+        : lit(states)
+        ? c.text
+        : c.muted,
+  );
+  final hoverFill = WidgetStateProperty.resolveWith<Color>(
+    (states) => !states.contains(WidgetState.disabled) && lit(states)
+        ? c.text.withValues(
+            // Stronger on the light theme, where a faint fill hardly shows.
+            alpha:
+                (states.contains(WidgetState.pressed) ? 0.10 : 0.06) *
+                (dark ? 1 : 1.8),
+          )
+        : Colors.transparent,
+  );
   final menuShape = WidgetStatePropertyAll(
     RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(Radii.s),
@@ -228,6 +311,12 @@ ThemeData buildTheme(Brightness brightness) {
       titleMedium: text.titleMedium?.copyWith(
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
+      ),
+      // Also the text of the fields: as large as the button labels.
+      bodyLarge: text.bodyLarge?.copyWith(
+        fontSize: 13,
+        height: 1.3,
+        letterSpacing: 0,
       ),
       labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w500),
       labelSmall: text.labelSmall?.copyWith(
@@ -268,47 +357,48 @@ ThemeData buildTheme(Brightness brightness) {
         side: hairline,
       ),
     ),
-    // Validation: a lit console key (SSL style), a translucent square of
-    // the accent glowing brighter on hover and on press.
+    // Validation: a console key with a backlit legend (SSL style), flat:
+    // the legend glows like a LED, brighter on hover and on press.
     filledButtonTheme: FilledButtonThemeData(
       style: ButtonStyle(
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.xs)),
         ),
-        textStyle: WidgetStatePropertyAll(buttonText),
+        textStyle: WidgetStateProperty.resolveWith(
+          (states) => buttonText.copyWith(shadows: _keyGlow(states, dark)),
+        ),
+        // 32 high like the other buttons and the fields: no compact
+        // density shrink.
         minimumSize: const WidgetStatePropertyAll(Size(64, 32)),
+        visualDensity: VisualDensity.standard,
         padding: const WidgetStatePropertyAll(
           EdgeInsets.symmetric(horizontal: Space.m),
         ),
         elevation: const WidgetStatePropertyAll(0),
         backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
         overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-        foregroundColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) return c.muted;
-          final lit =
-              states.contains(WidgetState.hovered) ||
-              states.contains(WidgetState.pressed);
-          // On the light theme the label is darker, to stay crisp on the
-          // stronger cap.
-          return Color.lerp(
-            c.accent,
-            c.text,
-            (lit ? 0.45 : 0.0) + (dark ? 0.0 : 0.25),
-          )!;
-        }),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => _keyLegend(states, dark),
+        ),
         iconColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.disabled) ? c.muted : null,
+          (states) => _keyLegend(states, dark),
         ),
         backgroundBuilder: (context, states, child) =>
             _LitKey(c, states, child, dark: dark),
       ),
     ),
+    // Secondary actions: a hairline frame, lit only by the hover like the
+    // other buttons.
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        shape: square,
-        side: hairline,
-        foregroundColor: c.text,
-        textStyle: buttonText,
+      style: ButtonStyle(
+        shape: WidgetStatePropertyAll(square),
+        side: WidgetStatePropertyAll(hairline),
+        textStyle: WidgetStatePropertyAll(buttonText),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled) ? c.muted : c.text,
+        ),
+        backgroundColor: hoverFill,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
     ),
     // Secondary actions (cancel): discreet, lit only by the hover.
@@ -316,18 +406,26 @@ ThemeData buildTheme(Brightness brightness) {
       style: ButtonStyle(
         shape: WidgetStatePropertyAll(square),
         textStyle: WidgetStatePropertyAll(buttonText),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (states) =>
-              states.contains(WidgetState.hovered) ||
-                  states.contains(WidgetState.pressed)
-              ? c.text
-              : c.muted,
-        ),
-        overlayColor: WidgetStatePropertyAll(c.text.withValues(alpha: 0.05)),
+        foregroundColor: litOnHover,
+        backgroundColor: hoverFill,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
     ),
+    // Small square actions (26), lit on hover like the other buttons.
     iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(shape: square),
+      style: ButtonStyle(
+        shape: WidgetStatePropertyAll(square),
+        fixedSize: const WidgetStatePropertyAll(Size.square(28)),
+        minimumSize: const WidgetStatePropertyAll(Size.zero),
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        iconSize: const WidgetStatePropertyAll(16),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        // A desktop tool: the plain pointer, no hand.
+        mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.basic),
+        foregroundColor: litOnHover,
+        backgroundColor: hoverFill,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
     ),
     menuTheme: MenuThemeData(
       style: MenuStyle(
@@ -386,10 +484,22 @@ ThemeData buildTheme(Brightness brightness) {
         side: hairline,
       ),
     ),
+    // Fields as high as the buttons (32).
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: c.raised,
       isDense: true,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 11.5,
+      ),
+      hintStyle: TextStyle(color: c.muted, fontSize: 13),
+      labelStyle: TextStyle(color: c.muted, fontSize: 13),
+      floatingLabelStyle: TextStyle(color: c.muted, fontSize: 12),
+      helperStyle: TextStyle(color: c.muted, fontSize: 11.5),
+      errorStyle: TextStyle(color: c.ledRed, fontSize: 11.5),
+      prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 0),
+      suffixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 0),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.s),
         borderSide: hairline,
@@ -415,7 +525,14 @@ ThemeData buildTheme(Brightness brightness) {
         borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(color: c.border),
       ),
-      textStyle: TextStyle(color: c.text, fontSize: 12),
+      padding: const EdgeInsets.symmetric(horizontal: Space.s, vertical: 3),
+      textStyle: TextStyle(
+        fontFamily: Fonts.text,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w500,
+        height: 1.3,
+        color: c.text,
+      ),
       waitDuration: const Duration(milliseconds: 450),
     ),
     scrollbarTheme: ScrollbarThemeData(
@@ -451,70 +568,95 @@ ThemeData buildTheme(Brightness brightness) {
   );
 }
 
-/// Background of a lit console key for [states]: light level from idle to
-/// hover to press; off when disabled.
+/// Legend of a console key, SSL style: lit (near white on the dark theme,
+/// white on the near black cap of the light theme), dimmed when disabled.
+Color _keyLegend(Set<WidgetState> states, bool dark) =>
+    states.contains(WidgetState.disabled)
+    ? (dark ? const Color(0xFF8C909C) : const Color(0xFFEDEDF0))
+    : dark
+    ? const Color(0xFFF0F0F2)
+    : const Color(0xFFFAFAFC);
+
+/// Light level of a console key: idle, hover, press; null when disabled.
+double? _keyLevel(Set<WidgetState> states) =>
+    states.contains(WidgetState.disabled)
+    ? null
+    : states.contains(WidgetState.pressed)
+    ? 1.0
+    : states.contains(WidgetState.hovered) ||
+          states.contains(WidgetState.focused)
+    ? 0.6
+    : 0.2;
+
+/// Glow of a lit legend, like a LED behind it.
+List<Shadow> _keyGlow(Set<WidgetState> states, bool dark) {
+  final level = _keyLevel(states);
+  if (level == null) return const [];
+  return [
+    Shadow(
+      color: _keyLegend(states, dark).withValues(alpha: 0.35 + 0.4 * level),
+      blurRadius: 4 + 6 * level,
+    ),
+  ];
+}
+
+/// Cap of a console key for [states], flat: a dark cap with a lit frame on
+/// the dark theme, a near black cap on the light theme (lighter when
+/// disabled).
 class _LitKey extends StatelessWidget {
   const _LitKey(this.c, this.states, this.child, {required this.dark});
 
   final AppColors c;
   final Set<WidgetState> states;
   final Widget? child;
-
-  /// On a light background the cap needs more color to read as lit.
   final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = states.contains(WidgetState.disabled);
-    final level = disabled
-        ? 0.0
-        : states.contains(WidgetState.pressed)
-        ? 1.0
-        : states.contains(WidgetState.hovered) ||
-              states.contains(WidgetState.focused)
-        ? 0.7
-        : 0.4;
-    // On the light theme, a brighter tint keeps the cap from turning grey
-    // over the warm background.
-    final light = dark
-        ? c.accent
-        : Color.lerp(c.accent, const Color(0xFF2FD9A6), 0.45)!;
-    final cap = dark ? 1.0 : 2.4;
+    final level = _keyLevel(states);
+    final legend = _keyLegend(states, dark);
+    final Color cap;
+    final Color frame;
+    if (dark) {
+      cap = level == null
+          ? Colors.transparent
+          : Colors.white.withValues(alpha: 0.03 + 0.07 * level);
+      frame = level == null
+          ? c.border
+          : legend.withValues(alpha: 0.35 + 0.45 * level);
+    } else {
+      cap = level == null
+          ? const Color(0xFFB4B7BE)
+          // Lighter on hover, back to black when pressed.
+          : level == 1
+          ? const Color(0xFF111215)
+          : Color.lerp(
+              const Color(0xFF1C1D21),
+              const Color(0xFF474A53),
+              (level - 0.2) / 0.4,
+            )!;
+      frame = cap;
+    }
     return AnimatedContainer(
       duration: Motion.fast,
       curve: Motion.curve,
       decoration: BoxDecoration(
+        color: cap,
         borderRadius: BorderRadius.circular(Radii.xs),
-        border: Border.all(
-          color: disabled
-              ? c.border
-              : light.withValues(
-                  alpha: (dark ? 0.35 : 0.6) + (dark ? 0.6 : 0.4) * level,
-                ),
-        ),
-        // Light spread from the middle of the key, like a lamp behind a
-        // translucent cap.
-        gradient: RadialGradient(
-          radius: 1.4,
-          colors: [
-            light.withValues(
-              alpha: disabled ? 0.0 : cap * (0.08 + 0.32 * level),
-            ),
-            light.withValues(
-              alpha: disabled ? 0.0 : cap * (0.03 + 0.12 * level),
-            ),
-          ],
-        ),
-        color: disabled ? c.raised : null,
+        border: Border.all(color: frame),
         boxShadow: [
-          BoxShadow(
-            color: light.withValues(alpha: 0.45 * level),
-            blurRadius: 2 + 12 * level,
-            spreadRadius: -1,
-          ),
+          if (dark && level != null)
+            BoxShadow(
+              color: legend.withValues(alpha: 0.05 + 0.12 * level),
+              blurRadius: 4 + 8 * level,
+            ),
         ],
       ),
-      child: child,
+      // The icons glow like the legend.
+      child: IconTheme.merge(
+        data: IconThemeData(shadows: _keyGlow(states, dark)),
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

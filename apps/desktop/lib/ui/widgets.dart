@@ -161,11 +161,6 @@ class Meter extends StatefulWidget {
 }
 
 class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
-  static const _segments = 24;
-
-  /// Width of the window lit while the progress is unknown.
-  static const _window = 5;
-
   late final _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
@@ -197,9 +192,46 @@ class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  /// Color of the LED at [i] on the scale.
-  Color _colorAt(AppColors c, int i) {
-    final position = i / (_segments - 1);
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: widget.height,
+    width: double.infinity,
+    child: CustomPaint(
+      painter: _MeterPainter(
+        context.colors,
+        widget.value,
+        widget.value == null ? _controller : null,
+      ),
+    ),
+  );
+}
+
+/// Paints the LEDs of a [Meter] on whole physical pixels, so that every LED
+/// has the same width and every gap the same width at any size and screen
+/// scale. Such a row rarely fills a width exactly: the number of LEDs (about
+/// 24) is the one leaving the fewest pixels, shared at both ends.
+class _MeterPainter extends CustomPainter {
+  _MeterPainter(this.c, this.value, this.sweep) : super(repaint: sweep);
+
+  final AppColors c;
+  final double? value;
+
+  /// Position of the sweep while the value is unknown.
+  final Animation<double>? sweep;
+
+  /// Usual number of LEDs, and the spread allowed around it.
+  static const _segments = 24;
+  static const _spread = 4;
+
+  /// Space between two LEDs.
+  static const _gap = 3.0;
+
+  /// Width of the window lit while the progress is unknown.
+  static const _window = 5;
+
+  /// Color of the LED at [i] of [n] on the scale.
+  Color _colorAt(int i, int n) {
+    final position = i / (n - 1);
     return position < 0.7
         ? c.ledGreen
         : position < 0.9
@@ -207,73 +239,76 @@ class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
         : c.ledRed;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final value = widget.value;
-        // Light level of the LED at [i], from 0 (off) to 1.
-        double level(int i) {
-          if (value != null) return i < (value * _segments).round() ? 1 : 0;
-          final head = (_controller.value * (_segments + _window)).floor();
-          final offset = head - i;
-          if (offset < 0 || offset >= _window) return 0;
-          return offset == 0 || offset == _window - 1 ? 0.45 : 1;
-        }
-
-        return Row(
-          spacing: 2,
-          children: [
-            for (var i = 0; i < _segments; i++)
-              Expanded(
-                child: _MeterLed(_colorAt(c, i), level(i), widget.height),
-              ),
-          ],
-        );
-      },
-    );
+  /// Light level of the LED at [i] of [n], from 0 (off) to 1.
+  double _levelAt(int i, int n) {
+    if (value case final v?) return i < (v * n).round() ? 1 : 0;
+    final head = ((sweep?.value ?? 0) * (n + _window)).floor();
+    final offset = head - i;
+    if (offset < 0 || offset >= _window) return 0;
+    return offset == 0 || offset == _window - 1 ? 0.45 : 1;
   }
-}
-
-/// One LED of a [Meter].
-class _MeterLed extends StatelessWidget {
-  const _MeterLed(this.color, this.level, this.height);
-
-  final Color color;
-  final double level;
-  final double height;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: height,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(1),
+  void paint(Canvas canvas, Size size) {
+    // Scale and position of this box on the screen, in physical pixels.
+    final m = canvas.getTransform();
+    final (sx, sy, tx, ty) = (m[0], m[5], m[12], m[13]);
+    final left = tx.round();
+    final width = (tx + size.width * sx).round() - left;
+    final gap = (_gap * sx).round().clamp(1, 1 << 20);
+    // LED count and width leaving the fewest pixels unused, nearest to 24.
+    var (n, led, rest) = (0, 0, width);
+    for (var d = 0; d <= _spread; d++) {
+      for (final count in {_segments - d, _segments + d}) {
+        final w = (width - gap * (count - 1)) ~/ count;
+        final r = width - w * count - gap * (count - 1);
+        if (w >= 1 && r < rest) (n, led, rest) = (count, w, r);
+      }
+    }
+    if (n == 0) return;
+    final start = left + rest ~/ 2;
+    final top = (ty.roundToDouble() - ty) / sy;
+    final height = (size.height * sy).round() / sy;
+    for (var i = 0; i < n; i++) {
+      final color = _colorAt(i, n);
+      final level = _levelAt(i, n);
+      final x = (start + i * (led + gap) - tx) / sx;
+      final rect = Rect.fromLTWH(x, top, led / sx, height);
+      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(1));
+      if (level > 0) {
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = color.withValues(alpha: 0.5 * level)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2 * level),
+        );
+      }
       // Brighter core, like the lens of a lit LED.
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: level == 0
-            ? [color.withValues(alpha: 0.14), color.withValues(alpha: 0.10)]
-            : [
-                Color.lerp(
-                  color,
-                  Colors.white,
-                  0.35 * level,
-                )!.withValues(alpha: 0.4 + 0.6 * level),
-                color.withValues(alpha: 0.35 + 0.65 * level),
-              ],
-      ),
-      boxShadow: [
-        if (level > 0)
-          BoxShadow(
-            color: color.withValues(alpha: 0.5 * level),
-            blurRadius: 4 * level,
-          ),
-      ],
-    ),
-  );
+      final colors = level == 0
+          ? [color.withValues(alpha: 0.14), color.withValues(alpha: 0.10)]
+          : [
+              Color.lerp(
+                color,
+                Colors.white,
+                0.35 * level,
+              )!.withValues(alpha: 0.4 + 0.6 * level),
+              color.withValues(alpha: 0.35 + 0.65 * level),
+            ];
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: colors,
+          ).createShader(rect),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MeterPainter old) =>
+      old.value != value || old.c != c || old.sweep != sweep;
 }
 
 /// Waiting for content: an amber light breathing in the middle.
@@ -343,6 +378,190 @@ class BusyLabel extends StatelessWidget {
       Opacity(opacity: busy ? 0 : 1, child: Text(label)),
       if (busy) Led(context.colors.ledAmber, size: 8, mode: LedMode.pulse),
     ],
+  );
+}
+
+/// Drop-down field: a text field look (same height as the fields and the
+/// buttons) opening a console menu of [options] (value -> label), the
+/// current one lit.
+class Dropdown<T> extends StatelessWidget {
+  const Dropdown({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    this.label,
+  });
+
+  final T? value;
+  final Map<T, String> options;
+  final ValueChanged<T> onChanged;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 2),
+      menuChildren: [
+        for (final MapEntry(:key, value: text) in options.entries)
+          MenuItemButton(
+            leadingIcon: ChoiceLight(checked: key == value),
+            onPressed: () => onChanged(key),
+            child: Text(text),
+          ),
+      ],
+      builder: (context, controller, _) => MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () =>
+              controller.isOpen ? controller.close() : controller.open(),
+          child: InputDecorator(
+            isEmpty: value == null,
+            isFocused: controller.isOpen,
+            decoration: InputDecoration(
+              labelText: label,
+              suffixIcon: Disclosure(
+                controller.isOpen ? Disclosure.up : Disclosure.down,
+                color: controller.isOpen ? c.accent : c.muted,
+              ),
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 28,
+                minHeight: 0,
+              ),
+            ),
+            child: Text(
+              options[value] ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// REAPER logo, the icon of the actions opening a project in REAPER
+/// (used with the permission of Cockos, see `assets/third_party/reaper`).
+class ReaperIcon extends StatelessWidget {
+  const ReaperIcon({super.key, this.size = 16});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+    'assets/third_party/reaper/reaper.png',
+    width: size,
+    height: size,
+    filterQuality: FilterQuality.medium,
+  );
+}
+
+/// Small square action of a row or a card: an [icon] (an [Icon] or any
+/// 16 px widget), lit on hover like every icon button (see the theme). Over
+/// an aurora ([onAurora]) it sits on a frosted pad.
+class IconAction extends StatelessWidget {
+  const IconAction({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.onAurora = false,
+  });
+
+  /// Size of the action, square (the icon button size of the theme).
+  static const size = 28.0;
+
+  final Widget icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool onAurora;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!onAurora) {
+      return IconButton(tooltip: tooltip, onPressed: onPressed, icon: icon);
+    }
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final pad = dark ? Colors.black : Colors.white;
+    final ink = dark ? Colors.white : context.colors.text;
+    bool lit(Set<WidgetState> states) =>
+        states.contains(WidgetState.hovered) ||
+        states.contains(WidgetState.pressed);
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: icon,
+      // Same hover as elsewhere: the pad thickens, the icon brightens.
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => pad.withValues(
+            alpha: (dark ? 0.35 : 0.6) + (lit(states) ? 0.2 : 0),
+          ),
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? ink.withValues(alpha: 0.45)
+              : lit(states)
+              ? ink
+              : ink.withValues(alpha: 0.85),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the title detail: an expand icon.
+class OpenDetailAction extends StatelessWidget {
+  const OpenDetailAction({
+    super.key,
+    required this.tooltip,
+    required this.onPressed,
+    this.onAurora = false,
+  });
+
+  final String tooltip;
+  final VoidCallback onPressed;
+  final bool onAurora;
+
+  @override
+  Widget build(BuildContext context) => IconAction(
+    icon: const Icon(Icons.open_in_full_rounded),
+    tooltip: tooltip,
+    onPressed: onPressed,
+    onAurora: onAurora,
+  );
+}
+
+/// Small filled triangle telling whether something is open, turning to
+/// its new direction: [right] then [down] for a fold, [down] then [up] for
+/// a menu.
+class Disclosure extends StatelessWidget {
+  const Disclosure(this.turns, {super.key, this.size = 22, this.color});
+
+  static const right = 0.0;
+  static const down = 0.25;
+  static const up = 0.75;
+
+  /// Direction, in turns from pointing right.
+  final double turns;
+  final double size;
+
+  /// Muted when null.
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => AnimatedRotation(
+    turns: turns,
+    duration: Motion.fast,
+    curve: Motion.curve,
+    child: Icon(
+      Icons.arrow_right_rounded,
+      size: size,
+      color: color ?? context.colors.muted,
+    ),
   );
 }
 

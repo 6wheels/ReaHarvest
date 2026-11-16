@@ -45,7 +45,8 @@ class _TitleCardState extends State<TitleCard> {
     final t = widget.title;
     final c = context.colors;
     final l10n = AppLocalizations.of(context);
-    final palette = AuroraPalette.of(t.id);
+    final light = Theme.of(context).brightness == Brightness.light;
+    final palette = AuroraPalette.of(t.id, light: light);
     final tags = [
       for (final v in parentTags(t)) tagValueLabel(l10n, v).toUpperCase(),
     ].join(labelSeparator);
@@ -58,7 +59,6 @@ class _TitleCardState extends State<TitleCard> {
         : c.border;
 
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() {
         _hovered = true;
         _phase += 1;
@@ -136,7 +136,7 @@ class _TitleCardState extends State<TitleCard> {
                                 child: TitleActions(
                                   t,
                                   visible: _hovered || widget.selected,
-                                  onDark: true,
+                                  onAurora: true,
                                 ),
                               ),
                               const Spacer(),
@@ -146,7 +146,7 @@ class _TitleCardState extends State<TitleCard> {
                                 overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(
-                                      color: Colors.white,
+                                      color: light ? c.text : Colors.white,
                                       height: 1.2,
                                     ),
                               ),

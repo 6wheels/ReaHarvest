@@ -51,10 +51,6 @@ class NavigationNotifier extends Notifier<NavigationSettings> {
     ),
   );
 
-  /// Docks the overview below the titles, or lets it float over them.
-  void setOverviewPinned(bool pinned) =>
-      _set(state.copyWith(overviewPinned: pinned));
-
   void applyView(SavedView view) =>
       _set(state.copyWith(query: view.query, filter: view.filter));
 

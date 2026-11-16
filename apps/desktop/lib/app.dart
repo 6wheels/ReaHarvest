@@ -18,15 +18,18 @@ class ReaHarvestApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Only what the app shell needs: navigation changes are saved in the
     // settings too, and must not rebuild the whole application.
-    final (theme, language, textScale) = ref.watch(
-      settingsProvider.select((s) => (s.theme, s.language, s.textScale)),
+    final (theme, accentPreference, language, textScale) = ref.watch(
+      settingsProvider.select(
+        (s) => (s.theme, s.accent, s.language, s.textScale),
+      ),
     );
+    final accent = accentOf(accentPreference);
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
+      theme: buildTheme(Brightness.light, accent: accent),
+      darkTheme: buildTheme(Brightness.dark, accent: accent),
       themeMode: switch (theme) {
         ThemePreference.system => ThemeMode.system,
         ThemePreference.light => ThemeMode.light,
