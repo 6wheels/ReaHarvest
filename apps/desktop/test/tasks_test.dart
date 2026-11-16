@@ -12,6 +12,14 @@ import 'package:reaharvest/ui/tasks_zone.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 void main() {
+  /// Lets the frames run for a while: a failed task blinks without end, so
+  /// the tree never settles.
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
   late ProviderContainer container;
   TasksNotifier tasks() => container.read(tasksProvider.notifier);
   List<TaskState> states() => [
@@ -232,7 +240,7 @@ void main() {
     expect(find.text('Cancelling…'), findsOneWidget);
     step.complete();
     await running;
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.text('Reading the folders'), findsNothing);
     expect(find.text('Broken'), findsOneWidget);
     expect(find.text('Failed'), findsOneWidget);
@@ -240,18 +248,18 @@ void main() {
     expect(find.text('Cancelled'), findsNWidgets(2));
 
     await tasks().run((l10n) => 'Done', (_) async {});
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.text('Done'), findsNWidgets(2), reason: 'label and state');
 
     await tester.tap(find.text('Clear finished'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.byType(TextButton), findsNothing);
 
     // A finished task is shown when nothing runs, then the zone collapses.
     await tasks().run((l10n) => 'Last', (_) async {});
-    await tester.pumpAndSettle();
+    await settle(tester);
     await tester.tap(find.text('TASKS // 1'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.text('Last'), findsOneWidget);
   });
 
@@ -315,7 +323,7 @@ void main() {
       }),
       openReport: true,
     );
-    await tester.pumpAndSettle();
+    await settle(tester);
 
     // Problems expanded, the rest collapsed.
     expect(find.text('Move'), findsNWidgets(2));
@@ -340,20 +348,20 @@ void main() {
     );
     expect(find.textContaining('kick.wav'), findsNothing);
     await tester.ensureVisible(find.text('Media moved · 1'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     await tester.tap(find.text('Media moved · 1'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.textContaining('kick.wav'), findsOneWidget);
     await tester.tap(find.text('Close'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.text('Media moved · 1'), findsNothing);
 
     // Without openReport, the report waits in the zone.
     await tasks().run((l10n) => 'Scan', (_) async => const Report());
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.text('Nothing to report.'), findsNothing);
     await tester.tap(find.text('Report'));
-    await tester.pumpAndSettle();
+    await settle(tester);
     expect(find.text('Nothing to report.'), findsOneWidget);
   });
 

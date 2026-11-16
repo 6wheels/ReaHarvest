@@ -300,6 +300,9 @@ class FakeReaperActions extends ReaperActions {
 }
 
 void main() {
+  /// A button label hidden behind its busy light.
+  final busyLabel = find.byWidgetPredicate((w) => w is BusyLabel && w.busy);
+
   late MemorySettings settings;
   late FakeLibraryCatalog catalog;
   late FakeVersionActions versions;
@@ -823,12 +826,12 @@ void main() {
 
     await tester.tap(find.text('ARTIST'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Other Artist'));
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Other Artist'));
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(1200, 790));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CheckboxMenuButton), findsNothing);
+    expect(find.widgetWithText(MenuItemButton, 'Other Artist'), findsNothing);
     expect(find.byType(TitleCard), findsNWidgets(6));
     expect(find.text('ARTIST // OTHER ARTIST'), findsOneWidget);
     expect(settings.saved.last.navigation.filter.tags, {
@@ -875,7 +878,7 @@ void main() {
     Future<void> toggle(String chip, String value) async {
       await tester.tap(find.text(chip));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(CheckboxMenuButton, value));
+      await tester.tap(find.widgetWithText(MenuItemButton, value));
       await tester.pumpAndSettle();
       await tester.tapAt(const Offset(1200, 790));
       await tester.pumpAndSettle();
@@ -1293,14 +1296,14 @@ void main() {
     await tester.tap(find.text('Adopt'));
     await tester.pumpAndSettle();
     expect(find.text('REAPER is open'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(busyLabel, findsNothing);
     await tester.tap(find.text('Continue anyway'));
     await tester.pump();
     await tester.pump();
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(busyLabel, findsOneWidget);
     slow.complete();
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(busyLabel, findsNothing);
     expect(versions.adopted, [('Glass Garden v1.rpp', 'intro')]);
   });
 
@@ -1522,7 +1525,7 @@ void main() {
     final slow = pending = Completer<void>();
     await tester.tap(find.text('Create'));
     await tester.pump();
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(busyLabel, findsOneWidget);
     slow.complete();
     await tester.pumpAndSettle();
     expect(versions.created, [
