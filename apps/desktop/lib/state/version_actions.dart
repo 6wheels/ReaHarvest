@@ -300,15 +300,20 @@ class VersionActions {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
-    final trashed = await Isolate.run(
-      () => keepOnlyVersion(MountedFolderStorage(root), dir, version),
-    );
-    _log.info(
-      'Only version ${_at(title, version)} kept, moved to the trash: '
-      '${trashed.join(', ')}',
-    );
-    ref.invalidate(trashProvider(title.id));
-    await ref.rescanTitle(entry, title);
+    try {
+      final trashed = await Isolate.run(
+        () => keepOnlyVersion(MountedFolderStorage(root), dir, version),
+      );
+      _log.info(
+        'Only version ${_at(title, version)} kept, moved to the trash: '
+        '${trashed.join(', ')}',
+      );
+    } finally {
+      // Also after a failure: the folders already moved are shown in the
+      // trash, the others stay.
+      ref.invalidate(trashProvider(title.id));
+      await ref.rescanTitle(entry, title);
+    }
   }
 
   /// Permanently deletes the trash entries [paths] of [title], version

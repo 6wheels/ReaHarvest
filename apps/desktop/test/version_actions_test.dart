@@ -94,6 +94,20 @@ void main() {
     expect(await container.read(trashProvider(title().id).future), isEmpty);
   });
 
+  test('rescans the title when keeping only a version fails', () async {
+    final song = await bandWithSong();
+    Directory(p.join(song, 'v2')).createSync();
+    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v2', 'v2.rpp'));
+    await scans.scanAll();
+    final kept = version('v1.rpp');
+    // Gone since the last scan: refused, nothing moved.
+    Directory(p.join(song, 'v1')).deleteSync(recursive: true);
+
+    await expectLater(versions.keepOnly(title(), kept), throwsStateError);
+
+    expect(title().versions.map((v) => v.folder), ['v2']);
+  });
+
   test('lists the project templates of a library', () async {
     final templates = Directory(
       p.join(root.path, 'resources', 'ProjectTemplates'),
