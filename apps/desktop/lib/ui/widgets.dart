@@ -337,30 +337,68 @@ class MenuLegend extends StatelessWidget {
   );
 }
 
-/// Square light of a checkable menu entry, lit when [checked].
+/// Square light of a checkable entry, lit when [checked]; half lit with a
+/// bar when null (some of a group selected).
 class ChoiceLight extends StatelessWidget {
   const ChoiceLight({super.key, required this.checked});
 
-  final bool checked;
+  final bool? checked;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final partial = checked == null;
+    final on = checked ?? true;
     return AnimatedContainer(
       duration: Motion.fast,
       width: 10,
       height: 10,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: checked ? c.accent : Colors.transparent,
+        color: partial
+            ? c.accent.withValues(alpha: 0.25)
+            : on
+            ? c.accent
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(Radii.xs),
-        border: Border.all(color: checked ? c.accent : c.muted),
+        border: Border.all(color: on ? c.accent : c.muted),
         boxShadow: [
-          if (checked)
-            BoxShadow(color: c.accent.withValues(alpha: 0.5), blurRadius: 6),
+          if (on)
+            BoxShadow(
+              color: c.accent.withValues(alpha: partial ? 0.3 : 0.5),
+              blurRadius: 6,
+            ),
         ],
       ),
+      child: partial ? Container(width: 6, height: 2, color: c.accent) : null,
     );
   }
+}
+
+/// Checkbox lit like a [ChoiceLight]: a null [value] shows a partial
+/// selection (select all of a group).
+class LightCheckbox extends StatelessWidget {
+  const LightCheckbox({
+    super.key,
+    required this.value,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final bool? value;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    checked: value ?? false,
+    mixed: value == null,
+    child: IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: ChoiceLight(checked: value),
+    ),
+  );
 }
 
 /// Button label hidden behind a breathing light while [busy], keeping the
@@ -381,10 +419,22 @@ class BusyLabel extends StatelessWidget {
   );
 }
 
+/// Label of the button confirming an action: the label of the action
+/// itself, without the ellipsis telling that it asks first (`Move…` is
+/// confirmed by `Move`).
+String actionLabel(String action) =>
+    action.endsWith('…') ? action.substring(0, action.length - 1) : action;
+
+/// Focuses [node] once the menu it belongs to is shown, so that the arrow
+/// keys move through the entries, Enter or Space activate one and Escape
+/// closes the menu.
+void focusMenuEntry(FocusNode node) =>
+    WidgetsBinding.instance.addPostFrameCallback((_) => node.requestFocus());
+
 /// Drop-down field: a text field look (same height as the fields and the
 /// buttons) opening a console menu of [options] (value -> label), the
-/// current one lit.
-class Dropdown<T> extends StatelessWidget {
+/// current one lit and focused.
+class Dropdown<T> extends StatefulWidget {
   const Dropdown({
     super.key,
     required this.value,
@@ -399,15 +449,36 @@ class Dropdown<T> extends StatelessWidget {
   final String? label;
 
   @override
+  State<Dropdown<T>> createState() => _DropdownState<T>();
+}
+
+class _DropdownState<T> extends State<Dropdown<T>> {
+  /// The current entry, or the first one.
+  final _entry = FocusNode();
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final value = widget.value;
+    final options = widget.options;
+    final focused = options.containsKey(value)
+        ? value
+        : options.keys.firstOrNull;
     return MenuAnchor(
       alignmentOffset: const Offset(0, 2),
+      onOpen: () => focusMenuEntry(_entry),
       menuChildren: [
         for (final MapEntry(:key, value: text) in options.entries)
           MenuItemButton(
+            focusNode: key == focused ? _entry : null,
             leadingIcon: ChoiceLight(checked: key == value),
-            onPressed: () => onChanged(key),
+            onPressed: () => widget.onChanged(key),
             child: Text(text),
           ),
       ],
@@ -420,7 +491,7 @@ class Dropdown<T> extends StatelessWidget {
             isEmpty: value == null,
             isFocused: controller.isOpen,
             decoration: InputDecoration(
-              labelText: label,
+              labelText: widget.label,
               suffixIcon: Disclosure(
                 controller.isOpen ? Disclosure.up : Disclosure.down,
                 color: controller.isOpen ? c.accent : c.muted,
@@ -502,7 +573,7 @@ class IconAction extends StatelessWidget {
         color: dark
             ? Colors.black.withValues(alpha: 0.45)
             : Colors.white.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(Radii.xs),
+        borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(
           color: dark
               ? Colors.white.withValues(alpha: 0.22)

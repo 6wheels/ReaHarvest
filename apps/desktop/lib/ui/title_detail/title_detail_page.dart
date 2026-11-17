@@ -40,8 +40,17 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
 
   void _select(String fileName) => setState(() => _selected = fileName);
 
-  Future<void> _newVersion(Title title, Version? selected) async {
-    final name = await showNewVersionDialog(context, title, selected);
+  Future<void> _newVersion(
+    Title title,
+    Version? selected, {
+    bool duplicate = false,
+  }) async {
+    final name = await showNewVersionDialog(
+      context,
+      title,
+      selected,
+      duplicate: duplicate,
+    );
     if (name != null) _select(name);
   }
 
@@ -130,8 +139,11 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                                 title,
                                 selected,
                                 onSelect: _select,
-                                onNewVersion: () =>
-                                    _newVersion(title, selected),
+                                onDuplicate: () => _newVersion(
+                                  title,
+                                  selected,
+                                  duplicate: true,
+                                ),
                                 key: ValueKey(selected.fileName),
                               ),
                       ),

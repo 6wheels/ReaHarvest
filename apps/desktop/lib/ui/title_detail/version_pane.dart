@@ -25,7 +25,7 @@ class VersionPane extends ConsumerWidget {
     this.version, {
     super.key,
     required this.onSelect,
-    required this.onNewVersion,
+    required this.onDuplicate,
   });
 
   final Title title;
@@ -34,8 +34,8 @@ class VersionPane extends ConsumerWidget {
   /// Selects the version of this file name (after a rename).
   final ValueChanged<String> onSelect;
 
-  /// Opens the new version dialog, this version offered as source.
-  final VoidCallback onNewVersion;
+  /// Opens the new version dialog, a copy of this version chosen.
+  final VoidCallback onDuplicate;
 
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
     final name = await showEditVersionDialog(context, ref, title, version);
@@ -90,7 +90,7 @@ class VersionPane extends ConsumerWidget {
               ),
             ),
             if (alerts.notAdopted) ...[
-              const SizedBox(width: Space.s),
+              const SizedBox(width: Space.m),
               Pill(l10n.notAdopted, color: c.muted),
             ],
           ],
@@ -173,7 +173,7 @@ class VersionPane extends ConsumerWidget {
                 if (!freeTree) ...[
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.copy_rounded),
-                    onPressed: onNewVersion,
+                    onPressed: onDuplicate,
                     child: Text(l10n.duplicateVersion),
                   ),
                   MenuItemButton(

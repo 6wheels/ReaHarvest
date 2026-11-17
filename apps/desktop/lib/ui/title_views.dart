@@ -8,6 +8,7 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
+import 'overview.dart';
 import 'status_trail.dart';
 import 'title_actions.dart';
 import 'widgets.dart';
@@ -78,11 +79,11 @@ class _TitleListState extends ConsumerState<TitleList> {
         Divider(height: 1, color: c.border),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               Space.xl,
               Space.xs,
               Space.xl,
-              Space.xl,
+              libraryBottomPadding(overviewOpen: selected != null),
             ),
             itemCount: titles.length,
             itemExtent: 40,
@@ -288,6 +289,16 @@ class _TitleRowState extends ConsumerState<TitleRow> {
   var _hovered = false;
 
   @override
+  void didUpdateWidget(TitleRow old) {
+    super.didUpdateWidget(old);
+    if (widget.selected && !old.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) revealSelectedTitle(context);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return MouseRegion(
@@ -396,7 +407,12 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
     final selected = ref.watch(overviewProvider);
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xl),
+      padding: EdgeInsets.fromLTRB(
+        Space.xl,
+        0,
+        Space.xl,
+        libraryBottomPadding(overviewOpen: selected != null),
+      ),
       itemCount: rows.length,
       itemExtent: 36,
       itemBuilder: (context, i) {

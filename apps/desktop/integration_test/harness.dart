@@ -315,17 +315,12 @@ Future<void> openSectionFix(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
-/// Confirms the open fix preview of [count] items, then waits for the end
-/// of its batch, whose report opens.
-Future<void> confirmFix(WidgetTester tester, Harness h, int count) async {
+/// Confirms the open fix preview, then waits for the end of its batch,
+/// whose report opens.
+Future<void> confirmFix(WidgetTester tester, Harness h) async {
   final before = h.tasks.length;
   // The tasks zone may show an earlier batch under the same label.
-  await tester.tap(
-    find.widgetWithText(
-      FilledButton,
-      count == 1 ? 'Fix 1 item' : 'Fix $count items',
-    ),
-  );
+  await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
   await waitFor(
     tester,
     () => h.tasks.length > before && !h.tasks[before].isRunning,

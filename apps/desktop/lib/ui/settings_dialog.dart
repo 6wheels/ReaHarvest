@@ -145,19 +145,23 @@ class _SettingsPanel extends ConsumerWidget {
                           label: l10n.accentColor,
                           child: SegmentedButton<AccentPreference>(
                             showSelectedIcon: false,
+                            // Swatches only, named by their tooltip.
                             segments: [
                               for (final (value, label) in [
+                                (AccentPreference.neutral, l10n.accentNeutral),
+                                (AccentPreference.orange, l10n.accentOrange),
+                                (AccentPreference.yellow, l10n.accentYellow),
                                 (AccentPreference.teal, l10n.accentTeal),
                                 (AccentPreference.blue, l10n.accentBlue),
-                                (AccentPreference.neutral, l10n.accentNeutral),
+                                (AccentPreference.violet, l10n.accentViolet),
                               ])
                                 ButtonSegment(
                                   value: value,
-                                  icon: _Swatch(
+                                  tooltip: label,
+                                  label: _Swatch(
                                     accentOf(value)
                                         .on(Theme.of(context).brightness),
                                   ),
-                                  label: Text(label),
                                 ),
                             ],
                             selected: {settings.accent},
@@ -449,8 +453,8 @@ class _Swatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(Radii.xs),

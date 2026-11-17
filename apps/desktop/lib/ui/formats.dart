@@ -90,12 +90,6 @@ String? libraryName(WidgetRef ref, Title title) => ref
     .firstOrNull
     ?.displayName;
 
-/// Tag values and library of [title], joined.
-String titleSubtitle(WidgetRef ref, AppLocalizations l10n, Title title) => [
-  for (final v in parentTags(title)) tagValueLabel(l10n, v),
-  ?libraryName(ref, title),
-].join(' · ');
-
 /// Label (unless not [withLabel]), owner, date and tempo of [version],
 /// joined.
 String versionDetails(

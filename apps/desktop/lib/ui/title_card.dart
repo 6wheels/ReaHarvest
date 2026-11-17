@@ -6,6 +6,7 @@ import '../state/navigation.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
+import 'overview.dart';
 import 'status_trail.dart';
 import 'title_actions.dart';
 import 'widgets.dart';
@@ -39,6 +40,16 @@ class _TitleCardState extends State<TitleCard> {
 
   /// Aurora drift: moves forward on each hover, never back.
   var _phase = 0.0;
+
+  @override
+  void didUpdateWidget(TitleCard old) {
+    super.didUpdateWidget(old);
+    if (widget.selected && !old.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) revealSelectedTitle(context);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -162,8 +162,8 @@ class _WindowButtons extends StatelessWidget {
   );
 }
 
-/// Window buttons drawn in the style of the application (Windows): flat
-/// squares lit on hover, the close one turning red.
+/// Window buttons drawn in the style of the application (Windows): glyphs
+/// glowing on hover, the close one a red key.
 class _ConsoleWindowButtons extends StatefulWidget {
   const _ConsoleWindowButtons();
 
@@ -228,9 +228,11 @@ class _ConsoleWindowButtonsState extends State<_ConsoleWindowButtons>
   }
 }
 
-/// One window button: the height of the title bar, a muted glyph lit on
-/// hover; [danger] lights it red (close).
-class _CaptionButton extends StatefulWidget {
+/// One window button: the height of the title bar, no cap, a muted glyph
+/// glowing on hover like the other icon buttons; [danger] turns it into a
+/// red key on hover (close). Its tooltip waits longer than the others: the
+/// window buttons are well known.
+class _CaptionButton extends StatelessWidget {
   const _CaptionButton({
     required this.icon,
     required this.tooltip,
@@ -246,53 +248,18 @@ class _CaptionButton extends StatefulWidget {
   final bool danger;
 
   @override
-  State<_CaptionButton> createState() => _CaptionButtonState();
-}
-
-class _CaptionButtonState extends State<_CaptionButton> {
-  var _hovered = false;
-  var _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final lit = _hovered || _pressed;
-    final fill = !lit
-        ? Colors.transparent
-        : widget.danger
-        ? c.ledRed.withValues(alpha: _pressed ? 0.75 : 1)
-        : c.text.withValues(
-            alpha:
-                (_pressed ? 0.12 : 0.07) *
-                (Theme.of(context).brightness == Brightness.dark ? 1 : 1.6),
-          );
-    final ink = !lit
-        ? c.muted
-        : widget.danger
-        ? Colors.white
-        : c.text;
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() {
-          _hovered = false;
-          _pressed = false;
-        }),
-        child: GestureDetector(
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapCancel: () => setState(() => _pressed = false),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTap: widget.onPressed,
-          child: AnimatedContainer(
-            duration: Motion.fast,
-            width: 44,
-            height: studioTitleBarHeight,
-            color: fill,
-            child: Icon(widget.icon, size: widget.iconSize, color: ink),
-          ),
-        ),
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    waitDuration: const Duration(milliseconds: 1500),
+    child: IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      style: (danger ? closeKeyStyle(context) : glowButtonStyle(context)).merge(
+        IconButton.styleFrom(
+          fixedSize: const Size(44, studioTitleBarHeight),
+          iconSize: iconSize,
+        ).merge(Theme.of(context).iconButtonTheme.style),
       ),
-    );
-  }
+    ),
+  );
 }

@@ -198,7 +198,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Café.wav'), findsOne);
     await tapText(tester, 'Fix…');
-    await tapText(tester, 'Fix 1 item');
+    await tapText(tester, 'Fix');
     await waitFor(
       tester,
       () => find.text('Media moved · 1').evaluate().isNotEmpty,

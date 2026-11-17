@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
@@ -9,7 +10,8 @@ import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
 import 'to_sort/to_sort_page.dart';
-import 'widgets.dart' show ChoiceLight, Disclosure, MenuLegend;
+import 'widgets.dart'
+    show ChoiceLight, Disclosure, MenuLegend, actionLabel, focusMenuEntry;
 
 /// Filter chips, saved views, "To sort" / "To adopt" and display mode, below
 /// the search bar (SPEC §5.2). Chips offering a single value are hidden.
@@ -283,8 +285,10 @@ class _DisplaySwitch extends StatelessWidget {
   }
 }
 
-/// Chip opening a menu of checkable values.
-class _MultiChoiceChip<T> extends StatelessWidget {
+/// Chip opening a menu of checkable values. From the keyboard: the arrows
+/// move through the values, Space checks or unchecks one, Enter or Escape
+/// closes the menu.
+class _MultiChoiceChip<T> extends StatefulWidget {
   const _MultiChoiceChip({
     super.key,
     required this.label,
@@ -301,7 +305,25 @@ class _MultiChoiceChip<T> extends StatelessWidget {
   final ValueChanged<Set<T>> onChanged;
 
   @override
+  State<_MultiChoiceChip<T>> createState() => _MultiChoiceChipState<T>();
+}
+
+class _MultiChoiceChipState<T> extends State<_MultiChoiceChip<T>> {
+  final _menu = MenuController();
+
+  /// The first value, focused when the menu opens.
+  final _first = FocusNode();
+
+  @override
+  void dispose() {
+    _first.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final _MultiChoiceChip(:label, :options, :selected, :labelOf, :onChanged) =
+        widget;
     // Selected values no longer offered stay listed, to be cleared.
     final values = [...options, ...selected.where((s) => !options.contains(s))];
     final text = switch (selected.length) {
@@ -310,19 +332,30 @@ class _MultiChoiceChip<T> extends StatelessWidget {
       final n => '$label$labelSeparator$n',
     };
     return MenuAnchor(
+      controller: _menu,
       alignmentOffset: const Offset(0, Space.xs),
+      onOpen: () => focusMenuEntry(_first),
       menuChildren: [
         MenuLegend(label),
-        for (final v in values)
-          MenuItemButton(
-            closeOnActivate: false,
-            leadingIcon: ChoiceLight(checked: selected.contains(v)),
-            onPressed: () => onChanged(
-              selected.contains(v)
-                  ? ({...selected}..remove(v))
-                  : {...selected, v},
+        for (final (i, v) in values.indexed)
+          // Space (and a click) toggles the value, Enter closes.
+          CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.enter): _menu.close,
+              const SingleActivator(LogicalKeyboardKey.numpadEnter):
+                  _menu.close,
+            },
+            child: MenuItemButton(
+              focusNode: i == 0 ? _first : null,
+              closeOnActivate: false,
+              leadingIcon: ChoiceLight(checked: selected.contains(v)),
+              onPressed: () => onChanged(
+                selected.contains(v)
+                    ? ({...selected}..remove(v))
+                    : {...selected, v},
+              ),
+              child: Text(labelOf(v)),
             ),
-            child: Text(labelOf(v)),
           ),
       ],
       builder: (context, controller, _) => Pill(
@@ -336,22 +369,39 @@ class _MultiChoiceChip<T> extends StatelessWidget {
   }
 }
 
-class _SavedViewsChip extends ConsumerWidget {
+/// Chip opening the saved views; its first entry is focused on opening, so
+/// that the keyboard (arrows, Enter, Escape) drives the menu.
+class _SavedViewsChip extends ConsumerStatefulWidget {
   const _SavedViewsChip();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SavedViewsChip> createState() => _SavedViewsChipState();
+}
+
+class _SavedViewsChipState extends ConsumerState<_SavedViewsChip> {
+  final _first = FocusNode();
+
+  @override
+  void dispose() {
+    _first.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final views = ref.watch(navigationProvider.select((n) => n.savedViews));
     final notifier = ref.read(navigationProvider.notifier);
     return MenuAnchor(
       alignmentOffset: const Offset(0, Space.xs),
+      onOpen: () => focusMenuEntry(_first),
       menuChildren: [
         MenuLegend(l10n.views),
         if (views.isEmpty)
           MenuItemButton(onPressed: null, child: Text(l10n.noSavedView)),
-        for (final v in views)
+        for (final (i, v) in views.indexed)
           MenuItemButton(
+            focusNode: i == 0 ? _first : null,
             onPressed: () => notifier.applyView(v),
             trailingIcon: IconButton(
               tooltip: l10n.deleteView,
@@ -367,6 +417,8 @@ class _SavedViewsChip extends ConsumerWidget {
           child: Divider(height: 1),
         ),
         MenuItemButton(
+          // The first entry when no view is saved yet.
+          focusNode: views.isEmpty ? _first : null,
           leadingIcon: const Icon(Icons.bookmark_add_outlined),
           onPressed: () async {
             final name = await _askViewName(context);
@@ -410,7 +462,7 @@ class _SavedViewsChip extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => submit(context),
-            child: Text(l10n.save),
+            child: Text(actionLabel(l10n.saveView)),
           ),
         ],
       ),

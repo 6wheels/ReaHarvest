@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart' hide Title;
@@ -16,6 +17,46 @@ import 'widgets.dart';
 
 /// Height of the overview dock.
 const overviewHeight = 196.0;
+
+/// Margin between the overview and the bottom of the library.
+const overviewBottom = Space.l;
+
+/// Bottom padding of a library view (cards, list, tree): while the
+/// overview is open, the last titles can scroll above it.
+double libraryBottomPadding({required bool overviewOpen}) =>
+    overviewOpen ? overviewHeight + overviewBottom + Space.m : Space.xl;
+
+/// Scrolls the title of [context], just selected, into view: above the
+/// overview when the overview hides its bottom, down when its top is
+/// scrolled out. Its scroll view must reach the bottom of the library.
+void revealSelectedTitle(BuildContext context) {
+  final item = context.findRenderObject();
+  final scrollable = Scrollable.maybeOf(context);
+  final viewport = scrollable?.context.findRenderObject();
+  if (item is! RenderBox || !item.attached || viewport is! RenderBox) return;
+  final top = item.localToGlobal(Offset.zero, ancestor: viewport).dy;
+  final bottom = top + item.size.height;
+  final visible =
+      viewport.size.height - overviewHeight - overviewBottom - Space.m;
+  final position = scrollable!.position;
+  final double delta;
+  if (top < Space.m) {
+    delta = top - Space.m;
+  } else if (bottom > visible) {
+    // The top stays visible when the title is taller than the room left.
+    delta = min(bottom - visible, top - Space.m);
+  } else {
+    return;
+  }
+  position.animateTo(
+    (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    ),
+    duration: Motion.medium,
+    curve: Motion.curve,
+  );
+}
 
 /// Number of versions listed in the overview.
 const _recentCount = 4;
@@ -41,22 +82,33 @@ class Overview extends ConsumerWidget {
         .firstOrNull;
     final radius = BorderRadius.circular(Radii.m);
 
-    final Widget body = Padding(
-      // Same margin on every side: the close button sits in the corner.
-      padding: const EdgeInsets.all(Space.m),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (title != null) ...[
-            Expanded(child: _Identity(title)),
-            const SizedBox(width: Space.l),
-            SizedBox(width: _recentWidth, child: _Recent(title)),
-          ] else
-            const Spacer(),
-          const SizedBox(width: Space.s),
-          // Close level with the heading of the versions, detail level with
-          // their first line.
-          Column(
+    // Same margin around the content, a little more on the left; the
+    // actions sit in the corner, with a small margin.
+    const margin = Space.s + Space.xs;
+    final Widget body = Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Space.m, margin, 0, margin),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (title != null) ...[
+                  Expanded(child: _Identity(title)),
+                  const SizedBox(width: Space.l),
+                  SizedBox(width: _recentWidth, child: _Recent(title)),
+                ] else
+                  const Spacer(),
+              ],
+            ),
+          ),
+        ),
+        // Close about level with the heading of the versions, detail with
+        // their first line.
+        Padding(
+          padding: const EdgeInsets.all(Space.xs),
+          child: Column(
             spacing: Space.xs + 1,
             children: [
               IconAction(
@@ -70,8 +122,8 @@ class Overview extends ConsumerWidget {
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
 
     return DecoratedBox(
@@ -92,7 +144,7 @@ class Overview extends ConsumerWidget {
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: c.surface.withValues(alpha: 0.72),
+              color: c.surface.withValues(alpha: 0.6),
               borderRadius: radius,
               border: Border.all(color: c.border),
             ),
@@ -115,7 +167,11 @@ class _Identity extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final subtitle = titleSubtitle(ref, l10n, title);
+    // Artist and album as on the cards.
+    final tags = [
+      for (final v in parentTags(title)) tagValueLabel(l10n, v).toUpperCase(),
+    ].join(labelSeparator);
+    final library = libraryName(ref, title);
     final meta = [
       l10n.versionCount(title.versions.length),
       if (tempoOf(title) case final bpm?) l10n.bpm(bpm),
@@ -136,20 +192,37 @@ class _Identity extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            titleName(title),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: text.titleLarge,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: Text(
+                  titleName(title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleLarge,
+                ),
+              ),
+              if (tags.isNotEmpty) ...[
+                const SizedBox(width: Space.s),
+                Flexible(
+                  child: Text(
+                    tags,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.legend.copyWith(fontSize: 9.5),
+                  ),
+                ),
+              ],
+            ],
           ),
-          if (subtitle.isNotEmpty)
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: text.bodyMedium?.copyWith(color: c.muted),
+          if (library != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: SectionLabel(library),
             ),
-          const SizedBox(height: 2),
+          const SizedBox(height: Space.xs),
           Row(
             children: [
               Flexible(

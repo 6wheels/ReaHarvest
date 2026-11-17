@@ -18,21 +18,24 @@ import 'version_ui_actions.dart';
 enum _Source { blank, template, duplicate }
 
 /// Asks for a new version of [title] (blank, from a template, or a copy of
-/// [selected]) and creates it. Returns its file name, null when cancelled.
+/// [selected]) and creates it; a copy of [selected] first when [duplicate].
+/// Returns its file name, null when cancelled.
 Future<String?> showNewVersionDialog(
   BuildContext context,
   Title title,
-  Version? selected,
-) => showDialog<String>(
+  Version? selected, {
+  bool duplicate = false,
+}) => showDialog<String>(
   context: context,
-  builder: (_) => _NewVersionDialog(title, selected),
+  builder: (_) => _NewVersionDialog(title, selected, duplicate: duplicate),
 );
 
 class _NewVersionDialog extends ConsumerStatefulWidget {
-  const _NewVersionDialog(this.title, this.selected);
+  const _NewVersionDialog(this.title, this.selected, {required this.duplicate});
 
   final Title title;
   final Version? selected;
+  final bool duplicate;
 
   @override
   ConsumerState<_NewVersionDialog> createState() => _NewVersionDialogState();
@@ -41,7 +44,9 @@ class _NewVersionDialog extends ConsumerStatefulWidget {
 class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
   final _label = TextEditingController();
   late final _name = TextEditingController(text: _suggested);
-  var _source = _Source.blank;
+  late var _source = widget.duplicate && widget.selected != null
+      ? _Source.duplicate
+      : _Source.blank;
   String? _template;
 
   /// The file name follows the label until edited by hand.
@@ -114,7 +119,9 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
           subtitle: hint == null ? null : Text(hint),
         );
     return AlertDialog(
-      title: Text(l10n.newVersion),
+      title: Text(
+        widget.duplicate ? l10n.duplicateVersionTitle : l10n.newVersion,
+      ),
       content: SizedBox(
         width: 440,
         child: Column(
@@ -166,19 +173,22 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
               }),
               decoration: InputDecoration(
                 labelText: l10n.versionLabel,
+                // Room kept for the error: the dialog keeps its size.
+                helperText: ' ',
                 errorText: _labelEdited && labelMissing
                     ? l10n.labelRequired
                     : null,
                 isDense: true,
               ),
             ),
-            const SizedBox(height: Space.m),
+            const SizedBox(height: Space.xs),
             TextField(
               controller: _name,
               onChanged: (_) => setState(() => _nameEdited = true),
               onSubmitted: (_) => ready ? _create() : null,
               decoration: InputDecoration(
                 labelText: l10n.fileName,
+                helperText: ' ',
                 errorText: error,
                 isDense: true,
               ),
@@ -200,7 +210,13 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
         ),
         FilledButton(
           onPressed: ready ? _create : null,
-          child: BusyLabel(l10n.create, busy: _busy),
+          // The action chosen: a copy or a new version.
+          child: BusyLabel(
+            _source == _Source.duplicate
+                ? actionLabel(l10n.duplicateVersion)
+                : l10n.newVersion,
+            busy: _busy,
+          ),
         ),
       ],
     );

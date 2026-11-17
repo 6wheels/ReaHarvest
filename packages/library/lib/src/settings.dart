@@ -243,7 +243,7 @@ final class NavigationSettings {
 enum ThemePreference { system, light, dark }
 
 /// Accent color of the interface (SPEC §7.1).
-enum AccentPreference { teal, blue, neutral }
+enum AccentPreference { neutral, orange, yellow, teal, blue, violet }
 
 /// Application settings (SPEC §5.1). Null paths mean "use the default".
 final class AppSettings {
@@ -254,7 +254,7 @@ final class AppSettings {
     this.reaperResources,
     this.templatesFolder,
     this.theme = ThemePreference.system,
-    this.accent = AccentPreference.teal,
+    this.accent = AccentPreference.neutral,
     this.textScale = 1.0,
     this.language = systemLanguage,
     this.navigation = const NavigationSettings(),
@@ -390,7 +390,7 @@ final class AppSettings {
           ThemePreference.system,
       accent:
           AccentPreference.values.asNameMap()[json['accent']] ??
-          AccentPreference.teal,
+          AccentPreference.neutral,
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
       language: json['language'] as String? ?? systemLanguage,
       navigation: NavigationSettings.fromJson(

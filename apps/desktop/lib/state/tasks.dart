@@ -249,3 +249,22 @@ final libraryTurnsProvider = Provider<LibraryTurns>((ref) => LibraryTurns());
 final tasksProvider = NotifierProvider<TasksNotifier, List<BackgroundTask>>(
   TasksNotifier.new,
 );
+
+/// Whether the tasks zone is unfolded.
+final tasksZoneUnfoldedProvider = NotifierProvider<TasksZoneUnfolded, bool>(
+  TasksZoneUnfolded.new,
+);
+
+class TasksZoneUnfolded extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void toggle() => state = !state;
+
+  /// Folds the zone (Escape). Returns whether it was unfolded and shown.
+  bool fold() {
+    final shown = state && ref.read(tasksProvider).isNotEmpty;
+    state = false;
+    return shown;
+  }
+}

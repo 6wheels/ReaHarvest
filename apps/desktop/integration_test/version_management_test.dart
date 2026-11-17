@@ -169,7 +169,7 @@ void main() {
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tapText(tester, 'Band template');
-    await tapText(tester, 'Create');
+    await tapText(tester, 'New version');
     await waitFor(
       tester,
       // Adopted versions are shown by their label.
@@ -196,7 +196,7 @@ void main() {
     await tapText(tester, 'Copy of “Song - bridge”');
     await tester.enterText(field('Label'), 'solo');
     await tester.pumpAndSettle();
-    await tapText(tester, 'Create');
+    await tapText(tester, 'Duplicate');
     await waitFor(
       tester,
       () =>
@@ -216,7 +216,7 @@ void main() {
     await tester.enterText(field('File name'), 'Song - guitar solo');
     await tester.enterText(field('Label'), 'guitar');
     await tester.pumpAndSettle();
-    await tapText(tester, 'Save');
+    await tapText(tester, 'Rename');
     await waitFor(
       tester,
       () =>
@@ -237,7 +237,7 @@ void main() {
     await tapText(tester, 'Rename…');
     await tester.enterText(field('Label'), 'lead');
     await tester.pumpAndSettle();
-    await tapText(tester, 'Save');
+    await tapText(tester, 'Rename');
     expect(find.text('REAPER is open'), findsNothing);
     await waitFor(
       tester,
@@ -293,7 +293,7 @@ void main() {
     );
     await tapText(tester, 'Empty the trash');
     expect(find.text('Delete 1 file permanently?'), findsOne);
-    await tapText(tester, 'Delete permanently');
+    await tapText(tester, 'Empty the trash');
     await waitFor(
       tester,
       () => find.text('Unused media').evaluate().isNotEmpty,
@@ -509,7 +509,7 @@ void main() {
       ),
       findsOne,
     );
-    await tapText(tester, 'Fix 1 item');
+    await tapText(tester, 'Fix');
     await waitFor(
       tester,
       () => find.text('Media moved · ${names.length}').evaluate().isNotEmpty,

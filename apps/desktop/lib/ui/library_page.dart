@@ -11,6 +11,7 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
+import '../state/tasks.dart';
 import '../theme/app_theme.dart';
 import 'filter_bar.dart';
 import 'settings_dialog.dart';
@@ -34,9 +35,47 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   final _searchFocus = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  /// Keys handled wherever the focus is, while no dialog covers the page:
+  /// Ctrl+F (⌘F) focuses the search, Escape does what it does in the page
+  /// when nothing has the focus.
+  bool _onKey(KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        !mounted ||
+        !(ModalRoute.isCurrentOf(context) ?? true)) {
+      return false;
+    }
+    final keyboard = HardwareKeyboard.instance;
+    if (event.logicalKey == LogicalKeyboardKey.keyF &&
+        (keyboard.isControlPressed || keyboard.isMetaPressed)) {
+      _searchFocus.requestFocus();
+      return true;
+    }
+    final focus = FocusManager.instance.primaryFocus;
+    if (event.logicalKey == LogicalKeyboardKey.escape &&
+        (focus == null || focus == FocusManager.instance.rootScope)) {
+      _escape();
+      return true;
+    }
+    return false;
+  }
+
+  /// Folds the tasks zone, or else closes the overview.
+  void _escape() {
+    if (!ref.read(tasksZoneUnfoldedProvider.notifier).fold()) {
+      ref.read(overviewProvider.notifier).close();
+    }
   }
 
   @override
@@ -74,52 +113,50 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
     return Scaffold(
       body: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): () =>
-              ref.read(overviewProvider.notifier).close(),
-          const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
-              _searchFocus.requestFocus(),
-          const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () =>
-              _searchFocus.requestFocus(),
-        },
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: overview == null
-                    ? null
-                    : ref.read(overviewProvider.notifier).close,
-                child: RepaintBoundary(
-                  child: Column(
-                    children: [
-                      StudioTitleBar(
-                        center: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 480),
-                          child: LibrarySearchField(focusNode: _searchFocus),
+        bindings: {const SingleActivator(LogicalKeyboardKey.escape): _escape},
+        // A scope inside the shortcuts: when the search loses the focus (a
+        // click elsewhere), the focus falls back here and Escape still
+        // reaches the page.
+        child: FocusScope(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: overview == null
+                      ? null
+                      : ref.read(overviewProvider.notifier).close,
+                  child: RepaintBoundary(
+                    child: Column(
+                      children: [
+                        StudioTitleBar(
+                          center: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 480),
+                            child: LibrarySearchField(focusNode: _searchFocus),
+                          ),
+                          trailing: const _SettingsButton(),
                         ),
-                        trailing: const _SettingsButton(),
-                      ),
-                      if (hasTitles || hasIssues) const FilterBar(),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: Motion.medium,
-                          child: content,
+                        if (hasTitles || hasIssues) const FilterBar(),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: Motion.medium,
+                            child: content,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: Space.xl,
-              right: Space.xl,
-              bottom: Space.l,
-              height: overviewHeight,
-              child: _OverviewHost(overview),
-            ),
-          ],
+              Positioned(
+                left: Space.xl,
+                right: Space.xl,
+                bottom: overviewBottom,
+                height: overviewHeight,
+                child: _OverviewHost(overview),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -169,9 +206,16 @@ class _OverviewHostState extends State<_OverviewHost> {
 /// Search field of the library title bar: filters the titles as one types;
 /// a discreet button or Escape clears it.
 class LibrarySearchField extends ConsumerStatefulWidget {
-  const LibrarySearchField({super.key, required this.focusNode});
+  const LibrarySearchField({
+    super.key,
+    required this.focusNode,
+    this.autofocus = true,
+  });
 
   final FocusNode focusNode;
+
+  /// Focused on startup (the showcase turns it off).
+  final bool autofocus;
 
   @override
   ConsumerState<LibrarySearchField> createState() => _LibrarySearchFieldState();
@@ -224,7 +268,7 @@ class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
           controller: _controller,
           focusNode: widget.focusNode,
           textAlignVertical: TextAlignVertical.center,
-          autofocus: true,
+          autofocus: widget.autofocus,
           onChanged: ref.read(navigationProvider.notifier).setQuery,
           // Enter opens the detail of the title in the overview.
           onSubmitted: (_) {
@@ -254,14 +298,14 @@ class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
                       tooltip: l10n.clearSearch,
                       onPressed: _clear,
                       // Explicit: the field restyles its suffix buttons.
-                      style: Theme.of(context).iconButtonTheme.style?.merge(
-                        IconButton.styleFrom(
-                          fixedSize: const Size.square(22),
-                          minimumSize: Size.zero,
-                          padding: EdgeInsets.zero,
-                          iconSize: 14,
-                        ),
-                      ),
+                      // Smaller than the theme size, so that the field
+                      // keeps its height.
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size.square(22),
+                        minimumSize: Size.zero,
+                        padding: EdgeInsets.zero,
+                        iconSize: 14,
+                      ).merge(Theme.of(context).iconButtonTheme.style),
                       icon: const Icon(Icons.close_rounded),
                     ),
                   ),
@@ -278,31 +322,15 @@ class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
   }
 }
 
-class _SettingsButton extends StatefulWidget {
+class _SettingsButton extends StatelessWidget {
   const _SettingsButton();
 
   @override
-  State<_SettingsButton> createState() => _SettingsButtonState();
-}
-
-class _SettingsButtonState extends State<_SettingsButton> {
-  var _hovered = false;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    onEnter: (_) => setState(() => _hovered = true),
-    onExit: (_) => setState(() => _hovered = false),
-    child: IconButton(
-      tooltip: AppLocalizations.of(context).settings,
-      iconSize: 16,
-      onPressed: () => showSettings(context),
-      icon: AnimatedRotation(
-        turns: _hovered ? 0.125 : 0,
-        duration: Motion.medium,
-        curve: Motion.curve,
-        child: const Icon(Icons.settings_outlined),
-      ),
-    ),
+  Widget build(BuildContext context) => IconButton(
+    tooltip: AppLocalizations.of(context).settings,
+    iconSize: 16,
+    onPressed: () => showSettings(context),
+    icon: const Icon(Icons.settings_outlined),
   );
 }
 
@@ -419,7 +447,7 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
               Space.xl,
               double.infinity,
             ),
-            Space.xl,
+            libraryBottomPadding(overviewOpen: overview != null),
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,

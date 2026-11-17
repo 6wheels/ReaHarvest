@@ -374,7 +374,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           onPressed: _checked.isEmpty || !_valid || _waitingPreview
               ? null
               : confirm,
-          child: Text(l10n.taskFix(_checked.length)),
+          child: Text(actionLabel(l10n.fixAction)),
         ),
       ],
     );
@@ -458,16 +458,22 @@ class _LevelFieldState extends State<LevelField> {
       return widget.options().where((o) => o.toLowerCase().contains(typed));
     },
     onSelected: (_) => widget.onChanged(),
-    fieldViewBuilder: (context, controller, focusNode, _) => TextField(
-      controller: controller,
-      focusNode: focusNode,
-      onChanged: (_) => widget.onChanged(),
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hint,
-        errorText: widget.error,
-      ),
-    ),
+    // Up and down move through the options, Enter picks the highlighted
+    // one, Escape hides them.
+    fieldViewBuilder: (context, controller, focusNode, onSubmitted) =>
+        TextField(
+          controller: controller,
+          focusNode: focusNode,
+          onChanged: (_) => widget.onChanged(),
+          onSubmitted: (_) => onSubmitted(),
+          decoration: InputDecoration(
+            labelText: widget.label,
+            hintText: widget.hint,
+            // Room kept for the error: the dialog keeps its size.
+            helperText: ' ',
+            errorText: widget.error,
+          ),
+        ),
     // A console menu, like the other ones of the application.
     optionsViewBuilder: (context, onSelected, options) => Align(
       alignment: Alignment.topLeft,
@@ -493,10 +499,12 @@ class _LevelFieldState extends State<LevelField> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final o in options)
-                      MenuItemButton(
+                    for (final (i, o) in options.indexed)
+                      _Option(
+                        highlighted:
+                            AutocompleteHighlightedOption.of(context) == i,
                         onPressed: () => onSelected(o),
-                        child: Text(o),
+                        label: o,
                       ),
                   ],
                 ),
@@ -507,4 +515,48 @@ class _LevelFieldState extends State<LevelField> {
       ),
     ),
   );
+}
+
+/// Option of a [LevelField]: lit like a hovered menu entry while
+/// highlighted with the keyboard, and scrolled into view.
+class _Option extends StatefulWidget {
+  const _Option({
+    required this.highlighted,
+    required this.onPressed,
+    required this.label,
+  });
+
+  final bool highlighted;
+  final VoidCallback onPressed;
+  final String label;
+
+  @override
+  State<_Option> createState() => _OptionState();
+}
+
+class _OptionState extends State<_Option> {
+  @override
+  void didUpdateWidget(_Option old) {
+    super.didUpdateWidget(old);
+    if (widget.highlighted && !old.highlighted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Scrollable.ensureVisible(context);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return MenuItemButton(
+      onPressed: widget.onPressed,
+      style: widget.highlighted
+          ? MenuItemButton.styleFrom(
+              backgroundColor: c.accent.withValues(alpha: 0.10),
+              foregroundColor: c.accent,
+            )
+          : null,
+      child: Text(widget.label),
+    );
+  }
 }

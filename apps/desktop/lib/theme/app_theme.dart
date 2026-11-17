@@ -168,17 +168,22 @@ extension AppColorsX on BuildContext {
 }
 
 /// Accent color of the interface: a hue and a saturation, as light as the
-/// default accent on each theme. A neutral one (no saturation) is near white
+/// teal accent on each theme. A neutral one (no saturation) is near white
 /// on the dark theme and near black on the light one, like the keys of a
-/// console.
+/// console. The colors are soft and warm, like the LEDs of a mixing desk.
 @immutable
 final class Accent {
   const Accent(this.hue, this.saturation);
 
-  /// Default accent; [buildTheme] uses the exact design tokens for it.
+  /// Default accent.
+  static const neutral = Accent(230, 0);
+  static const orange = Accent(26, 0.6);
+  static const yellow = Accent(44, 0.62);
+
+  /// [buildTheme] uses the exact design tokens for it.
   static const teal = Accent(163, 0.63);
   static const blue = Accent(199, 0.63);
-  static const neutral = Accent(230, 0);
+  static const violet = Accent(266, 0.45);
 
   final double hue;
   final double saturation;
@@ -201,15 +206,18 @@ final class Accent {
 
 /// Accent of the [preference].
 Accent accentOf(AccentPreference preference) => switch (preference) {
+  AccentPreference.neutral => Accent.neutral,
+  AccentPreference.orange => Accent.orange,
+  AccentPreference.yellow => Accent.yellow,
   AccentPreference.teal => Accent.teal,
   AccentPreference.blue => Accent.blue,
-  AccentPreference.neutral => Accent.neutral,
+  AccentPreference.violet => Accent.violet,
 };
 
 /// Material theme built on the design tokens. Material is only the
 /// foundation: no splash, flat surfaces, hairlines, nearly square corners.
-/// The accent is [accent] (default: teal).
-ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.teal}) {
+/// The accent is [accent] (default: neutral).
+ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
   final dark = brightness == Brightness.dark;
   final tokens = dark ? AppColors.dark : AppColors.light;
   final c = accent == Accent.teal
@@ -261,6 +269,14 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.teal}) {
     borderRadius: BorderRadius.circular(Radii.s),
   );
   final hairline = BorderSide(color: c.border);
+  final headlineSmall = text.headlineSmall?.copyWith(
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.4,
+  );
+  final titleLarge = text.titleLarge?.copyWith(
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.3,
+  );
   final buttonText = const TextStyle(
     fontFamily: Fonts.text,
     fontSize: 13,
@@ -309,14 +325,8 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.teal}) {
         fontWeight: FontWeight.w700,
         letterSpacing: -0.6,
       ),
-      headlineSmall: text.headlineSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.4,
-      ),
-      titleLarge: text.titleLarge?.copyWith(
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.3,
-      ),
+      headlineSmall: headlineSmall,
+      titleLarge: titleLarge,
       titleMedium: text.titleMedium?.copyWith(
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
@@ -352,7 +362,8 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.teal}) {
         borderRadius: BorderRadius.circular(Radii.m),
         side: hairline,
       ),
-      titleTextStyle: text.titleLarge,
+      // A size above the title of a version.
+      titleTextStyle: headlineSmall,
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
@@ -514,7 +525,9 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.teal}) {
       ),
       waitDuration: const Duration(milliseconds: 450),
     ),
+    // Always shown: where the list stands is always visible.
     scrollbarTheme: ScrollbarThemeData(
+      thumbVisibility: const WidgetStatePropertyAll(true),
       thickness: const WidgetStatePropertyAll(6),
       radius: const Radius.circular(Radii.xs),
       thumbColor: WidgetStateProperty.resolveWith(
@@ -549,18 +562,19 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.teal}) {
 
 /// Style of the light actions (icon buttons, small text actions): no cap,
 /// the label lit in the accent with a glow on hover, flashing on a click.
-/// [ink] is the color at rest (muted by default).
-ButtonStyle glowButtonStyle(BuildContext context, {Color? ink}) =>
-    _glowStyle(context.colors, ink: ink);
+/// [ink] is the color at rest (muted by default), [lit] the color on hover
+/// (the accent by default).
+ButtonStyle glowButtonStyle(BuildContext context, {Color? ink, Color? lit}) =>
+    _glowStyle(context.colors, ink: ink, lit: lit);
 
-ButtonStyle _glowStyle(AppColors c, {Color? ink}) {
+ButtonStyle _glowStyle(AppColors c, {Color? ink, Color? lit}) {
   final color = WidgetStateProperty.resolveWith(
     (states) => states.contains(WidgetState.disabled)
         ? (ink ?? c.muted).withValues(alpha: 0.45)
         : states.contains(WidgetState.hovered) ||
               states.contains(WidgetState.pressed) ||
               states.contains(WidgetState.focused)
-        ? c.accent
+        ? lit ?? c.accent
         : ink ?? c.muted,
   );
   return ButtonStyle(
@@ -572,6 +586,36 @@ ButtonStyle _glowStyle(AppColors c, {Color? ink}) {
     elevation: const WidgetStatePropertyAll(0),
     backgroundBuilder: (context, states, child) =>
         _Glow(states: states, child: child),
+  );
+}
+
+/// Style of the window close button: a muted glyph at rest, a red console
+/// key with a glyph glowing like a LED on hover and on press.
+ButtonStyle closeKeyStyle(BuildContext context) {
+  final c = context.colors;
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  final key = _Key(c, c.ledRed, dark: dark, main: true);
+  bool lit(Set<WidgetState> states) =>
+      !states.contains(WidgetState.disabled) &&
+      (states.contains(WidgetState.hovered) ||
+          states.contains(WidgetState.pressed));
+  final ink = WidgetStateProperty.resolveWith(
+    (states) => lit(states) ? key.legend(states) : c.muted,
+  );
+  return ButtonStyle(
+    foregroundColor: ink,
+    iconColor: ink,
+    backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+    side: const WidgetStatePropertyAll(BorderSide.none),
+    elevation: const WidgetStatePropertyAll(0),
+    // The key sits inside the button, a small margin around it.
+    backgroundBuilder: (context, states, child) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: lit(states)
+          ? _LitKey(key, states, child)
+          : Center(child: child ?? const SizedBox.shrink()),
+    ),
   );
 }
 

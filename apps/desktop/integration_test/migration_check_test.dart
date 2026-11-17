@@ -67,7 +67,7 @@ void main() {
   /// report.
   Future<void> fixSection(WidgetTester tester, String header) async {
     await openSectionFix(tester, header);
-    await confirmFix(tester, h, 1);
+    await confirmFix(tester, h);
   }
 
   testWidgets('inventories, keeps the originals and checks the batch', (

@@ -53,7 +53,7 @@ void main() {
     // starts; nothing moved.
     final before = h.tasks.length;
     await openSectionFix(tester, wrongLevel);
-    await tester.tap(find.widgetWithText(FilledButton, 'Fix 1 item'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await waitFor(
       tester,
       () => h.tasks.length > before && h.tasks.last.isQueued,
@@ -74,7 +74,7 @@ void main() {
     holding = turns.run(library, () => hold.future);
     final queued = h.tasks.length;
     await openSectionFix(tester, wrongLevel);
-    await tester.tap(find.widgetWithText(FilledButton, 'Fix 1 item'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await waitFor(
       tester,
       () => h.tasks.length > queued && h.tasks.last.isQueued,

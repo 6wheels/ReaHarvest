@@ -8,16 +8,6 @@ import '../theme/app_theme.dart';
 import 'report_dialog.dart';
 import 'widgets.dart';
 
-/// Background tasks zone at the bottom of the application (SPEC §5.2): the
-/// latest task, expandable into the list of all of them. Hidden when there
-/// is no task.
-class TasksZone extends ConsumerStatefulWidget {
-  const TasksZone({super.key});
-
-  @override
-  ConsumerState<TasksZone> createState() => _TasksZoneState();
-}
-
 /// Navigator of the application, for the tasks zone which sits outside of
 /// it.
 final appNavigatorKey = GlobalKey<NavigatorState>();
@@ -29,12 +19,16 @@ void _openReport(String title, Report report) {
   }
 }
 
-class _TasksZoneState extends ConsumerState<TasksZone> {
-  var _expanded = false;
+/// Background tasks zone at the bottom of the application (SPEC §5.2): the
+/// latest task, expandable into the list of all of them. Hidden when there
+/// is no task.
+class TasksZone extends ConsumerWidget {
+  const TasksZone({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tasks = ref.watch(tasksProvider);
+    final expanded = ref.watch(tasksZoneUnfoldedProvider);
     final c = context.colors;
     final l10n = AppLocalizations.of(context);
     // Reports of the actions launched by the user open when they end.
@@ -60,10 +54,10 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
         orElse: () => tasks.last,
       );
       final toggle = TextButton.icon(
-        onPressed: () => setState(() => _expanded = !_expanded),
+        onPressed: ref.read(tasksZoneUnfoldedProvider.notifier).toggle,
         iconAlignment: IconAlignment.end,
         // The zone unfolds upwards.
-        icon: Disclosure(_expanded ? Disclosure.down : Disclosure.up),
+        icon: Disclosure(expanded ? Disclosure.down : Disclosure.up),
         label: Text(
           '${l10n.tasks.toUpperCase()}$labelSeparator${tasks.length}',
           style: context.legend.copyWith(color: c.text),
@@ -74,7 +68,7 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
         shape: Border(top: BorderSide(color: c.border)),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: Space.m),
-          child: _expanded
+          child: expanded
               ? Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -82,7 +76,7 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
                       children: [
                         const Spacer(),
                         if (tasks.any((t) => t.isFinished))
-                          OutlinedButton(
+                          TextButton(
                             onPressed: ref
                                 .read(tasksProvider.notifier)
                                 .clearFinished,
@@ -121,6 +115,10 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
     );
   }
 }
+
+/// Width of the state and report columns of a task, with room for the
+/// longer labels of the supported languages.
+const _actionWidth = 104.0;
 
 class _TaskRow extends ConsumerWidget {
   const _TaskRow(this.task, {this.detailed = false});
@@ -221,14 +219,26 @@ class _TaskRow extends ConsumerWidget {
             ),
           ],
           const SizedBox(width: Space.m),
-          trailing,
-          if (task.report case final report?) ...[
-            const SizedBox(width: Space.s),
-            OutlinedButton(
-              onPressed: () => _openReport(task.label(l10n), report),
-              child: Text(l10n.report),
-            ),
-          ],
+          // State and report in columns of one width, the report slot kept
+          // empty: the rows line up whatever the state or the language.
+          SizedBox(
+            width: _actionWidth,
+            // A button fills its column, a state is centered in it.
+            child: trailing is ButtonStyleButton
+                ? trailing
+                : Center(child: trailing),
+          ),
+          const SizedBox(width: Space.xs),
+          SizedBox(
+            width: _actionWidth,
+            child: switch (task.report) {
+              final report? => TextButton(
+                onPressed: () => _openReport(task.label(l10n), report),
+                child: Text(l10n.report),
+              ),
+              null => null,
+            },
+          ),
         ],
       ),
     );

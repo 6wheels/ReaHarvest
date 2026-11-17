@@ -10,7 +10,10 @@ import '../formats.dart';
 import '../labels.dart';
 import '../widgets.dart';
 
-class VersionItem extends ConsumerWidget {
+/// Version of the title detail list, like a rack strip: a light lit when
+/// the version is adopted (off when not), its label and readouts, its
+/// status and alert. The selected strip has a lit edge.
+class VersionItem extends ConsumerStatefulWidget {
   const VersionItem(
     this.title,
     this.version, {
@@ -25,7 +28,15 @@ class VersionItem extends ConsumerWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VersionItem> createState() => _VersionItemState();
+}
+
+class _VersionItemState extends ConsumerState<VersionItem> {
+  var _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final VersionItem(:title, :version, :selected) = widget;
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
@@ -47,77 +58,112 @@ class VersionItem extends ConsumerWidget {
       if (m?.owner case final owner?) owners[owner] ?? l10n.unknownOwner,
     ].join(' · ');
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Material(
-        color: selected ? c.accent.withValues(alpha: 0.12) : Colors.transparent,
-        borderRadius: BorderRadius.circular(Radii.s),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Radii.s),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Space.m,
-              vertical: Space.s,
+      padding: const EdgeInsets.only(bottom: Space.xs + 2),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: Motion.fast,
+          curve: Motion.curve,
+          decoration: BoxDecoration(
+            color: selected ? c.accent.withValues(alpha: 0.07) : c.surface,
+            borderRadius: BorderRadius.circular(Radii.s),
+            border: Border.all(
+              color: selected
+                  ? c.accent.withValues(alpha: 0.45)
+                  : _hovered
+                  ? c.muted.withValues(alpha: 0.6)
+                  : c.border,
             ),
-            child: Row(
-              children: [
-                if (m != null || alerts.notAdopted) ...[
-                  Icon(
-                    m == null
-                        ? Icons.help_outline_rounded
-                        : Icons.check_circle_outline_rounded,
-                    size: 18,
-                    color: m == null ? c.muted : c.accent,
-                  ),
-                  const SizedBox(width: Space.s),
-                ],
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: text.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: generic ? c.muted : null,
-                        ),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(Radii.s),
+              onTap: widget.onTap,
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Lit edge of the selected strip only.
+                    AnimatedContainer(
+                      duration: Motion.fast,
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      color: selected ? c.accent : Colors.transparent,
+                    ),
+                    const SizedBox(width: Space.s + 2),
+                    if (m != null || alerts.notAdopted) ...[
+                      Center(
+                        child: m == null
+                            ? Tooltip(
+                                message: l10n.notAdopted,
+                                child: Led(c.accent, lit: false),
+                              )
+                            : Led(c.accent),
                       ),
-                      Text.rich(
-                        TextSpan(
-                          text: details,
+                      const SizedBox(width: Space.s + 2),
+                    ],
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            if (generic)
-                              TextSpan(
-                                text: ' · ${version.fileName}',
-                                style: const TextStyle(
-                                  fontStyle: FontStyle.italic,
-                                ),
+                            Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: text.bodyMedium?.copyWith(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: generic ? c.muted : null,
                               ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text.rich(
+                              TextSpan(
+                                text: details,
+                                children: [
+                                  if (generic)
+                                    TextSpan(
+                                      text: ' · ${version.fileName}',
+                                      style: const TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.readout.copyWith(fontSize: 11),
+                            ),
                           ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: text.bodySmall?.copyWith(color: c.muted),
+                      ),
+                    ),
+                    if (status != null) ...[
+                      const SizedBox(width: Space.s),
+                      Center(
+                        child: Pill(statusLabel(l10n, status), color: c.accent),
                       ),
                     ],
-                  ),
+                    if (alerts.missing.isNotEmpty ||
+                        alerts.duplicates.isNotEmpty) ...[
+                      const SizedBox(width: Space.s),
+                      const Center(
+                        child: Icon(
+                          Icons.warning_amber_rounded,
+                          size: 18,
+                          color: warningColor,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: Space.m),
+                  ],
                 ),
-                if (status != null) ...[
-                  const SizedBox(width: Space.s),
-                  Pill(statusLabel(l10n, status), color: c.accent),
-                ],
-                if (alerts.missing.isNotEmpty ||
-                    alerts.duplicates.isNotEmpty) ...[
-                  const SizedBox(width: Space.s),
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    size: 18,
-                    color: warningColor,
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),

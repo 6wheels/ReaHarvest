@@ -282,7 +282,7 @@ void main() {
             reaperResources: '/home/alice/.config/REAPER',
             templatesFolder: '/templates',
             theme: ThemePreference.dark,
-            accent: AccentPreference.neutral,
+            accent: AccentPreference.violet,
             textScale: 1.2,
             language: 'fr',
             navigation: const NavigationSettings(
@@ -332,7 +332,7 @@ void main() {
       expect(read.templatesFolder, '/templates');
       expect(
         (read.theme, read.accent, read.textScale, read.language),
-        (ThemePreference.dark, AccentPreference.neutral, 1.2, 'fr'),
+        (ThemePreference.dark, AccentPreference.violet, 1.2, 'fr'),
       );
       final nav = read.navigation;
       expect((nav.displayMode, nav.query), (DisplayMode.tree, 'tide'));

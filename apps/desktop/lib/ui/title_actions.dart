@@ -92,6 +92,16 @@ class TitleActions extends ConsumerStatefulWidget {
 class _TitleActionsState extends ConsumerState<TitleActions> {
   var _menuOpen = false;
 
+  /// First enabled entry of the menu, focused on opening so that Escape
+  /// closes it.
+  final _first = FocusNode();
+
+  @override
+  void dispose() {
+    _first.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -130,7 +140,10 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
             ),
             _gap,
             MenuAnchor(
-              onOpen: () => setState(() => _menuOpen = true),
+              onOpen: () {
+                setState(() => _menuOpen = true);
+                focusMenuEntry(_first);
+              },
               onClose: () => setState(() => _menuOpen = false),
               // Not wired yet (#51 and following).
               menuChildren: [
@@ -143,6 +156,7 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
                   child: Text(l10n.createBackup),
                 ),
                 SubmenuButton(
+                  focusNode: _first,
                   leadingIcon: const Icon(Icons.flag_outlined),
                   menuChildren: [
                     for (final s in Title.defaultStatuses)

@@ -105,11 +105,13 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
               onSubmitted: (_) => _save(),
               decoration: InputDecoration(
                 labelText: l10n.fileName,
+                // Room kept for the error: the dialog keeps its size.
+                helperText: ' ',
                 errorText: error,
                 isDense: true,
               ),
             ),
-            const SizedBox(height: Space.m),
+            const SizedBox(height: Space.xs),
             TextField(
               controller: _label,
               enabled: adopted,
@@ -117,7 +119,7 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
               onSubmitted: (_) => _save(),
               decoration: InputDecoration(
                 labelText: l10n.versionLabel,
-                helperText: adopted ? null : l10n.labelNeedsAdoption,
+                helperText: adopted ? ' ' : l10n.labelNeedsAdoption,
                 errorText: _labelMissing ? l10n.labelRequired : null,
                 isDense: true,
               ),
@@ -132,7 +134,7 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
         ),
         FilledButton(
           onPressed: error == null && !_labelMissing ? _save : null,
-          child: Text(l10n.save),
+          child: Text(actionLabel(l10n.editVersion)),
         ),
       ],
     );

@@ -14,6 +14,7 @@ import 'l10n/app_localizations.dart';
 import 'state/navigation.dart';
 import 'state/providers.dart';
 import 'state/reaper.dart';
+import 'state/tasks.dart';
 import 'theme/app_theme.dart';
 import 'ui/aurora.dart';
 import 'ui/filter_bar.dart' as filter show Pill;
@@ -24,6 +25,7 @@ import 'ui/overview.dart';
 import 'ui/path_row.dart';
 import 'ui/status_trail.dart';
 import 'ui/studio_title_bar.dart';
+import 'ui/tasks_zone.dart';
 import 'ui/title_card.dart';
 import 'ui/to_sort/fix_dialog.dart' show Choice, LevelField;
 import 'ui/to_sort/to_sort_item.dart';
@@ -52,6 +54,7 @@ Future<void> main() async {
           (ref) async => PluginCache.parse(vstIni: const [], jsIni: null),
         ),
         reaperExecutableProvider.overrideWith((ref) async => null),
+        tasksProvider.overrideWith(_ShowcaseTasks.new),
       ],
       child: const UiShowcaseApp(),
     ),
@@ -66,6 +69,47 @@ class _ShowcaseSettings extends SettingsNotifier {
 
   @override
   Future<void> persist(AppSettings settings) async {}
+}
+
+/// Tasks in every state, for the tasks zone. Cancel and "Clear finished"
+/// work on them; nothing runs.
+class _ShowcaseTasks extends TasksNotifier {
+  @override
+  List<BackgroundTask> build() => [
+    BackgroundTask(
+      id: 1,
+      label: (l10n) => l10n.taskScan('Band'),
+      state: TaskState.done,
+    ),
+    BackgroundTask(
+      id: 2,
+      label: (l10n) => l10n.taskMove('Old/Loose.rpp'),
+      state: TaskState.failed,
+      error: 'The target folder already exists.',
+    ),
+    BackgroundTask(
+      id: 3,
+      label: (l10n) => l10n.taskFix(2),
+      state: TaskState.done,
+      report: _plan.blocked,
+    ),
+    BackgroundTask(
+      id: 4,
+      label: (l10n) => l10n.taskUndoFix,
+      state: TaskState.cancelled,
+    ),
+    BackgroundTask(
+      id: 5,
+      label: (l10n) => l10n.taskScan('Archive'),
+      state: TaskState.queued,
+    ),
+    BackgroundTask(
+      id: 6,
+      label: (l10n) => l10n.taskFix(3),
+      progress: 0.42,
+      step: (l10n) => l10n.taskStepFix(2, 3),
+    ),
+  ];
 }
 
 /// Size of a title card in the library grid (see `library_page.dart`).
@@ -85,7 +129,13 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   bool _loading = true;
 
   /// Accent picked in the settings bar.
-  Accent _accent = Accent.teal;
+  Accent _accent = Accent.neutral;
+
+  /// Interface size (text scale of the settings, 75 to 150 %).
+  double _scale = 1;
+
+  /// Light of the "select all" specimen: none, some, all.
+  bool? _all = false;
 
   // Local state of the interactive specimens.
   bool _checked = true;
@@ -112,6 +162,13 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
+    // The tasks zone opens its reports over the pages.
+    navigatorKey: appNavigatorKey,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context)
+          .copyWith(textScaler: TextScaler.linear(_scale)),
+      child: child!,
+    ),
     themeMode: _themeMode,
     theme: buildTheme(Brightness.light, accent: _accent),
     darkTheme: buildTheme(Brightness.dark, accent: _accent),
@@ -177,6 +234,17 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             onChanged: (v) => setState(() => _progress = v),
           ),
         ),
+        Text('SIZE ${(_scale * 100).round()}%', style: context.readout),
+        SizedBox(
+          width: 180,
+          child: Slider(
+            min: 0.75,
+            max: 1.5,
+            divisions: 15,
+            value: _scale,
+            onChanged: (v) => setState(() => _scale = v),
+          ),
+        ),
         TextButton(
           onPressed: () => setState(
             () => _locale = Locale(_locale.languageCode == 'en' ? 'fr' : 'en'),
@@ -214,9 +282,12 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                 ),
               ),
               const SizedBox(width: Space.s),
+              preset('Neutral', Accent.neutral),
+              preset('Orange', Accent.orange),
+              preset('Yellow', Accent.yellow),
               preset('Teal', Accent.teal),
               preset('Blue', Accent.blue),
-              preset('Neutral', Accent.neutral),
+              preset('Violet', Accent.violet),
               const SizedBox(width: Space.m),
               Text('HUE ${accent.hue.round()}°', style: context.readout),
               SizedBox(
@@ -525,6 +596,30 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ),
         _Specimen(
+          'LightCheckbox — select all: none, some, all',
+          child: Row(
+            children: [
+              LightCheckbox(
+                value: _all,
+                tooltip: 'Select all',
+                onPressed: () => setState(
+                  () => _all = switch (_all) {
+                    false => null,
+                    null => true,
+                    true => false,
+                  },
+                ),
+              ),
+              const SizedBox(width: Space.s),
+              Text(switch (_all) {
+                false => 'None selected',
+                null => 'Some selected',
+                true => 'All selected',
+              }),
+            ],
+          ),
+        ),
+        _Specimen(
           'Menu with ChoiceLight — click to open',
           child: MenuAnchor(
             menuChildren: [
@@ -549,6 +644,12 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ),
       ]),
+      _Section(
+        'Notifications',
+        'Real TasksZone on mock tasks in every state: click TASKS to unfold, '
+            'Escape folds it in the app.',
+        [const _Specimen('TasksZone', width: 900, child: TasksZone())],
+      ),
       _Section('Forms', 'Fields, drop-downs and buttons share one height.', [
         _Specimen(
           'Heights side by side',
@@ -724,7 +825,10 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             onBack: () {},
             center: SizedBox(
               width: 360,
-              child: LibrarySearchField(focusNode: _searchFocus),
+              child: LibrarySearchField(
+                focusNode: _searchFocus,
+                autofocus: false,
+              ),
             ),
             trailing: IconButton(
               onPressed: () {},

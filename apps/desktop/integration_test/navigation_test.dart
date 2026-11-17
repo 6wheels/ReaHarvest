@@ -85,7 +85,7 @@ void main() {
     await tester.pumpAndSettle();
     await tapText(tester, 'Save current view…');
     await tester.enterText(dialogField('View name'), 'Live');
-    await tapText(tester, 'Save');
+    await tapText(tester, 'Save current view');
     await tapText(tester, 'Clear filters');
     await showsCards(tester, {'Song', 'Ballad', 'Encore'});
 

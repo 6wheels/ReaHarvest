@@ -1,9 +1,10 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest/ui/to_sort/to_sort_item.dart';
+import 'package:reaharvest/ui/widgets.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'harness.dart';
@@ -22,14 +23,14 @@ void main() {
 
   tearDown(() => h.dispose());
 
-  /// Checkbox of the item [title].
+  /// Selection light of the item [title].
   Finder box(String title) => find.descendant(
-    of: find.ancestor(of: find.text(title), matching: find.byType(Row)).first,
-    matching: find.byType(Checkbox),
+    of: find.ancestor(of: find.text(title), matching: find.byType(Item)),
+    matching: find.byType(ChoiceLight),
   );
 
-  bool? checked(WidgetTester tester, Finder checkbox) =>
-      tester.widget<Checkbox>(checkbox).value;
+  bool? checked(WidgetTester tester, Finder light) =>
+      tester.widget<ChoiceLight>(light).checked;
 
   /// Rescans every library from the page, and waits for the end.
   Future<void> fullScan(WidgetTester tester) async {
@@ -121,8 +122,11 @@ void main() {
     // is then partly checked.
     await showToSort(tester, find.text(tooHigh));
     final all = find.descendant(
-      of: toSortSection(tooHigh),
-      matching: find.byType(Checkbox),
+      of: find.descendant(
+        of: toSortSection(tooHigh),
+        matching: find.byType(LightCheckbox),
+      ),
+      matching: find.byType(ChoiceLight),
     );
     await tester.tap(box('Lonely'));
     await tester.pumpAndSettle();
@@ -158,7 +162,7 @@ void main() {
     expect(find.text('Artist/Single'), findsOne);
     expect(find.text('Artist/Bside'), findsNothing);
     expect(find.text('→ Artist/_Unassigned/Lonely'), findsOne);
-    await confirmFix(tester, h, 2);
+    await confirmFix(tester, h);
     expect(find.text('Folders moved · 2'), findsOne);
     expect(find.textContaining('Files missing or changed'), findsNothing);
     await tapText(tester, 'Close');
