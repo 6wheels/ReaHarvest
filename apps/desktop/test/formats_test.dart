@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart' hide Title;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/ui/formats.dart';
+import 'package:reaharvest/ui/widgets.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 void main() {
@@ -46,6 +48,54 @@ void main() {
     expect((versionName(folder), versionName(free)), ('Take', 'sub/take'));
   });
 
+  test('sizeBreakdown lists the kinds of files, the largest first', () {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final version =
+        Version(
+          fileName: 'a/a.rpp',
+          modified: DateTime(2026),
+          size: 0,
+        ).withSizes('a', const {
+          SizeCategory.project: 2048,
+          SizeCategory.media: 0,
+          SizeCategory.history: 5 * 1024 * 1024,
+          SizeCategory.reaperBackups: 1024,
+          SizeCategory.renders: 4096,
+          SizeCategory.other: 10,
+        });
+    expect(
+      sizeBreakdown(l10n, version),
+      'Backup points 5.0 MB · Renders 4.0 KB · Project 2.0 KB · '
+      'REAPER backups 1.0 KB · Other 10 B',
+    );
+    expect(sizeCategoryLabel(l10n, SizeCategory.media), 'Media');
+  });
+
+  test('versionFolderCount counts folders, not projects', () {
+    Version at(String file) => Version(
+      fileName: file,
+      folder: file.split('/').first,
+      modified: DateTime(2026),
+      size: 1,
+    );
+    final title = Title(
+      id: NodeId.generate(),
+      libraryId: LibraryId.generate(),
+      path: 'A/B/C',
+      tags: const {},
+      versions: [at('a/a.rpp'), at('a/a copy.rpp'), at('b/b.rpp')],
+    );
+    expect(versionFolderCount(title), 2);
+  });
+
+  test('a shared version folder has its own failure message', () {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    expect(
+      failureMessage(l10n, const SharedVersionFolderException('a')),
+      l10n.sharedVersionFolder,
+    );
+  });
+
   group('versionNameError', () {
     final l10n = lookupAppLocalizations(const Locale('en'));
     final title = Title(
@@ -69,10 +119,20 @@ void main() {
     });
 
     test('refuses an invalid name', () {
-      for (final name in ['.rpp', 'a/b', ' ', 'Assets', '.hidden']) {
+      for (final name in ['.rpp', 'a/b', ' ', '.hidden']) {
         expect(
           versionNameError(l10n, title, name),
           l10n.invalidVersionName,
+          reason: name,
+        );
+      }
+    });
+
+    test('refuses the names reserved by the application', () {
+      for (final name in ['Assets', 'media', 'Renders.rpp', 'Backups']) {
+        expect(
+          versionNameError(l10n, title, name),
+          l10n.reservedVersionName,
           reason: name,
         );
       }

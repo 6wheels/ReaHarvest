@@ -46,7 +46,6 @@ List<Title> demoTitles() {
           for (var v = 0; v <= i % 5; v++)
             Version(
               fileName: '$name v${v + 1}/$name v${v + 1}.rpp',
-              folder: '$name v${v + 1}',
               modified: now.subtract(Duration(days: i * 9 + v)),
               size: 1,
               tempo: 72.0 + i * 7,
@@ -57,7 +56,11 @@ List<Title> demoTitles() {
                       owner: const MemberId('demo-member'),
                       label: 'take ${v + 1}',
                     ),
-            ),
+            ).withSizes('$name v${v + 1}', const {
+              SizeCategory.project: 2 * 1024,
+              SizeCategory.media: 3 * 1024 * 1024,
+              SizeCategory.history: 512 * 1024,
+            }),
         ],
       ),
   ];

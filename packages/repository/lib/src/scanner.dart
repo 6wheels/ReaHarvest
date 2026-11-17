@@ -216,8 +216,20 @@ final class _Scanner {
   final corrupted = <String>[];
   final stamps = <String, FileStamp>{};
 
-  /// Bytes of the indexed files below each folder (version sizes).
-  final sizes = <String, int>{};
+  /// Bytes of every file below each folder, excluded ones too, by category
+  /// relative to that folder (version sizes).
+  final sizes = <String, Map<SizeCategory, int>>{};
+
+  /// Folders holding files, by parent folder.
+  late final children = () {
+    final children = <String, List<String>>{};
+    for (final folder in files.keys) {
+      if (folder.isNotEmpty) {
+        children.putIfAbsent(parentOf(folder), () => []).add(folder);
+      }
+    }
+    return children;
+  }();
 
   /// Lowercase paths of every file, excluded ones too, to find missing
   /// media (case-insensitive like Windows and macOS).
@@ -338,9 +350,9 @@ final class _Scanner {
     }
   }
 
-  /// Records the listed entry [e]: every file in [existing]; folders,
-  /// files, stamps and folder sizes outside the excluded ones; traces of
-  /// projects kept in a trash or history.
+  /// Records the listed entry [e]: every file in [existing] and in the
+  /// folder sizes; folders, files and stamps outside the excluded ones;
+  /// traces of projects kept in a trash or history.
   void _add(StorageEntry e) {
     final segments = e.path.split('/');
     final parents = segments.sublist(0, segments.length - 1);
@@ -349,6 +361,7 @@ final class _Scanner {
         segments.first == migrationFolderName) {
       return;
     }
+    if (!e.isDirectory) _addSize(segments, e.size);
     if (parents.any(isExcludedFolder)) {
       if (!e.isDirectory && isProjectFile(e.path)) _addTrace(parents);
       return;
@@ -358,11 +371,37 @@ final class _Scanner {
     } else if (!isExcludedFile(segments.last)) {
       files.putIfAbsent(parentOf(e.path), () => []).add(e);
       stamps[e.path] = _stamp(e);
-      for (var d = parentOf(e.path); ; d = parentOf(d)) {
-        sizes[d] = (sizes[d] ?? 0) + e.size;
-        if (d.isEmpty) break;
-      }
     }
+  }
+
+  /// Adds the [size] of the file [segments] to each of its folders, in the
+  /// category it has from there.
+  void _addSize(List<String> segments, int size) {
+    for (var i = 0; i < segments.length; i++) {
+      final dir = segments.take(i).join('/');
+      final category = _categoryOf(segments.sublist(i));
+      final bytes = sizes.putIfAbsent(dir, () => {});
+      bytes[category] = (bytes[category] ?? 0) + size;
+    }
+  }
+
+  /// Category of the file [relative] (path segments) in a version folder.
+  static SizeCategory _categoryOf(List<String> relative) {
+    final name = relative.last.toLowerCase();
+    if (relative.length == 1) {
+      if (isProjectFile(name)) return SizeCategory.project;
+      if (name.endsWith('.rpp-bak') || name.endsWith('.rpp-undo')) {
+        return SizeCategory.reaperBackups;
+      }
+      return SizeCategory.other;
+    }
+    return switch (relative.first.toLowerCase()) {
+      'media' => SizeCategory.media,
+      'renders' => SizeCategory.renders,
+      historyFolderName => SizeCategory.history,
+      'backups' => SizeCategory.reaperBackups,
+      _ => SizeCategory.other,
+    };
   }
 
   /// Records the title of a project kept in the folders [parents]: the
@@ -613,12 +652,11 @@ final class _Scanner {
     return versions;
   }
 
-  /// Subfolders of [dir] holding a project, reserved title folders aside.
+  /// Subfolders of [dir] holding a project, reserved folders aside (a
+  /// `Media/` of the former layout is not a version).
   Iterable<String> _versionFolders(String dir) => [
-    for (final folder in files.keys)
-      if (folder != dir &&
-          parentOf(folder) == dir &&
-          !isReservedTitleFolder(p.posix.basename(folder)) &&
+    for (final folder in children[dir] ?? const <String>[])
+      if (!isReservedFolder(p.posix.basename(folder)) &&
           _projects(folder).isNotEmpty)
         folder,
   ];
@@ -697,11 +735,11 @@ final class _Scanner {
   }
 
   /// Whether the folder [segments] is or lies in a reserved folder: a layout
-  /// level named like one, a reserved folder of a title (at [depth]) or of a
-  /// version (one level below).
+  /// level named like one, a reserved folder at the place of a version
+  /// folder (at [depth]) or of a version (one level below).
   static bool _isReserved(List<String> segments, int depth) =>
       segments.take(depth).any(isReservedFolder) ||
-      (segments.length > depth && isReservedTitleFolder(segments[depth])) ||
+      (segments.length > depth && isReservedFolder(segments[depth])) ||
       (segments.length > depth + 1 &&
           isReservedVersionFolder(segments[depth + 1]));
 
@@ -710,6 +748,7 @@ final class _Scanner {
     fileName: e.path.substring(dir.isEmpty ? 0 : dir.length + 1),
     modified: e.modified,
     size: e.size,
+    sizes: {SizeCategory.project: e.size},
   );
 
   /// The title [dir]; the label and owner of its adopted versions are read
@@ -755,26 +794,11 @@ final class _Scanner {
     String folder,
     StorageEntry e,
   ) async {
-    final size = sizes[folder] ?? 0;
     final name = p.posix.basename(folder);
+    final bytes = sizes[folder] ?? const <SizeCategory, int>{};
     if (previous.stamps[e.path] == stamps[e.path]) {
       if (previousVersions[e.path] case final v?) {
-        return Version(
-          fileName: v.fileName,
-          modified: v.modified,
-          size: size,
-          folder: name,
-          sampleRate: v.sampleRate,
-          metadata: v.metadata,
-          tempo: v.tempo,
-          length: v.length,
-          trackCount: v.trackCount,
-          itemCount: v.itemCount,
-          plugins: v.plugins,
-          media: v.media,
-          recordPath: v.recordPath,
-          renderFile: v.renderFile,
-        );
+        return v.withSizes(name, bytes);
       }
     }
     final (:text, encoding: _) = await readProject(storage, e.path);
@@ -783,8 +807,7 @@ final class _Scanner {
     return Version(
       fileName: base.fileName,
       modified: base.modified,
-      size: size,
-      folder: name,
+      size: 0,
       sampleRate: project.sampleRate,
       metadata: VersionMetadata.fromExtState(
         project.extState(VersionMetadata.section),
@@ -800,7 +823,7 @@ final class _Scanner {
       media: project.mediaFiles,
       recordPath: project.recordPath,
       renderFile: project.renderFile,
-    );
+    ).withSizes(name, bytes);
   }
 
   /// Node file of [dir], written with [level] if missing and [writeNodes];

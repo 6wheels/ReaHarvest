@@ -86,6 +86,9 @@ void main() {
     modified: t0,
     size: 10,
     folder: label == null ? null : 'take',
+    sizes: label == null
+        ? const {}
+        : const {SizeCategory.project: 6, SizeCategory.history: 4},
     sampleRate: label == null ? null : 48000,
     tempo: label == null ? null : 98.5,
     length: label == null ? null : 184.5,
@@ -173,6 +176,8 @@ void main() {
       expect(a.metadata!.label, 'chorus B');
       expect(a.modified, t0);
       expect((a.folder, a.size, a.sampleRate), ('take', 10, 48000));
+      expect(a.sizes, {SizeCategory.project: 6, SizeCategory.history: 4});
+      expect(t.versions.last.sizes, isEmpty);
       expect(a.tempo, 98.5);
       expect((a.length, a.trackCount, a.itemCount), (184.5, 12, 40));
       expect(a.plugins, song.versions.first.plugins);

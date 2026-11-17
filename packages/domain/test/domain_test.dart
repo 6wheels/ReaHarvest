@@ -228,6 +228,19 @@ void main() {
       final copy = v.withMetadata(m);
       expect((copy.fileName, copy.size, copy.metadata), ('a.rpp', 1, m));
     });
+
+    test('places a version in its folder with its sizes', () {
+      const m = VersionMetadata(id: VersionId('V'));
+      final v = Version(
+        fileName: 'a/a.rpp',
+        modified: DateTime(2026),
+        size: 1,
+        tempo: 90,
+        metadata: m,
+      ).withSizes('a', {SizeCategory.project: 3, SizeCategory.history: 4});
+      expect((v.folder, v.size, v.tempo, v.metadata), ('a', 7, 90.0, m));
+      expect(v.sizes[SizeCategory.history], 4);
+    });
   });
 
   group('title', () {

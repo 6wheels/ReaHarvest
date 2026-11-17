@@ -269,29 +269,59 @@ void main() {
       ]);
     });
 
-    test('sizes a version by the files of its folder', () async {
+    test('sizes a version by every file of its folder, by kind', () async {
       final lib = library(Layout.classic());
       const project = blankProject;
       put('band/album/song/v1/v1.rpp', project);
+      put('band/album/song/v1/v1.rpp-bak', 'b' * 7);
       put('band/album/song/v1/Media/a.wav', 'a' * 100);
       put('band/album/song/v1/Media/a.wav.reapeaks', 'x' * 1000);
-      put('band/album/song/v1/.history/v1 old.rpp', 'x' * 1000);
+      put('band/album/song/v1/Renders/mix.wav', 'r' * 30);
+      put('band/album/song/v1/.history/v1 old.rpp', 'h' * 2000);
+      put('band/album/song/v1/Backups/v1-2026.rpp', 'k' * 40);
+      put('band/album/song/v1/notes.txt', 'n' * 3);
       put('band/album/song/v2/v2.rpp', project);
       put('band/album/song/Assets/score.pdf', 'x' * 1000);
       final counting = CountingStorage(storage);
 
       final first = await scan(counting, lib);
-      expect(first.titles.single.versions.map((v) => v.size), [
-        project.length + 100,
-        project.length,
-      ]);
+      final v1 = first.titles.single.versions.first;
+      expect(v1.sizes, {
+        SizeCategory.project: project.length,
+        SizeCategory.reaperBackups: 47,
+        SizeCategory.media: 1100,
+        SizeCategory.renders: 30,
+        SizeCategory.history: 2000,
+        SizeCategory.other: 3,
+      });
+      expect(v1.size, project.length + 3180);
+      expect(first.titles.single.versions.last.sizes, {
+        SizeCategory.project: project.length,
+      });
 
-      // A media added: the size follows, the project is not read again.
-      put('band/album/song/v1/Media/b.wav', 'b' * 5);
+      // A backup point added: the size follows, the project is not read
+      // again.
+      put('band/album/song/v1/.history/v1 new.rpp', 'h' * 5);
       counting.reads.clear();
       final second = await scan(counting, lib, previous: first);
       expect(counting.reads, isEmpty);
-      expect(second.titles.single.versions.first.size, project.length + 105);
+      final again = second.titles.single.versions.first;
+      expect(again.sizes[SizeCategory.history], 2005);
+      expect(again.size, project.length + 3185);
+    });
+
+    test('a reserved folder of a title is never a version', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1/v1.rpp', unknown);
+      // Pool of the former layout, renders, REAPER backups at title level.
+      put('band/album/song/Media/sub.rpp', unknown);
+      put('band/album/song/renders/r.rpp', unknown);
+      put('band/album/song/Backups/b.rpp', unknown);
+
+      final result = await scan(storage, lib);
+
+      expect(result.titles.single.versions.map((v) => v.folder), ['v1']);
+      expect(issuePaths(result), isEmpty);
     });
 
     test('writes missing node files and keeps ids on rescan', () async {
@@ -1247,7 +1277,21 @@ void main() {
         () => createVersion(storage, title, 'Song', meta()),
         throwsStateError,
       );
-      for (final name in ['', ' ', 'a/b', '.hidden', 'end.', 'Assets']) {
+      for (final name in [
+        '',
+        ' ',
+        'a/b',
+        '.hidden',
+        'end.',
+        // Kept by the application, in any case.
+        'Assets',
+        'media',
+        'Renders',
+        'BACKUPS',
+        '.history',
+        '.trash',
+        'Media ',
+      ]) {
         expect(isValidVersionName(name), isFalse, reason: name);
         expect(
           () => createVersion(storage, title, name, meta()),
@@ -1498,6 +1542,91 @@ void main() {
       expect(exists('$title/notes/readme.txt'), isTrue);
       expect(dir('$title/B'), isFalse);
       expect(exists('$title/.trash/C/C.rpp'), isTrue);
+    });
+
+    test('keeps a version only from its folder, alone in it', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/Song/Song copy.RPP', adopted);
+      put('$title/B/B.rpp', unknown);
+      put('$title/Media/sub.rpp', unknown);
+
+      // Its folder holds another project: nothing moves.
+      await expectLater(
+        keepOnlyVersion(storage, title, version('Song')),
+        throwsA(isA<SharedVersionFolderException>()),
+      );
+      // Gone since the last scan: nothing moves.
+      await expectLater(
+        keepOnlyVersion(storage, title, version('Gone')),
+        throwsStateError,
+      );
+      expect(dir('$title/B'), isTrue);
+
+      await keepOnlyVersion(storage, title, version('B', 'B.rpp'));
+      // A reserved folder is never a version.
+      expect(exists('$title/Media/sub.rpp'), isTrue);
+      expect(dir('$title/.trash/Song'), isTrue);
+    });
+
+    test('keeps a version whose folder changed case outside the app', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/B/B.rpp', unknown);
+      Directory(p.joinAll([root.path, ...title.split('/'), 'Song']))
+          .renameSync(p.joinAll([root.path, ...title.split('/'), 'song']));
+
+      await keepOnlyVersion(storage, title, version('Song'));
+
+      expect(exists('$title/song/Song.RPP'), isTrue);
+      expect(dir('$title/B'), isFalse);
+    }, testOn: 'windows || mac-os');
+
+    test('refuses to move or rename a folder of several projects', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/Song/Song copy.RPP', adopted);
+
+      await expectLater(
+        deleteVersion(storage, title, version('Song')),
+        throwsA(isA<SharedVersionFolderException>()),
+      );
+      await expectLater(
+        renameVersion(storage, title, version('Song'), 'Other'),
+        throwsA(
+          isA<SharedVersionFolderException>().having(
+            (e) => e.folder,
+            'folder',
+            '$title/Song',
+          ),
+        ),
+      );
+      expect(exists('$title/Song/Song copy.RPP'), isTrue);
+      expect(dir('$title/Other'), isFalse);
+      expect(const SharedVersionFolderException('a').toString(), contains('a'));
+    });
+
+    test('renames a version by a change of case', () async {
+      put('$title/mix/mix.rpp', adopted);
+
+      final path = await renameVersion(
+        storage,
+        title,
+        version('mix', 'mix.rpp'),
+        'Mix',
+      );
+
+      expect(path, '$title/Mix/Mix.rpp');
+      final names = [
+        for (final e in Directory(
+          p.joinAll([root.path, ...title.split('/')]),
+        ).listSync())
+          p.basename(e.path),
+      ];
+      expect(names, ['Mix']);
+      expect(
+        Directory(p.joinAll([root.path, ...title.split('/'), 'Mix']))
+            .listSync()
+            .map((e) => p.basename(e.path)),
+        ['Mix.rpp'],
+      );
     });
 
     test('purges trash entries only, folders whole', () async {

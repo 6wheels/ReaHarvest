@@ -104,7 +104,7 @@ Future<void> keepOnlyVersionFromUi(
   final confirmed = await confirm(
     context,
     title: l10n.keepOnlyVersionTitle(versionName(version)),
-    content: l10n.keepOnlyVersionHint(title.versions.length - 1),
+    content: l10n.keepOnlyVersionHint(versionFolderCount(title) - 1),
     action: l10n.keepOnlyVersionAction,
     danger: true,
   );

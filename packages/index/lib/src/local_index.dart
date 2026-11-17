@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 11;
+const _schemaVersion = 12;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -51,6 +51,7 @@ CREATE TABLE versions (
   file_name TEXT NOT NULL,
   folder TEXT,
   size INTEGER NOT NULL,
+  sizes TEXT NOT NULL,
   sample_rate INTEGER,
   modified INTEGER NOT NULL,
   version_id TEXT,
@@ -88,7 +89,7 @@ CREATE TABLE issues (
 
 const _tables = [
   'issues',
-  // Dropped in schema 11; kept here so that an older index loses it.
+  // Dropped in schema 11; kept here so that an older index drops it.
   'subprojects',
   'files',
   'versions',
@@ -262,10 +263,10 @@ final class LocalIndex {
     );
     _insertAll(
       'INSERT INTO versions (library_id, title_path, file_name, folder, '
-      'size, sample_rate, modified, version_id, owner, label, tempo, '
+      'size, sizes, sample_rate, modified, version_id, owner, label, tempo, '
       'length, track_count, item_count, plugins, media, record_path, '
       'render_file) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         for (final t in titles)
           for (final v in t.versions)
@@ -275,6 +276,9 @@ final class LocalIndex {
               v.fileName,
               v.folder,
               v.size,
+              jsonEncode({
+                for (final e in v.sizes.entries) e.key.name: e.value,
+              }),
               v.sampleRate,
               v.modified.microsecondsSinceEpoch,
               v.metadata?.id,
@@ -615,6 +619,10 @@ final class LocalIndex {
       modified: DateTime.fromMicrosecondsSinceEpoch(r['modified'] as int),
       size: r['size'] as int,
       folder: r['folder'] as String?,
+      sizes: {
+        for (final e in (jsonDecode(r['sizes'] as String) as Map).entries)
+          SizeCategory.values.byName(e.key as String): e.value as int,
+      },
       sampleRate: r['sample_rate'] as int?,
       metadata: versionId == null
           ? null

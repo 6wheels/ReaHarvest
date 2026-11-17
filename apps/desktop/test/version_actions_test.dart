@@ -210,8 +210,9 @@ void main() {
     await bandWithSong();
     await versions.adopt(title(), version('v1.rpp'), 'main');
     final id = version('v1.rpp').metadata!.id;
-    Future<List<Backup>> backups() async =>
-        (await container.read(historyProvider(title().id).future))[id] ?? [];
+    Future<List<Backup>> backups() => container.read(
+      historyProvider((title().id, version('v1.rpp').fileName)).future,
+    );
 
     await versions.backup(title(), version('v1.rpp'));
     final saved = (await backups()).single;

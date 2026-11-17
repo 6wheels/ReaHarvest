@@ -105,6 +105,11 @@ class VersionPane extends ConsumerWidget {
           ),
           style: text.bodyMedium?.copyWith(color: c.muted),
         ),
+        if (version.folder != null && version.sizes.isNotEmpty)
+          Text(
+            sizeBreakdown(l10n, version),
+            style: text.bodySmall?.copyWith(color: c.muted),
+          ),
         if (entry != null)
           Row(
             children: [
@@ -225,7 +230,7 @@ class VersionPane extends ConsumerWidget {
                       deleteVersionFromUi(context, ref, title, version),
                   child: Text(l10n.deleteVersion),
                 ),
-                if (!freeTree && title.versions.length > 1)
+                if (!freeTree && versionFolderCount(title) > 1)
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.filter_1_rounded),
                     onPressed: () =>
@@ -294,7 +299,7 @@ class VersionPane extends ConsumerWidget {
           const SizedBox(height: Space.l),
           SectionLabel(l10n.history),
           const SizedBox(height: Space.xs),
-          History(title, version, m.id),
+          History(title, version),
         ],
       ],
     );

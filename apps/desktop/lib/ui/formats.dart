@@ -35,6 +35,11 @@ String versionNameOf(String input) {
 String versionName(Version version) =>
     version.folder ?? p.posix.withoutExtension(version.fileName);
 
+/// Number of version folders of [title] (a folder may hold several
+/// projects until it is sorted).
+int versionFolderCount(Title title) =>
+    {for (final v in title.versions) ?v.folder}.length;
+
 /// Why [input] cannot be the name of a version of [title], for its folder
 /// and its `.RPP` ([versionNameOf]), other than its version folder
 /// [current]; null when it can.
@@ -45,6 +50,7 @@ String? versionNameError(
   String? current,
 }) {
   final name = versionNameOf(input);
+  if (isReservedFolder(name)) return l10n.reservedVersionName;
   if (!isValidVersionName(name)) return l10n.invalidVersionName;
   final lower = name.toLowerCase();
   final taken = title.versions.any(
@@ -114,6 +120,25 @@ String versionDetails(
     if (withSize) formatSize(version.size),
   ].join(' · ');
 }
+
+/// Size of each kind of file of [version], the largest first; empty kinds
+/// left out (SPEC §4.3).
+String sizeBreakdown(AppLocalizations l10n, Version version) => [
+  for (final e
+      in version.sizes.entries.where((e) => e.value > 0).toList()
+        ..sort((a, b) => b.value.compareTo(a.value)))
+    '${sizeCategoryLabel(l10n, e.key)} ${formatSize(e.value)}',
+].join(' · ');
+
+String sizeCategoryLabel(AppLocalizations l10n, SizeCategory category) =>
+    switch (category) {
+      SizeCategory.project => l10n.sizeProject,
+      SizeCategory.media => l10n.sizeMedia,
+      SizeCategory.renders => l10n.sizeRenders,
+      SizeCategory.history => l10n.sizeHistory,
+      SizeCategory.reaperBackups => l10n.sizeReaperBackups,
+      SizeCategory.other => l10n.sizeOther,
+    };
 
 /// Project length as `m:ss`, or `h:mm:ss` from one hour.
 String formatLength(double seconds) {

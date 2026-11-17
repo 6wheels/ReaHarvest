@@ -23,7 +23,8 @@ bool isReservedTitleFolder(String name) =>
 bool isReservedVersionFolder(String name) =>
     reservedVersionFolders.contains(name.toLowerCase());
 
-/// Whether [name] is a reserved folder of a title or of a version.
+/// Whether [name] is a reserved folder of a title or of a version
+/// (case-insensitive): a name the application keeps for its own use.
 bool isReservedFolder(String name) =>
     isReservedTitleFolder(name) || isReservedVersionFolder(name);
 

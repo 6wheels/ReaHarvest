@@ -335,7 +335,7 @@ void main() {
     List<LibraryIssue> issues = const [],
     List<LibraryEntry> configured = const [band],
     Map<LibraryId, Library>? indexed,
-    Map<VersionId, List<Backup>> history = const {},
+    Map<String, List<Backup>> history = const {},
     PeaksPreference? peaks = const PeaksPreference(
       altPeaks: true,
       altPeaksPath: '/peaks',
@@ -370,7 +370,9 @@ void main() {
             indexed ?? {demoLibrary.id: demoLibrary},
           ),
           issuesProvider.overrideWithValue(issues),
-          historyProvider.overrideWith((ref, id) async => history),
+          historyProvider.overrideWith(
+            (ref, key) async => history[key.$2] ?? const [],
+          ),
           trashProvider.overrideWith(
             (ref, id) async => [
               StorageEntry(
@@ -1061,7 +1063,7 @@ void main() {
       history: {
         for (final v in ferry.versions)
           if (v.metadata case final m?)
-            m.id: [
+            v.fileName: [
               Backup(
                 path: 'x/.history/b.rpp',
                 versionId: m.id,
@@ -1390,6 +1392,12 @@ void main() {
       ),
       findsOneWidget,
     );
+    // The size of the version folder, by kind of file.
+    expect(find.textContaining('3.5 MB'), findsWidgets);
+    expect(
+      find.text('Media 3.0 MB · Backup points 512 KB · Project 2.0 KB'),
+      findsOne,
+    );
     await tester.tap(find.byTooltip('Show in file explorer'));
     expect(revealed, [
       p.joinAll([
@@ -1602,6 +1610,12 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('A version already has this name'), findsOne);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name of the folder and project'),
+      'Backups',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('This name is reserved by ReaHarvest'), findsOne);
 
     await tester.enterText(
       find.widgetWithText(TextField, 'Name of the folder and project'),

@@ -111,7 +111,7 @@ class VersionActions {
       ),
     );
     _log.info('Version ${_at(title, version)} backed up');
-    ref.invalidate(historyProvider(title.id));
+    ref.invalidate(historyProvider);
   }
 
   /// Restores [backup] into [version] of [title], after backing up its
@@ -132,7 +132,7 @@ class VersionActions {
       ),
     );
     _log.info('Version ${_at(title, version)} restored from $path');
-    ref.invalidate(historyProvider(title.id));
+    ref.invalidate(historyProvider);
     await ref.rescanTitle(entry, title);
   }
 
@@ -342,44 +342,33 @@ class VersionActions {
 
 final versionActionsProvider = Provider<VersionActions>(VersionActions.new);
 
-/// Backups of the versions of a title, read in the `.history/` of each
-/// version folder, by version, newest first (SPEC §5.4); empty for free
-/// tree titles, which have no history.
+/// Backups of the version of [Version.fileName] in the title of [NodeId],
+/// read in the `.history/` of its own folder only, newest first (SPEC
+/// §5.4); empty for a version without folder (free tree) or not adopted.
 final historyProvider = FutureProvider.autoDispose
-    .family<Map<VersionId, List<Backup>>, NodeId>((ref, id) async {
+    .family<List<Backup>, (NodeId, String)>((ref, key) async {
+      final (id, fileName) = key;
       final title = ref
           .watch(titlesProvider)
           .where((t) => t.id == id)
           .firstOrNull;
-      if (title == null ||
-          ref.watch(indexedLibrariesProvider)[title.libraryId]?.isFreeTree !=
-              false) {
-        return const {};
+      final version = title?.versions
+          .where((v) => v.fileName == fileName)
+          .firstOrNull;
+      final folder = version?.folder;
+      final versionId = version?.metadata?.id;
+      if (title == null || folder == null || versionId == null) {
+        return const [];
       }
       final root = ref.watch(
         settingsProvider.select((s) => s.library(title.libraryId)?.libraryRoot),
       );
-      if (root == null) return const {};
-      final dirs = [
-        for (final v in title.versions)
-          if (v.folder case final folder?) joinPath(title.path, folder),
-      ];
-      return Isolate.run(() async {
-        final storage = MountedFolderStorage(root);
-        final history = <VersionId, List<Backup>>{};
-        for (final dir in dirs) {
-          for (final MapEntry(:key, :value) in (await readHistory(
-            storage,
-            dir,
-          )).entries) {
-            history.putIfAbsent(key, () => []).addAll(value);
-          }
-        }
-        for (final backups in history.values) {
-          backups.sort((a, b) => b.created.compareTo(a.created));
-        }
-        return history;
-      });
+      if (root == null) return const [];
+      final dir = joinPath(title.path, folder);
+      final history = await Isolate.run(
+        () => readHistory(MountedFolderStorage(root), dir),
+      );
+      return history[versionId] ?? const [];
     });
 
 /// Entries in the trash of a title: version folders and assets (SPEC

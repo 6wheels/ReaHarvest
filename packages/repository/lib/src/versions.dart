@@ -23,11 +23,25 @@ String suggestedVersionName(String title, String label, {String? owner}) => [
 ].map((s) => s.trim()).where((s) => s.isNotEmpty).join(' - ');
 
 /// Whether [name] can name a version folder and its `.RPP` (SPEC §3.2): a
-/// valid folder name, not a reserved title folder (`Assets`).
+/// valid folder name, none of the names the application keeps for itself
+/// ([isReservedFolder]: `Assets`, `Media`, `Backups`…, in any case).
 bool isValidVersionName(String name) =>
     isValidFolderName(name) &&
     name.trim().isNotEmpty &&
-    !isReservedTitleFolder(name);
+    !isReservedFolder(name.trim());
+
+/// Thrown by an action on a version folder holding several projects (a
+/// *Save As* in place): it would also act on the other ones; the folder is
+/// sorted first ("To sort", SPEC §3.2).
+final class SharedVersionFolderException implements Exception {
+  const SharedVersionFolderException(this.folder);
+
+  /// Library path of the folder.
+  final String folder;
+
+  @override
+  String toString() => 'Several projects in the version folder $folder';
+}
 
 /// Creates the version [name] in the title folder [titleDir], blank or from
 /// the project [template] (SPEC §5.4): the folder `<name>/` holding
@@ -99,9 +113,10 @@ Future<String> duplicateVersion(
 }
 
 /// Renames the version [version] of the title [titleDir] to [name]: its
-/// folder and its `.RPP` together (SPEC §5.4); its identity is kept by its
-/// EXTSTATE. Returns the new path of the project. Throws like
-/// [createVersion].
+/// folder and its `.RPP` together (SPEC §5.4), a change of case included;
+/// its identity is kept by its EXTSTATE. Returns the new path of the
+/// project. Throws like [createVersion], and
+/// [SharedVersionFolderException] when its folder holds other projects.
 Future<String> renameVersion(
   RepositoryStorage storage,
   String titleDir,
@@ -110,15 +125,18 @@ Future<String> renameVersion(
 ) async {
   final current = _folderOf(version);
   var folder = joinPath(titleDir, current);
+  await _checkSingleProject(storage, folder);
   if (name != current) {
-    final target = await _newVersionFolder(storage, titleDir, name);
-    await storage.move(folder, target);
+    final target = name.toLowerCase() == current.toLowerCase()
+        ? _versionFolder(titleDir, name)
+        : await _newVersionFolder(storage, titleDir, name);
+    await _move(storage, folder, target);
     folder = target;
   }
   final file = p.posix.basename(version.fileName);
   final renamed = '$name${p.posix.extension(file)}';
   if (renamed != file) {
-    await storage.move(joinPath(folder, file), joinPath(folder, renamed));
+    await _move(storage, joinPath(folder, file), joinPath(folder, renamed));
   }
   return joinPath(folder, renamed);
 }
@@ -126,7 +144,8 @@ Future<String> renameVersion(
 /// Moves the version [version] of the title [titleDir] to the title's
 /// `.trash/`: its whole folder; in a free tree, its `.RPP` alone, into a
 /// `.trash/` next to it (SPEC §3.3). Suffixed on a name clash. Returns its
-/// path in the trash.
+/// path in the trash. Throws [SharedVersionFolderException] when its folder
+/// holds other projects.
 Future<String> deleteVersion(
   RepositoryStorage storage,
   String titleDir,
@@ -134,6 +153,7 @@ Future<String> deleteVersion(
 ) async {
   final folder = version.folder;
   final from = joinPath(titleDir, folder ?? version.fileName);
+  if (folder != null) await _checkSingleProject(storage, from);
   final to = await freePath(
     storage,
     joinPath(joinPath(parentOf(from), trashFolderName), p.posix.basename(from)),
@@ -145,18 +165,28 @@ Future<String> deleteVersion(
 
 /// Moves every version folder of the title [titleDir] but the one of [keep]
 /// to its `.trash/` (UI: « Garder uniquement cette version », SPEC §5.4),
-/// suffixed on a name clash. Returns their paths in the trash.
+/// suffixed on a name clash. Returns their paths in the trash. Throws
+/// [StateError] when the folder of [keep] is gone (renamed outside the
+/// application since the last scan), and [SharedVersionFolderException]
+/// when it holds other projects: nothing is moved then.
 Future<List<String>> keepOnlyVersion(
   RepositoryStorage storage,
   String titleDir,
   Version keep,
 ) async {
   final kept = joinPath(titleDir, _folderOf(keep));
+  if (await storage.stat(kept) case final e? when e.isDirectory) {
+    await _checkSingleProject(storage, kept);
+  } else {
+    throw StateError('Version folder not found: $kept');
+  }
   final trashed = <String>[];
   for (final e in await storage.list(titleDir)) {
+    // Compared without case: the folder may differ in case only on a
+    // case-insensitive file system.
     if (!e.isDirectory ||
-        e.path == kept ||
-        isReservedTitleFolder(p.posix.basename(e.path)) ||
+        e.path.toLowerCase() == kept.toLowerCase() ||
+        isReservedFolder(p.posix.basename(e.path)) ||
         !(await storage.list(e.path)).any((f) => isProjectFile(f.path))) {
       continue;
     }
@@ -224,14 +254,44 @@ Future<String> _newVersionFolder(
   String titleDir,
   String name,
 ) async {
-  if (!isValidVersionName(name)) {
-    throw ArgumentError.value(name, 'name', 'Invalid version name');
-  }
-  final folder = joinPath(titleDir, name);
+  final folder = _versionFolder(titleDir, name);
   if (await storage.stat(folder) != null) {
     throw StateError('Version already exists: $folder');
   }
   return folder;
+}
+
+/// Path of the version folder [name] in [titleDir]; throws
+/// [ArgumentError] on an invalid name.
+String _versionFolder(String titleDir, String name) {
+  if (!isValidVersionName(name)) {
+    throw ArgumentError.value(name, 'name', 'Invalid version name');
+  }
+  return joinPath(titleDir, name);
+}
+
+/// Throws [SharedVersionFolderException] when [folder] holds several
+/// projects.
+Future<void> _checkSingleProject(
+  RepositoryStorage storage,
+  String folder,
+) async {
+  final projects = [
+    for (final e in await storage.list(folder))
+      if (!e.isDirectory && isProjectFile(e.path)) e,
+  ];
+  if (projects.length > 1) throw SharedVersionFolderException(folder);
+}
+
+/// Moves [from] to [to]; through a temporary name when they differ in case
+/// only, which a case-insensitive file system sees as one path.
+Future<void> _move(RepositoryStorage storage, String from, String to) async {
+  if (from.toLowerCase() != to.toLowerCase()) {
+    return storage.move(from, to);
+  }
+  final temporary = await freePath(storage, '$to.renaming', folder: true);
+  await storage.move(from, temporary);
+  await storage.move(temporary, to);
 }
 
 Future<void> _createVersionFolders(
