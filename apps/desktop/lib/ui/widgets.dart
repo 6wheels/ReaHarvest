@@ -48,7 +48,8 @@ enum LedMode {
 }
 
 /// Status light: a small dot, glowing when [lit], still, breathing or
-/// blinking according to [mode].
+/// blinking according to [mode]; always still when the system asks for
+/// fewer animations.
 class Led extends StatefulWidget {
   const Led(
     this.color, {
@@ -70,9 +71,13 @@ class Led extends StatefulWidget {
 class _LedState extends State<Led> with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(vsync: this);
 
+  /// The system asks for fewer animations: the light stays still.
+  var _still = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     _animate();
   }
 
@@ -82,8 +87,10 @@ class _LedState extends State<Led> with SingleTickerProviderStateMixin {
     if (old.mode != widget.mode || old.lit != widget.lit) _animate();
   }
 
+  LedMode get _mode => _still ? LedMode.steady : widget.mode;
+
   void _animate() {
-    switch (widget.lit ? widget.mode : LedMode.steady) {
+    switch (widget.lit ? _mode : LedMode.steady) {
       case LedMode.steady:
         _controller
           ..stop()
@@ -116,7 +123,7 @@ class _LedState extends State<Led> with SingleTickerProviderStateMixin {
         // Light level from 0 (off) to 1 (fully lit).
         final level = !widget.lit
             ? 0.0
-            : switch (widget.mode) {
+            : switch (_mode) {
                 LedMode.steady => 1.0,
                 LedMode.pulse => Curves.easeInOut.transform(t),
                 // On for the first half of the cycle, with soft edges.

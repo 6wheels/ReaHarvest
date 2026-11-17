@@ -188,7 +188,7 @@ void main() {
     );
     final song = find.widgetWithText(TitleCard, 'Song');
     expect(
-      find.descendant(of: song, matching: find.textContaining('1 to adopt')),
+      find.descendant(of: song, matching: find.textContaining('1 TO ADOPT')),
       findsOne,
     );
     await tester.tap(song);
@@ -255,7 +255,7 @@ void main() {
     expect(
       find.descendant(
         of: find.widgetWithText(TitleCard, 'Song'),
-        matching: find.textContaining('2 versions'),
+        matching: find.textContaining('VER 2'),
       ),
       findsOne,
     );

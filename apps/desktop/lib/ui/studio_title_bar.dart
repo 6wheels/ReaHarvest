@@ -52,19 +52,6 @@ class StudioTitleBar extends StatelessWidget {
     final brand = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (onBack != null) ...[
-          SizedBox.square(
-            dimension: 28,
-            child: IconButton(
-              tooltip: l10n.back,
-              padding: EdgeInsets.zero,
-              iconSize: 16,
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_rounded),
-            ),
-          ),
-          const SizedBox(width: Space.s),
-        ],
         Led(c.accent),
         const SizedBox(width: Space.s),
         Flexible(
@@ -94,13 +81,39 @@ class StudioTitleBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: drag(
-              Padding(
-                padding: EdgeInsets.only(
-                  left: _isMacOS ? 76 : Space.s + Space.xs,
-                  right: Space.s,
-                ),
-                child: Align(alignment: Alignment.centerLeft, child: brand),
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: _isMacOS ? 76 : Space.s + Space.xs,
+              ),
+              child: Row(
+                children: [
+                  // Outside the move area: a click goes back at once,
+                  // without waiting for a double click.
+                  if (onBack != null) ...[
+                    SizedBox.square(
+                      dimension: 28,
+                      child: IconButton(
+                        tooltip: l10n.back,
+                        padding: EdgeInsets.zero,
+                        iconSize: 16,
+                        onPressed: onBack,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      ),
+                    ),
+                    const SizedBox(width: Space.s),
+                  ],
+                  Expanded(
+                    child: drag(
+                      Padding(
+                        padding: const EdgeInsets.only(right: Space.s),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: brand,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

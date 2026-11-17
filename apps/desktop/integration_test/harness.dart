@@ -92,6 +92,11 @@ class Harness {
   /// (created on first run), index opened, then the app pumped.
   Future<void> start(WidgetTester tester) async {
     await _fitWindow(tester);
+    // Lights stay still (a failed task blinks for ever otherwise), so that
+    // the tests can wait for the animations to end.
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     final settings = (await tester.runAsync(
       () => SettingsFile(settingsPath).load(),
     ))!;

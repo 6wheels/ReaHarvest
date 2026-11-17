@@ -76,7 +76,7 @@ void main() {
     // Tag filter, saved as a view.
     await tester.tap(chip('Artist'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Other'));
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Other'));
     await tester.pumpAndSettle();
     await tester.tap(chip('Artist: Other'));
     await tester.pumpAndSettle();
@@ -86,7 +86,7 @@ void main() {
     await tapText(tester, 'Save current view…');
     await tester.enterText(dialogField('View name'), 'Live');
     await tapText(tester, 'Save current view');
-    await tapText(tester, 'Clear filters');
+    await tapText(tester, 'CLEAR FILTERS');
     await showsCards(tester, {'Song', 'Ballad', 'Encore'});
 
     // List: a click on a row opens the overview.

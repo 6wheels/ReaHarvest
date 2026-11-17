@@ -74,7 +74,7 @@ void main() {
     expect(
       find.descendant(
         of: card('Demo'),
-        matching: find.textContaining('Unassigned'),
+        matching: find.textContaining('UNASSIGNED'),
       ),
       findsOne,
     );
@@ -98,10 +98,10 @@ void main() {
     expect(chip('Title'), findsNothing);
     await tester.tap(chip('Artist'));
     await tester.pumpAndSettle();
-    final menu = find.byType(CheckboxMenuButton);
-    expect(find.widgetWithText(CheckboxMenuButton, 'Other Artist'), findsOne);
+    final menu = find.byType(MenuItemButton);
+    expect(find.widgetWithText(MenuItemButton, 'Other Artist'), findsOne);
     expect(menu, findsNWidgets(3));
-    await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Unassigned'));
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Unassigned'));
     await tester.pumpAndSettle();
     // The chip closes its menu.
     await tester.tap(chip('Artist: Unassigned'));
@@ -109,7 +109,7 @@ void main() {
     expect(menu, findsNothing);
     await waitFor(tester, () => cards(tester).length == 1, reason: 'filtered');
     expect(cards(tester), {'Demo'});
-    await tapText(tester, 'Clear filters');
+    await tapText(tester, 'CLEAR FILTERS');
     await waitFor(tester, () => cards(tester).length == 8, reason: 'cleared');
 
     // Tree: libraries, then the levels above the titles; a collapsed group
@@ -164,6 +164,6 @@ void main() {
       expect(chip(label), findsOne, reason: label);
     }
     expect(find.text('Non classé'), findsWidgets);
-    expect(find.textContaining('À ranger ·'), findsOne);
+    expect(find.textContaining('À RANGER //'), findsOne);
   });
 }

@@ -86,11 +86,11 @@ void main() {
     await h.addLibrary(tester, 'Band', Layout.classic());
 
     // Counter of titles, number of versions to adopt on the card.
-    expect(find.widgetWithText(Pill, 'To adopt · 2'), findsOne);
+    expect(find.widgetWithText(Pill, 'TO ADOPT // 2'), findsOne);
     expect(
       find.descendant(
         of: find.widgetWithText(TitleCard, 'Song'),
-        matching: find.textContaining('2 to adopt'),
+        matching: find.textContaining('2 TO ADOPT'),
       ),
       findsOne,
     );
@@ -107,7 +107,7 @@ void main() {
     await back(tester);
 
     // The filter keeps the titles having a version to adopt.
-    final pill = find.widgetWithText(Pill, 'To adopt · 1');
+    final pill = find.widgetWithText(Pill, 'TO ADOPT // 1');
     expect(pill, findsOne);
     await tester.tap(pill);
     await waitFor(tester, () => cards(tester).length == 1, reason: 'filter');
@@ -159,6 +159,6 @@ void main() {
     // Its label is kept.
     expect(find.text('intro'), findsAtLeastNWidgets(2));
     await back(tester);
-    expect(find.widgetWithText(Pill, 'To adopt · 1'), findsOne);
+    expect(find.widgetWithText(Pill, 'TO ADOPT // 1'), findsOne);
   });
 }
