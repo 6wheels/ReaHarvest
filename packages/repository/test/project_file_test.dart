@@ -124,7 +124,7 @@ void main() {
     final version = result.titles.single.versions.single;
     expect(version.media, [r'audio-files\Café.wav']);
     expect(result.issues.items[ReportKind.missingMedia], isNull);
-    expect(result.issues.items[ReportKind.mediaOutsidePool], isNotNull);
+    expect(result.issues.items[ReportKind.mediaOutsideVersion], isNotNull);
   });
 
   group('with a Windows-1252 project', () {

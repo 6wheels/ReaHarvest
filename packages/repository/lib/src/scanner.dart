@@ -11,6 +11,7 @@ import 'project_file.dart';
 import 'conventions.dart';
 import 'migration.dart';
 import 'mounted_folder_storage.dart';
+import 'fix_proposals.dart';
 import 'node_file.dart';
 import 'scaffold.dart';
 
@@ -28,6 +29,7 @@ final class ScanResult {
     this.stamps = const {},
     this.freeTree = false,
     this.journalPosition,
+    this.candidates = const [],
   });
 
   /// Titles found, sorted by path.
@@ -36,16 +38,17 @@ final class ScanResult {
   /// Node files by folder path (`''` for the root).
   final Map<String, NodeFile> nodes;
 
-  /// `.RPP` files and folders outside the layout, duplicated version
-  /// identifiers, and projects whose media, record path or render target
-  /// do not follow the title conventions (SPEC §4.3, the references or
-  /// value as detail, one per line), by kind ("To sort", SPEC §5.2, §5.8 step 3), each sorted
-  /// by path. Misplaced items name their expected level and, when known,
-  /// their target: the title of a project too deep, the proposed position
-  /// of a folder recognized through the known values. Unknown intermediate
-  /// folders are not scanned further, except titles placed too high,
-  /// indexed where they are with the tags of their target.
+  /// Every issue of the library ("To sort", SPEC §5.2, §5.8 step 3), by
+  /// kind, each sorted by path: those of the [candidates], each one once,
+  /// and the folders whose node file has another level. Misplaced items
+  /// name their expected level and, when known, their target. Titles
+  /// below an unknown intermediate folder are not indexed, except titles
+  /// placed too high, indexed where they are with the tags of their target.
   final Report issues;
+
+  /// Title candidates of a layout library (SPEC §5.8 step 3), sorted by
+  /// root; empty in a free tree.
+  final List<ScanCandidate> candidates;
 
   /// Paths of unreadable or corrupted `.RPP` and node files. A folder whose
   /// node file is corrupted is not scanned further.
@@ -80,6 +83,7 @@ final class ScanResult {
     },
     freeTree: freeTree,
     journalPosition: journalPosition,
+    candidates: candidates,
   );
 
   /// Versions without metadata ("To adopt", SPEC §4.2); always empty in a
@@ -90,6 +94,32 @@ final class ScanResult {
         for (final v in t.versions)
           if (!v.isAdopted) (t, v),
   ];
+}
+
+/// A title candidate (SPEC §5.8 step 3): a `.RPP`, its siblings and its
+/// children are versions of one same title, reserved folders aside.
+final class ScanCandidate {
+  const ScanCandidate({
+    required this.root,
+    this.title,
+    this.versions = const [],
+    this.issues = const Report(),
+  });
+
+  /// Folder of the candidate: its title folder (at the layout depth, or
+  /// placed too high), or the folder holding its projects when they lie
+  /// above the title level.
+  final String root;
+
+  /// Path of the indexed title the candidate is (its [root]) or is matched
+  /// to (one of its version ids known by that title); null if none.
+  final String? title;
+
+  /// Its readable projects, their file name relative to [root], sorted.
+  final List<Version> versions;
+
+  /// Its problems, one item per problem, by kind, each sorted by path.
+  final Report issues;
 }
 
 /// Scans [root] in a background isolate (see [scan]).
@@ -157,6 +187,9 @@ typedef TitleScan = ({
   Report issues,
   List<String> corrupted,
   List<String> orphanNodes,
+
+  /// The candidate of the title folder; null with [title].
+  ScanCandidate? candidate,
 });
 
 /// Scans the folder of [previous] in a background isolate (see
@@ -178,16 +211,33 @@ Future<TitleScan> scanTitleFolder(
 /// not change since [stored], the last scan of the library, are not read
 /// again; a reference leaving the folder is checked with one `stat`.
 ///
+/// The files a migration rewrote after the journal position of [stored]
+/// are read again ([rewrittenSince]); that position is left as it is, for
+/// the next full scan.
+///
 /// Writes nothing: a title whose node file is missing or unreadable is no
 /// longer a title, nor is a folder without a project in it or below it (a
 /// free tree title: without a project directly in it). Duplicated version
-/// identifiers span titles: they are left to the caller.
+/// identifiers and versions known by another title span titles: they are
+/// left to the caller, like the issues of the position of the title.
 Future<TitleScan> scanTitle(
   RepositoryStorage storage,
   Library library,
   Title previous, {
   ScanResult stored = const ScanResult(),
-}) => _Scanner(storage, library, stored, null, false).runTitle(previous);
+}) async {
+  final position = stored.journalPosition;
+  final paths = position == null
+      ? const <String>{}
+      : (await rewrittenSince(storage, position)).paths;
+  return _Scanner(
+    storage,
+    library,
+    stored.withoutStamps(paths),
+    null,
+    false,
+  ).runTitle(previous);
+}
 
 final class _Scanner {
   _Scanner(
@@ -197,6 +247,8 @@ final class _Scanner {
     this.journalPosition,
     this.writeNodes,
   ) : previousVersions = {
+        for (final c in previous.candidates)
+          for (final v in c.versions) joinPath(c.root, v.fileName): v,
         for (final t in previous.titles)
           for (final v in t.versions) joinPath(t.path, v.fileName): v,
       };
@@ -212,8 +264,22 @@ final class _Scanner {
   final files = <String, List<StorageEntry>>{};
   final titles = <Title>[];
   final nodes = <String, NodeFile>{};
+
+  /// Issues outside any candidate.
   final issues = <ReportKind, List<ReportItem>>{};
   final corrupted = <String>[];
+
+  /// Projects of each candidate, by root.
+  final groups = <String, List<StorageEntry>>{};
+
+  /// Candidate roots holding projects above the title level only: their
+  /// folder is not a title folder.
+  final shallow = <String>{};
+
+  /// Issues, versions and matched title of each candidate, by root.
+  final candidateIssues = <String, Map<ReportKind, List<ReportItem>>>{};
+  final candidateVersions = <String, List<Version>>{};
+  final matched = <String, String>{};
   final stamps = <String, FileStamp>{};
 
   /// Bytes of every file below each folder, excluded ones too, by category
@@ -247,22 +313,48 @@ final class _Scanner {
       await _scanFreeTree(ordered);
     } else {
       await _scanLayout(ordered, layout);
+      _group(layout);
+      await _readCandidates();
+      _findDuplicates();
+      _findKnownElsewhere(layout);
     }
     final orphanNodes = _orphanNodes();
     titles.sort((a, b) => a.path.compareTo(b.path));
-    _findDuplicates();
-    if (layout != null) titles.forEach(_checkMedia);
     _sort();
+    final candidates = _candidates();
     return ScanResult(
       titles: titles,
       nodes: nodes,
-      issues: Report(issues),
+      issues: Report({
+        for (final kind in ReportKind.values)
+          if ({
+                ...?issues[kind],
+                for (final c in candidates) ...?c.issues.items[kind],
+              }.toList()
+              case final list when list.isNotEmpty)
+            kind: list..sort((a, b) => a.path.compareTo(b.path)),
+      }),
       corrupted: corrupted,
       orphanNodes: orphanNodes,
       stamps: stamps,
       freeTree: layout == null,
       journalPosition: journalPosition,
+      candidates: candidates,
     );
+  }
+
+  /// The candidates found, sorted by root.
+  List<ScanCandidate> _candidates() {
+    final titlePaths = {for (final t in titles) t.path};
+    return [
+      for (final root in groups.keys.toList()..sort())
+        ScanCandidate(
+          root: root,
+          title: titlePaths.contains(root) ? root : matched[root],
+          versions: candidateVersions[root] ?? const [],
+          issues: Report(candidateIssues[root] ?? const {}),
+        ),
+    ];
   }
 
   /// Scans the folder of [previous] only, as [run] would see it (SPEC §8):
@@ -277,18 +369,28 @@ final class _Scanner {
         : await _layoutTitle(previous, layout);
     if (title != null) titles.add(title);
     if (title != null && layout != null) {
-      await _statOutside(title);
-      _checkMedia(title);
+      for (final MapEntry(key: folder, value: entries) in files.entries) {
+        final projects = entries.where(_isProject);
+        if (projects.isNotEmpty && !_inReserved(folder)) {
+          groups.putIfAbsent(dir, () => []).addAll(projects);
+        }
+      }
+      await _readCandidates(statOutside: true);
+      if (groups[dir] case final projects?) {
+        _checkFolders(dir, projects, layout);
+      }
     }
     final orphanNodes = _orphanNodes();
     _sort();
+    final candidate = _candidates().where((c) => c.root == dir).firstOrNull;
     return (
       title: title,
       node: nodes[dir],
       stamps: stamps,
-      issues: Report(issues),
+      issues: candidate?.issues ?? const Report(),
       corrupted: corrupted,
       orphanNodes: orphanNodes,
+      candidate: title == null ? null : candidate,
     );
   }
 
@@ -307,8 +409,7 @@ final class _Scanner {
   }
 
   /// The layout title [previous] scanned again: null if its folder is no
-  /// longer a node of the title level. A title placed too high reports no
-  /// project below it, like [_scanLayout].
+  /// longer a node of the title level.
   Future<Title?> _layoutTitle(Title previous, Layout layout) async {
     final dir = previous.path;
     final depth = layout.levels.length;
@@ -318,19 +419,13 @@ final class _Scanner {
     }
     final node = await _node(dir, layout.leaf.key);
     if (node == null || node.level != layout.leaf.key) return null;
-    if (!tooHigh) {
-      for (final folder in files.keys) {
-        final segments = folder.split('/');
-        if (segments.length > depth) _reportTooDeep(folder, segments, layout);
-      }
-    }
     return _title(dir, node, previous.tags, await _readVersions(dir));
   }
 
-  /// Adds to [existing] the files outside the folder of [title] that its
-  /// versions refer to, one `stat` per reference.
-  Future<void> _statOutside(Title title) async {
-    final inside = '${title.path}/'.toLowerCase();
+  /// Adds to [existing] the files outside the candidate folder [root] that
+  /// its [versions] refer to, one `stat` per reference.
+  Future<void> _statOutside(String root, List<Version> versions) async {
+    final inside = '$root/'.toLowerCase();
     final checked = <String>{};
     Future<void> check(String path, List<String> refs) async {
       for (final ref in refs) {
@@ -345,8 +440,8 @@ final class _Scanner {
       }
     }
 
-    for (final v in title.versions) {
-      await check(joinPath(title.path, v.fileName), v.media);
+    for (final v in versions) {
+      await check(joinPath(root, v.fileName), v.media);
     }
   }
 
@@ -432,8 +527,10 @@ final class _Scanner {
 
   void _sort() {
     corrupted.sort();
-    for (final list in issues.values) {
-      list.sort((a, b) => a.path.compareTo(b.path));
+    for (final map in [issues, ...candidateIssues.values]) {
+      for (final list in map.values) {
+        list.sort((a, b) => a.path.compareTo(b.path));
+      }
     }
   }
 
@@ -475,6 +572,9 @@ final class _Scanner {
     }
   }
 
+  /// Finds the nodes and the titles of the layout: the folders of the title
+  /// level below known values, and the titles placed too high. The issues
+  /// of the projects are found per candidate ([_group]).
   Future<void> _scanLayout(List<String> ordered, Layout layout) async {
     final depth = layout.levels.length;
     final qualified = _qualified(depth);
@@ -487,18 +587,14 @@ final class _Scanner {
       }
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
       final d = segments.length;
-      if (d > 0 && d <= depth && !qualified.contains(dir)) {
+      if (d == 0 || d > depth) continue;
+      if (!qualified.contains(dir)) {
         // Not a node: no project in or below it, or a reserved folder.
         skipped.add(dir);
         continue;
       }
-      if (d > depth) {
-        _reportTooDeep(dir, segments, layout);
-        continue;
-      }
-      if (d > 0 && d < depth && !_isKnown(segments)) {
+      if (d < depth && !_isKnown(segments)) {
         final (kind, item) = _levelIssue(segments, layout);
-        _issue(kind, item);
         skipped.add(dir);
         // A title placed too high stays visible where it is, tagged as at
         // its target (missing levels unassigned), until it is moved.
@@ -510,15 +606,6 @@ final class _Scanner {
           }
         }
         continue;
-      }
-      if (d < depth) {
-        for (final e in _projects(dir)) {
-          _issue(
-            ReportKind.projectTooShallow,
-            ReportItem.misplaced(e.path, level: layout.leaf),
-          );
-        }
-        if (d == 0) continue;
       }
       final level = layout.levels[d - 1].key;
       final node = await _node(dir, level);
@@ -542,77 +629,297 @@ final class _Scanner {
     }
   }
 
-  void _issue(ReportKind kind, ReportItem item) =>
-      issues.putIfAbsent(kind, () => []).add(item);
+  void _issue(ReportKind kind, ReportItem item, {String? candidate}) {
+    final map = candidate == null
+        ? issues
+        : candidateIssues.putIfAbsent(candidate, () => {});
+    final list = map.putIfAbsent(kind, () => []);
+    if (!list.contains(item)) list.add(item);
+  }
 
-  /// Reports the projects of [dir], a folder inside a version folder, as
-  /// too deep, their title as target; nothing in a version folder itself
-  /// (its projects are versions) nor in a reserved folder (`Assets/`,
-  /// `Media/`…).
-  void _reportTooDeep(String dir, List<String> segments, Layout layout) {
-    final depth = layout.levels.length;
-    if (isReservedTitleFolder(segments[depth]) ||
-        segments.length == depth + 1 ||
-        isReservedVersionFolder(segments[depth + 1])) {
-      return;
+  /// Groups the projects into title candidates (SPEC §5.8 step 3), with the
+  /// issues of their position and of their folders.
+  void _group(Layout layout) {
+    for (final MapEntry(key: dir, value: entries) in files.entries) {
+      final projects = entries.where(_isProject).toList();
+      if (projects.isEmpty || _inReserved(dir)) continue;
+      final segments = dir.isEmpty ? <String>[] : dir.split('/');
+      final (:root, :found) = _place(segments, layout, projects);
+      groups.putIfAbsent(root, () => []).addAll(projects);
+      for (final (kind, item) in found) {
+        _issue(kind, item, candidate: root);
+      }
     }
-    for (final e in _projects(dir)) {
-      _issue(
-        ReportKind.projectTooDeep,
-        ReportItem.misplaced(
-          e.path,
-          level: layout.leaf,
-          target: segments.take(depth).join('/'),
-        ),
-      );
+    for (final MapEntry(key: root, value: projects) in groups.entries) {
+      if (!shallow.contains(root)) _checkFolders(root, projects, layout);
     }
   }
 
-  /// Reports the versions sharing a version identifier with another one
-  /// (manual duplication, SPEC §4.2), the identifier as detail.
-  void _findDuplicates() {
-    for (final MapEntry(key: id, value: versions) in duplicateVersions(
-      titles,
-    ).entries) {
-      for (final (t, v) in versions) {
+  /// Root of the candidate of the [projects] of the folder [segments], and
+  /// the issues of its position: the first unknown intermediate folder
+  /// above it (named after a known value of another level, a title placed
+  /// too high, or an unknown value), or projects above the title level.
+  /// Every project at or below the title level belongs to that title.
+  ({String root, List<(ReportKind, ReportItem)> found}) _place(
+    List<String> segments,
+    Layout layout,
+    List<StorageEntry> projects,
+  ) {
+    final depth = layout.levels.length;
+    var titleDepth = depth;
+    final found = <(ReportKind, ReportItem)>[];
+    for (var i = 1; i < depth && i <= segments.length; i++) {
+      final above = segments.sublist(0, i);
+      if (_isKnown(above)) continue;
+      final (kind, item) = _levelIssue(above, layout);
+      found.add((kind, item));
+      titleDepth = switch (kind) {
+        // The title lies as far below that folder as below its known place.
+        ReportKind.misplacedLevel =>
+          depth + i - layout.levels.indexOf(item.level!) - 1,
+        ReportKind.titleTooHigh => i,
+        _ => depth,
+      };
+      break;
+    }
+    if (segments.length < titleDepth) {
+      final root = segments.join('/');
+      shallow.add(root);
+      for (final e in projects) {
+        found.add((
+          ReportKind.projectTooShallow,
+          ReportItem.misplaced(e.path, level: layout.leaf),
+        ));
+      }
+      return (root: root, found: found);
+    }
+    return (root: segments.take(titleDepth).join('/'), found: found);
+  }
+
+  /// Reports the folders of the candidate title folder [root] holding its
+  /// [projects]: projects directly in it, member and status subfolders
+  /// (`<title>/<member>/…`, `<title>/<status>/…`,
+  /// `<title>/<member>/<status>/…`), version folders holding several
+  /// projects, and projects below a version folder (SPEC §3.2, §5.8 step
+  /// 3). A subfolder is a member folder when named after a declared member,
+  /// a status folder when named after a status; any other one is a version
+  /// folder.
+  void _checkFolders(String root, List<StorageEntry> projects, Layout layout) {
+    final versionFolders = <String, List<String>>{};
+    for (final e in projects) {
+      final folder = parentOf(e.path);
+      final rest = folder == root
+          ? <String>[]
+          : folder.substring(root.isEmpty ? 0 : root.length + 1).split('/');
+      var base = root;
+      var grouped = false;
+      final member = rest.isEmpty ? null : _member(rest.first);
+      if (member != null) {
+        base = joinPath(base, rest.removeAt(0));
         _issue(
-          ReportKind.duplicateVersionId,
-          ReportItem(joinPath(t.path, v.fileName), id),
+          ReportKind.memberFolder,
+          ReportItem(base, member.id),
+          candidate: root,
+        );
+        grouped = true;
+      }
+      final status = rest.isEmpty ? null : _status(rest.first);
+      if (status != null) {
+        base = joinPath(base, rest.removeAt(0));
+        _issue(
+          ReportKind.statusFolder,
+          ReportItem(base, status),
+          candidate: root,
+        );
+        grouped = true;
+      }
+      switch (rest.length) {
+        case 0 when !grouped:
+          _issue(
+            ReportKind.projectInTitleFolder,
+            ReportItem(e.path),
+            candidate: root,
+          );
+        case 0:
+          break;
+        case 1:
+          versionFolders
+              .putIfAbsent(folder, () => [])
+              .add(p.posix.basename(e.path));
+        default:
+          _issue(
+            ReportKind.projectTooDeep,
+            ReportItem.misplaced(e.path, level: layout.leaf, target: root),
+            candidate: root,
+          );
+      }
+    }
+    for (final MapEntry(key: folder, value: names) in versionFolders.entries) {
+      if (names.length > 1) {
+        _issue(
+          ReportKind.severalProjectsInVersion,
+          ReportItem(folder, (names..sort()).join('\n')),
+          candidate: root,
         );
       }
     }
   }
 
-  /// Reports the versions of [title] whose media are not all present in the
-  /// `Media/` of their version folder (outside it, missing, absolute or
-  /// outside the library), whose record path is not `Media` or whose render
-  /// target is not in `Renders/` (SPEC §4.3, §5.8 step 3).
-  void _checkMedia(Title title) {
-    for (final v in title.versions) {
-      final path = joinPath(title.path, v.fileName);
+  /// Declared member named [folder] (ignoring case), if any.
+  Member? _member(String folder) => library.members
+      .where((m) => m.name.toLowerCase() == folder.toLowerCase())
+      .firstOrNull;
+
+  /// Status named by [folder] ([proposeStatus]), if any.
+  static String? _status(String folder) =>
+      proposeStatus({for (final s in Title.defaultStatuses) s: s}, folder);
+
+  /// Whether the folder [dir] is or lies in a reserved folder.
+  static bool _inReserved(String dir) =>
+      dir.isNotEmpty && dir.split('/').any(isReservedFolder);
+
+  /// Reads the projects of every candidate (the versions of its title
+  /// reused, their file names relative to the same folder), then checks their media; with [statOutside], the references
+  /// leaving a candidate are checked with one `stat` each.
+  Future<void> _readCandidates({bool statOutside = false}) async {
+    final read = {
+      for (final t in titles)
+        for (final v in t.versions) joinPath(t.path, v.fileName): v,
+    };
+    for (final MapEntry(key: root, value: projects) in groups.entries) {
+      final versions = <Version>[];
+      for (final e in projects) {
+        // A title is the candidate of its own folder.
+        if (read[e.path] case final v?) {
+          versions.add(v);
+          continue;
+        }
+        if (corrupted.contains(e.path)) continue;
+        try {
+          versions.add(await _readVersion(root, parentOf(e.path), e));
+        } on Object catch (error) {
+          if (!_isCorruption(error)) rethrow;
+          corrupted.add(e.path);
+        }
+      }
+      versions.sort((a, b) => a.fileName.compareTo(b.fileName));
+      candidateVersions[root] = versions;
+      if (statOutside) await _statOutside(root, versions);
+      _checkMedia(root, versions);
+    }
+  }
+
+  /// Reports the projects sharing a version identifier with another one
+  /// (manual duplication, SPEC §4.2), the identifier as detail.
+  void _findDuplicates() {
+    final byId = <VersionId, List<(String, String)>>{};
+    for (final MapEntry(key: root, value: versions)
+        in candidateVersions.entries) {
+      for (final v in versions) {
+        if (v.metadata?.id case final id?) {
+          byId.putIfAbsent(id, () => []).add((
+            root,
+            joinPath(root, v.fileName),
+          ));
+        }
+      }
+    }
+    for (final MapEntry(key: id, value: paths) in byId.entries) {
+      if (paths.length < 2) continue;
+      for (final (root, path) in paths) {
+        _issue(
+          ReportKind.duplicateVersionId,
+          ReportItem(path, id),
+          candidate: root,
+        );
+      }
+    }
+  }
+
+  /// Matches the candidates to the titles that know one of their version
+  /// identifiers (a project added, moved or changed by hand, SPEC §5.8
+  /// step 3): an entry of the node file of another title (statuses, labels
+  /// and owners of the versions that no longer exist are kept, SPEC §4.2)
+  /// whose candidate has no project with that identifier now. Each such
+  /// project is reported, that title as target.
+  void _findKnownElsewhere(Layout layout) {
+    final present = {
+      for (final MapEntry(key: root, value: versions)
+          in candidateVersions.entries)
+        root: {for (final v in versions) ?v.metadata?.id},
+    };
+    final knownBy = <String, String>{};
+    for (final t in titles..sort((a, b) => a.path.compareTo(b.path))) {
+      final node = nodes[t.path];
+      if (node == null) continue;
+      for (final id in {
+        ...node.versionStatuses.keys,
+        ...node.versionLabels.keys,
+        ...node.versionOwners.keys,
+      }) {
+        if (present[t.path]?.contains(id) ?? false) continue;
+        knownBy.putIfAbsent(id, () => t.path);
+      }
+    }
+    for (final MapEntry(key: root, value: versions)
+        in candidateVersions.entries) {
+      for (final v in versions) {
+        final title = knownBy[v.metadata?.id];
+        if (title == null || title == root) continue;
+        _issue(
+          ReportKind.knownVersionElsewhere,
+          ReportItem.misplaced(
+            joinPath(root, v.fileName),
+            level: layout.leaf,
+            target: title,
+          ),
+          candidate: root,
+        );
+        matched.putIfAbsent(root, () => title);
+      }
+    }
+  }
+
+  /// Reports the [versions] of the candidate [root] whose media are not
+  /// all present in the `Media/` of their folder (outside it, missing,
+  /// absolute or outside the library), whose record path is not `Media` or
+  /// whose render target is not in `Renders/` (SPEC §4.3, §5.8 step 3).
+  void _checkMedia(String root, List<Version> versions) {
+    for (final v in versions) {
+      final path = joinPath(root, v.fileName);
       final dir = parentOf(path);
-      final pool = '${joinPath(dir, mediaFolderName)}/'.toLowerCase();
+      final media = '${joinPath(dir, mediaFolderName)}/'.toLowerCase();
       final renders = joinPath(dir, rendersFolderName).toLowerCase();
-      _checkReferences(path, v.media, pool);
+      _checkReferences(root, path, v.media, media);
       final record = resolveReference(dir, v.recordPath ?? '');
-      if (record?.toLowerCase() != pool.substring(0, pool.length - 1)) {
+      if (record?.toLowerCase() != media.substring(0, media.length - 1)) {
         _issue(
           ReportKind.recordPathNotMedia,
           ReportItem(path, v.recordPath ?? ''),
+          candidate: root,
         );
       }
       final render = resolveReference(dir, v.renderFile ?? '')?.toLowerCase();
       if (render == null ||
           (render != renders && !render.startsWith('$renders/'))) {
-        _issue(ReportKind.renderFileForm, ReportItem(path, v.renderFile ?? ''));
+        _issue(
+          ReportKind.renderFileForm,
+          ReportItem(path, v.renderFile ?? ''),
+          candidate: root,
+        );
       }
     }
   }
 
-  /// Reports the media [refs] of the project [path] that are outside the
-  /// [pool] (lowercase, with a trailing `/`), missing, absolute or outside
-  /// the library.
-  void _checkReferences(String path, List<String> refs, String pool) {
+  /// Reports the media [refs] of the project [path] of the candidate
+  /// [root] that are outside its [media] folder (lowercase, with a
+  /// trailing `/`), missing, absolute or outside the library.
+  void _checkReferences(
+    String root,
+    String path,
+    List<String> refs,
+    String media,
+  ) {
     final outside = <String>[];
     final missing = <String>[];
     final external = <String>[];
@@ -622,15 +929,17 @@ final class _Scanner {
         external.add(ref);
       } else if (!existing.contains(file)) {
         missing.add(ref);
-      } else if (!file.startsWith(pool)) {
+      } else if (!file.startsWith(media)) {
         outside.add(ref);
       }
     }
     void report(ReportKind kind, List<String> refs) {
-      if (refs.isNotEmpty) _issue(kind, ReportItem(path, refs.join('\n')));
+      if (refs.isNotEmpty) {
+        _issue(kind, ReportItem(path, refs.join('\n')), candidate: root);
+      }
     }
 
-    report(ReportKind.mediaOutsidePool, outside);
+    report(ReportKind.mediaOutsideVersion, outside);
     report(ReportKind.missingMedia, missing);
     report(ReportKind.externalMedia, external);
   }

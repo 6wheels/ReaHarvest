@@ -379,6 +379,61 @@ void main() {
       expect(watch.elapsed, lessThan(const Duration(seconds: 1)));
     });
 
+    test('stores and restores title candidates', () async {
+      final root = Directory.systemTemp.createTempSync('reaharvest_scan_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final lib = library().withKnownValues(const [
+        KnownValue('Band', [KnownValue('Album')]),
+      ]);
+      final project = File('$fixtures/tracks.rpp').readAsStringSync();
+      for (final path in [
+        'Band/Album/Song/v1/v1.rpp',
+        'Band/Album/Song/loose.rpp',
+        'Band/Album/x.rpp',
+        'Stranger/Album/One/v/v.rpp',
+        'Stranger/Album/Two/v/v.rpp',
+      ]) {
+        File(p.joinAll([root.path, ...path.split('/')]))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync(project);
+      }
+      final storage = CountingStorage(MountedFolderStorage(root.path));
+      final result = await scan(storage, lib);
+      index.update(lib, result);
+
+      final restored = index.scanResult(lib.id)!;
+      Object? describe(ScanResult s) => [
+        for (final c in s.candidates)
+          [
+            c.root,
+            c.title,
+            for (final v in c.versions) [v.fileName, v.tempo],
+            c.issues.toString(),
+          ],
+      ];
+      expect(describe(restored), describe(result));
+      expect(restored.candidates.map((c) => c.root), [
+        'Band/Album',
+        'Band/Album/Song',
+        'Stranger/Album/One',
+        'Stranger/Album/Two',
+      ]);
+      // A project of a candidate is not a version of its title.
+      expect(index.titles().single.versions.map((v) => v.fileName), [
+        'v1/v1.rpp',
+      ]);
+      // An unknown folder above two candidates: one row each, shown once.
+      expect(
+        index.issues(kind: ReportKind.unknownValue).map((i) => i.item.path),
+        ['Stranger'],
+      );
+      expect(restored.issues.items[ReportKind.unknownValue], hasLength(1));
+
+      storage.reads.clear();
+      await scan(storage, lib, previous: restored);
+      expect(storage.reads, isEmpty);
+    });
+
     test('restored scan makes a rescan incremental', () async {
       final root = Directory.systemTemp.createTempSync('reaharvest_scan_');
       addTearDown(() => root.deleteSync(recursive: true));
@@ -532,6 +587,15 @@ void main() {
           for (final i in index.issues(library: id))
             [i.kind, i.item.path, i.item.detail, i.item.level?.key],
         ],
+        'candidates': [
+          for (final c in s.candidates)
+            [
+              c.root,
+              c.title,
+              for (final v in c.versions) [v.fileName, v.metadata?.id],
+              c.issues.toString(),
+            ],
+        ],
         'stamps': s.stamps,
       };
     }
@@ -622,6 +686,7 @@ void main() {
       put('$one/v/v.rpp', project(id: VersionId.generate()));
       put('$one/v/Media/a.wav', 'a');
       put('$one/v/mix/deep.rpp', project());
+      put('$one/loose.rpp', project());
       await rescanAndCompare(lib, one);
       expect(index.issues(kind: ReportKind.duplicateVersionId), isEmpty);
       expect(
@@ -723,6 +788,7 @@ void main() {
         issues: const Report(),
         corrupted: const [],
         orphanNodes: const [],
+        candidate: null,
       ));
 
       expect(index.libraries().single.knownValues, changed.knownValues);
@@ -751,6 +817,7 @@ void main() {
           issues: const Report(),
           corrupted: const [],
           orphanNodes: const [],
+          candidate: null,
         )),
         throwsA(isA<SqliteException>()),
       );

@@ -1784,10 +1784,7 @@ void main() {
     await tester.tap(find.text('TO SORT // 5'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 1'),
-      findsOne,
-    );
+    expect(find.text('PROJECTS BELOW A VERSION FOLDER · 1'), findsOne);
     expect(find.text('UNREADABLE FILES · 1'), findsOne);
     expect(find.text('Band · Artist/Album/Song/Alice/mix'), findsOne);
     expect(find.text('Expected: Title'), findsWidgets);
@@ -2008,7 +2005,7 @@ void main() {
   ) async {
     LibraryIssue outside(String path) => (
       library: band.id,
-      kind: ReportKind.mediaOutsidePool,
+      kind: ReportKind.mediaOutsideVersion,
       item: ReportItem(path, 'audio-files\\kick.wav\naudio-files\\snare.wav'),
     );
     await pumpApp(
@@ -2051,7 +2048,7 @@ void main() {
     const song = 'Artist/Album/Song';
     LibraryIssue outside(String path) => (
       library: band.id,
-      kind: ReportKind.mediaOutsidePool,
+      kind: ReportKind.mediaOutsideVersion,
       item: ReportItem(path, r'audio\kick.wav'),
     );
     await pumpApp(
@@ -2132,7 +2129,7 @@ void main() {
       issues: [
         (
           library: band.id,
-          kind: ReportKind.mediaOutsidePool,
+          kind: ReportKind.mediaOutsideVersion,
           item: const ReportItem('Artist/Album/Song/a.rpp', r'audio\kick.wav'),
         ),
       ],
@@ -2173,7 +2170,7 @@ void main() {
     );
     LibraryIssue outside(LibraryId library, String path) => (
       library: library,
-      kind: ReportKind.mediaOutsidePool,
+      kind: ReportKind.mediaOutsideVersion,
       item: ReportItem(path, r'audio\kick.wav'),
     );
     await pumpApp(

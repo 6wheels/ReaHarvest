@@ -27,7 +27,7 @@ void main() {
 
   const lost = 'Files missing or changed since the inventory';
   const wrongLevel = 'FOLDERS AT THE WRONG LEVEL · 1';
-  const tooDeep = 'PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 1';
+  const tooDeep = 'PROJECTS BELOW A VERSION FOLDER · 1';
 
   String band() => h.path('Band');
 

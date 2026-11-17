@@ -22,7 +22,7 @@ void main() {
   tearDown(() => h.dispose());
 
   const title = 'A fix was interrupted';
-  const tooDeep = 'PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 1';
+  const tooDeep = 'PROJECTS BELOW A VERSION FOLDER · 1';
   const take = 'Artist/Album/Song/v1/Alice/take.rpp';
   const lifted = 'Artist/Album/Song/take.rpp';
 

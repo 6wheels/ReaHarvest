@@ -196,6 +196,41 @@ void main() {
     },
   );
 
+  test('a rewritten project is read again by the title scan', () async {
+    final project = File('$fixtures/tracks.rpp').readAsStringSync();
+    storage.put('song/v1/v1.rpp', project);
+    final lib = library();
+    final first = await scan(storage, lib);
+
+    final migration = Migration.start(storage);
+    await migration.inventory.take(hash);
+    await migration.storage.write(
+      'song/v1/v1.rpp',
+      Stream.value(utf8.encode(project.replaceFirst('TEMPO 128', 'TEMPO 129'))),
+    );
+
+    final result = await scanTitle(
+      storage,
+      lib,
+      first.titles.single,
+      stored: first,
+    );
+    expect(result.title!.versions.single.tempo, 129);
+    // Without a journal position, the stored data is kept.
+    final stale = await scanTitle(
+      storage,
+      lib,
+      first.titles.single,
+      stored: ScanResult(
+        titles: first.titles,
+        nodes: first.nodes,
+        stamps: first.stamps,
+        candidates: first.candidates,
+      ),
+    );
+    expect(stale.title!.versions.single.tempo, 128);
+  });
+
   test('the scan ignores .migration', () async {
     storage.put('.migration/s/originals/song/v.rpp', 'x');
     final result = await scan(storage, library());

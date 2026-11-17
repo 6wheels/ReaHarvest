@@ -15,7 +15,7 @@ const batchFixKinds = {
 /// Issue kinds fixed by normalizing the media of the title of the project
 /// (#69): the whole title is fixed at once, its media being shared.
 const normalizeKinds = {
-  ReportKind.mediaOutsidePool,
+  ReportKind.mediaOutsideVersion,
   ReportKind.recordPathNotMedia,
 };
 

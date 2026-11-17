@@ -106,7 +106,7 @@ void main() {
         ['Expected: Artist'],
       ),
       (
-        'PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 2',
+        'PROJECTS BELOW A VERSION FOLDER · 2',
         ['take.rpp', 'final.rpp', 'Proposed place: Artist/Album/Song'],
       ),
       ('PROJECTS ABOVE THE TITLE LEVEL · 1', ['loose.rpp']),
