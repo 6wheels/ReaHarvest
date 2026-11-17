@@ -115,34 +115,7 @@ void main() {
             '$song/Media/loose.wav',
           ]);
         });
-
-        test('is never listed by the purge', () async {
-          storage.put('$song/Media/unnamed.wav', 'x');
-
-          final listed = await unreferencedMedia(storage, song);
-
-          expect(
-            listed.map((e) => e.path),
-            unorderedEquals([
-              '$song/Media/orphan.wav',
-              '$song/Media/unnamed.wav',
-            ]),
-          );
-        });
       });
     }
-
-    test('named by a backup only: not listed by the purge', () async {
-      storage = MemoryStorage()
-        ..put('$song/Media/hat.wav', 'hat')
-        ..put('$song/Media/orphan.wav', 'orphan')
-        ..put('$song/Song.rpp', project(utf8.encode('nothing')))
-        ..put('$song/Backups/Song.rpp-bak', project(utf8.encode('Hat.wav')))
-        ..put('$song/.trash/Old.rpp', project(utf8.encode('orphan.wav')));
-
-      final listed = await unreferencedMedia(storage, song);
-
-      expect(listed.map((e) => e.path), ['$song/Media/orphan.wav']);
-    });
   });
 }

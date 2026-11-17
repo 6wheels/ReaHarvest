@@ -9,10 +9,10 @@ import '../formats.dart';
 import '../widgets.dart';
 import 'version_ui_actions.dart';
 
-/// Asks for a new file name and label of [version] of [title] and applies
-/// them. A rename waits for the REAPER warning (SPEC §5.7); a label, stored
-/// outside the project, does not (SPEC §4.2). Returns its file name, null
-/// when cancelled or failed.
+/// Asks for a new name (of its folder and its `.RPP`) and label of
+/// [version] of [title] and applies them. A rename waits for the REAPER
+/// warning (SPEC §5.7); a label, stored outside the project, does not (SPEC
+/// §4.2). Returns its [Version.fileName], null when cancelled or failed.
 Future<String?> showEditVersionDialog(
   BuildContext context,
   WidgetRef ref,
@@ -25,13 +25,13 @@ Future<String?> showEditVersionDialog(
   );
   if (values == null || !context.mounted) return null;
   final (name, label) = values;
-  if (name == version.fileName && label == (version.metadata?.label ?? '')) {
+  if (name == version.folder && label == (version.metadata?.label ?? '')) {
     return null;
   }
   Future<String> edit() => ref
       .read(versionActionsProvider)
-      .editVersion(title, version, fileName: name, label: label);
-  if (name != version.fileName) {
+      .editVersion(title, version, name: name, label: label);
+  if (name != version.folder) {
     String? result;
     await runProjectChange(context, ref, () async => result = await edit());
     return result;
@@ -57,7 +57,7 @@ class _EditVersionDialog extends StatefulWidget {
 }
 
 class _EditVersionDialogState extends State<_EditVersionDialog> {
-  late final _name = TextEditingController(text: widget.version.fileName);
+  late final _name = TextEditingController(text: versionName(widget.version));
   late final _label = TextEditingController(
     text: widget.version.metadata?.label ?? '',
   );
@@ -73,7 +73,7 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
     l10n,
     widget.title,
     _name.text,
-    current: widget.version.fileName,
+    current: widget.version.folder,
   );
 
   /// An adopted version keeps a label (SPEC §4.2).
@@ -82,8 +82,7 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
 
   void _save() {
     if (_error(AppLocalizations.of(context)) != null || _labelMissing) return;
-    Navigator.of(context)
-        .pop((withProjectExtension(_name.text), _label.text.trim()));
+    Navigator.of(context).pop((versionNameOf(_name.text), _label.text.trim()));
   }
 
   @override
@@ -104,7 +103,7 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _save(),
               decoration: InputDecoration(
-                labelText: l10n.fileName,
+                labelText: l10n.versionFolderName,
                 // Room kept for the error: the dialog keeps its size.
                 helperText: ' ',
                 errorText: error,

@@ -166,7 +166,7 @@ void main() {
     'a project rewritten before a crash is read again by the scan',
     () async {
       final project = File('$fixtures/tracks.rpp').readAsStringSync();
-      storage.put('song/v1.rpp', project);
+      storage.put('song/v1/v1.rpp', project);
       final lib = library();
       final first = await scan(storage, lib);
       expect(first.titles.single.versions.single.tempo, 128);
@@ -175,7 +175,7 @@ void main() {
       await migration.inventory.take(hash);
       // Same size, date restored: only the journal tells it changed.
       await migration.storage.write(
-        'song/v1.rpp',
+        'song/v1/v1.rpp',
         Stream.value(
           utf8.encode(project.replaceFirst('TEMPO 128', 'TEMPO 129')),
         ),

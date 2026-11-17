@@ -86,7 +86,6 @@ final titlesProvider = Provider<List<Title>>((ref) {
           path: t.path,
           tags: {'title': names[t.libraryId]!},
           versions: t.versions,
-          status: t.status,
           versionStatuses: t.versionStatuses,
         )
       else

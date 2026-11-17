@@ -8,7 +8,8 @@ import 'project_file.dart';
 import 'conventions.dart';
 import 'scaffold.dart';
 
-/// A backup of a version, in the `.history/` folder of its title (SPEC §5.4).
+/// A backup of a version, in the `.history/` of its version folder (SPEC
+/// §5.4).
 final class Backup {
   const Backup({
     required this.path,
@@ -27,10 +28,10 @@ final class Backup {
 }
 
 /// Backs up the version [fileName] of the title [titleDir] (UI: « Créer un
-/// point de sauvegarde », SPEC §5.4): copies it into `.history/` as
-/// `<name> <yyyy-MM-dd HHmmss>.<ext>`, its relative paths rebased so that the
-/// backup opens in REAPER ([rebaseProjectPaths]); the version is unchanged.
-/// Returns the path of the backup.
+/// point de sauvegarde », SPEC §5.4): copies it into the `.history/` of its
+/// version folder as `<name> <yyyy-MM-dd HHmmss>.<ext>`, its relative paths
+/// rebased so that the backup opens in REAPER ([rebaseProjectPaths]); the
+/// version is unchanged. Returns the path of the backup.
 Future<String> backupVersion(
   RepositoryStorage storage,
   String titleDir,
@@ -39,7 +40,10 @@ Future<String> backupVersion(
 }) async {
   final name = p.posix.basenameWithoutExtension(fileName);
   final ext = p.posix.extension(fileName);
-  final history = joinPath(titleDir, historyFolderName);
+  final history = joinPath(
+    parentOf(joinPath(titleDir, fileName)),
+    historyFolderName,
+  );
   final target = await freePath(
     storage,
     joinPath(history, '$name ${_stamp(now ?? DateTime.now())}$ext'),
@@ -57,13 +61,14 @@ Future<String> backupVersion(
   return target;
 }
 
-/// Backups of the title [titleDir], by version, newest first. Files that are
-/// not projects or carry no version identity are left out.
+/// Backups in the `.history/` of the version folder [versionDir], by
+/// version, newest first. Files that are not projects or carry no version
+/// identity are left out.
 Future<Map<VersionId, List<Backup>>> readHistory(
   RepositoryStorage storage,
-  String titleDir,
+  String versionDir,
 ) async {
-  final folder = joinPath(titleDir, historyFolderName);
+  final folder = joinPath(versionDir, historyFolderName);
   if (await storage.stat(folder) == null) return const {};
   final history = <VersionId, List<Backup>>{};
   for (final e in await storage.list(folder)) {
@@ -91,8 +96,8 @@ Future<Map<VersionId, List<Backup>>> readHistory(
 
 /// Restores the backup [backup] into the version [fileName] of the title
 /// [titleDir] (SPEC §5.4): the current content is backed up first, then
-/// replaced, its relative paths rebased to the title folder. Returns the path
-/// of that new backup.
+/// replaced, its relative paths rebased to the version folder. Returns the
+/// path of that new backup.
 Future<String> restoreBackup(
   RepositoryStorage storage,
   String titleDir,

@@ -22,28 +22,33 @@ String formatSize(int bytes) {
       : '${value.toStringAsFixed(value < 10 ? 1 : 0)} ${units[unit]}';
 }
 
-/// [name] with the `.RPP` extension when it has none.
-String withProjectExtension(String name) {
-  final trimmed = name.trim();
-  return isProjectFile(trimmed) ? trimmed : '$trimmed.RPP';
+/// The version name typed as [input]: trimmed, without a `.RPP` extension.
+String versionNameOf(String input) {
+  final trimmed = input.trim();
+  return isProjectFile(trimmed)
+      ? p.posix.withoutExtension(trimmed).trim()
+      : trimmed;
 }
 
-/// Why [name] cannot be the file name of a version of [title] (other than
-/// its version [current]); null when it can.
+/// Name of [version]: its folder, or its file name without the extension in
+/// a free tree.
+String versionName(Version version) =>
+    version.folder ?? p.posix.withoutExtension(version.fileName);
+
+/// Why [input] cannot be the name of a version of [title], for its folder
+/// and its `.RPP` ([versionNameOf]), other than its version folder
+/// [current]; null when it can.
 String? versionNameError(
   AppLocalizations l10n,
   Title title,
-  String name, {
+  String input, {
   String? current,
 }) {
-  final file = withProjectExtension(name);
-  if (!isValidFolderName(file) ||
-      p.posix.basenameWithoutExtension(file).trim().isEmpty) {
-    return l10n.invalidVersionName;
-  }
-  final lower = file.toLowerCase();
+  final name = versionNameOf(input);
+  if (!isValidVersionName(name)) return l10n.invalidVersionName;
+  final lower = name.toLowerCase();
   final taken = title.versions.any(
-    (v) => v.fileName != current && v.fileName.toLowerCase() == lower,
+    (v) => v.folder != current && v.folder?.toLowerCase() == lower,
   );
   return taken ? l10n.versionNameTaken : null;
 }
@@ -97,6 +102,7 @@ String versionDetails(
   AppLocalizations l10n,
   Version version, {
   bool withLabel = true,
+  bool withSize = false,
 }) {
   final owners = ref.watch(ownerNamesProvider);
   final m = version.metadata;
@@ -105,6 +111,7 @@ String versionDetails(
     if (m?.owner case final owner?) owners[owner] ?? l10n.unknownOwner,
     shortDate(l10n, version.modified),
     if (version.tempo case final bpm?) l10n.bpm(bpm.round()),
+    if (withSize) formatSize(version.size),
   ].join(' · ');
 }
 

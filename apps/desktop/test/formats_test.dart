@@ -24,10 +24,26 @@ void main() {
     expect(formatLength(3725), '1:02:05');
   });
 
-  test('withProjectExtension adds .RPP only when missing', () {
-    expect(withProjectExtension(' Song '), 'Song.RPP');
-    expect(withProjectExtension('Song.rpp'), 'Song.rpp');
-    expect(withProjectExtension('Song.RPP'), 'Song.RPP');
+  test('versionNameOf trims the name and drops a project extension', () {
+    expect(versionNameOf(' Song '), 'Song');
+    expect(versionNameOf('Song.rpp'), 'Song');
+    expect(versionNameOf('Song v2.RPP '), 'Song v2');
+    expect(versionNameOf('Song.txt'), 'Song.txt');
+  });
+
+  test('versionName is the folder, else the file name', () {
+    final folder = Version(
+      fileName: 'Take/old.rpp',
+      folder: 'Take',
+      modified: DateTime(2026),
+      size: 1,
+    );
+    final free = Version(
+      fileName: 'sub/take.rpp',
+      modified: DateTime(2026),
+      size: 1,
+    );
+    expect((versionName(folder), versionName(free)), ('Take', 'sub/take'));
   });
 
   group('versionNameError', () {
@@ -38,25 +54,34 @@ void main() {
       path: 'Band/Album/Song',
       tags: const {},
       versions: [
-        Version(fileName: 'Song.rpp', modified: DateTime(2026), size: 1),
+        Version(
+          fileName: 'Song/Song.rpp',
+          folder: 'Song',
+          modified: DateTime(2026),
+          size: 1,
+        ),
       ],
     );
 
     test('accepts a free name', () {
       expect(versionNameError(l10n, title, 'Song v2'), isNull);
+      expect(versionNameError(l10n, title, 'Song v2.rpp'), isNull);
     });
 
     test('refuses an invalid name', () {
-      expect(versionNameError(l10n, title, '.rpp'), l10n.invalidVersionName);
-      expect(versionNameError(l10n, title, 'a/b'), l10n.invalidVersionName);
+      for (final name in ['.rpp', 'a/b', ' ', 'Assets', '.hidden']) {
+        expect(
+          versionNameError(l10n, title, name),
+          l10n.invalidVersionName,
+          reason: name,
+        );
+      }
     });
 
     test('refuses a taken name, case-insensitively, except the current', () {
       expect(versionNameError(l10n, title, 'song'), l10n.versionNameTaken);
-      expect(
-        versionNameError(l10n, title, 'song', current: 'Song.rpp'),
-        isNull,
-      );
+      expect(versionNameError(l10n, title, 'song.RPP'), l10n.versionNameTaken);
+      expect(versionNameError(l10n, title, 'song', current: 'Song'), isNull);
     });
   });
 }

@@ -26,8 +26,10 @@ void main() {
   testWidgets('opens a backup with normalized paths and restores it', (
     tester,
   ) async {
-    final version = File(h.copyCleanProject('Band/Artist/Album/Song/v1.rpp'));
-    final history = Directory(h.path('Band/Artist/Album/Song/.history'));
+    final version = File(
+      h.copyCleanProject('Band/Artist/Album/Song/v1/v1.rpp'),
+    );
+    final history = Directory(h.path('Band/Artist/Album/Song/v1/.history'));
     List<File> backups() => history.existsSync()
         ? history.listSync().whereType<File>().toList()
         : const [];
@@ -55,7 +57,8 @@ void main() {
     await waitFor(tester, () => adopt.evaluate().isEmpty, reason: 'adopted');
     expect(find.text('No backup point yet.'), findsOne);
 
-    // Backup point, its paths rebased onto the title folder.
+    // Backup point in the history of the version, its paths rebased onto
+    // the version folder.
     await tapText(tester, 'Create a backup point');
     await waitFor(
       tester,

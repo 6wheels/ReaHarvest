@@ -23,15 +23,15 @@ void main() {
 
   const title = 'A fix was interrupted';
   const tooDeep = 'PROJECTS TOO DEEP (MEMBER OR STATUS SUBFOLDER) · 1';
-  const take = 'Artist/Album/Song/Alice/take.rpp';
+  const take = 'Artist/Album/Song/v1/Alice/take.rpp';
   const lifted = 'Artist/Album/Song/take.rpp';
 
   testWidgets('offers the undo, runs no fix meanwhile, undoes it', (
     tester,
   ) async {
-    h.copyCleanProject('Band/Artist/Album/Song/v1.rpp');
+    h.copyCleanProject('Band/Artist/Album/Song/v1/v1.rpp');
     h.copyCleanProject('Band/$take');
-    h.copyCleanProject('Band/Live/Ballad/v1.rpp');
+    h.copyCleanProject('Band/Live/Ballad/v1/v1.rpp');
     await h.writeSettings();
     await h.start(tester);
     await tapText(tester, 'Later');
@@ -79,7 +79,7 @@ void main() {
     await waitForText(tester, title);
     expect(await fixing, isNull);
     expect(h.tasks.length, tasks);
-    expect(File(h.path('Band/Live/Ballad/v1.rpp')).existsSync(), isTrue);
+    expect(File(h.path('Band/Live/Ballad/v1/v1.rpp')).existsSync(), isTrue);
 
     // Undone, after the warning that REAPER is open: the project back in
     // its member subfolder, nothing lost.

@@ -85,6 +85,8 @@ void main() {
     fileName: fileName,
     modified: t0,
     size: 10,
+    folder: label == null ? null : 'take',
+    sampleRate: label == null ? null : 48000,
     tempo: label == null ? null : 98.5,
     length: label == null ? null : 184.5,
     trackCount: label == null ? null : 12,
@@ -155,9 +157,6 @@ void main() {
           corrupted: ['Band/bad.rpp'],
           orphanNodes: ['Band/render/.node.json'],
           stamps: {'Band/First Album/Song/a.RPP': (size: 10, modified: t0)},
-          subprojects: const {
-            'Band/First Album/Song/Media/sub.rpp': [r'C:\x.wav'],
-          },
         ),
       );
 
@@ -173,21 +172,23 @@ void main() {
       expect(a.metadata!.owner, owner);
       expect(a.metadata!.label, 'chorus B');
       expect(a.modified, t0);
+      expect((a.folder, a.size, a.sampleRate), ('take', 10, 48000));
       expect(a.tempo, 98.5);
       expect((a.length, a.trackCount, a.itemCount), (184.5, 12, 40));
       expect(a.plugins, song.versions.first.plugins);
       expect(a.media, [r'Media\kick.wav']);
       expect((a.recordPath, a.renderFile), ('Media', 'Renders'));
       expect(t.versions.last.isAdopted, isFalse);
+      expect(
+        (t.versions.last.folder, t.versions.last.sampleRate),
+        (null, null),
+      );
       expect(t.versions.last.tempo, isNull);
       expect(t.versions.last.trackCount, isNull);
       expect(t.versions.last.plugins, isEmpty);
       expect(t.versions.last.media, isEmpty);
       expect(t.versions.last.recordPath, isNull);
       expect(restored.nodes['Band']!.id, nodeId);
-      expect(restored.subprojects, {
-        'Band/First Album/Song/Media/sub.rpp': [r'C:\x.wav'],
-      });
       expect(restored.issues.items, {
         ReportKind.projectTooDeep: [
           const ReportItem.misplaced(
@@ -376,7 +377,7 @@ void main() {
     test('restored scan makes a rescan incremental', () async {
       final root = Directory.systemTemp.createTempSync('reaharvest_scan_');
       addTearDown(() => root.deleteSync(recursive: true));
-      final song = Directory(p.join(root.path, 'Band', 'Album', 'Song'))
+      final song = Directory(p.join(root.path, 'Band', 'Album', 'Song', 'v1'))
         ..createSync(recursive: true);
       File('$fixtures/tracks.rpp').copySync(p.join(song.path, 'v1.rpp'));
       File(p.join(song.path, 'Media', 'kick.wav'))
@@ -389,8 +390,8 @@ void main() {
       expect(
         index.files(lib.id).map((f) => f.path),
         containsAll([
-          'Band/Album/Song/v1.rpp',
-          'Band/Album/Song/Media/kick.wav',
+          'Band/Album/Song/v1/v1.rpp',
+          'Band/Album/Song/v1/Media/kick.wav',
           'Band/Album/Song/.node.json',
         ]),
       );
@@ -403,26 +404,32 @@ void main() {
         previous: index.scanResult(lib.id),
       );
       expect(storage.reads, isEmpty);
-      expect(again.titles.single.versions.single.fileName, 'v1.rpp');
+      expect(again.titles.single.versions.single.fileName, 'v1/v1.rpp');
+      expect(
+        again.titles.single.versions.single.size,
+        File('$fixtures/tracks.rpp').lengthSync() + 'audio'.length,
+      );
     });
 
     test('stores statuses and keeps them across a restart', () async {
       final root = Directory.systemTemp.createTempSync('reaharvest_scan_');
       addTearDown(() => root.deleteSync(recursive: true));
-      Directory(p.join(root.path, 'Band', 'Album', 'Song'))
+      Directory(p.join(root.path, 'Band', 'Album', 'Song', 'v1'))
           .createSync(recursive: true);
       File('$fixtures/tracks.rpp')
-          .copySync(p.join(root.path, 'Band', 'Album', 'Song', 'v1.rpp'));
+          .copySync(p.join(root.path, 'Band', 'Album', 'Song', 'v1', 'v1.rpp'));
       final lib = library();
       final storage = MountedFolderStorage(root.path);
-      await scan(storage, lib);
-      final versionId = VersionId.generate();
-      await setTitleStatus(storage, 'Band/Album/Song', 'recording');
+      final versionId = (await scan(
+        storage,
+        lib,
+      )).titles.single.versions.single.key;
       await setVersionStatus(storage, 'Band/Album/Song', versionId, 'done');
       index.update(lib, await scan(storage, lib));
 
       final stored = index.titles().single;
-      expect(stored.status, 'recording');
+      // The title status is derived from the version statuses.
+      expect(stored.status, 'done');
       expect(stored.versionStatuses, {versionId: 'done'});
 
       // After a restart, unchanged node files are not read again: statuses
@@ -432,7 +439,7 @@ void main() {
         lib,
         previous: index.scanResult(lib.id),
       );
-      expect(again.titles.single.status, 'recording');
+      expect(again.titles.single.status, 'done');
       expect(again.nodes['Band/Album/Song']!.versionStatuses, {
         versionId: 'done',
       });
@@ -450,7 +457,7 @@ void main() {
         label: 'chorus B',
         owner: owner,
       );
-      await createVersion(storage, title, 'v1.rpp', kept);
+      await createVersion(storage, title, 'v1', kept);
       final gone = VersionId.generate();
       await setVersionLabel(storage, title, gone, 'old take');
       index.update(lib, await scan(storage, lib));
@@ -491,7 +498,9 @@ void main() {
               for (final v in t.versions)
                 [
                   v.fileName,
+                  v.folder,
                   v.size,
+                  v.sampleRate,
                   v.modified,
                   v.metadata?.id,
                   v.metadata?.label,
@@ -509,7 +518,6 @@ void main() {
             key: [
               value.id,
               value.level,
-              value.status,
               value.versionStatuses,
               value.versionLabels,
               value.versionOwners,
@@ -520,7 +528,6 @@ void main() {
             [i.kind, i.item.path, i.item.detail, i.item.level?.key],
         ],
         'stamps': s.stamps,
-        'subprojects': s.subprojects,
       };
     }
 
@@ -590,7 +597,7 @@ void main() {
       final shared = VersionId.generate();
       for (var i = 0; i < 1000; i++) {
         put(
-          'Artist ${i % 10}/Album ${i % 50}/Title $i/v.rpp',
+          'Artist ${i % 10}/Album ${i % 50}/Title $i/v/v.rpp',
           project(id: i < 2 ? shared : VersionId.generate()),
         );
       }
@@ -599,24 +606,27 @@ void main() {
         index
             .issues(kind: ReportKind.duplicateVersionId)
             .map((i) => i.item.path),
-        ['Artist 0/Album 0/Title 0/v.rpp', 'Artist 1/Album 1/Title 1/v.rpp'],
+        [
+          'Artist 0/Album 0/Title 0/v/v.rpp',
+          'Artist 1/Album 1/Title 1/v/v.rpp',
+        ],
       );
       const one = 'Artist 1/Album 1/Title 1';
 
       // Separated: the duplicate across titles is gone.
-      put('$one/v.rpp', project(id: VersionId.generate()));
-      put('$one/Media/a.wav', 'a');
-      put('$one/mix/deep.rpp', project());
+      put('$one/v/v.rpp', project(id: VersionId.generate()));
+      put('$one/v/Media/a.wav', 'a');
+      put('$one/v/mix/deep.rpp', project());
       await rescanAndCompare(lib, one);
       expect(index.issues(kind: ReportKind.duplicateVersionId), isEmpty);
       expect(
         index.issues(kind: ReportKind.projectTooDeep).single.item.path,
-        '$one/mix/deep.rpp',
+        '$one/v/mix/deep.rpp',
       );
 
       // A copy keeping the id of another title: found again.
       put(
-        '$one/copy.rpp',
+        '$one/copy/copy.rpp',
         project(
           id: index.titles(library: lib.id).first.versions.single.metadata!.id,
         ),
@@ -630,11 +640,11 @@ void main() {
         KnownValue('Band', [KnownValue('Album'), KnownValue('Album 2')]),
       ]);
       const song = 'Band/Album/Song';
-      put('$song/v.rpp', project(media: [r'Media\a.wav']));
-      put('$song/Media/a.wav', 'a');
-      put('$song/Media/b.wav', 'b');
-      put('Band/Loose/v.rpp', project());
-      put('Band/Album 2/Song/v.rpp', project());
+      put('$song/v/v.rpp', project(media: [r'Media\a.wav']));
+      put('$song/v/Media/a.wav', 'a');
+      put('$song/v/Media/b.wav', 'b');
+      put('Band/Loose/v/v.rpp', project());
+      put('Band/Album 2/Song/v/v.rpp', project());
       index.update(lib, await scan(storage, lib));
       await index.hashPending(lib.id, (path) async => 'h');
       expect(
@@ -642,15 +652,15 @@ void main() {
         'Band/Loose',
       );
 
-      File(p.join(root.path, 'Band', 'Album', 'Song', 'Media', 'b.wav'))
+      File(p.join(root.path, 'Band', 'Album', 'Song', 'v', 'Media', 'b.wav'))
           .deleteSync();
-      put('$song/Media/c.wav', 'c');
+      put('$song/v/Media/c.wav', 'c');
       await rescanAndCompare(lib, song);
-      expect(index.hashOf(lib.id, '$song/Media/a.wav'), 'h');
-      expect(index.hashOf(lib.id, '$song/Media/c.wav'), isNull);
-      expect(index.hashOf(lib.id, 'Band/Album 2/Song/v.rpp'), 'h');
+      expect(index.hashOf(lib.id, '$song/v/Media/a.wav'), 'h');
+      expect(index.hashOf(lib.id, '$song/v/Media/c.wav'), isNull);
+      expect(index.hashOf(lib.id, 'Band/Album 2/Song/v/v.rpp'), 'h');
 
-      put('Band/Loose/w.rpp', project());
+      put('Band/Loose/w/w.rpp', project());
       await rescanAndCompare(lib, 'Band/Loose');
       expect(
         index.issues(kind: ReportKind.titleTooHigh).single.item.path,
@@ -661,14 +671,15 @@ void main() {
     test('drops a folder that is no longer a title', () async {
       final lib = library();
       const song = 'Band/Album/Song';
-      put('$song/v.rpp', project());
-      put('$song/mix/deep.rpp', project());
-      put('Band/Album/Other/v.rpp', project());
+      put('$song/v/v.rpp', project());
+      put('$song/v/mix/deep.rpp', project());
+      put('Band/Album/Other/v/v.rpp', project());
       index.update(lib, await scan(storage, lib));
       final previous = index.titles().firstWhere((t) => t.path == song);
 
-      File(p.join(root.path, 'Band', 'Album', 'Song', 'v.rpp')).deleteSync();
-      File(p.join(root.path, 'Band', 'Album', 'Song', 'mix', 'deep.rpp'))
+      File(p.join(root.path, 'Band', 'Album', 'Song', 'v', 'v.rpp'))
+          .deleteSync();
+      File(p.join(root.path, 'Band', 'Album', 'Song', 'v', 'mix', 'deep.rpp'))
           .deleteSync();
       index.updateTitle(
         lib,
@@ -688,7 +699,7 @@ void main() {
       ]);
       expect(
         index.files(lib.id).map((f) => f.path),
-        isNot(contains('$song/v.rpp')),
+        isNot(contains('$song/v/v.rpp')),
       );
     });
 
@@ -704,7 +715,6 @@ void main() {
         title: null,
         node: null,
         stamps: const {},
-        subprojects: const {},
         issues: const Report(),
         corrupted: const [],
         orphanNodes: const [],
@@ -733,7 +743,6 @@ void main() {
           title: twice,
           node: null,
           stamps: const {},
-          subprojects: const {},
           issues: const Report(),
           corrupted: const [],
           orphanNodes: const [],

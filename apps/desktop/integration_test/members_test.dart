@@ -52,7 +52,7 @@ void main() {
   ];
 
   testWidgets('declares the members and offers them as owners', (tester) async {
-    final song = h.copyCleanProject('Band/Artist/Album/Song/v1.rpp');
+    final song = h.copyCleanProject('Band/Artist/Album/Song/v1/v1.rpp');
     await h.writeSettings();
     await h.start(tester);
     await tapText(tester, 'Later');

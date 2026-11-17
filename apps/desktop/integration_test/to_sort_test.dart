@@ -47,25 +47,25 @@ void main() {
     tester,
   ) async {
     for (final path in [
-      'Band/Artist/Album/Song/v1.rpp',
-      // Member and status subfolders.
-      'Band/Artist/Album/Song/Alice/take.rpp',
-      'Band/Artist/Album/Song/mix/final.rpp',
+      'Band/Artist/Album/Song/v1/v1.rpp',
+      // Member and status subfolders in a version folder.
+      'Band/Artist/Album/Song/v1/Alice/take.rpp',
+      'Band/Artist/Album/Song/v1/mix/final.rpp',
       // An album at the artist level.
-      'Band/Album/Ballad/v1.rpp',
+      'Band/Album/Ballad/v1/v1.rpp',
       // Titles right under the artist.
-      'Band/Artist/Lonely/v1.rpp',
-      'Band/Artist/Single/v1.rpp',
-      'Band/Artist/Bside/v1.rpp',
+      'Band/Artist/Lonely/v1/v1.rpp',
+      'Band/Artist/Single/v1/v1.rpp',
+      'Band/Artist/Bside/v1/v1.rpp',
       // An artist that is not a known value.
-      'Band/Stranger/Live/Tune/v1.rpp',
-      'Band/Artist/Album/Hymn/v1.rpp',
+      'Band/Stranger/Live/Tune/v1/v1.rpp',
+      'Band/Artist/Album/Hymn/v1/v1.rpp',
     ]) {
       h.copyCleanProject(path);
     }
     h.copyFixture('render.rpp', 'Band/Artist/loose.rpp');
     // A version and its Save As copy.
-    final hymn = File(h.path('Band/Artist/Album/Hymn/v1.rpp'));
+    final hymn = File(h.path('Band/Artist/Album/Hymn/v1/v1.rpp'));
     hymn.writeAsStringSync(
       setExtState(
         hymn.readAsStringSync(),
@@ -76,7 +76,7 @@ void main() {
         ).toExtState(),
       ),
     );
-    hymn.copySync(h.path('Band/Artist/Album/Hymn/v1 copy.rpp'));
+    hymn.copySync(h.path('Band/Artist/Album/Hymn/v1/v1 copy.rpp'));
     await h.writeSettings();
     await h.start(tester);
     await tapText(tester, 'Later');
@@ -171,10 +171,10 @@ void main() {
     expect(find.textContaining('selected'), findsNothing);
     for (final name in ['Lonely', 'Single']) {
       expect(
-        File(h.path('Band/Artist/_Unassigned/$name/v1.rpp')).existsSync(),
+        File(h.path('Band/Artist/_Unassigned/$name/v1/v1.rpp')).existsSync(),
         isTrue,
       );
     }
-    expect(File(h.path('Band/Artist/Bside/v1.rpp')).existsSync(), isTrue);
+    expect(File(h.path('Band/Artist/Bside/v1/v1.rpp')).existsSync(), isTrue);
   });
 }

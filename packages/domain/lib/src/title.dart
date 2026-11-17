@@ -1,6 +1,7 @@
 import 'ids.dart';
 
-/// A title: leaf node folder holding `Media/`, assets and versions.
+/// A title: leaf node folder holding its assets, its trash and one folder
+/// per version (SPEC §3.2).
 final class Title {
   const Title({
     required this.id,
@@ -8,7 +9,6 @@ final class Title {
     required this.path,
     required this.tags,
     this.versions = const [],
-    this.status,
     this.versionStatuses = const {},
   });
 
@@ -33,15 +33,27 @@ final class Title {
 
   final List<Version> versions;
 
-  /// Title status key (e.g. `mixing`); null when not set.
-  final String? status;
-
   /// Status of each version, by [Version.key]. May hold keys of versions
   /// that no longer exist.
   final Map<String, String> versionStatuses;
 
   /// Status of [version]; null when not set.
   String? statusOf(Version version) => versionStatuses[version.key];
+
+  /// Title status, never stored (SPEC §5.9): the highest status of its
+  /// versions in the order of [defaultStatuses], a status outside it
+  /// ranking below; null when no version has one.
+  String? get status {
+    String? best;
+    var rank = -2;
+    for (final v in versions) {
+      final s = statusOf(v);
+      if (s == null) continue;
+      final r = defaultStatuses.indexOf(s);
+      if (r > rank) (best, rank) = (s, r);
+    }
+    return best;
+  }
 }
 
 /// Versions sharing a version id (manual duplicates, e.g. *Save As*,
@@ -94,12 +106,15 @@ final class VersionMetadata {
   }
 }
 
-/// A `.RPP` file in a title folder.
+/// A version of a title: in a layout library, a version folder holding its
+/// `.RPP` (SPEC §3.2); in a free tree, a `.RPP` below the title (SPEC §3.3).
 final class Version {
   const Version({
     required this.fileName,
     required this.modified,
     required this.size,
+    this.folder,
+    this.sampleRate,
     this.metadata,
     this.tempo,
     this.length,
@@ -111,15 +126,23 @@ final class Version {
     this.renderFile,
   });
 
-  /// File path relative to the title folder, `/`-separated: a plain file
-  /// name in layout libraries, possibly nested in a free tree (SPEC §3.3).
-  /// Free in layout libraries, not part of the identity.
+  /// Path of the `.RPP` relative to the title folder, `/`-separated:
+  /// `<version>/<version>.RPP` in layout libraries, possibly nested in a
+  /// free tree (SPEC §3.3). Not part of the identity.
   final String fileName;
 
   /// Version date (file modification time).
   final DateTime modified;
 
+  /// Bytes used: the files of the version folder in layout libraries (the
+  /// indexed ones), the `.RPP` alone in a free tree.
   final int size;
+
+  /// Name of the version folder, in the title folder; null in a free tree.
+  final String? folder;
+
+  /// Project sample rate (`SAMPLERATE`); null when unknown.
+  final int? sampleRate;
 
   /// Null when the file has no metadata yet ("To adopt" section).
   final VersionMetadata? metadata;
@@ -158,6 +181,8 @@ final class Version {
     fileName: fileName,
     modified: modified,
     size: size,
+    folder: folder,
+    sampleRate: sampleRate,
     metadata: metadata,
     tempo: tempo,
     length: length,

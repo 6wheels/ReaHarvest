@@ -12,8 +12,8 @@ import '../formats.dart';
 import '../widgets.dart';
 import 'version_ui_actions.dart';
 
-/// Files in the trash of a title, with their permanent deletion (purge),
-/// then the purge of the media no project uses any more (SPEC §5.4).
+/// Entries in the trash of a title (version folders and assets), with
+/// their permanent deletion (purge, SPEC §5.4).
 class TrashView extends ConsumerWidget {
   const TrashView(this.title, {super.key});
 
@@ -34,64 +34,11 @@ class TrashView extends ConsumerWidget {
       action: action,
     );
     if (confirmed != true || !context.mounted) return;
-    final service = ref.read(versionActionsProvider);
-    final List<StorageEntry> unused;
     try {
-      unused = await service.purge(title, [for (final f in files) f.path]);
-    } on FormatException {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.mediaUnreadable)));
-      return;
-    } on Object catch (e) {
-      fail(messenger, l10n, e);
-      return;
-    }
-    messenger.showSnackBar(SnackBar(content: Text(l10n.trashPurged)));
-    if (unused.isEmpty || !context.mounted) return;
-    final size = unused.fold(0, (sum, e) => sum + e.size);
-    final purgeMedia = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.unusedMediaTitle),
-        content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.unusedMediaHint(unused.length, formatSize(size))),
-              const SizedBox(height: Space.s),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 200),
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    for (final e in unused)
-                      Text(
-                        '${p.posix.basename(e.path)} · ${formatSize(e.size)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.keep),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.deleteForever),
-          ),
-        ],
-      ),
-    );
-    if (purgeMedia != true) return;
-    try {
-      await service.purgeUnusedMedia(title, [for (final e in unused) e.path]);
-      messenger.showSnackBar(SnackBar(content: Text(l10n.mediaPurged)));
+      await ref.read(versionActionsProvider).purge(title, [
+        for (final f in files) f.path,
+      ]);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.trashPurged)));
     } on Object catch (e) {
       fail(messenger, l10n, e);
     }
@@ -145,7 +92,9 @@ class TrashView extends ConsumerWidget {
           Row(
             children: [
               Icon(
-                isProjectFile(e.path)
+                e.isDirectory
+                    ? Icons.folder_outlined
+                    : isProjectFile(e.path)
                     ? Icons.music_note_outlined
                     : Icons.insert_drive_file_outlined,
                 size: 16,

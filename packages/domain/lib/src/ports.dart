@@ -42,7 +42,8 @@ abstract interface class RepositoryStorage {
 
   Future<void> createDirectory(String path);
 
-  /// Permanently deletes the file [path] (explicit purge only, SPEC §5.4).
+  /// Permanently deletes the file or folder [path], a folder with
+  /// everything below it (explicit purge only, SPEC §5.4).
   Future<void> delete(String path);
 
   /// Sets the modification date of the file [path] (a project rewritten by

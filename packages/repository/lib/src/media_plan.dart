@@ -89,7 +89,7 @@ final class TitleFacts {
     final dir = parentOf(path);
     final pool = joinPath(titleDir, mediaFolderName).toLowerCase();
     if (dir == titleDir || dir.toLowerCase() == pool) return ProjectRole.title;
-    if (!isReservedTitleFolder(segments.first)) return ProjectRole.notLifted;
+    if (!isReservedFolder(segments.first)) return ProjectRole.notLifted;
     return null;
   }
 }
@@ -426,7 +426,7 @@ final class _Planner {
       final segments = relativeTo(titleDir, e.path).split('/');
       if (e.isDirectory ||
           !isMediaFile(e.path) ||
-          isReservedTitleFolder(segments.first) ||
+          isReservedFolder(segments.first) ||
           segments.any(isExcludedFolder) ||
           targets.containsKey(key) ||
           kept.contains(key)) {

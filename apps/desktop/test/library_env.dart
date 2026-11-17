@@ -68,12 +68,13 @@ void setUpLibraryEnv() {
   });
 }
 
-/// Library `Band` holding `Artist/Album/Song/v1.rpp` (not adopted).
+/// Library `Band` holding `Artist/Album/Song/v1/v1.rpp` (not adopted).
+/// Returns the folder of the title.
 Future<String> bandWithSong() async {
   final band = folder('Band');
   final song = p.join(band, 'Artist', 'Album', 'Song');
-  Directory(song).createSync(recursive: true);
-  File('../../test/fixtures/tracks.rpp').copySync(p.join(song, 'v1.rpp'));
+  Directory(p.join(song, 'v1')).createSync(recursive: true);
+  File('../../test/fixtures/tracks.rpp').copySync(p.join(song, 'v1', 'v1.rpp'));
   await catalog.addLocal(
     folder: band,
     displayName: '',
@@ -83,5 +84,8 @@ Future<String> bandWithSong() async {
 }
 
 Title title() => index.titles().single;
-Version version(String name) =>
-    title().versions.firstWhere((v) => v.fileName == name);
+
+/// The version of [title] whose project is named [name] (in any folder).
+Version version(String name) => title().versions.firstWhere(
+  (v) => v.fileName == name || p.posix.basename(v.fileName) == name,
+);

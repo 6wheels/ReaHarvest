@@ -9,19 +9,23 @@ const collabFolderName = '.collab';
 /// (SPEC §5.8).
 const migrationFolderName = '.migration';
 
-/// Title subfolders holding no versions (SPEC §3.2), lowercase.
-const reservedTitleFolders = {
-  'media',
-  'renders',
-  'assets',
-  '.history',
-  '.trash',
-  'backups',
-};
+/// Title subfolders that are not versions (SPEC §3.2), lowercase.
+const reservedTitleFolders = {'assets', '.trash'};
 
-/// Whether [name] is a reserved folder of a title (`Media`, `.trash`…).
+/// Version subfolders (SPEC §3.2), lowercase.
+const reservedVersionFolders = {'media', 'renders', 'backups', '.history'};
+
+/// Whether [name] is a reserved folder of a title (`Assets`, `.trash`).
 bool isReservedTitleFolder(String name) =>
     reservedTitleFolders.contains(name.toLowerCase());
+
+/// Whether [name] is a reserved folder of a version (`Media`, `.history`…).
+bool isReservedVersionFolder(String name) =>
+    reservedVersionFolders.contains(name.toLowerCase());
+
+/// Whether [name] is a reserved folder of a title or of a version.
+bool isReservedFolder(String name) =>
+    isReservedTitleFolder(name) || isReservedVersionFolder(name);
 
 /// Folders never scanned for versions, wherever they are, lowercase:
 /// REAPER backups, history and trash.

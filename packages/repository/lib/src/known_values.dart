@@ -23,7 +23,7 @@ Future<List<KnownValue>> prefillKnownValues(
         folders.length < layout.levels.length ||
         segments.first == collabFolderName ||
         folders.any(isExcludedFolder) ||
-        folders.take(layout.levels.length).any(isReservedTitleFolder)) {
+        folders.take(layout.levels.length).any(isReservedFolder)) {
       continue;
     }
     paths.add(folders.take(intermediate).join('/'));

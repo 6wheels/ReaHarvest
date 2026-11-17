@@ -37,11 +37,16 @@ List<Title> demoTitles() {
           'album': 'Album ${i ~/ 4 + 1}',
           'title': name,
         },
-        status: statuses[i % statuses.length],
+        // The title status is the one of its first version.
+        versionStatuses: {
+          i == 3 ? '$name v1/$name v1.rpp' : 'demo-$i-0':
+              ?statuses[i % statuses.length],
+        },
         versions: [
           for (var v = 0; v <= i % 5; v++)
             Version(
-              fileName: '$name v${v + 1}.rpp',
+              fileName: '$name v${v + 1}/$name v${v + 1}.rpp',
+              folder: '$name v${v + 1}',
               modified: now.subtract(Duration(days: i * 9 + v)),
               size: 1,
               tempo: 72.0 + i * 7,

@@ -112,15 +112,15 @@ void main() {
   test('rescans only the title changed by a version action', () async {
     final song = await bandWithSong();
     final other = p.join(p.dirname(song), 'Other');
-    Directory(other).createSync();
-    File(p.join(song, 'v1.rpp')).copySync(p.join(other, 'v1.rpp'));
+    Directory(p.join(other, 'v1')).createSync(recursive: true);
+    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(other, 'v1', 'v1.rpp'));
     await scans.scanAll();
     Title titleAt(String name) =>
         index.titles().singleWhere((t) => t.tags['title'] == name);
 
-    // Changes outside the application, in both titles.
-    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v2.rpp'));
-    File(p.join(other, 'v1.rpp')).copySync(p.join(other, 'v2.rpp'));
+    // Changes outside the application, in both titles (Save As copies).
+    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v1', 'v2.rpp'));
+    File(p.join(other, 'v1', 'v1.rpp')).copySync(p.join(other, 'v1', 'v2.rpp'));
     final v1 = titleAt('Song').versions.single;
     await versions.setStatusOf(titleAt('Song'), v1, 'mixing');
 
@@ -162,7 +162,7 @@ void main() {
   test('a failed title rescan is only logged', () async {
     final song = await bandWithSong();
     final entry = container.read(settingsProvider).libraries.single;
-    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v2.rpp'));
+    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v1', 'v2.rpp'));
     // Hidden on Windows: replaced, not overwritten.
     File(p.join(entry.libraryRoot, libraryFileName))
       ..deleteSync()

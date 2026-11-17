@@ -18,7 +18,7 @@ void main() {
     final saved = (await container.read(
       historyProvider(title().id).future,
     ))[id]!.single;
-    final project = File(p.join(song, 'v1.rpp'));
+    final project = File(p.join(song, 'v1', 'v1.rpp'));
 
     // REAPER not found.
     expect(await reaper.openVersion(title(), version('v1.rpp')), isFalse);
