@@ -114,6 +114,7 @@ class KnownValuesEditor extends StatelessWidget {
             // A level below a value may be left unassigned (no album).
             if (depth > 0 && !level.any((v) => v.value == Layout.unassigned))
               TextButton(
+                style: glowButtonStyle(context),
                 onPressed: () =>
                     onChanged(values.withPath([...parent, Layout.unassigned])),
                 child: Text(l10n.unassigned),

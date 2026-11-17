@@ -82,7 +82,7 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
                       children: [
                         const Spacer(),
                         if (tasks.any((t) => t.isFinished))
-                          TextButton(
+                          OutlinedButton(
                             onPressed: ref
                                 .read(tasksProvider.notifier)
                                 .clearFinished,
@@ -224,7 +224,7 @@ class _TaskRow extends ConsumerWidget {
           trailing,
           if (task.report case final report?) ...[
             const SizedBox(width: Space.s),
-            TextButton(
+            OutlinedButton(
               onPressed: () => _openReport(task.label(l10n), report),
               child: Text(l10n.report),
             ),

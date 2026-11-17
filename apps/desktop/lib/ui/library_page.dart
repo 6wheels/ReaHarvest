@@ -253,9 +253,14 @@ class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
                     child: IconButton(
                       tooltip: l10n.clearSearch,
                       onPressed: _clear,
-                      style: IconButton.styleFrom(
-                        fixedSize: const Size.square(22),
-                        iconSize: 14,
+                      // Explicit: the field restyles its suffix buttons.
+                      style: Theme.of(context).iconButtonTheme.style?.merge(
+                        IconButton.styleFrom(
+                          fixedSize: const Size.square(22),
+                          minimumSize: Size.zero,
+                          padding: EdgeInsets.zero,
+                          iconSize: 14,
+                        ),
                       ),
                       icon: const Icon(Icons.close_rounded),
                     ),

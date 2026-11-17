@@ -127,7 +127,7 @@ class _MembersDialogState extends ConsumerState<_MembersDialog> {
                         ),
                       ),
                     const SizedBox(height: Space.s),
-                    TextButton.icon(
+                    OutlinedButton.icon(
                       onPressed: _add,
                       icon: const Icon(Icons.add_rounded),
                       label: Text(l10n.addMember),

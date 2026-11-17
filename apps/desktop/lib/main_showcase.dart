@@ -1,5 +1,6 @@
 // UI showcase: every real component of the app on static data, with the
 // real theme. No I/O: run with `flutter run -d windows -t lib/main_showcase.dart`.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'l10n/app_localizations.dart';
 import 'state/navigation.dart';
@@ -27,7 +29,16 @@ import 'ui/to_sort/fix_dialog.dart' show Choice, LevelField;
 import 'ui/to_sort/to_sort_item.dart';
 import 'ui/widgets.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // The window frame of the application: its own title bar and buttons.
+  if (defaultTargetPlatform == TargetPlatform.windows) {
+    await windowManager.ensureInitialized();
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(titleBarStyle: TitleBarStyle.hidden),
+      windowManager.show,
+    );
+  }
   // Providers read by the overview and the card actions, served from the
   // mock data below: nothing is read from or written to the disk, and REAPER
   // is never found.
@@ -115,7 +126,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
     ],
     home: Builder(
       builder: (context) => Scaffold(
-        appBar: _appBar(context),
+        appBar: _windowBar(context),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(Space.l),
           child: Column(
@@ -128,6 +139,23 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
       ),
     ),
   );
+
+  /// The title bar of the application above the showcase controls.
+  PreferredSizeWidget _windowBar(BuildContext context) {
+    final controls = _appBar(context);
+    return PreferredSize(
+      preferredSize: Size.fromHeight(
+        studioTitleBarHeight + controls.preferredSize.height,
+      ),
+      child: Column(
+        children: [
+          const StudioTitleBar(location: 'UI showcase'),
+          // An app bar needs a bounded height outside the scaffold slot.
+          SizedBox(height: controls.preferredSize.height, child: controls),
+        ],
+      ),
+    );
+  }
 
   PreferredSizeWidget _appBar(BuildContext context) {
     final accent = _accent;

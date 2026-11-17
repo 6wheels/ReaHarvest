@@ -145,7 +145,7 @@ class _ToSortListState extends ConsumerState<ToSortList> {
             style: Theme.of(context).textTheme.bodySmall
                 ?.copyWith(color: context.colors.muted),
           ),
-        TextButton(
+        OutlinedButton(
           onPressed: () =>
               _fixAll(context, ref, kind, selected.isEmpty ? issues : selected),
           child: Text(l10n.fixAction),

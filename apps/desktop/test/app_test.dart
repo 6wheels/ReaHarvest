@@ -455,7 +455,7 @@ void main() {
     openedFolders.clear();
     await tester.ensureVisible(find.text('/data/logs'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Open'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Open'));
     expect(openedFolders, ['/data/logs']);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);

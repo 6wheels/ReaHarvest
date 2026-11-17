@@ -432,7 +432,7 @@ void main() {
 
     // The report of the startup-like scan waits in the tasks zone (#63).
     expect(find.text('Libraries scanned · 2'), findsNothing);
-    await tester.tap(find.widgetWithText(TextButton, 'Report').last);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Report').last);
     await tester.pumpAndSettle();
     expect(find.text('Libraries scanned · 2'), findsOne);
     await tapText(tester, 'Close');

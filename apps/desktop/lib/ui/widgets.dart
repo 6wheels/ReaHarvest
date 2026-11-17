@@ -460,8 +460,9 @@ class ReaperIcon extends StatelessWidget {
 }
 
 /// Small square action of a row or a card: an [icon] (an [Icon] or any
-/// 16 px widget), lit on hover like every icon button (see the theme). Over
-/// an aurora ([onAurora]) it sits on a frosted pad.
+/// 16 px widget) glowing in the accent on hover (see the theme). Over an
+/// aurora ([onAurora]) it sits on a small frosted pad with a hairline, to
+/// stand out.
 class IconAction extends StatelessWidget {
   const IconAction({
     super.key,
@@ -481,39 +482,39 @@ class IconAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!onAurora) {
-      return IconButton(tooltip: tooltip, onPressed: onPressed, icon: icon);
-    }
+    // Explicit, so that a field holding it (suffix) does not restyle it.
+    final theme = Theme.of(context).iconButtonTheme.style;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final pad = dark ? Colors.black : Colors.white;
-    final ink = dark ? Colors.white : context.colors.text;
-    bool lit(Set<WidgetState> states) =>
-        states.contains(WidgetState.hovered) ||
-        states.contains(WidgetState.pressed);
-    return IconButton(
+    final button = IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
       icon: icon,
-      // Same hover as elsewhere: the pad thickens, the icon brightens.
-      style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => pad.withValues(
-            alpha: (dark ? 0.35 : 0.6) + (lit(states) ? 0.2 : 0),
-          ),
-        ),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.disabled)
-              ? ink.withValues(alpha: 0.45)
-              : lit(states)
-              ? ink
-              : ink.withValues(alpha: 0.85),
+      style: onAurora
+          ? glowButtonStyle(
+              context,
+              ink: dark ? Colors.white : context.colors.text,
+            ).merge(theme)
+          : theme,
+    );
+    if (!onAurora) return button;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: dark
+            ? Colors.black.withValues(alpha: 0.45)
+            : Colors.white.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(Radii.xs),
+        border: Border.all(
+          color: dark
+              ? Colors.white.withValues(alpha: 0.22)
+              : Colors.black.withValues(alpha: 0.12),
         ),
       ),
+      child: button,
     );
   }
 }
 
-/// Opens the title detail: an expand icon.
+/// Opens the title detail: the full screen corners.
 class OpenDetailAction extends StatelessWidget {
   const OpenDetailAction({
     super.key,
@@ -528,7 +529,7 @@ class OpenDetailAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IconAction(
-    icon: const Icon(Icons.open_in_full_rounded),
+    icon: const Icon(Icons.fullscreen_rounded),
     tooltip: tooltip,
     onPressed: onPressed,
     onAurora: onAurora,

@@ -265,7 +265,7 @@ class VersionPane extends ConsumerWidget {
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
+            child: OutlinedButton.icon(
               icon: const Icon(Icons.call_split_rounded, size: 18),
               onPressed: () => runProjectChange(
                 context,

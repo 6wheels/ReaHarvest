@@ -100,7 +100,7 @@ class History extends ConsumerWidget {
                 onPressed: () => _open(context, ref, b),
                 icon: const ReaperIcon(),
               ),
-              TextButton(
+              OutlinedButton(
                 onPressed: () =>
                     _restore(context, ref, b, format.format(b.created)),
                 child: Text(l10n.restore),

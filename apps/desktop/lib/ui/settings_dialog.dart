@@ -238,7 +238,7 @@ class _SettingsPanel extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: Space.s),
-                              TextButton(
+                              OutlinedButton(
                                 onPressed: () => ref.read(openFolderProvider)(
                                   ref.read(logFolderProvider),
                                 ),
@@ -359,15 +359,15 @@ class _Libraries extends ConsumerWidget {
                 // Known values of the intermediate levels (SPEC §3.1).
                 if (indexed[library.id]?.layout case final layout?
                     when layout.levels.length > 1)
-                  TextButton(
+                  OutlinedButton(
                     onPressed: () => showKnownValues(context, library, layout),
                     child: Text(l10n.knownValues),
                   ),
-                TextButton(
+                OutlinedButton(
                   onPressed: () => showMembers(context, library),
                   child: Text(l10n.members),
                 ),
-                TextButton(
+                OutlinedButton(
                   onPressed: () => _confirmRemoval(context, ref, library),
                   child: Text(l10n.removeLibrary),
                 ),

@@ -31,7 +31,7 @@ class ToSortPage extends StatelessWidget {
               trailing: Consumer(
                 builder: (context, ref, _) => Tooltip(
                   message: l10n.fullScanTooltip,
-                  child: TextButton.icon(
+                  child: OutlinedButton.icon(
                     onPressed: () =>
                         ref.read(libraryScansProvider).scanAll(full: true),
                     icon: const Icon(Icons.refresh_rounded, size: 16),

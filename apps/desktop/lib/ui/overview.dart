@@ -42,7 +42,8 @@ class Overview extends ConsumerWidget {
     final radius = BorderRadius.circular(Radii.m);
 
     final Widget body = Padding(
-      padding: const EdgeInsets.fromLTRB(Space.l, Space.m, Space.s, Space.m),
+      // Same margin on every side: the close button sits in the corner.
+      padding: const EdgeInsets.all(Space.m),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -53,8 +54,10 @@ class Overview extends ConsumerWidget {
           ] else
             const Spacer(),
           const SizedBox(width: Space.s),
+          // Close level with the heading of the versions, detail level with
+          // their first line.
           Column(
-            spacing: Space.xs,
+            spacing: Space.xs + 1,
             children: [
               IconAction(
                 icon: const Icon(Icons.close_rounded),
@@ -241,15 +244,18 @@ class _Recent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: 24,
+          height: IconAction.size,
           child: Row(
             children: [
               Expanded(child: SectionLabel(l10n.recentVersions)),
               if (versions.length > _recentCount)
                 TextButton(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: Space.s),
+                  // Small, to fit the heading.
+                  style: glowButtonStyle(context).merge(
+                    TextButton.styleFrom(
+                      minimumSize: const Size(0, 22),
+                      padding: const EdgeInsets.symmetric(horizontal: Space.s),
+                    ),
                   ),
                   onPressed: () => openTitleDetail(context, title.id),
                   child: Text(l10n.allVersions(versions.length)),
