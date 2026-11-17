@@ -107,8 +107,8 @@ void main() {
   });
 
   test('the scan indexes a Windows-1252 project and finds its media', () async {
-    putBytes('$_title/a.rpp', fixtureWithItem(r'audio-files\Café.wav'));
-    file('$_title/audio-files/Café.wav')
+    putBytes('$_title/a/a.rpp', fixtureWithItem(r'audio-files\Café.wav'));
+    file('$_title/a/audio-files/Café.wav')
       ..parent.createSync(recursive: true)
       ..writeAsStringSync('wav');
 

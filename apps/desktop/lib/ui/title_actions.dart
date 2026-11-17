@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../l10n/app_localizations.dart';
@@ -43,7 +42,7 @@ Future<void> openLatestInReaper(
         title: Text(l10n.notYourVersionTitle),
         content: Text(
           l10n.notYourVersionHint(
-            p.posix.withoutExtension(version.fileName),
+            versionName(version),
             ref.read(ownerNamesProvider)[owner] ?? l10n.unknownOwner,
           ),
         ),

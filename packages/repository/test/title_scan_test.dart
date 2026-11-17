@@ -54,7 +54,9 @@ Object? describe(Title? title) => title == null
           for (final v in title.versions)
             [
               v.fileName,
+              v.folder,
               v.size,
+              v.sampleRate,
               v.modified,
               v.metadata?.id,
               v.metadata?.label,
@@ -83,10 +85,7 @@ void expectAsFullScan(TitleScan scan, ScanResult full, String dir) {
     for (final MapEntry(:key, :value) in full.stamps.entries)
       if (_below(key, dir)) key: value,
   });
-  expect(scan.subprojects, {
-    for (final MapEntry(:key, :value) in full.subprojects.entries)
-      if (_below(key, dir)) key: value,
-  });
+
   expect(scan.issues.items, {
     for (final (kind, items) in full.issues.sections)
       if (kind != ReportKind.duplicateVersionId &&
@@ -119,32 +118,35 @@ void main() {
     const other = 'band/album/other';
     final shared = VersionId.generate();
 
-    /// A layout library: [song] with versions, pool, subproject, issues and
-    /// a corrupted project; [other] sharing a version id and a media file.
+    /// A layout library: [song] with version folders, media, a subproject,
+    /// issues and a corrupted project; [other] sharing a version id and a
+    /// media file.
     void fill() {
       storage
-        ..put('$song/v1.rpp', project([r'Media\a.wav'], id: shared))
+        ..put('$song/v1/v1.rpp', project([r'Media\a.wav'], id: shared))
+        ..put('$song/v1/Media/a.wav', 'a')
+        ..put('$song/v1/Media/sub.rpp', project([r'..\..\x\y.wav']))
+        ..put('$song/v1/Media/deep/x.rpp', project([]))
+        ..put('$song/v1/mix/deep.rpp', project([]))
+        ..put('$song/v1/mix/.node.json', '{"nodeId":"N","level":"title"}')
         ..put(
-          '$song/v2.rpp',
+          '$song/v2/v2.rpp',
           project([
             r'Media\a.wav',
-            r'..\other\Media\b.wav',
-            r'..\other\Media\none.wav',
+            r'..\..\other\o1\Media\b.wav',
+            r'..\..\other\o1\Media\none.wav',
+            r'..\v1\Media\a.wav',
             r'Media\gone.wav',
             r'C:\Users\someone\c.wav',
-            r'..\..\..\..\d.wav',
+            r'..\..\..\..\..\d.wav',
           ], record: 'audio'),
         )
-        ..put('$song/bad.rpp', '<REAPER_PROJECT  <TRACK')
-        ..put('$song/Media/a.wav', 'a')
-        ..put('$song/Media/sub.rpp', project([r'a.wav', r'..\..\x\y.wav']))
-        ..put('$song/Media/deep/x.rpp', project([]))
-        ..put('$song/mix/deep.rpp', project([]))
-        ..put('$song/mix/.node.json', '{"nodeId":"N","level":"title"}')
-        ..put('$song/.trash/old.rpp', project([]))
+        ..put('$song/v2/Media/a.wav', 'a')
+        ..put('$song/bad/bad.rpp', '<REAPER_PROJECT  <TRACK')
+        ..put('$song/.trash/old/old.rpp', project([]))
         ..put('$song/notes.txt', 'n')
-        ..put('$other/v1.rpp', project([r'Media\b.wav'], id: shared))
-        ..put('$other/Media/b.wav', 'b');
+        ..put('$other/o1/o1.rpp', project([r'Media\b.wav'], id: shared))
+        ..put('$other/o1/Media/b.wav', 'b');
     }
 
     test('finds in one title what the full scan finds there', () async {
@@ -154,7 +156,7 @@ void main() {
       storage.log.clear();
       // Changes made by version actions: a project, the node file.
       storage.put(
-        '$song/v2.rpp',
+        '$song/v2/v2.rpp',
         project([r'Media\a.wav'], id: VersionId.generate()),
         modified: DateTime(2027),
       );
@@ -171,22 +173,27 @@ void main() {
         stored: first,
       );
 
-      // Only its folder listed; one stat per reference leaving it; only
-      // the changed files and the corrupted project read again.
+      // Only its folder listed; no reference leaving it any more; only the
+      // changed files and the corrupted project read again.
       expect(storage.listed, ['$song/**']);
-      expect(storage.stats, ['band/album/x/y.wav']);
+      expect(storage.stats, isEmpty);
       expect(
         storage.reads,
-        unorderedEquals(['$song/v2.rpp', '$song/.node.json', '$song/bad.rpp']),
+        unorderedEquals([
+          '$song/v2/v2.rpp',
+          '$song/.node.json',
+          '$song/bad/bad.rpp',
+        ]),
       );
       expect(storage.log, ['write $song/.node.json']);
       expectAsFullScan(result, await scan(storage, lib, previous: first), song);
       expect(result.title!.statusOf(result.title!.versions.first), 'mixing');
-      expect(result.corrupted, ['$song/bad.rpp']);
-      expect(result.orphanNodes, ['$song/mix/.node.json']);
+      expect(result.title!.status, 'mixing');
+      expect(result.corrupted, ['$song/bad/bad.rpp']);
+      expect(result.orphanNodes, ['$song/v1/mix/.node.json']);
       expect(
         result.issues.items[ReportKind.projectTooDeep]!.map((i) => i.path),
-        ['$song/mix/deep.rpp'],
+        ['$song/v1/mix/deep.rpp'],
       );
     });
 
@@ -206,19 +213,21 @@ void main() {
       expect(
         storage.stats,
         unorderedEquals([
-          'band/album/other/Media/b.wav',
-          'band/album/other/Media/none.wav',
-          'band/album/x/y.wav',
+          'band/album/other/o1/Media/b.wav',
+          'band/album/other/o1/Media/none.wav',
         ]),
       );
+      // Media of another title or of another version: outside the version.
       expect(result.issues.items[ReportKind.mediaOutsidePool], [
-        const ReportItem('$song/v2.rpp', r'..\other\Media\b.wav'),
+        const ReportItem(
+          '$song/v2/v2.rpp',
+          '..\\..\\other\\o1\\Media\\b.wav\n..\\v1\\Media\\a.wav',
+        ),
       ]);
       expect(result.issues.items[ReportKind.missingMedia], [
-        const ReportItem('$song/Media/sub.rpp', r'..\..\x\y.wav'),
         const ReportItem(
-          '$song/v2.rpp',
-          '..\\other\\Media\\none.wav\nMedia\\gone.wav',
+          '$song/v2/v2.rpp',
+          '..\\..\\other\\o1\\Media\\none.wav\nMedia\\gone.wav',
         ),
       ]);
       expectAsFullScan(result, first, song);
@@ -232,7 +241,7 @@ void main() {
 
       final result = await scanTitle(storage, lib, titleAt(first, song));
 
-      expect(storage.reads, contains('$song/v1.rpp'));
+      expect(storage.reads, contains('$song/v1/v1.rpp'));
       expectAsFullScan(result, first, song);
     });
 
@@ -240,9 +249,9 @@ void main() {
       final lib = library(Layout.classic())
           .withKnownValues(const [KnownValue('band')]);
       storage
-        ..put('band/loose/v.rpp', project([r'Media\a.wav']))
-        ..put('band/loose/Media/a.wav', 'a')
-        ..put('band/loose/sub/deep.rpp', project([]));
+        ..put('band/loose/v/v.rpp', project([r'Media\a.wav']))
+        ..put('band/loose/v/Media/a.wav', 'a')
+        ..put('band/loose/v/sub/deep.rpp', project([]));
       final first = await scan(storage, lib);
       final loose = titleAt(first, 'band/loose');
       expect(loose.tags['album'], Layout.unassigned);
@@ -250,6 +259,7 @@ void main() {
       final result = await scanTitle(storage, lib, loose, stored: first);
 
       expect(result.title!.tags, loose.tags);
+      expect(result.title!.versions.single.fileName, 'v/v.rpp');
       expect(result.issues.items, isEmpty);
       expectAsFullScan(result, first, 'band/loose');
     });
@@ -338,9 +348,9 @@ void main() {
 
       test('gives no title once its last project is purged', () async {
         final lib = library(Layout.classic());
-        storage.put('$song/v1.rpp', project([]));
+        storage.put('$song/v1/v1.rpp', project([]));
         final first = await scan(storage, lib);
-        storage.files.remove('$song/v1.rpp');
+        storage.files.remove('$song/v1/v1.rpp');
 
         final result = await scanTitle(
           storage,
@@ -379,7 +389,7 @@ void main() {
 
       test('lets a failed listing through', () async {
         final lib = library(Layout.classic());
-        storage.put('$song/v1.rpp', project([]));
+        storage.put('$song/v1/v1.rpp', project([]));
         final first = await scan(storage, lib);
 
         await expectLater(
@@ -398,7 +408,7 @@ void main() {
       await createVersion(
         mounted,
         song,
-        'v1.rpp',
+        'v1',
         VersionMetadata(id: VersionId.generate()),
       );
       final first = await scan(mounted, lib);

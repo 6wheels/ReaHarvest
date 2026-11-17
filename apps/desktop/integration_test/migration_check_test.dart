@@ -34,9 +34,9 @@ void main() {
   /// A title in place, a project in a member subfolder, an album at the
   /// artist level, then the app started on the library.
   Future<void> start(WidgetTester tester) async {
-    h.copyCleanProject('Band/Artist/Album/Song/v1.rpp');
-    h.copyCleanProject('Band/Artist/Album/Song/Alice/take.rpp');
-    h.copyCleanProject('Band/Live/Ballad/v1.rpp');
+    h.copyCleanProject('Band/Artist/Album/Song/v1/v1.rpp');
+    h.copyCleanProject('Band/Artist/Album/Song/v1/Alice/take.rpp');
+    h.copyCleanProject('Band/Live/Ballad/v1/v1.rpp');
     await h.writeSettings();
     await h.start(tester);
     await tapText(tester, 'Later');
@@ -74,7 +74,7 @@ void main() {
     tester,
   ) async {
     await start(tester);
-    final take = h.path('Band/Artist/Album/Song/Alice/take.rpp');
+    final take = h.path('Band/Artist/Album/Song/v1/Alice/take.rpp');
     final original = File(take).readAsBytesSync();
 
     await fixSection(tester, tooDeep);
@@ -90,10 +90,10 @@ void main() {
     expect(
       migration.inventory.files.keys,
       containsAll([
-        'Artist/Album/Song/v1.rpp',
-        'Artist/Album/Song/Alice/take.rpp',
-        'Artist/Album/Song/Alice/Media/01-261108_1921.wav',
-        'Live/Ballad/v1.rpp',
+        'Artist/Album/Song/v1/v1.rpp',
+        'Artist/Album/Song/v1/Alice/take.rpp',
+        'Artist/Album/Song/v1/Alice/Media/01-261108_1921.wav',
+        'Live/Ballad/v1/v1.rpp',
       ]),
     );
     expect(migration.inventory.files.keys, isNot(contains('.library.json')));
@@ -141,7 +141,7 @@ void main() {
     // Its report opens, empty: nothing was done.
     expect(find.text('Nothing to report.'), findsOne);
     await tapText(tester, 'Close');
-    expect(File(h.path('Band/Live/Ballad/v1.rpp')).existsSync(), isTrue);
+    expect(File(h.path('Band/Live/Ballad/v1/v1.rpp')).existsSync(), isTrue);
     final interrupted = (await latest(tester))!;
     expect(interrupted.inventory.isComplete, isFalse);
     // The item is still to sort.
@@ -152,7 +152,10 @@ void main() {
     expect(find.text('Folders moved · 1'), findsOne);
     expect(find.textContaining(lost), findsNothing);
     await tapText(tester, 'Close');
-    expect(File(h.path('Band/Artist/Live/Ballad/v1.rpp')).existsSync(), isTrue);
+    expect(
+      File(h.path('Band/Artist/Live/Ballad/v1/v1.rpp')).existsSync(),
+      isTrue,
+    );
     final resumed = (await latest(tester))!;
     expect(resumed.folder, interrupted.folder);
     expect(resumed.inventory.isComplete, isTrue);
@@ -162,7 +165,7 @@ void main() {
   testWidgets('reports a file changed during a batch', (tester) async {
     await start(tester);
     final media = File(
-      h.path('Band/Artist/Album/Song/Media/01-261108_1921.wav'),
+      h.path('Band/Artist/Album/Song/v1/Media/01-261108_1921.wav'),
     );
 
     // Another member's change lands while the fix runs, after the
@@ -192,7 +195,10 @@ void main() {
     );
     expect(find.text('Folders moved · 1'), findsOne);
     await tapText(tester, 'Close');
-    expect(File(h.path('Band/Artist/Live/Ballad/v1.rpp')).existsSync(), isTrue);
+    expect(
+      File(h.path('Band/Artist/Live/Ballad/v1/v1.rpp')).existsSync(),
+      isTrue,
+    );
 
     // The next batch takes a fresh inventory, holding the change: no gap.
     await fixSection(tester, tooDeep);

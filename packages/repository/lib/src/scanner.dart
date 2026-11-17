@@ -26,7 +26,6 @@ final class ScanResult {
     this.corrupted = const [],
     this.orphanNodes = const [],
     this.stamps = const {},
-    this.subprojects = const {},
     this.freeTree = false,
     this.journalPosition,
   });
@@ -60,11 +59,6 @@ final class ScanResult {
   /// path; used to skip unchanged files on the next scan.
   final Map<String, FileStamp> stamps;
 
-  /// Media references of the projects found in the pool of a title
-  /// (subprojects, `<SOURCE RPP_PROJECT`), by path; used to check them
-  /// without reading them again when unchanged.
-  final Map<String, List<String>> subprojects;
-
   /// Whether the library is a free tree (SPEC §3.3).
   final bool freeTree;
 
@@ -84,7 +78,6 @@ final class ScanResult {
       for (final MapEntry(:key, :value) in stamps.entries)
         if (!paths.contains(key)) key: value,
     },
-    subprojects: subprojects,
     freeTree: freeTree,
     journalPosition: journalPosition,
   );
@@ -122,8 +115,10 @@ Future<ScanResult> scanFolder(
 /// except those a migration rewrote after [journalPosition] (the position
 /// stored with [previous], [rewrittenSince]); free tree projects are never
 /// read (no metadata, SPEC §3.3). A layout folder is a node only if a
-/// project lies in it or below it (outside the reserved title folders), or,
-/// for a title, if its trash or history still holds one (#54).
+/// project lies in it or below it (outside the reserved title and version
+/// folders), or, for a title, if its trash or the history of one of its
+/// versions still holds one (#54). The versions of a title are the projects
+/// of its subfolders, reserved ones aside (SPEC §3.2).
 ///
 /// With [writeNodes] (root of a `local` library, workspace), missing
 /// `.node.json` files are written for these nodes and for free tree titles:
@@ -156,7 +151,6 @@ typedef TitleScan = ({
 
   /// Stamps of the files of the title folder.
   Map<String, FileStamp> stamps,
-  Map<String, List<String>> subprojects,
 
   /// Issues whose path is below the title folder, duplicated version
   /// identifiers aside (they span titles).
@@ -221,7 +215,21 @@ final class _Scanner {
   final issues = <ReportKind, List<ReportItem>>{};
   final corrupted = <String>[];
   final stamps = <String, FileStamp>{};
-  final subprojects = <String, List<String>>{};
+
+  /// Bytes of every file below each folder, excluded ones too, by category
+  /// relative to that folder (version sizes).
+  final sizes = <String, Map<SizeCategory, int>>{};
+
+  /// Folders holding files, by parent folder.
+  late final children = () {
+    final children = <String, List<String>>{};
+    for (final folder in files.keys) {
+      if (folder.isNotEmpty) {
+        children.putIfAbsent(parentOf(folder), () => []).add(folder);
+      }
+    }
+    return children;
+  }();
 
   /// Lowercase paths of every file, excluded ones too, to find missing
   /// media (case-insensitive like Windows and macOS).
@@ -243,12 +251,7 @@ final class _Scanner {
     final orphanNodes = _orphanNodes();
     titles.sort((a, b) => a.path.compareTo(b.path));
     _findDuplicates();
-    if (layout != null) {
-      for (final t in titles) {
-        await _readSubprojects(t.path);
-      }
-      titles.forEach(_checkMedia);
-    }
+    if (layout != null) titles.forEach(_checkMedia);
     _sort();
     return ScanResult(
       titles: titles,
@@ -257,7 +260,6 @@ final class _Scanner {
       corrupted: corrupted,
       orphanNodes: orphanNodes,
       stamps: stamps,
-      subprojects: subprojects,
       freeTree: layout == null,
       journalPosition: journalPosition,
     );
@@ -275,7 +277,6 @@ final class _Scanner {
         : await _layoutTitle(previous, layout);
     if (title != null) titles.add(title);
     if (title != null && layout != null) {
-      await _readSubprojects(dir);
       await _statOutside(title);
       _checkMedia(title);
     }
@@ -285,7 +286,6 @@ final class _Scanner {
       title: title,
       node: nodes[dir],
       stamps: stamps,
-      subprojects: subprojects,
       issues: Report(issues),
       corrupted: corrupted,
       orphanNodes: orphanNodes,
@@ -313,8 +313,7 @@ final class _Scanner {
     final dir = previous.path;
     final depth = layout.levels.length;
     final tooHigh = _depth(dir) < depth;
-    if (!_qualified(depth).contains(dir) ||
-        (tooHigh && _projects(dir).isEmpty)) {
+    if (!_qualified(depth).contains(dir) || (tooHigh && !_holdsTitle(dir))) {
       return null;
     }
     final node = await _node(dir, layout.leaf.key);
@@ -329,7 +328,7 @@ final class _Scanner {
   }
 
   /// Adds to [existing] the files outside the folder of [title] that its
-  /// versions and subprojects refer to, one `stat` per reference.
+  /// versions refer to, one `stat` per reference.
   Future<void> _statOutside(Title title) async {
     final inside = '${title.path}/'.toLowerCase();
     final checked = <String>{};
@@ -349,14 +348,11 @@ final class _Scanner {
     for (final v in title.versions) {
       await check(joinPath(title.path, v.fileName), v.media);
     }
-    for (final MapEntry(:key, :value) in subprojects.entries) {
-      await check(key, value);
-    }
   }
 
-  /// Records the listed entry [e]: every file in [existing]; folders,
-  /// files and stamps outside the excluded ones; traces of projects kept
-  /// in a trash or history.
+  /// Records the listed entry [e]: every file in [existing] and in the
+  /// folder sizes; folders, files and stamps outside the excluded ones;
+  /// traces of projects kept in a trash or history.
   void _add(StorageEntry e) {
     final segments = e.path.split('/');
     final parents = segments.sublist(0, segments.length - 1);
@@ -365,13 +361,9 @@ final class _Scanner {
         segments.first == migrationFolderName) {
       return;
     }
+    if (!e.isDirectory) _addSize(segments, e.size);
     if (parents.any(isExcludedFolder)) {
-      final last = parents.lastOrNull?.toLowerCase();
-      if (!e.isDirectory &&
-          (last == trashFolderName || last == historyFolderName) &&
-          isProjectFile(e.path)) {
-        traces.add(parentOf(parentOf(e.path)));
-      }
+      if (!e.isDirectory && isProjectFile(e.path)) _addTrace(parents);
       return;
     }
     if (e.isDirectory) {
@@ -379,6 +371,52 @@ final class _Scanner {
     } else if (!isExcludedFile(segments.last)) {
       files.putIfAbsent(parentOf(e.path), () => []).add(e);
       stamps[e.path] = _stamp(e);
+    }
+  }
+
+  /// Adds the [size] of the file [segments] to each of its folders, in the
+  /// category it has from there.
+  void _addSize(List<String> segments, int size) {
+    for (var i = 0; i < segments.length; i++) {
+      final dir = segments.take(i).join('/');
+      final category = _categoryOf(segments.sublist(i));
+      final bytes = sizes.putIfAbsent(dir, () => {});
+      bytes[category] = (bytes[category] ?? 0) + size;
+    }
+  }
+
+  /// Category of the file [relative] (path segments) in a version folder.
+  static SizeCategory _categoryOf(List<String> relative) {
+    final name = relative.last.toLowerCase();
+    if (relative.length == 1) {
+      if (isProjectFile(name)) return SizeCategory.project;
+      if (name.endsWith('.rpp-bak') || name.endsWith('.rpp-undo')) {
+        return SizeCategory.reaperBackups;
+      }
+      return SizeCategory.other;
+    }
+    return switch (relative.first.toLowerCase()) {
+      'media' => SizeCategory.media,
+      'renders' => SizeCategory.renders,
+      historyFolderName => SizeCategory.history,
+      'backups' => SizeCategory.reaperBackups,
+      _ => SizeCategory.other,
+    };
+  }
+
+  /// Records the title of a project kept in the folders [parents]: the
+  /// folder holding the trash, for a project in it or in a version folder
+  /// in it (`<title>/.trash/<version>/`); the folder above the version
+  /// holding the history, for a backup (`<title>/<version>/.history/`).
+  void _addTrace(List<String> parents) {
+    final i = parents.indexWhere(isExcludedFolder);
+    final kept = parents.length - i - 1;
+    final base = parents.take(i).join('/');
+    switch (parents[i].toLowerCase()) {
+      case trashFolderName when kept <= 1:
+        traces.add(base);
+      case historyFolderName when kept == 0 && base.isNotEmpty:
+        traces.add(parentOf(base));
     }
   }
 
@@ -507,12 +545,17 @@ final class _Scanner {
   void _issue(ReportKind kind, ReportItem item) =>
       issues.putIfAbsent(kind, () => []).add(item);
 
-  /// Reports the projects of [dir], a folder inside a title (member or
-  /// status subfolder…), as too deep, their title as target; nothing in a
-  /// reserved title folder (`Media/`…).
+  /// Reports the projects of [dir], a folder inside a version folder, as
+  /// too deep, their title as target; nothing in a version folder itself
+  /// (its projects are versions) nor in a reserved folder (`Assets/`,
+  /// `Media/`…).
   void _reportTooDeep(String dir, List<String> segments, Layout layout) {
     final depth = layout.levels.length;
-    if (isReservedTitleFolder(segments[depth])) return;
+    if (isReservedTitleFolder(segments[depth]) ||
+        segments.length == depth + 1 ||
+        isReservedVersionFolder(segments[depth + 1])) {
+      return;
+    }
     for (final e in _projects(dir)) {
       _issue(
         ReportKind.projectTooDeep,
@@ -540,46 +583,16 @@ final class _Scanner {
     }
   }
 
-  /// Reads the media references of the projects in the pool of the title
-  /// [dir] (subprojects), unless unchanged since the previous scan;
-  /// unreadable ones are reported as corrupted.
-  Future<void> _readSubprojects(String dir) async {
-    final pool = joinPath(dir, mediaFolderName).toLowerCase();
-    for (final MapEntry(key: folder, value: entries) in files.entries) {
-      if (folder.toLowerCase() != pool) continue;
-      for (final e in entries.where(_isProject)) {
-        if (previous.stamps[e.path] == stamps[e.path]) {
-          if (previous.subprojects[e.path] case final refs?) {
-            subprojects[e.path] = refs;
-            continue;
-          }
-        }
-        try {
-          final (:text, encoding: _) = await readProject(storage, e.path);
-          subprojects[e.path] = RppProject.parse(text).mediaFiles;
-        } on Object catch (error) {
-          if (!_isCorruption(error)) rethrow;
-          corrupted.add(e.path);
-        }
-      }
-    }
-  }
-
-  /// Reports the versions of [title] whose media are not all present in its
-  /// pool (outside `Media/`, missing, absolute or outside the library),
-  /// whose record path is not `Media` or whose render target is not in
-  /// `Renders/` (SPEC §4.3, §5.8 step 3).
+  /// Reports the versions of [title] whose media are not all present in the
+  /// `Media/` of their version folder (outside it, missing, absolute or
+  /// outside the library), whose record path is not `Media` or whose render
+  /// target is not in `Renders/` (SPEC §4.3, §5.8 step 3).
   void _checkMedia(Title title) {
-    final dir = title.path;
-    final pool = '${joinPath(dir, mediaFolderName)}/'.toLowerCase();
-    final renders = joinPath(dir, rendersFolderName).toLowerCase();
-    for (final MapEntry(key: path, value: refs) in subprojects.entries) {
-      if ('${parentOf(path)}/'.toLowerCase() == pool) {
-        _checkReferences(path, refs, pool);
-      }
-    }
     for (final v in title.versions) {
-      final path = joinPath(dir, v.fileName);
+      final path = joinPath(title.path, v.fileName);
+      final dir = parentOf(path);
+      final pool = '${joinPath(dir, mediaFolderName)}/'.toLowerCase();
+      final renders = joinPath(dir, rendersFolderName).toLowerCase();
       _checkReferences(path, v.media, pool);
       final record = resolveReference(dir, v.recordPath ?? '');
       if (record?.toLowerCase() != pool.substring(0, pool.length - 1)) {
@@ -622,20 +635,36 @@ final class _Scanner {
     report(ReportKind.externalMedia, external);
   }
 
-  /// Versions of the projects in the title [dir]; unreadable ones are
-  /// reported as corrupted.
+  /// Versions of the title [dir]: the projects of its subfolders, reserved
+  /// ones aside (SPEC §3.2); unreadable ones are reported as corrupted.
   Future<List<Version>> _readVersions(String dir) async {
     final versions = <Version>[];
-    for (final e in _projects(dir)) {
-      try {
-        versions.add(await _readVersion(dir, e));
-      } on Object catch (error) {
-        if (!_isCorruption(error)) rethrow;
-        corrupted.add(e.path);
+    for (final folder in _versionFolders(dir)) {
+      for (final e in _projects(folder)) {
+        try {
+          versions.add(await _readVersion(dir, folder, e));
+        } on Object catch (error) {
+          if (!_isCorruption(error)) rethrow;
+          corrupted.add(e.path);
+        }
       }
     }
     return versions;
   }
+
+  /// Subfolders of [dir] holding a project, reserved folders aside (a
+  /// `Media/` of the former layout is not a version).
+  Iterable<String> _versionFolders(String dir) => [
+    for (final folder in children[dir] ?? const <String>[])
+      if (!isReservedFolder(p.posix.basename(folder)) &&
+          _projects(folder).isNotEmpty)
+        folder,
+  ];
+
+  /// Whether [dir] holds a title: projects in it (former layout) or in
+  /// version folders.
+  bool _holdsTitle(String dir) =>
+      _projects(dir).isNotEmpty || _versionFolders(dir).isNotEmpty;
 
   /// Whether the intermediate folders [segments] are known values (SPEC
   /// §3.1); always true while the library declares none.
@@ -661,7 +690,7 @@ final class _Scanner {
         ),
       );
     }
-    if (_projects(dir).isNotEmpty) {
+    if (_holdsTitle(dir)) {
       return (
         ReportKind.titleTooHigh,
         ReportItem.misplaced(
@@ -683,7 +712,8 @@ final class _Scanner {
 
   /// Layout folders, up to [depth], that can be nodes: those holding a
   /// project in them or below them, and titles whose trash or history
-  /// holds one; reserved title folders (`Media/`…) never are (#54).
+  /// holds one; reserved folders (`Assets/`, `Media/`…) never are, nor is
+  /// anything below them (#54).
   Set<String> _qualified(int depth) {
     final qualified = <String>{};
     void addWithParents(String dir) {
@@ -692,31 +722,38 @@ final class _Scanner {
 
     for (final MapEntry(key: dir, value: entries) in files.entries) {
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
-      if (!entries.any(_isProject) ||
-          segments.take(depth).any(isReservedTitleFolder)) {
-        continue;
-      }
+      if (!entries.any(_isProject) || _isReserved(segments, depth)) continue;
       addWithParents(dir);
     }
     for (final dir in traces) {
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
-      if (segments.length == depth && !segments.any(isReservedTitleFolder)) {
+      if (segments.length == depth && !_isReserved(segments, depth)) {
         addWithParents(dir);
       }
     }
     return qualified;
   }
 
+  /// Whether the folder [segments] is or lies in a reserved folder: a layout
+  /// level named like one, a reserved folder at the place of a version
+  /// folder (at [depth]) or of a version (one level below).
+  static bool _isReserved(List<String> segments, int depth) =>
+      segments.take(depth).any(isReservedFolder) ||
+      (segments.length > depth && isReservedFolder(segments[depth])) ||
+      (segments.length > depth + 1 &&
+          isReservedVersionFolder(segments[depth + 1]));
+
   /// Version without project data (free tree projects are never read).
   static Version _version(String dir, StorageEntry e) => Version(
     fileName: e.path.substring(dir.isEmpty ? 0 : dir.length + 1),
     modified: e.modified,
     size: e.size,
+    sizes: {SizeCategory.project: e.size},
   );
 
   /// The title [dir]; the label and owner of its adopted versions are read
-  /// from [node] at every scan, the label falling back to the file name
-  /// without its extension (SPEC §4.2).
+  /// from [node] at every scan, the label falling back to the version folder
+  /// name (the file name without its extension in a free tree, SPEC §4.2).
   Title _title(
     String dir,
     NodeFile node,
@@ -737,6 +774,7 @@ final class _Scanner {
                 id: m.id,
                 label:
                     node.versionLabels[m.id] ??
+                    v.folder ??
                     p.posix.basenameWithoutExtension(v.fileName),
                 owner: node.versionOwners[m.id] as MemberId?,
               ),
@@ -744,17 +782,24 @@ final class _Scanner {
           else
             v,
       ],
-      status: node.status,
       versionStatuses: node.versionStatuses,
     );
   }
 
-  /// Version of the project [e] in the title [dir], with its metadata,
-  /// tempo, length, counts and plugins; reused from the previous scan if
-  /// unchanged.
-  Future<Version> _readVersion(String dir, StorageEntry e) async {
+  /// Version of the project [e] in the version folder [folder] of the title
+  /// [dir], with its size, metadata, tempo, sample rate, length, counts and
+  /// plugins; its project data reused from the previous scan if unchanged.
+  Future<Version> _readVersion(
+    String dir,
+    String folder,
+    StorageEntry e,
+  ) async {
+    final name = p.posix.basename(folder);
+    final bytes = sizes[folder] ?? const <SizeCategory, int>{};
     if (previous.stamps[e.path] == stamps[e.path]) {
-      if (previousVersions[e.path] case final v?) return v;
+      if (previousVersions[e.path] case final v?) {
+        return v.withSizes(name, bytes);
+      }
     }
     final (:text, encoding: _) = await readProject(storage, e.path);
     final project = RppProject.parse(text);
@@ -762,7 +807,8 @@ final class _Scanner {
     return Version(
       fileName: base.fileName,
       modified: base.modified,
-      size: base.size,
+      size: 0,
+      sampleRate: project.sampleRate,
       metadata: VersionMetadata.fromExtState(
         project.extState(VersionMetadata.section),
       ),
@@ -777,7 +823,7 @@ final class _Scanner {
       media: project.mediaFiles,
       recordPath: project.recordPath,
       renderFile: project.renderFile,
-    );
+    ).withSizes(name, bytes);
   }
 
   /// Node file of [dir], written with [level] if missing and [writeNodes];

@@ -13,6 +13,7 @@ import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
+import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'library_env.dart';
 
@@ -109,8 +110,9 @@ void main() {
       ..writeAsStringSync('a');
     await scans.scanAll();
     final id = container.read(settingsProvider).libraries.single.id;
-    expect(index.issues(kind: ReportKind.mediaOutsidePool), hasLength(1));
 
+    // The media normalization still works on the pool of a title, whose
+    // projects the scan no longer reads as versions (reworked in #148).
     // The preview plans the operations, without making them.
     final preview = await migration.previewNormalization(id, const [
       'Artist/Album/Other',
@@ -123,21 +125,10 @@ void main() {
 
     await migration.fix(id, const [NormalizeMedia('Artist/Album/Other')]);
 
-    expect(
-      File(p.join(other, 'v.rpp')).readAsStringSync(),
-      contains(r'FILE "Media\a.wav"'),
-    );
-    expect(index.issues(kind: ReportKind.mediaOutsidePool), isEmpty);
-    final title = index.titles().firstWhere((t) => t.tags['title'] == 'Other');
-    expect(title.versions.single.modified, DateTime(2020, 1, 2));
-    // Read again despite the same size and date.
-    expect(title.versions.single.media, [r'Media\a.wav']);
-    expect(
-      index
-          .issues(kind: ReportKind.missingMedia)
-          .where((i) => i.item.path.startsWith('Artist/Album/Other/')),
-      isEmpty,
-    );
+    final project = File(p.join(other, 'v.rpp'));
+    expect(project.readAsStringSync(), contains(r'FILE "Media\a.wav"'));
+    expect(project.lastModifiedSync(), DateTime(2020, 1, 2));
+    expect(File(p.join(other, 'Media', 'a.wav')).existsSync(), isTrue);
   });
 
   test('moves a misplaced project into a title', () async {
@@ -242,12 +233,16 @@ void main() {
     ]);
     final l10n = lookupAppLocalizations(const Locale('en'));
     expect(container.read(tasksProvider).last.label(l10n), 'Fix 2 items');
-    final lifted = index
-        .titles()
-        .firstWhere((t) => t.tags['title'] == 'Song')
-        .versions
-        .firstWhere((v) => v.fileName == 'take.rpp');
-    expect(lifted.metadata!.owner, 'bob');
+    // Lifted into the title folder, not a version folder yet (#148).
+    final lifted = VersionMetadata.fromExtState(
+      RppProject.parse(File(p.join(song, 'take.rpp')).readAsStringSync())
+          .extState(VersionMetadata.section),
+    )!.id;
+    final node = await readNodeFile(
+      MountedFolderStorage(band),
+      'Artist/Album/Song',
+    );
+    expect(node!.versionOwners[lifted], 'bob');
     expect(
       index.titles().map((t) => t.path),
       contains('Artist/_Unassigned/Old'),
@@ -258,14 +253,15 @@ void main() {
     final song = await bandWithSong();
     final band = p.dirname(p.dirname(p.dirname(song)));
     for (final name in ['One', 'Two']) {
-      final dir = Directory(p.join(band, 'Artist', name))..createSync();
+      final dir = Directory(p.join(band, 'Artist', name, name))
+        ..createSync(recursive: true);
       File('../../test/fixtures/tracks.rpp')
           .copySync(p.join(dir.path, '$name.rpp'));
     }
-    Directory(p.join(band, 'Artist', 'Live', 'Three'))
+    Directory(p.join(band, 'Artist', 'Live', 'Three', 'v'))
         .createSync(recursive: true);
     File('../../test/fixtures/tracks.rpp')
-        .copySync(p.join(band, 'Artist', 'Live', 'Three', 'three.rpp'));
+        .copySync(p.join(band, 'Artist', 'Live', 'Three', 'v', 'three.rpp'));
     final entry = container.read(settingsProvider).libraries.single;
     await catalog.setKnownValues(entry, const [
       KnownValue('Artist', [KnownValue('Album')]),

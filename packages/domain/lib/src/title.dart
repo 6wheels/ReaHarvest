@@ -1,6 +1,7 @@
 import 'ids.dart';
 
-/// A title: leaf node folder holding `Media/`, assets and versions.
+/// A title: leaf node folder holding its assets, its trash and one folder
+/// per version (SPEC §3.2).
 final class Title {
   const Title({
     required this.id,
@@ -8,7 +9,6 @@ final class Title {
     required this.path,
     required this.tags,
     this.versions = const [],
-    this.status,
     this.versionStatuses = const {},
   });
 
@@ -33,15 +33,27 @@ final class Title {
 
   final List<Version> versions;
 
-  /// Title status key (e.g. `mixing`); null when not set.
-  final String? status;
-
   /// Status of each version, by [Version.key]. May hold keys of versions
   /// that no longer exist.
   final Map<String, String> versionStatuses;
 
   /// Status of [version]; null when not set.
   String? statusOf(Version version) => versionStatuses[version.key];
+
+  /// Title status, never stored (SPEC §5.9): the highest status of its
+  /// versions in the order of [defaultStatuses], a status outside it
+  /// ranking below; null when no version has one.
+  String? get status {
+    String? best;
+    var rank = -2;
+    for (final v in versions) {
+      final s = statusOf(v);
+      if (s == null) continue;
+      final r = defaultStatuses.indexOf(s);
+      if (r > rank) (best, rank) = (s, r);
+    }
+    return best;
+  }
 }
 
 /// Versions sharing a version id (manual duplicates, e.g. *Save As*,
@@ -94,12 +106,16 @@ final class VersionMetadata {
   }
 }
 
-/// A `.RPP` file in a title folder.
+/// A version of a title: in a layout library, a version folder holding its
+/// `.RPP` (SPEC §3.2); in a free tree, a `.RPP` below the title (SPEC §3.3).
 final class Version {
   const Version({
     required this.fileName,
     required this.modified,
     required this.size,
+    this.folder,
+    this.sizes = const {},
+    this.sampleRate,
     this.metadata,
     this.tempo,
     this.length,
@@ -111,15 +127,26 @@ final class Version {
     this.renderFile,
   });
 
-  /// File path relative to the title folder, `/`-separated: a plain file
-  /// name in layout libraries, possibly nested in a free tree (SPEC §3.3).
-  /// Free in layout libraries, not part of the identity.
+  /// Path of the `.RPP` relative to the title folder, `/`-separated:
+  /// `<version>/<version>.RPP` in layout libraries, possibly nested in a
+  /// free tree (SPEC §3.3). Not part of the identity.
   final String fileName;
 
   /// Version date (file modification time).
   final DateTime modified;
 
+  /// Bytes used: every file of the version folder in layout libraries,
+  /// backups included; the `.RPP` alone in a free tree.
   final int size;
+
+  /// [size] by category of file; empty when unknown.
+  final Map<SizeCategory, int> sizes;
+
+  /// Name of the version folder, in the title folder; null in a free tree.
+  final String? folder;
+
+  /// Project sample rate (`SAMPLERATE`); null when unknown.
+  final int? sampleRate;
 
   /// Null when the file has no metadata yet ("To adopt" section).
   final VersionMetadata? metadata;
@@ -154,11 +181,29 @@ final class Version {
   bool get isAdopted => metadata != null;
 
   /// This version with [metadata] instead of its own.
-  Version withMetadata(VersionMetadata? metadata) => Version(
+  Version withMetadata(VersionMetadata metadata) => _copy(metadata: metadata);
+
+  /// This version in the version folder [folder], whose files weigh
+  /// [sizes]; [size] is their total.
+  Version withSizes(String? folder, Map<SizeCategory, int> sizes) => _copy(
+    folder: folder,
+    sizes: sizes,
+    size: sizes.values.fold<int>(0, (a, b) => a + b),
+  );
+
+  Version _copy({
+    VersionMetadata? metadata,
+    String? folder,
+    int? size,
+    Map<SizeCategory, int>? sizes,
+  }) => Version(
     fileName: fileName,
     modified: modified,
-    size: size,
-    metadata: metadata,
+    size: size ?? this.size,
+    folder: folder ?? this.folder,
+    sizes: sizes ?? this.sizes,
+    sampleRate: sampleRate,
+    metadata: metadata ?? this.metadata,
     tempo: tempo,
     length: length,
     trackCount: trackCount,
@@ -172,6 +217,28 @@ final class Version {
   /// Version identity used for statuses: the version id, or [fileName] when
   /// the version has no metadata (free tree versions, SPEC §3.3).
   String get key => metadata?.id ?? fileName;
+}
+
+/// Kind of the files of a version folder, to tell what takes space (SPEC
+/// §4.3).
+enum SizeCategory {
+  /// The `.RPP` files of the folder.
+  project,
+
+  /// `Media/`.
+  media,
+
+  /// `Renders/`.
+  renders,
+
+  /// The backup points of ReaHarvest (`.history/`).
+  history,
+
+  /// REAPER's own backups: `Backups/`, `.rpp-bak` and `.rpp-undo` files.
+  reaperBackups,
+
+  /// Anything else (peaks, notes…).
+  other,
 }
 
 /// A plugin used by a version, as written in the `.RPP` (SPEC §5.3).

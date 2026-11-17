@@ -718,7 +718,8 @@ Future<void> openVersionInReaper(
 }
 
 /// Text shown when an action fails with [error].
-String failureMessage(AppLocalizations l10n, Object error) =>
-    error is ProjectEncodingException
-    ? l10n.projectEncodingFailed
-    : l10n.actionFailed('$error');
+String failureMessage(AppLocalizations l10n, Object error) => switch (error) {
+  ProjectEncodingException() => l10n.projectEncodingFailed,
+  SharedVersionFolderException() => l10n.sharedVersionFolder,
+  _ => l10n.actionFailed('$error'),
+};

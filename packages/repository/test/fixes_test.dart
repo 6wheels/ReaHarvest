@@ -252,7 +252,7 @@ void main() {
     put(
       'Song/.node.json',
       '{"nodeId":"${newUlid()}","level":"title",'
-          '"status":"mixing","versionStatuses":{"$a":"demo","$b":"demo"},'
+          '"tags":["live"],"versionStatuses":{"$a":"demo","$b":"demo"},'
           '"versionLabels":{"$a":"intro","$b":"lost"},'
           '"versionOwners":{"$a":"alice","$b":"carol"}}',
     );
@@ -263,7 +263,7 @@ void main() {
     put(
       'Band/_Unassigned/Song/.node.json',
       '{"nodeId":"${newUlid()}","level":"title",'
-          '"status":"final","versionStatuses":{"$b":"mixing"},'
+          '"tags":["demo","live"],"versionStatuses":{"$b":"mixing"},'
           '"versionLabels":{"$b":"chorus"},"versionOwners":{"$b":"bob"}}',
     );
     put('Band/_Unassigned/Song/Song.rpp', media);
@@ -282,9 +282,6 @@ void main() {
       const ReportItem('$title/Media/kick (2).wav', 'Song/Media/kick.wav'),
       const ReportItem('$title/Song (2).rpp', 'Song/Song.rpp'),
     ]);
-    expect(report.items[ReportKind.titleStatusDropped], [
-      const ReportItem(title, 'mixing'),
-    ]);
     // The moved project follows its renamed media; the other is untouched.
     expect(
       RppProject.parse(file('$title/Song (2).rpp').readAsStringSync())
@@ -297,7 +294,7 @@ void main() {
     expect(file('$title/Media/snare.wav').existsSync(), isTrue);
     expect(file('$title/Assets/tab.txt').existsSync(), isTrue);
     final node = (await readNodeFile(storage, title))!;
-    expect(node.status, 'final');
+    expect(node.tags, ['demo', 'live']);
     expect(node.versionStatuses, {a: 'demo', b: 'mixing'});
     // Labels and owners of both sides; the target wins on a same id.
     expect(node.versionLabels, {a: 'intro', b: 'chorus'});
@@ -327,7 +324,7 @@ void main() {
         'Band 2/Album/One/one.rpp',
       ),
     ]);
-    expect(report.items[ReportKind.titleStatusDropped], isEmpty);
+    expect(report.items[ReportKind.titleStatusDropped], isNull);
     expect(file('Band/Album/Two/two.rpp').existsSync(), isTrue);
     expect(file('${m.folder}/merged/Band 2/.node.json').existsSync(), isTrue);
     expect(await noLoss(m), isTrue);
@@ -562,18 +559,40 @@ void main() {
       put('$other/b.rpp', theirs);
       put('$other/Media/y.wav', 'y');
       put('$other/Media/sub.rpp', rpp([r'..\..\Song\audio\x.wav']));
-      final library = Library(
-        id: LibraryId.generate(),
-        mode: LibraryMode.local,
-        layout: Layout.classic(),
+      // Usage of the media by the projects of both titles (pool layout,
+      // which the scan no longer reads as versions).
+      Future<Map<String, List<String>>> usage() async => mediaUsage(
+        ScanResult(
+          titles: [
+            for (final (title, files) in [
+              (other, ['b.rpp', 'Media/sub.rpp']),
+              (song, ['a.rpp']),
+            ])
+              Title(
+                id: NodeId.generate(),
+                libraryId: const LibraryId('L'),
+                path: title,
+                tags: const {},
+                versions: [
+                  for (final f in files)
+                    Version(
+                      fileName: f,
+                      modified: DateTime(2026),
+                      size: 0,
+                      media: RppProject.parse(
+                        file('$title/$f').readAsStringSync(),
+                      ).mediaFiles,
+                    ),
+                ],
+              ),
+          ],
+        ),
       );
-      Future<Map<String, List<String>>> usage() async =>
-          mediaUsage(await scan(storage, library));
       expect(await usage(), {
         '$song/audio/x.wav': [
           '$other/b.rpp',
-          '$song/a.rpp',
           '$other/Media/sub.rpp',
+          '$song/a.rpp',
         ],
         '$other/Media/y.wav': ['$other/b.rpp'],
       });

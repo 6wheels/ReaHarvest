@@ -66,7 +66,7 @@ Future<MediaPlan> planTitle(
 }
 
 /// Projects referencing each media of the library, by file path, from the
-/// versions of the titles of [result] and the subprojects of their pools.
+/// versions of the titles of [result].
 /// Projects outside the titles are not indexed, hence not listed.
 Map<String, List<String>> mediaUsage(ScanResult result) {
   final usage = <String, List<String>>{};
@@ -83,7 +83,6 @@ Map<String, List<String>> mediaUsage(ScanResult result) {
       add(joinPath(title.path, v.fileName), v.media);
     }
   }
-  result.subprojects.forEach(add);
   return usage;
 }
 
@@ -276,8 +275,7 @@ String _rootName(String path) {
 /// backups, history or trash.
 bool _inReservedFolder(String titleDir, String path) {
   final segments = relativeTo(titleDir, path).split('/');
-  return isReservedTitleFolder(segments.first) ||
-      segments.any(isExcludedFolder);
+  return isReservedFolder(segments.first) || segments.any(isExcludedFolder);
 }
 
 /// References and record path of the project [path], and which of

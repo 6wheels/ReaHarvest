@@ -37,11 +37,15 @@ List<Title> demoTitles() {
           'album': 'Album ${i ~/ 4 + 1}',
           'title': name,
         },
-        status: statuses[i % statuses.length],
+        // The title status is the one of its first version.
+        versionStatuses: {
+          i == 3 ? '$name v1/$name v1.rpp' : 'demo-$i-0':
+              ?statuses[i % statuses.length],
+        },
         versions: [
           for (var v = 0; v <= i % 5; v++)
             Version(
-              fileName: '$name v${v + 1}.rpp',
+              fileName: '$name v${v + 1}/$name v${v + 1}.rpp',
               modified: now.subtract(Duration(days: i * 9 + v)),
               size: 1,
               tempo: 72.0 + i * 7,
@@ -52,7 +56,11 @@ List<Title> demoTitles() {
                       owner: const MemberId('demo-member'),
                       label: 'take ${v + 1}',
                     ),
-            ),
+            ).withSizes('$name v${v + 1}', const {
+              SizeCategory.project: 2 * 1024,
+              SizeCategory.media: 3 * 1024 * 1024,
+              SizeCategory.history: 512 * 1024,
+            }),
         ],
       ),
   ];

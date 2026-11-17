@@ -19,7 +19,7 @@ enum _Source { blank, template, duplicate }
 
 /// Asks for a new version of [title] (blank, from a template, or a copy of
 /// [selected]) and creates it; a copy of [selected] first when [duplicate].
-/// Returns its file name, null when cancelled.
+/// Returns its [Version.fileName], null when cancelled.
 Future<String?> showNewVersionDialog(
   BuildContext context,
   Title title,
@@ -77,7 +77,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
           .read(versionActionsProvider)
           .addVersion(
             widget.title,
-            withProjectExtension(_name.text),
+            versionNameOf(_name.text),
             _label.text,
             source: _source == _Source.duplicate ? widget.selected : null,
             template: _source == _Source.template ? _template : null,
@@ -147,9 +147,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
                   if (selected != null)
                     source(
                       _Source.duplicate,
-                      l10n.versionSourceDuplicate(
-                        p.posix.withoutExtension(selected.fileName),
-                      ),
+                      l10n.versionSourceDuplicate(versionName(selected)),
                     ),
                 ],
               ),
@@ -187,7 +185,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
               onChanged: (_) => setState(() => _nameEdited = true),
               onSubmitted: (_) => ready ? _create() : null,
               decoration: InputDecoration(
-                labelText: l10n.fileName,
+                labelText: l10n.versionFolderName,
                 helperText: ' ',
                 errorText: error,
                 isDense: true,

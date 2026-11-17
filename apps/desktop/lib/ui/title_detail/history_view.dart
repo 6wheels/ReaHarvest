@@ -12,11 +12,10 @@ import '../widgets.dart';
 
 /// Backup points of a version: open and restore (SPEC §5.4).
 class History extends ConsumerWidget {
-  const History(this.title, this.version, this.id, {super.key});
+  const History(this.title, this.version, {super.key});
 
   final Title title;
   final Version version;
-  final VersionId id;
 
   Future<void> _restore(
     BuildContext context,
@@ -77,7 +76,8 @@ class History extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     final backups =
-        ref.watch(historyProvider(title.id)).value?[id] ?? const <Backup>[];
+        ref.watch(historyProvider((title.id, version.fileName))).value ??
+        const <Backup>[];
     final format = DateFormat.yMMMd(l10n.localeName).add_Hm();
     if (backups.isEmpty) {
       return Text(

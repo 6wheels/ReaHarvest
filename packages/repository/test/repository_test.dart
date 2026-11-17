@@ -109,6 +109,15 @@ void main() {
     layout: layout,
   );
 
+  /// The version folder [folder] of a layout title, its project named
+  /// [file] (`<folder>.RPP` by default).
+  Version version(String folder, [String? file]) => Version(
+    fileName: '$folder/${file ?? '$folder.RPP'}',
+    folder: folder,
+    modified: DateTime(2026),
+    size: 0,
+  );
+
   setUp(() {
     root = Directory.systemTemp.createTempSync('reaharvest_repo_');
     storage = MountedFolderStorage(root.path);
@@ -199,17 +208,23 @@ void main() {
   group('layout scan', () {
     test('finds titles, versions, to sort and to adopt', () async {
       final lib = library(Layout.classic());
-      put('band/album/song/v1.rpp', adopted);
-      put('band/album/song/v2.RPP', unknown);
-      put('band/album/song/v2.rpp-bak', unknown);
-      put('band/album/song/Backups/v2-2024-01-02_1030.rpp', unknown);
-      put('band/album/song/.history/old.rpp', unknown);
-      put('band/album/song/Media/a.wav');
-      put('band/album/song/old-takes/notes.txt');
-      put('band/album/song/old-takes/take.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', adopted);
+      put('band/album/song/v2/v2.RPP', unknown);
+      put('band/album/song/v2/v2.rpp-bak', unknown);
+      put('band/album/song/v2/Backups/v2-2024-01-02_1030.rpp', unknown);
+      put('band/album/song/v2/.history/old.rpp', unknown);
+      put('band/album/song/v2/Media/a.wav');
+      put('band/album/song/v2/Media/sub.rpp', unknown);
+      put('band/album/song/v2/old-takes/notes.txt');
+      put('band/album/song/v2/old-takes/take.rpp', unknown);
       put('band/album/song/Alice/mix/a.rpp', unknown);
-      put('band/_Unassigned/other/v1.rpp', unknown);
-      put('band/_Unassigned/other/copy.rpp', adopted);
+      put('band/album/song/Assets/notes.rpp', unknown);
+      put('band/album/song/.trash/old/old.rpp', unknown);
+      // Left to the title-oriented scan (#147): neither a version nor
+      // reported yet.
+      put('band/album/song/loose.rpp', unknown);
+      put('band/_Unassigned/other/v1/v1.rpp', unknown);
+      put('band/_Unassigned/other/copy/copy.rpp', adopted);
       put('band/loose.rpp', unknown);
       put('root.rpp', unknown);
       put('.collab/x.rpp', unknown);
@@ -223,12 +238,13 @@ void main() {
       final song = result.titles[1];
       expect(song.tags, {'artist': 'band', 'album': 'album', 'title': 'song'});
       expect(song.libraryId, lib.id);
-      expect(song.versions.map((v) => v.fileName), ['v1.rpp', 'v2.RPP']);
+      expect(song.versions.map((v) => v.fileName), ['v1/v1.rpp', 'v2/v2.RPP']);
+      expect(song.versions.map((v) => v.folder), ['v1', 'v2']);
       expect(song.versions[0].isAdopted, isTrue);
       expect(song.versions[1].isAdopted, isFalse);
       expect(layoutIssues(result), {
         ReportKind.projectTooDeep: [
-          for (final path in ['Alice/mix/a.rpp', 'old-takes/take.rpp'])
+          for (final path in ['Alice/mix/a.rpp', 'v2/old-takes/take.rpp'])
             ReportItem.misplaced(
               'band/album/song/$path',
               level: lib.layout!.leaf,
@@ -241,16 +257,71 @@ void main() {
         ],
         ReportKind.duplicateVersionId: [
           for (final path in [
-            'band/_Unassigned/other/copy.rpp',
-            'band/album/song/v1.rpp',
+            'band/_Unassigned/other/copy/copy.rpp',
+            'band/album/song/v1/v1.rpp',
           ])
             ReportItem(path, adoptedId),
         ],
       });
       expect(result.toAdopt.map((e) => '${e.$1.path}/${e.$2.fileName}'), [
-        'band/_Unassigned/other/v1.rpp',
-        'band/album/song/v2.RPP',
+        'band/_Unassigned/other/v1/v1.rpp',
+        'band/album/song/v2/v2.RPP',
       ]);
+    });
+
+    test('sizes a version by every file of its folder, by kind', () async {
+      final lib = library(Layout.classic());
+      const project = blankProject;
+      put('band/album/song/v1/v1.rpp', project);
+      put('band/album/song/v1/v1.rpp-bak', 'b' * 7);
+      put('band/album/song/v1/Media/a.wav', 'a' * 100);
+      put('band/album/song/v1/Media/a.wav.reapeaks', 'x' * 1000);
+      put('band/album/song/v1/Renders/mix.wav', 'r' * 30);
+      put('band/album/song/v1/.history/v1 old.rpp', 'h' * 2000);
+      put('band/album/song/v1/Backups/v1-2026.rpp', 'k' * 40);
+      put('band/album/song/v1/notes.txt', 'n' * 3);
+      put('band/album/song/v2/v2.rpp', project);
+      put('band/album/song/Assets/score.pdf', 'x' * 1000);
+      final counting = CountingStorage(storage);
+
+      final first = await scan(counting, lib);
+      final v1 = first.titles.single.versions.first;
+      expect(v1.sizes, {
+        SizeCategory.project: project.length,
+        SizeCategory.reaperBackups: 47,
+        SizeCategory.media: 1100,
+        SizeCategory.renders: 30,
+        SizeCategory.history: 2000,
+        SizeCategory.other: 3,
+      });
+      expect(v1.size, project.length + 3180);
+      expect(first.titles.single.versions.last.sizes, {
+        SizeCategory.project: project.length,
+      });
+
+      // A backup point added: the size follows, the project is not read
+      // again.
+      put('band/album/song/v1/.history/v1 new.rpp', 'h' * 5);
+      counting.reads.clear();
+      final second = await scan(counting, lib, previous: first);
+      expect(counting.reads, isEmpty);
+      final again = second.titles.single.versions.first;
+      expect(again.sizes[SizeCategory.history], 2005);
+      expect(again.size, project.length + 3185);
+    });
+
+    test('a reserved folder of a title is never a version', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1/v1.rpp', unknown);
+      // Pool of the former layout, renders, REAPER backups at title level.
+      put('band/album/song/Media/sub.rpp', unknown);
+      put('band/album/song/renders/r.rpp', unknown);
+      put('band/album/song/Backups/b.rpp', unknown);
+
+      final result = await scan(storage, lib);
+
+      expect(result.titles.single.versions.map((v) => v.folder), ['v1']);
+      expect(issuePaths(result), isEmpty);
     });
 
     test('writes missing node files and keeps ids on rescan', () async {
@@ -279,7 +350,7 @@ void main() {
     test('sends folders with a wrong node level to sort', () async {
       final lib = library(Layout.classic());
       put('band/album/.node.json', '{"nodeId":"${newUlid()}","level":"title"}');
-      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
 
       final result = await scan(storage, lib);
 
@@ -295,18 +366,20 @@ void main() {
     test('reports corrupted node and project files', () async {
       final lib = library(Layout.classic());
       put('other/broken/.node.json', 'not json');
-      put('other/broken/song/v1.rpp', unknown);
+      put('other/broken/song/v1/v1.rpp', unknown);
       put('other/shape/.node.json', '["array"]');
-      put('other/shape/song/v1.rpp', unknown);
-      put('band/album/song/v1.rpp', unknown);
-      put('band/album/song/bad.rpp', r'<REAPER_PROJECT  <TRACK');
+      put('other/shape/song/v1/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
+      put('band/album/song/bad/bad.rpp', r'<REAPER_PROJECT  <TRACK');
 
       final result = await scan(storage, lib);
 
-      expect(result.titles.single.versions.map((v) => v.fileName), ['v1.rpp']);
+      expect(result.titles.single.versions.map((v) => v.fileName), [
+        'v1/v1.rpp',
+      ]);
       expect(issuePaths(result), isEmpty);
       expect(result.corrupted, [
-        'band/album/song/bad.rpp',
+        'band/album/song/bad/bad.rpp',
         'other/broken/.node.json',
         'other/shape/.node.json',
       ]);
@@ -314,7 +387,10 @@ void main() {
 
     test('folders without projects are not nodes (#54)', () async {
       final lib = library(Layout.classic());
-      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
+      put('band/album/song/Assets/old/old.rpp', unknown);
+      put('band/album/other/Assets/old/old.rpp', unknown);
+      put('band/album/other/v1/Media/sub.rpp', unknown);
       put('band/audio-files/kick.wav', 'x');
       put('band/render/sub/mix.wav', 'x');
       put('band/album/empty/notes.txt', 'x');
@@ -349,10 +425,14 @@ void main() {
 
     test('a title whose versions are all in its trash stays a title', () async {
       final lib = library(Layout.classic());
-      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
       final first = await scan(storage, lib);
       final id = first.titles.single.id;
-      await deleteVersion(storage, 'band/album/song', 'v1.rpp');
+      await deleteVersion(
+        storage,
+        'band/album/song',
+        first.titles.single.versions.single,
+      );
 
       final second = await scan(storage, lib, previous: first);
 
@@ -361,7 +441,7 @@ void main() {
       expect(second.orphanNodes, isEmpty);
 
       await purgeTrash(storage, 'band/album/song', [
-        'band/album/song/.trash/v1.rpp',
+        'band/album/song/.trash/v1',
       ]);
       final third = await scan(storage, lib, previous: second);
       expect(third.titles, isEmpty);
@@ -373,9 +453,20 @@ void main() {
       expect(exists('band/album/song/.node.json'), isTrue);
     });
 
+    test('a title whose versions have backups only stays a title', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1/.history/v1 2026-01-01 000000.rpp', unknown);
+      put('band/album/deep/v1/sub/.history/v1.rpp', unknown);
+
+      final result = await scan(storage, lib);
+
+      expect(result.titles.map((t) => t.path), ['band/album/song']);
+      expect(result.titles.single.versions, isEmpty);
+    });
+
     test('reports node files of folders that are not nodes', () async {
       final lib = library(Layout.classic());
-      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
       put('band/audio-files/.node.json', '{"nodeId": "01X", "level": "album"}');
       put('band/audio-files/kick.wav', 'x');
 
@@ -389,8 +480,8 @@ void main() {
 
     test('is incremental by size and mtime', () async {
       final lib = library(Layout.classic());
-      put('band/album/song/v1.rpp', adopted);
-      put('band/album/song/v2.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', adopted);
+      put('band/album/song/v2/v2.rpp', unknown);
       final counting = CountingStorage(storage);
 
       final first = await scan(counting, lib);
@@ -402,9 +493,9 @@ void main() {
         first.titles.single.versions[0].metadata?.id,
       );
 
-      put('band/album/song/v2.rpp', adopted);
+      put('band/album/song/v2/v2.rpp', adopted);
       final third = await scan(counting, lib, previous: second);
-      expect(counting.reads, ['band/album/song/v2.rpp']);
+      expect(counting.reads, ['band/album/song/v2/v2.rpp']);
       expect(third.toAdopt, isEmpty);
     });
 
@@ -425,38 +516,44 @@ void main() {
         '  >',
         '>',
       ].join('\n');
-      put('band/album/song/Media/a.wav', 'a');
-      put('band/album/song/audio-files/b.wav', 'b');
+      // Paths resolve from the version folder.
+      put('band/album/song/good/Media/a.wav', 'a');
+      put('band/album/song/bad/Media/a.wav', 'a');
+      put('band/album/song/bad/audio-files/b.wav', 'b');
       put(
-        'band/album/song/good.rpp',
+        'band/album/song/good/good.rpp',
         project('Media', r'Renders\mix.wav', [r'Media\a.wav', r'media\A.WAV']),
       );
       put(
-        'band/album/song/bad.rpp',
+        'band/album/song/bad/bad.rpp',
         project('audio-files', r'.\render', [
           r'Media\a.wav',
           r'.\audio-files\b.wav',
+          r'..\good\Media\a.wav',
           r'Media\gone.wav',
           r'C:\Users\someone\c.wav',
-          r'..\..\..\..\d.wav',
+          r'..\..\..\..\..\d.wav',
         ]),
       );
-      put('band/album/song/blank.rpp', project('', '', []));
+      put('band/album/song/blank/blank.rpp', project('', '', []));
 
       final counting = CountingStorage(storage);
       final first = await scan(counting, lib);
 
-      const bad = 'band/album/song/bad.rpp';
-      const blank = 'band/album/song/blank.rpp';
+      const bad = 'band/album/song/bad/bad.rpp';
+      const blank = 'band/album/song/blank/blank.rpp';
       final expected = {
         ReportKind.mediaOutsidePool: [
-          const ReportItem(bad, r'.\audio-files\b.wav'),
+          const ReportItem(
+            bad,
+            '.\\audio-files\\b.wav\n..\\good\\Media\\a.wav',
+          ),
         ],
         ReportKind.missingMedia: [const ReportItem(bad, r'Media\gone.wav')],
         ReportKind.externalMedia: [
           const ReportItem(
             bad,
-            'C:\\Users\\someone\\c.wav\n..\\..\\..\\..\\d.wav',
+            'C:\\Users\\someone\\c.wav\n..\\..\\..\\..\\..\\d.wav',
           ),
         ],
         ReportKind.recordPathNotMedia: [
@@ -472,60 +569,19 @@ void main() {
 
       // Unchanged projects are not read again: their references come from
       // the previous scan, checked against the files present now.
-      put('band/album/song/Media/gone.wav', 'g');
+      put('band/album/song/bad/Media/gone.wav', 'g');
       counting.reads.clear();
       final second = await scan(counting, lib, previous: first);
       expect(counting.reads, isEmpty);
       expect(second.issues.items[ReportKind.missingMedia], isNull);
-      expect(second.issues.items[ReportKind.mediaOutsidePool], [
-        const ReportItem(bad, r'.\audio-files\b.wav'),
-      ]);
-    });
-
-    test('reports the media issues of the subprojects of a pool', () async {
-      final lib = library(Layout.classic());
-      String project(List<String> media) => [
-        '<REAPER_PROJECT 0.1 "7.84/win64" 0',
-        '  <TRACK',
-        for (final m in media) ...[
-          '    <ITEM',
-          '      <SOURCE WAVE',
-          '        FILE "$m"',
-          '      >',
-          '    >',
-        ],
-        '  >',
-        '>',
-      ].join('\n');
-      const sub = 'band/album/song/Media/sub.rpp';
-      put('band/album/song/v1.rpp', unknown);
-      put('band/album/song/Media/v.wav', 'v');
-      put('band/album/song/audio/w.wav', 'w');
-      put(sub, project([r'v.wav', r'..\audio\w.wav', r'C:\Users\x.wav']));
-
-      final counting = CountingStorage(storage);
-      final first = await scan(counting, lib);
-
-      expect(first.subprojects.keys, [sub]);
-      expect(first.issues.items[ReportKind.mediaOutsidePool], [
-        const ReportItem(sub, r'..\audio\w.wav'),
-      ]);
-      expect(first.issues.items[ReportKind.externalMedia], [
-        const ReportItem(sub, r'C:\Users\x.wav'),
-      ]);
       expect(
-        first.issues.items[ReportKind.missingMedia]?.map((i) => i.path),
-        isNot(contains(sub)),
+        second.issues.items[ReportKind.mediaOutsidePool],
+        expected[ReportKind.mediaOutsidePool],
       );
-
-      counting.reads.clear();
-      final second = await scan(counting, lib, previous: first);
-      expect(counting.reads, isEmpty);
-      expect(second.subprojects, first.subprojects);
     });
 
     test('runs in an isolate', () async {
-      put('band/album/song/v1.rpp', adopted);
+      put('band/album/song/v1/v1.rpp', adopted);
       final result = await scanFolder(root.path, library(Layout.classic()));
       expect(result.titles.single.versions.single.isAdopted, isTrue);
     });
@@ -534,27 +590,25 @@ void main() {
   group('statuses', () {
     test('are written to the title node file and read by the scan', () async {
       final lib = library(Layout.classic());
-      put('band/album/song/v1.rpp', adopted);
+      put('band/album/song/v1/v1.rpp', adopted);
       final first = await scan(storage, lib);
       final versionId = first.titles.single.versions.single.metadata!.id;
 
-      await setTitleStatus(storage, 'band/album/song', 'mixing');
       await setVersionStatus(storage, 'band/album/song', versionId, 'done');
       final saved = jsonDecode(
         File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
             .readAsStringSync(),
       );
-      expect(saved['status'], 'mixing');
+      expect(saved.keys, isNot(contains('status')));
       expect(saved['versionStatuses'], {versionId: 'done'});
       expect(saved['nodeId'], first.titles.single.id);
 
       final second = await scan(storage, lib, previous: first);
       final title = second.titles.single;
-      expect(title.status, 'mixing');
+      // The title status is derived from its versions (SPEC §5.9).
+      expect(title.status, 'done');
       expect(title.statusOf(title.versions.single), 'done');
-      expect(second.nodes['band/album/song']!.status, 'mixing');
 
-      await setTitleStatus(storage, 'band/album/song', null);
       await setVersionStatus(storage, 'band/album/song', versionId, '');
       final cleared = (await scan(storage, lib, previous: second)).titles;
       expect(cleared.single.status, isNull);
@@ -571,17 +625,16 @@ void main() {
       await scan(storage, library(null));
       final gone = VersionId.generate();
       await setVersionStatus(storage, 'song', gone, 'idea');
-      await setTitleStatus(storage, 'song', 'writing');
 
       final title = (await scan(storage, library(null))).titles.single;
-      expect(title.status, 'writing');
+      expect(title.status, isNull);
       expect(title.versionStatuses, {gone: 'idea'});
       expect(title.statusOf(title.versions.single), isNull);
     });
 
     test('require an existing node file', () {
       expect(
-        setTitleStatus(storage, 'missing', 'idea'),
+        setVersionStatus(storage, 'missing', 'v', 'idea'),
         throwsA(isA<StateError>()),
       );
     });
@@ -598,12 +651,46 @@ void main() {
           reason: key,
         );
       }
+      for (final tags in [
+        'live',
+        1,
+        ['live', 2],
+      ]) {
+        expect(
+          () => NodeFile.fromJson({
+            'nodeId': newUlid(),
+            'level': 'title',
+            'tags': tags,
+          }),
+          throwsFormatException,
+          reason: '$tags',
+        );
+      }
+    });
+
+    test('keep the tags of a title, none by default', () {
+      final id = NodeId.generate();
+      final bare = NodeFile(id, 'title');
+      expect(bare.tags, isEmpty);
+      expect(bare.toJson().keys, isNot(contains('tags')));
+      final tagged = NodeFile.fromJson({
+        'nodeId': id,
+        'level': 'title',
+        'tags': ['live', 'rehearsal'],
+      });
+      expect(tagged.tags, ['live', 'rehearsal']);
+      expect(tagged.toJson()['tags'], ['live', 'rehearsal']);
+      expect(tagged.withVersionStatus('V', 'idea').tags, ['live', 'rehearsal']);
+      expect(
+        tagged.mergedWith(NodeFile(id, 'title', tags: ['solo', 'live'])).tags,
+        ['live', 'rehearsal', 'solo'],
+      );
     });
   });
 
   group('version labels and owners', () {
     const title = 'band/album/song';
-    const file = '$title/v1.rpp';
+    const file = '$title/v1/v1.rpp';
 
     File project() => File(p.joinAll([root.path, ...file.split('/')]));
 
@@ -642,7 +729,7 @@ void main() {
       expect((cleared.label, cleared.owner), ('v1', null));
     });
 
-    test('fall back to the file name, without owner', () async {
+    test('fall back to the folder name, without owner', () async {
       put(file, adopted);
       final m = (await scan(
         storage,
@@ -673,7 +760,7 @@ void main() {
       final copy = await separateDuplicateVersion(
         storage,
         title,
-        'v1.rpp',
+        'v1/v1.rpp',
         label: 'new',
       );
       final values = RppProject.parse(project().readAsStringSync())
@@ -767,10 +854,12 @@ void main() {
 
   group('project data', () {
     test('scan reads tempo, counts and plugins of layout versions', () async {
-      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
       final result = await scan(storage, library(Layout.classic()));
       final v = result.titles.single.versions.single;
       expect(v.tempo, 128);
+      expect(v.sampleRate, RppProject.parse(unknown).sampleRate);
+      expect(v.sampleRate, isNotNull);
       expect((v.trackCount, v.itemCount), (13, 6));
       expect(v.length, greaterThan(0));
       expect(
@@ -780,10 +869,13 @@ void main() {
     });
 
     test('rescan reads again the files without their stamp', () async {
-      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
       final lib = library(Layout.classic());
       final first = await scan(storage, lib);
-      final path = p.joinAll([root.path, 'band', 'album', 'song', 'v1.rpp']);
+      final path = p.joinAll([
+        root.path,
+        ...'band/album/song/v1/v1.rpp'.split('/'),
+      ]);
       final date = File(path).lastModifiedSync();
       // Same size and date, other content: a migration rewrite.
       File(path)
@@ -794,7 +886,7 @@ void main() {
       final fresh = await scan(
         storage,
         lib,
-        previous: first.withoutStamps({'band/album/song/v1.rpp'}),
+        previous: first.withoutStamps({'band/album/song/v1/v1.rpp'}),
       );
 
       expect(stale.titles.single.versions.single.tempo, 128);
@@ -802,14 +894,14 @@ void main() {
     });
 
     test('duplicates share a version id across titles', () async {
-      put('band/album/song/v1.rpp', adopted);
-      put('band/album/song/copy.rpp', adopted);
-      put('band/album/other/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', adopted);
+      put('band/album/song/copy/copy.rpp', adopted);
+      put('band/album/other/v1/v1.rpp', unknown);
       final result = await scan(storage, library(Layout.classic()));
       final duplicates = duplicateVersions(result.titles);
       expect(duplicates.values.single.map((d) => d.$2.fileName), [
-        'copy.rpp',
-        'v1.rpp',
+        'copy/copy.rpp',
+        'v1/v1.rpp',
       ]);
     });
   });
@@ -821,7 +913,7 @@ void main() {
     /// A folder not organized yet: a title, a member subfolder in it, a
     /// member folder standing at the title depth, loose projects.
     MemoryStorage misorganized() => MemoryStorage()
-      ..put('band/album/song/v1.rpp', adopted)
+      ..put('band/album/song/v1/v1.rpp', adopted)
       ..put('band/album/song/Alice/mix/a.rpp', unknown)
       ..put('band/single/Bob/take.rpp', unknown)
       ..put('band/loose.rpp', unknown)
@@ -879,16 +971,17 @@ void main() {
       expect(result.titles.map((t) => t.path), ['songs/kept']);
     });
 
-    test('scan keeps folders created by former scans', () async {
-      put('band/album/song/v1.rpp', adopted);
-      for (final name in titleFolders) {
+    test('scan keeps the folders of titles and versions', () async {
+      const folders = ['Assets', '.trash', 'v1/Media', 'v1/Renders'];
+      put('band/album/song/v1/v1.rpp', adopted);
+      for (final name in folders) {
         Directory(p.joinAll([root.path, 'band', 'album', 'song', name]))
             .createSync(recursive: true);
       }
 
       await scan(storage, library(Layout.classic()));
 
-      expect(titleFolders.every((n) => dir('band/album/song/$n')), isTrue);
+      expect(folders.every((n) => dir('band/album/song/$n')), isTrue);
       expect(exists('band/album/song/.node.json'), isTrue);
     });
 
@@ -899,9 +992,11 @@ void main() {
       expect(dir('songs/demo/Media'), isFalse);
     });
 
-    test('scaffoldTitle creates the folders and node file', () async {
+    test('scaffoldTitle writes the node file only', () async {
       final node = await scaffoldTitle(storage, 'band/album/song', 'title');
-      expect(titleFolders.every((n) => dir('band/album/song/$n')), isTrue);
+      for (final name in ['Assets', '.trash', 'Media', 'Renders']) {
+        expect(dir('band/album/song/$name'), isFalse, reason: name);
+      }
       final saved = await readNodeFile(storage, 'band/album/song');
       expect((saved!.id, saved.level), (node.id, 'title'));
     });
@@ -915,26 +1010,18 @@ void main() {
         File(p.joinAll([root.path, ...path.split('/')])).readAsStringSync();
 
     test('backs up a version under its name and date', () async {
-      put('$title/Song - chorus.RPP', adopted);
+      const dir = '$title/Song - chorus';
+      const file = 'Song - chorus/Song - chorus.RPP';
+      put('$title/$file', adopted);
 
-      final path = await backupVersion(
-        storage,
-        title,
-        'Song - chorus.RPP',
-        now: when,
-      );
-      final again = await backupVersion(
-        storage,
-        title,
-        'Song - chorus.RPP',
-        now: when,
-      );
+      final path = await backupVersion(storage, title, file, now: when);
+      final again = await backupVersion(storage, title, file, now: when);
 
-      expect(path, '$title/.history/Song - chorus 2026-11-07 153012.RPP');
-      expect(again, '$title/.history/Song - chorus 2026-11-07 153012 (2).RPP');
-      expect(read(path), rebaseProjectPaths(adopted, title, '$title/.history'));
+      expect(path, '$dir/.history/Song - chorus 2026-11-07 153012.RPP');
+      expect(again, '$dir/.history/Song - chorus 2026-11-07 153012 (2).RPP');
+      expect(read(path), rebaseProjectPaths(adopted, dir, '$dir/.history'));
       expect(read(path), isNot(adopted));
-      expect(read('$title/Song - chorus.RPP'), adopted);
+      expect(read('$title/$file'), adopted);
       final result = await scan(storage, library(Layout.classic()));
       expect(result.titles.single.versions, hasLength(1));
     });
@@ -943,47 +1030,56 @@ void main() {
       final id = VersionMetadata.fromExtState(
         RppProject.parse(adopted).extState(VersionMetadata.section),
       )!.id;
-      put('$title/v1.rpp', adopted);
-      put('$title/.history/unknown 2026-01-01 000000.rpp', unknown);
-      put('$title/.history/notes.txt', 'x');
-      await backupVersion(storage, title, 'v1.rpp', now: when);
+      put('$title/v1/v1.rpp', adopted);
+      put('$title/v1/.history/unknown 2026-01-01 000000.rpp', unknown);
+      put('$title/v1/.history/notes.txt', 'x');
+      put('$title/v2/v2.rpp', adopted);
+      await backupVersion(storage, title, 'v1/v1.rpp', now: when);
       await backupVersion(
         storage,
         title,
-        'v1.rpp',
+        'v1/v1.rpp',
         now: when.add(const Duration(days: 1)),
       );
 
-      final history = await readHistory(storage, title);
+      final history = await readHistory(storage, '$title/v1');
 
       expect(history.keys, [id]);
       expect(history[id]!.map((b) => b.created), [
         when.add(const Duration(days: 1)),
         when,
       ]);
-      expect(await readHistory(storage, 'band/album/other'), isEmpty);
+      // Each version has its own history.
+      expect(await readHistory(storage, '$title/v2'), isEmpty);
+      expect(await readHistory(storage, title), isEmpty);
     });
 
     test('restores a backup after backing up the current state', () async {
-      put('$title/v1.rpp', adopted);
-      final backup = await backupVersion(storage, title, 'v1.rpp', now: when);
-      put('$title/v1.rpp', '$adopted\n');
+      const dir = '$title/v1';
+      put('$dir/v1.rpp', adopted);
+      final backup = await backupVersion(
+        storage,
+        title,
+        'v1/v1.rpp',
+        now: when,
+      );
+      put('$dir/v1.rpp', '$adopted\n');
 
       final saved = await restoreBackup(
         storage,
         title,
-        'v1.rpp',
+        'v1/v1.rpp',
         backup,
         now: when.add(const Duration(hours: 1)),
       );
 
-      final history = '$title/.history';
-      expect(read(backup), rebaseProjectPaths(adopted, title, history));
+      const history = '$dir/.history';
+      expect(read(backup), rebaseProjectPaths(adopted, dir, history));
       expect(
-        read('$title/v1.rpp'),
-        rebaseProjectPaths(read(backup), history, title),
+        read('$dir/v1.rpp'),
+        rebaseProjectPaths(read(backup), history, dir),
       );
-      expect(read(saved), rebaseProjectPaths('$adopted\n', title, history));
+      expect(read(saved), rebaseProjectPaths('$adopted\n', dir, history));
     });
 
     const project = r'''<REAPER_PROJECT 0.1 "7.84/win64" 0
@@ -1064,12 +1160,12 @@ void main() {
   group('versions', () {
     const title = 'band/album/song';
 
-    test('suggests a file name from title, label and owner', () {
-      expect(suggestedVersionName('Song', 'chorus B'), 'Song - chorus B.RPP');
-      expect(suggestedVersionName('Song', ' '), 'Song.RPP');
+    test('suggests a name from title, label and owner', () {
+      expect(suggestedVersionName('Song', 'chorus B'), 'Song - chorus B');
+      expect(suggestedVersionName('Song', ' '), 'Song');
       expect(
         suggestedVersionName('Song', 'demo', owner: 'Bob'),
-        'Song - demo - Bob.RPP',
+        'Song - demo - Bob',
       );
     });
     final owner = MemberId.generate();
@@ -1095,19 +1191,17 @@ void main() {
       {for (final k in meta().toExtState().keys) k: null},
     );
 
-    /// [adopted] with every media reference replaced by [ref].
-    String withMedia(String ref, {String record = 'Media'}) => setRootAttribute(
-      rewriteMediaPaths(adopted, (_) => ref),
-      'RECORD_PATH',
-      [record, ''],
-    );
+    bool dir(String path) =>
+        Directory(p.joinAll([root.path, ...path.split('/')])).existsSync();
 
     test('creates a blank version, scanned as adopted', () async {
       await node();
       final m = meta('intro');
-      final path = await createVersion(storage, title, 'Song - intro.RPP', m);
+      final path = await createVersion(storage, title, 'Song - intro', m);
 
-      expect(path, '$title/Song - intro.RPP');
+      expect(path, '$title/Song - intro/Song - intro.RPP');
+      expect(dir('$title/Song - intro/Media'), isTrue);
+      expect(dir('$title/Song - intro/Renders'), isTrue);
       final root = RppProject.parse(read(path)).document.root;
       expect(root.line('RECORD_PATH')!.params, ['Media', '']);
       expect(root.line('RENDER_FILE')!.params, ['Renders']);
@@ -1115,44 +1209,48 @@ void main() {
         'VERSIONID': m.id,
       });
       final result = await scan(storage, library(Layout.classic()));
-      final read2 = result.titles.single.versions.single.metadata!;
+      final scanned = result.titles.single.versions.single;
+      expect(scanned.folder, 'Song - intro');
+      final read2 = scanned.metadata!;
       expect((read2.id, read2.label, read2.owner), (m.id, 'intro', owner));
     });
 
     test('version actions work on a title without its folders', () async {
-      put('$title/v1.rpp', adopted);
+      put('$title/v1/v1.rpp', adopted);
       await scan(storage, library(Layout.classic()));
-      bool dir(String name) =>
-          Directory(p.joinAll([root.path, ...title.split('/'), name]))
-              .existsSync();
-      expect(titleFolders.where(dir), isEmpty);
+      for (final name in ['Assets', '.trash', 'v1/Media', 'v1/.history']) {
+        expect(dir('$title/$name'), isFalse, reason: name);
+      }
 
-      expect(await readHistory(storage, title), isEmpty);
+      expect(await readHistory(storage, '$title/v1'), isEmpty);
       expect(await readTrash(storage, title), isEmpty);
-      expect(await unreferencedMedia(storage, title), isEmpty);
 
-      final created = await createVersion(storage, title, 'Song.RPP', meta());
-      final backup = await backupVersion(storage, title, 'v1.rpp');
-      final trashed = await deleteVersion(storage, title, 'Song.RPP');
+      final created = await createVersion(storage, title, 'Song', meta());
+      final backup = await backupVersion(storage, title, 'v1/v1.rpp');
+      final trashed = await deleteVersion(storage, title, version('Song'));
 
       expect(exists(backup), isTrue);
-      expect((await readHistory(storage, title)).values.single, hasLength(1));
+      expect(
+        (await readHistory(storage, '$title/v1')).values.single,
+        hasLength(1),
+      );
       expect(exists(created), isFalse);
+      expect(trashed, '$title/.trash/Song');
       expect((await readTrash(storage, title)).map((e) => e.path), [trashed]);
     });
 
     test('writes no project when the node file is missing', () async {
       await expectLater(
-        createVersion(storage, title, 'Song.RPP', meta()),
+        createVersion(storage, title, 'Song', meta()),
         throwsStateError,
       );
-      expect(exists('$title/Song.RPP'), isFalse);
+      expect(exists('$title/Song/Song.RPP'), isFalse);
     });
 
     test('writes no owner when none is given', () async {
       await node();
       final m = VersionMetadata(id: VersionId.generate(), label: 'solo');
-      await createVersion(storage, title, 'Song.RPP', m);
+      await createVersion(storage, title, 'Song', m);
       final saved = (await readNodeFile(storage, title))!;
       expect(saved.versionLabels, {m.id: 'solo'});
       expect(saved.versionOwners, isEmpty);
@@ -1163,7 +1261,7 @@ void main() {
       final path = await createVersion(
         storage,
         title,
-        'Song.rpp',
+        'Song',
         meta(),
         template: unknown,
       );
@@ -1174,43 +1272,96 @@ void main() {
     });
 
     test('refuses invalid or existing names', () async {
-      put('$title/Song.RPP', adopted);
+      put('$title/Song/Song.RPP', adopted);
       expect(
-        () => createVersion(storage, title, 'Song.RPP', meta()),
+        () => createVersion(storage, title, 'Song', meta()),
         throwsStateError,
       );
-      for (final name in ['Song.txt', 'a/b.rpp', '.rpp', ' .rpp']) {
+      for (final name in [
+        '',
+        ' ',
+        'a/b',
+        '.hidden',
+        'end.',
+        // Kept by the application, in any case.
+        'Assets',
+        'media',
+        'Renders',
+        'BACKUPS',
+        '.history',
+        '.trash',
+        'Media ',
+      ]) {
+        expect(isValidVersionName(name), isFalse, reason: name);
         expect(
           () => createVersion(storage, title, name, meta()),
           throwsArgumentError,
           reason: name,
         );
       }
+      expect(isValidVersionName('Song - take 2'), isTrue);
     });
 
-    test('duplicates a version under a new identity', () async {
-      put('$title/Song.RPP', adopted);
+    test('duplicates a version folder under a new identity', () async {
+      const from = '$title/Song';
+      final date = DateTime(2025, 3, 4, 5, 6, 7);
+      put('$from/Song.RPP', adopted);
+      put('$from/Media/kick.wav', 'kick');
+      File(p.joinAll([root.path, ...'$from/Media/kick.wav'.split('/')]))
+          .setLastModifiedSync(date);
+      put('$from/Renders/mix.wav', 'mix');
+      put('$from/.history/Song 2026-01-01 000000.RPP', adopted);
+      put('$from/notes.txt', 'x');
       await node();
       final m = meta('copy');
 
       final path = await duplicateVersion(
         storage,
         title,
-        'Song.RPP',
-        'Song - copy.RPP',
+        version('Song'),
+        'Song - copy',
         m,
       );
 
+      const to = '$title/Song - copy';
+      expect(path, '$to/Song - copy.RPP');
       expect(metadataOf(path)!.id, m.id);
       expect(withoutMetadata(read(path)), withoutMetadata(adopted));
+      expect(read('$to/Media/kick.wav'), 'kick');
+      expect(
+        File(p.joinAll([root.path, ...'$to/Media/kick.wav'.split('/')]))
+            .lastModifiedSync(),
+        date,
+      );
+      expect(dir('$to/Renders'), isTrue);
+      expect(exists('$to/Renders/mix.wav'), isFalse);
+      expect(dir('$to/.history'), isFalse);
+      expect(exists('$to/notes.txt'), isFalse);
+      expect(read('$from/Song.RPP'), adopted);
       final saved = (await readNodeFile(storage, title))!;
       expect(saved.versionLabels, {m.id: 'copy'});
       expect(saved.versionOwners, {m.id: owner});
     });
 
+    test('duplicates a version without media', () async {
+      put('$title/Song/Song.rpp', adopted);
+      await node();
+
+      final path = await duplicateVersion(
+        storage,
+        title,
+        version('Song', 'Song.rpp'),
+        'Song 2',
+        meta(),
+      );
+
+      expect(path, '$title/Song 2/Song 2.rpp');
+      expect(dir('$title/Song 2/Media'), isTrue);
+    });
+
     test('separates a Save As copy, its label copied', () async {
-      put('$title/Song.RPP', adopted);
-      put('$title/Song copy.RPP', adopted);
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/Song/Song copy.RPP', adopted);
       await node();
       await setVersionLabel(storage, title, adoptedId, 'chorus B');
       final other = MemberId.generate();
@@ -1219,14 +1370,14 @@ void main() {
       final id = await separateDuplicateVersion(
         storage,
         title,
-        'Song copy.RPP',
+        'Song/Song copy.RPP',
         label: 'chorus B',
         owner: owner,
       );
 
       expect(id, isNot(adoptedId));
-      expect(read('$title/Song.RPP'), adopted);
-      expect(metadataOf('$title/Song copy.RPP')!.id, id);
+      expect(read('$title/Song/Song.RPP'), adopted);
+      expect(metadataOf('$title/Song/Song copy.RPP')!.id, id);
       final saved = (await readNodeFile(storage, title))!;
       expect(saved.versionLabels, {adoptedId: 'chorus B', id: 'chorus B'});
       expect(saved.versionOwners, {adoptedId: other, id: owner});
@@ -1237,147 +1388,280 @@ void main() {
         )).titles.single.versions)
           v.fileName: v.metadata!,
       };
-      expect(versions['Song copy.RPP']!.label, 'chorus B');
-      expect(versions['Song.RPP']!.owner, other);
+      expect(versions['Song/Song copy.RPP']!.label, 'chorus B');
+      expect(versions['Song/Song.RPP']!.owner, other);
 
-      put('$title/Other.RPP', unknown);
+      put('$title/Other/Other.RPP', unknown);
       await expectLater(
-        separateDuplicateVersion(storage, title, 'Other.RPP', label: 'x'),
+        separateDuplicateVersion(storage, title, 'Other/Other.RPP', label: 'x'),
         throwsStateError,
       );
     });
 
     test('separates a Save As copy, the fallback label kept', () async {
-      put('$title/Song.RPP', adopted);
-      put('$title/Song copy.RPP', adopted);
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/Song/Song copy.RPP', adopted);
       await node();
 
-      // The original has no entry: its label is its file name.
+      // The original has no entry: its label is its folder name.
       final id = await separateDuplicateVersion(
         storage,
         title,
-        'Song copy.RPP',
+        'Song/Song copy.RPP',
         label: 'Song',
       );
 
       final saved = (await readNodeFile(storage, title))!;
       expect(saved.versionLabels, {id: 'Song'});
       expect(saved.versionOwners, isEmpty);
-      expect(metadataOf('$title/Song copy.RPP')!.id, id);
+      expect(metadataOf('$title/Song/Song copy.RPP')!.id, id);
     });
 
-    test('renames a version and edits its label', () async {
-      put('$title/Song.RPP', adopted);
+    test('renames a version folder and its project, edits its label', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/Song/Media/a.wav', 'a');
       await node();
-      final id = metadataOf('$title/Song.RPP')!.id;
+      final id = metadataOf('$title/Song/Song.RPP')!.id;
 
       final path = await renameVersion(
         storage,
         title,
-        'Song.RPP',
-        'Song B.RPP',
+        version('Song'),
+        'Song B',
       );
       await setVersionLabel(storage, title, id, 'bridge');
 
-      expect(path, '$title/Song B.RPP');
-      expect(exists('$title/Song.RPP'), isFalse);
+      expect(path, '$title/Song B/Song B.RPP');
+      expect(dir('$title/Song'), isFalse);
+      expect(read('$title/Song B/Media/a.wav'), 'a');
       expect(metadataOf(path)!.id, id);
       final m = (await scan(
         storage,
         library(Layout.classic()),
       )).titles.single.versions.single.metadata!;
       expect((m.id, m.label), (id, 'bridge'));
-      put('$title/Other.RPP', unknown);
+      put('$title/Other/Other.RPP', unknown);
       expect(
-        () => renameVersion(storage, title, 'Other.RPP', 'Song B.RPP'),
+        () => renameVersion(storage, title, version('Other'), 'Song B'),
         throwsStateError,
       );
-    });
-
-    test('deletes versions to the trash next to them', () async {
-      put('$title/Song.RPP', adopted);
-      put('$title/.trash/Song.RPP', adopted);
-      put('free/member/v2/take.rpp', unknown);
-
-      final trashed = await deleteVersion(storage, title, 'Song.RPP');
-      final nested = await deleteVersion(storage, 'free', 'member/v2/take.rpp');
-
-      expect(trashed, '$title/.trash/Song (2).RPP');
-      expect(nested, 'free/member/v2/.trash/take.rpp');
-      expect(exists('$title/Song.RPP'), isFalse);
-      expect((await readTrash(storage, 'free')).map((e) => e.path), [nested]);
-    });
-
-    test('purges trash files only', () async {
-      put('$title/.trash/Song.RPP', adopted);
-      put('$title/Song.RPP', adopted);
-
-      await expectLater(
-        purgeTrash(storage, title, ['$title/Song.RPP']),
+      expect(
+        () => renameVersion(storage, title, version('Other'), 'a/b'),
         throwsArgumentError,
       );
-      await purgeTrash(storage, title, [
-        for (final e in await readTrash(storage, title)) e.path,
-      ]);
-
-      expect(exists('$title/.trash/Song.RPP'), isFalse);
-      expect(exists('$title/Song.RPP'), isTrue);
     });
 
-    test('lists media referenced by no version nor backup', () async {
-      expect(RppProject.parse(adopted).mediaFiles, isNotEmpty);
-      put('$title/Song.RPP', withMedia(r'Media\kick.wav'));
-      put('$title/Other.RPP', withMedia('snare.wav'));
-      put(
-        '$title/.history/Song 2026-01-01 000000.RPP',
-        withMedia(r'..\Media\bass.wav', record: r'..\Media'),
-      );
-      put('$title/.trash/Old.RPP', withMedia(r'Media\old.wav'));
-      put('$title/Far.RPP', withMedia(r'D:\elsewhere\Media\far.wav'));
-      for (final name in [
-        'kick.wav',
-        'snare.wav',
-        'bass.wav',
-        'old.wav',
-        'far.wav',
-        'orphan.wav',
-        'orphan.wav.reapeaks',
-      ]) {
-        put('$title/Media/$name', 'x');
-      }
+    test('gives the project the name of its folder on a rename', () async {
+      put('$title/Take/old name.rpp', adopted);
 
-      final orphans = await unreferencedMedia(storage, title);
+      final renamed = await renameVersion(
+        storage,
+        title,
+        version('Take', 'old name.rpp'),
+        'Take 2',
+      );
+      // Same folder name: only the project follows it.
+      final same = await renameVersion(
+        storage,
+        title,
+        version('Take 2', 'Take 2.rpp'),
+        'Take 2',
+      );
+      put('$title/Mix/other.rpp', adopted);
+      final file = await renameVersion(
+        storage,
+        title,
+        version('Mix', 'other.rpp'),
+        'Mix',
+      );
+
+      expect(renamed, '$title/Take 2/Take 2.rpp');
+      expect(same, renamed);
+      expect(file, '$title/Mix/Mix.rpp');
+      expect(exists(file), isTrue);
+      expect(
+        () => renameVersion(
+          storage,
+          'free',
+          Version(fileName: 'a/b.rpp', modified: DateTime(2026), size: 0),
+          'c',
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test(
+      'moves version folders to the trash, free tree files beside',
+      () async {
+        put('$title/Song/Song.RPP', adopted);
+        put('$title/Song/Media/a.wav', 'aa');
+        put('$title/.trash/Song/Song.RPP', adopted);
+        put('free/member/v2/take.rpp', unknown);
+
+        final trashed = await deleteVersion(storage, title, version('Song'));
+        final nested = await deleteVersion(
+          storage,
+          'free',
+          Version(
+            fileName: 'member/v2/take.rpp',
+            modified: DateTime(2026),
+            size: 0,
+          ),
+        );
+
+        expect(trashed, '$title/.trash/Song (2)');
+        expect(read('$trashed/Media/a.wav'), 'aa');
+        expect(nested, 'free/member/v2/.trash/take.rpp');
+        expect(dir('$title/Song'), isFalse);
+        expect((await readTrash(storage, 'free')).map((e) => e.path), [nested]);
+        final trash = {
+          for (final e in await readTrash(storage, title)) e.path: e,
+        };
+        expect(trash.keys, unorderedEquals(['$title/.trash/Song', trashed]));
+        expect(trash[trashed]!.isDirectory, isTrue);
+        expect(trash[trashed]!.size, utf8.encode(adopted).length + 2);
+      },
+    );
+
+    test('keeps only one version, the others to the trash', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/B/B.rpp', unknown);
+      put('$title/C/C.rpp', unknown);
+      put('$title/.trash/B/B.rpp', unknown);
+      put('$title/Assets/score.pdf', 'x');
+      put('$title/notes/readme.txt', 'x');
+
+      final trashed = await keepOnlyVersion(storage, title, version('Song'));
 
       expect(
-        orphans.map((e) => e.path),
-        unorderedEquals(['$title/Media/old.wav', '$title/Media/orphan.wav']),
+        trashed,
+        unorderedEquals(['$title/.trash/B (2)', '$title/.trash/C']),
       );
-      await expectLater(
-        purgeMedia(storage, title, ['$title/Song.RPP']),
-        throwsArgumentError,
-      );
-      await purgeMedia(storage, title, [for (final e in orphans) e.path]);
-      expect(exists('$title/Media/orphan.wav'), isFalse);
-      expect(exists('$title/Media/kick.wav'), isTrue);
-      expect(await unreferencedMedia(storage, 'band/album/none'), isEmpty);
+      expect(exists('$title/Song/Song.RPP'), isTrue);
+      expect(exists('$title/Assets/score.pdf'), isTrue);
+      expect(exists('$title/notes/readme.txt'), isTrue);
+      expect(dir('$title/B'), isFalse);
+      expect(exists('$title/.trash/C/C.rpp'), isTrue);
     });
 
-    test('lists no media when a project cannot be read', () async {
-      put('$title/Media/a.wav', 'x');
-      File(p.joinAll([root.path, ...'$title/Bad.RPP'.split('/')]))
-        ..createSync(recursive: true)
-        ..writeAsBytesSync([0xff, 0xfe, 0x00]);
+    test('keeps a version only from its folder, alone in it', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/Song/Song copy.RPP', adopted);
+      put('$title/B/B.rpp', unknown);
+      put('$title/Media/sub.rpp', unknown);
+
+      // Its folder holds another project: nothing moves.
+      await expectLater(
+        keepOnlyVersion(storage, title, version('Song')),
+        throwsA(isA<SharedVersionFolderException>()),
+      );
+      // Gone since the last scan: nothing moves.
+      await expectLater(
+        keepOnlyVersion(storage, title, version('Gone')),
+        throwsStateError,
+      );
+      expect(dir('$title/B'), isTrue);
+
+      await keepOnlyVersion(storage, title, version('B', 'B.rpp'));
+      // A reserved folder is never a version.
+      expect(exists('$title/Media/sub.rpp'), isTrue);
+      expect(dir('$title/.trash/Song'), isTrue);
+    });
+
+    test('keeps a version whose folder changed case outside the app', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/B/B.rpp', unknown);
+      Directory(p.joinAll([root.path, ...title.split('/'), 'Song']))
+          .renameSync(p.joinAll([root.path, ...title.split('/'), 'song']));
+
+      await keepOnlyVersion(storage, title, version('Song'));
+
+      expect(exists('$title/song/Song.RPP'), isTrue);
+      expect(dir('$title/B'), isFalse);
+    }, testOn: 'windows || mac-os');
+
+    test('refuses to move or rename a folder of several projects', () async {
+      put('$title/Song/Song.RPP', adopted);
+      put('$title/Song/Song copy.RPP', adopted);
 
       await expectLater(
-        unreferencedMedia(storage, title),
-        throwsFormatException,
+        deleteVersion(storage, title, version('Song')),
+        throwsA(isA<SharedVersionFolderException>()),
       );
+      await expectLater(
+        renameVersion(storage, title, version('Song'), 'Other'),
+        throwsA(
+          isA<SharedVersionFolderException>().having(
+            (e) => e.folder,
+            'folder',
+            '$title/Song',
+          ),
+        ),
+      );
+      expect(exists('$title/Song/Song copy.RPP'), isTrue);
+      expect(dir('$title/Other'), isFalse);
+      expect(const SharedVersionFolderException('a').toString(), contains('a'));
+    });
+
+    test('renames a version by a change of case', () async {
+      put('$title/mix/mix.rpp', adopted);
+
+      final path = await renameVersion(
+        storage,
+        title,
+        version('mix', 'mix.rpp'),
+        'Mix',
+      );
+
+      expect(path, '$title/Mix/Mix.rpp');
+      final names = [
+        for (final e in Directory(
+          p.joinAll([root.path, ...title.split('/')]),
+        ).listSync())
+          p.basename(e.path),
+      ];
+      expect(names, ['Mix']);
+      expect(
+        Directory(p.joinAll([root.path, ...title.split('/'), 'Mix']))
+            .listSync()
+            .map((e) => p.basename(e.path)),
+        ['Mix.rpp'],
+      );
+    });
+
+    test('purges trash entries only, folders whole', () async {
+      put('$title/.trash/Song/Song.RPP', adopted);
+      put('$title/.trash/Song/Media/a.wav', 'a');
+      put('$title/.trash/score.pdf', 'x');
+      put('$title/Song/Song.RPP', adopted);
+
+      for (final path in [
+        '$title/Song/Song.RPP',
+        '$title/.trash/Song/Song.RPP',
+      ]) {
+        await expectLater(
+          purgeTrash(storage, title, [path]),
+          throwsArgumentError,
+          reason: path,
+        );
+      }
+      final trash = await readTrash(storage, title);
+      expect(
+        trash.map((e) => e.path),
+        unorderedEquals(['$title/.trash/Song', '$title/.trash/score.pdf']),
+      );
+      await purgeTrash(storage, title, [for (final e in trash) e.path]);
+
+      expect(dir('$title/.trash/Song'), isFalse);
+      expect(exists('$title/.trash/score.pdf'), isFalse);
+      expect(exists('$title/Song/Song.RPP'), isTrue);
+      expect(await readTrash(storage, title), isEmpty);
     });
   });
 
   group('adoption', () {
     test('writes the id into the project, label and owner aside', () async {
-      put('band/album/song/v1.rpp', unknown);
+      put('band/album/song/v1/v1.rpp', unknown);
       final lib = library(Layout.classic());
       expect((await scan(storage, lib)).toAdopt, hasLength(1));
       final metadata = VersionMetadata(
@@ -1385,7 +1669,7 @@ void main() {
         owner: MemberId.generate(),
         label: 'chorus B',
       );
-      await adoptVersion(storage, 'band/album/song', 'v1.rpp', metadata);
+      await adoptVersion(storage, 'band/album/song', 'v1/v1.rpp', metadata);
       final result = await scan(storage, lib);
       final read = result.titles.single.versions.single.metadata!;
       expect(
@@ -1394,7 +1678,7 @@ void main() {
       );
       expect(result.toAdopt, isEmpty);
       final text = File(
-        p.joinAll([root.path, 'band', 'album', 'song', 'v1.rpp']),
+        p.joinAll([root.path, 'band', 'album', 'song', 'v1', 'v1.rpp']),
       ).readAsStringSync();
       expect(RppProject.parse(text).extState(VersionMetadata.section), {
         'VERSIONID': metadata.id,
@@ -1633,16 +1917,16 @@ void main() {
           KnownValue(Layout.unassigned),
         ]),
       ]);
-      put('Band/First album/Song/v.rpp', unknown);
-      put('Band/_Unassigned/Other/v.rpp', unknown);
-      put('First album/Song2/v.rpp', unknown);
-      put('Loose/v.rpp', unknown);
-      put('Band/Loose2/v.rpp', unknown);
-      put('Stranger/Album/Song/v.rpp', unknown);
+      put('Band/First album/Song/v/v.rpp', unknown);
+      put('Band/_Unassigned/Other/v/v.rpp', unknown);
+      put('First album/Song2/v/v.rpp', unknown);
+      put('Loose/v/v.rpp', unknown);
+      put('Band/Loose2/v/v.rpp', unknown);
+      put('Stranger/Album/Song/v/v.rpp', unknown);
 
       final result = await scan(storage, lib);
 
-      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.tags, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v.rpp');      expect(result.titles[1].tags['artist'], 'Band');
+      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.tags, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v/v.rpp');      expect(result.titles[1].tags['artist'], 'Band');
       expect(layoutIssues(result), {
         ReportKind.misplacedLevel: [
           const ReportItem.misplaced(
@@ -1690,8 +1974,8 @@ void main() {
         'level', () async {
       final lib = library(Layout.projectOriented())
           .withKnownValues(const [KnownValue('Band')]);
-      put('Band/Song/v.rpp', unknown);
-      put('Old/v.rpp', unknown);
+      put('Band/Song/v/v.rpp', unknown);
+      put('Old/v/v.rpp', unknown);
       put('Old/$nodeFileName', '{"nodeId":"N","level":"artist"}');
 
       final result = await scan(storage, lib);

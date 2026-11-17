@@ -16,9 +16,10 @@ void main() {
     final id = version('v1.rpp').metadata!.id;
     await versions.backup(title(), version('v1.rpp'));
     final saved = (await container.read(
-      historyProvider(title().id).future,
-    ))[id]!.single;
-    final project = File(p.join(song, 'v1.rpp'));
+      historyProvider((title().id, version('v1.rpp').fileName)).future,
+    )).single;
+    expect(saved.versionId, id);
+    final project = File(p.join(song, 'v1', 'v1.rpp'));
 
     // REAPER not found.
     expect(await reaper.openVersion(title(), version('v1.rpp')), isFalse);

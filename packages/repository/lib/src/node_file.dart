@@ -8,26 +8,24 @@ const nodeFileName = '.node.json';
 /// `level` value of free tree title nodes (SPEC §3.3).
 const freeTreeLevel = 'title';
 
-/// Content of a `.node.json` file. Title nodes also carry the title and
-/// version statuses (SPEC §5.9), and the version labels and owners (SPEC
-/// §4.2), until the collab store takes them over.
+/// Content of a `.node.json` file. Title nodes also carry the version
+/// statuses and the tags (SPEC §5.9), and the version labels and owners
+/// (SPEC §4.2), until the collab store takes them over. The title status is
+/// not stored: it is derived from the version statuses.
 final class NodeFile {
   const NodeFile(
     this.id,
     this.level, {
-    this.status,
     this.versionStatuses = const {},
     this.versionLabels = const {},
     this.versionOwners = const {},
+    this.tags = const [],
   });
 
   final NodeId id;
 
   /// Layout level key, or [freeTreeLevel].
   final String level;
-
-  /// Title status key; null when not set.
-  final String? status;
 
   /// Version statuses, by [Version.key]: version id, or path relative to the
   /// title folder in a free tree.
@@ -40,15 +38,8 @@ final class NodeFile {
   /// Version owners (member ids), by version id.
   final Map<String, String> versionOwners;
 
-  /// Copy with the title status set to [status] (null or empty clears it).
-  NodeFile withStatus(String? status) => NodeFile(
-    id,
-    level,
-    status: _orNull(status),
-    versionStatuses: versionStatuses,
-    versionLabels: versionLabels,
-    versionOwners: versionOwners,
-  );
+  /// Free tags of the title (SPEC §5.9).
+  final List<String> tags;
 
   /// Copy with the status of the version keyed [version] (see
   /// [Version.key]) set to [status] (null or empty clears it).
@@ -80,16 +71,16 @@ final class NodeFile {
     return updated;
   }
 
-  /// This node with the entries of [other] it lacks: its title status if
-  /// it has none, and the version statuses, labels and owners of the ids it
-  /// does not know (folder merge, SPEC §5.8). Its own values win.
+  /// This node with the entries of [other] it lacks: the version statuses,
+  /// labels and owners of the ids it does not know, and the tags it does not
+  /// have (folder merge, SPEC §5.8). Its own values win.
   NodeFile mergedWith(NodeFile other) => NodeFile(
     id,
     level,
-    status: status ?? other.status,
     versionStatuses: _withMissing(versionStatuses, other.versionStatuses),
     versionLabels: _withMissing(versionLabels, other.versionLabels),
     versionOwners: _withMissing(versionOwners, other.versionOwners),
+    tags: {...tags, ...other.tags}.toList(),
   );
 
   /// [map] followed by the entries of [other] whose key it lacks.
@@ -109,29 +100,30 @@ final class NodeFile {
   }) => NodeFile(
     id,
     level,
-    status: status,
     versionStatuses: versionStatuses ?? this.versionStatuses,
     versionLabels: versionLabels ?? this.versionLabels,
     versionOwners: versionOwners ?? this.versionOwners,
+    tags: tags,
   );
 
   Map<String, Object?> toJson() => {
     'nodeId': id,
     'level': level,
-    'status': ?status,
     if (versionStatuses.isNotEmpty) 'versionStatuses': versionStatuses,
     if (versionLabels.isNotEmpty) 'versionLabels': versionLabels,
     if (versionOwners.isNotEmpty) 'versionOwners': versionOwners,
+    if (tags.isNotEmpty) 'tags': tags,
   };
 
   static NodeFile fromJson(Map<String, Object?> json) {
     final id = json['nodeId'];
     final level = json['level'];
-    final status = json['status'];
+    final tags = json['tags'] ?? const <Object?>[];
     if (id is! String ||
         !isUlid(id) ||
         level is! String ||
-        (status != null && status is! String)) {
+        tags is! List ||
+        tags.any((t) => t is! String)) {
       throw FormatException('Invalid $nodeFileName', json);
     }
     Map<String, String> map(String key) {
@@ -149,10 +141,10 @@ final class NodeFile {
     return NodeFile(
       NodeId(id),
       level,
-      status: _orNull(status as String?),
       versionStatuses: map('versionStatuses'),
       versionLabels: map('versionLabels'),
       versionOwners: map('versionOwners'),
+      tags: tags.cast<String>(),
     );
   }
 
@@ -188,16 +180,9 @@ Future<void> writeNodeFile(
   return storage.write(_nodePath(dir), Stream.value(utf8.encode('$json\n')));
 }
 
-/// Sets the status of the title at [titlePath] (null clears it). The node
-/// file is read again first, so that no concurrent change is lost.
-Future<NodeFile> setTitleStatus(
-  RepositoryStorage storage,
-  String titlePath,
-  String? status,
-) => updateNodeFile(storage, titlePath, (n) => n.withStatus(status));
-
 /// Sets the status of the version keyed [version] (see [Version.key]) in
-/// the title at [titlePath] (null clears it).
+/// the title at [titlePath] (null clears it). The node file is read again
+/// first, so that no concurrent change is lost.
 Future<NodeFile> setVersionStatus(
   RepositoryStorage storage,
   String titlePath,

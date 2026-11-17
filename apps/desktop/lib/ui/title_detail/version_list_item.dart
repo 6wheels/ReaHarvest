@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -49,7 +48,7 @@ class _VersionItemState extends ConsumerState<VersionItem> {
     final label = m == null
         ? alerts.notAdopted
               ? l10n.notAdopted
-              : p.posix.withoutExtension(version.fileName)
+              : versionName(version)
         : m.label;
     // Generic labels: muted, the file name tells the versions apart.
     final generic = alerts.notAdopted;

@@ -228,6 +228,19 @@ void main() {
       final copy = v.withMetadata(m);
       expect((copy.fileName, copy.size, copy.metadata), ('a.rpp', 1, m));
     });
+
+    test('places a version in its folder with its sizes', () {
+      const m = VersionMetadata(id: VersionId('V'));
+      final v = Version(
+        fileName: 'a/a.rpp',
+        modified: DateTime(2026),
+        size: 1,
+        tempo: 90,
+        metadata: m,
+      ).withSizes('a', {SizeCategory.project: 3, SizeCategory.history: 4});
+      expect((v.folder, v.size, v.tempo, v.metadata), ('a', 7, 90.0, m));
+      expect(v.sizes[SizeCategory.history], 4);
+    });
   });
 
   group('title', () {
@@ -249,7 +262,6 @@ void main() {
         path: 'Artist/Album/Song',
         tags: const {'title': 'Song'},
         versions: [adopted, free],
-        status: 'mixing',
         versionStatuses: const {'V1': 'done', 'sub/b.rpp': 'idea'},
       );
       expect((adopted.isAdopted, adopted.key), (true, 'V1'));
@@ -257,6 +269,32 @@ void main() {
       expect(title.statusOf(adopted), 'done');
       expect(title.statusOf(free), 'idea');
       expect(title.statusOf(version('c.rpp')), isNull);
+    });
+
+    test('derives the title status from its versions', () {
+      Title title(Map<String, String> statuses) => Title(
+        id: const NodeId('T'),
+        libraryId: const LibraryId('L'),
+        path: 'Song',
+        tags: const {},
+        versions: [
+          version('a/a.rpp', id: 'V1'),
+          version('b/b.rpp', id: 'V2'),
+          version('c/c.rpp', id: 'V3'),
+        ],
+        versionStatuses: statuses,
+      );
+      expect(title({}).status, isNull);
+      // The highest in the order of the statuses; a status of a version
+      // that no longer exists does not count.
+      expect(
+        title({'V1': 'writing', 'V2': 'mixing', 'V3': 'idea', 'V9': 'done'})
+            .status,
+        'mixing',
+      );
+      // A custom status ranks below the known ones.
+      expect(title({'V1': 'live', 'V2': 'idea'}).status, 'idea');
+      expect(title({'V1': 'live', 'V2': 'demo'}).status, 'live');
     });
 
     test('finds versions sharing a version id', () {

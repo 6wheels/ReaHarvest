@@ -161,6 +161,8 @@ class FakeVersionActions extends VersionActions {
   final edited = <(String, String, String)>[];
   final statuses = <(String, String?)>[];
   final trashed = <String>[];
+  final keptOnly = <String>[];
+  final purged = <List<String>>[];
   final restored = <String>[];
 
   @override
@@ -170,25 +172,25 @@ class FakeVersionActions extends VersionActions {
   @override
   Future<String> addVersion(
     Title title,
-    String fileName,
+    String name,
     String label, {
     Version? source,
     String? template,
   }) async {
     await pending?.future;
-    created.add((fileName, label, source?.fileName));
-    return fileName;
+    created.add((name, label, source?.fileName));
+    return '$name/$name.RPP';
   }
 
   @override
   Future<String> editVersion(
     Title title,
     Version version, {
-    required String fileName,
+    required String name,
     required String label,
   }) async {
-    edited.add((version.fileName, fileName, label));
-    return fileName;
+    edited.add((version.fileName, name, label));
+    return '$name/$name.RPP';
   }
 
   @override
@@ -201,6 +203,14 @@ class FakeVersionActions extends VersionActions {
   @override
   Future<void> trashVersion(Title title, Version version) async =>
       trashed.add(version.fileName);
+
+  @override
+  Future<void> keepOnly(Title title, Version version) async =>
+      keptOnly.add(version.fileName);
+
+  @override
+  Future<void> purge(Title title, List<String> paths) async =>
+      purged.add(paths);
 
   @override
   Future<void> adopt(
@@ -325,7 +335,7 @@ void main() {
     List<LibraryIssue> issues = const [],
     List<LibraryEntry> configured = const [band],
     Map<LibraryId, Library>? indexed,
-    Map<VersionId, List<Backup>> history = const {},
+    Map<String, List<Backup>> history = const {},
     PeaksPreference? peaks = const PeaksPreference(
       altPeaks: true,
       altPeaksPath: '/peaks',
@@ -360,11 +370,19 @@ void main() {
             indexed ?? {demoLibrary.id: demoLibrary},
           ),
           issuesProvider.overrideWithValue(issues),
-          historyProvider.overrideWith((ref, id) async => history),
+          historyProvider.overrideWith(
+            (ref, key) async => history[key.$2] ?? const [],
+          ),
           trashProvider.overrideWith(
             (ref, id) async => [
               StorageEntry(
-                path: 'Sample Artist/Album 2/Midnight Ferry/.trash/old.rpp',
+                path: 'Sample Artist/Album 2/Midnight Ferry/.trash/old take',
+                isDirectory: true,
+                size: 3 * 1024 * 1024,
+                modified: DateTime(2026, 11, 1),
+              ),
+              StorageEntry(
+                path: 'Sample Artist/Album 2/Midnight Ferry/.trash/score.pdf',
                 isDirectory: false,
                 size: 2048,
                 modified: DateTime(2026, 11, 1),
@@ -971,7 +989,7 @@ void main() {
                 path: t.path,
                 tags: t.tags,
                 versions: t.versions,
-                status: t.status,
+                versionStatuses: t.versionStatuses,
               ),
     ];
     await pumpApp(
@@ -1031,7 +1049,7 @@ void main() {
     await open();
     await tester.tap(find.text('Open anyway'));
     await tester.pumpAndSettle();
-    expect(reaper.opened, ['Midnight Ferry v1.rpp']);
+    expect(reaper.opened, ['Midnight Ferry v1/Midnight Ferry v1.rpp']);
   });
 
   testWidgets('opens and restores the backup points of a version', (
@@ -1045,7 +1063,7 @@ void main() {
       history: {
         for (final v in ferry.versions)
           if (v.metadata case final m?)
-            m.id: [
+            v.fileName: [
               Backup(
                 path: 'x/.history/b.rpp',
                 versionId: m.id,
@@ -1243,7 +1261,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(reaper.opened, ['Midnight Ferry v1.rpp']);
+    expect(reaper.opened, ['Midnight Ferry v1/Midnight Ferry v1.rpp']);
 
     await tester.tap(
       find.descendant(
@@ -1333,7 +1351,9 @@ void main() {
     slow.complete();
     await tester.pumpAndSettle();
     expect(busyLabel, findsNothing);
-    expect(versions.adopted, [('Glass Garden v1.rpp', 'intro')]);
+    expect(versions.adopted, [
+      ('Glass Garden v1/Glass Garden v1.rpp', 'intro'),
+    ]);
   });
 
   testWidgets('shows the absolute path of the selected version', (
@@ -1366,10 +1386,17 @@ void main() {
           'Sample Artist',
           'Album 1',
           'Glass Garden',
+          'Glass Garden v1',
           'Glass Garden v1.rpp',
         ]),
       ),
       findsOneWidget,
+    );
+    // The size of the version folder, by kind of file.
+    expect(find.textContaining('3.5 MB'), findsWidgets);
+    expect(
+      find.text('Media 3.0 MB · Backup points 512 KB · Project 2.0 KB'),
+      findsOne,
     );
     await tester.tap(find.byTooltip('Show in file explorer'));
     expect(revealed, [
@@ -1378,6 +1405,7 @@ void main() {
         'Sample Artist',
         'Album 1',
         'Glass Garden',
+        'Glass Garden v1',
         'Glass Garden v1.rpp',
       ]),
     ]);
@@ -1539,7 +1567,7 @@ void main() {
     await openMidnightFerry(tester);
     await tester.tap(find.text('New version'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(TextField, 'Midnight Ferry.RPP'), findsOne);
+    expect(find.widgetWithText(TextField, 'Midnight Ferry'), findsOne);
     // The label is required.
     Finder createButton() => find.widgetWithText(FilledButton, 'New version');
     expect(tester.widget<FilledButton>(createButton()).onPressed, isNull);
@@ -1550,10 +1578,7 @@ void main() {
 
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'bridge');
     await tester.pumpAndSettle();
-    expect(
-      find.widgetWithText(TextField, 'Midnight Ferry - bridge.RPP'),
-      findsOne,
-    );
+    expect(find.widgetWithText(TextField, 'Midnight Ferry - bridge'), findsOne);
     await tester.tap(find.text('Copy of “Midnight Ferry v1”'));
     await tester.pump();
     final slow = pending = Completer<void>();
@@ -1564,7 +1589,11 @@ void main() {
     slow.complete();
     await tester.pumpAndSettle();
     expect(versions.created, [
-      ('Midnight Ferry - bridge.RPP', 'bridge', 'Midnight Ferry v1.rpp'),
+      (
+        'Midnight Ferry - bridge',
+        'bridge',
+        'Midnight Ferry v1/Midnight Ferry v1.rpp',
+      ),
     ]);
   });
 
@@ -1576,14 +1605,20 @@ void main() {
     await tester.tap(find.text('Rename…'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'File name'),
+      find.widgetWithText(TextField, 'Name of the folder and project'),
       'Midnight Ferry v2',
     );
     await tester.pumpAndSettle();
     expect(find.text('A version already has this name'), findsOne);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Name of the folder and project'),
+      'Backups',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('This name is reserved by ReaHarvest'), findsOne);
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'File name'),
+      find.widgetWithText(TextField, 'Name of the folder and project'),
       'intro',
     );
     // An adopted version keeps a label.
@@ -1600,7 +1635,9 @@ void main() {
     await tester.pump();
     await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
     await tester.pumpAndSettle();
-    expect(versions.edited, [('Midnight Ferry v1.rpp', 'intro.RPP', 'first')]);
+    expect(versions.edited, [
+      ('Midnight Ferry v1/Midnight Ferry v1.rpp', 'intro', 'first'),
+    ]);
   });
 
   testWidgets('sets the status and deletes a version', (tester) async {
@@ -1612,7 +1649,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mixing').last);
     await tester.pumpAndSettle();
-    expect(versions.statuses, [('Midnight Ferry v1.rpp', 'mixing')]);
+    expect(versions.statuses, [
+      ('Midnight Ferry v1/Midnight Ferry v1.rpp', 'mixing'),
+    ]);
 
     await tester.tap(find.byTooltip('More actions').last);
     await tester.pumpAndSettle();
@@ -1624,7 +1663,47 @@ void main() {
     expect(find.text('REAPER is open'), findsOne);
     await tester.tap(find.text('Continue anyway'));
     await tester.pumpAndSettle();
-    expect(versions.trashed, ['Midnight Ferry v1.rpp']);
+    expect(versions.trashed, ['Midnight Ferry v1/Midnight Ferry v1.rpp']);
+  });
+
+  testWidgets('keeps only one version after one confirmation', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await openMidnightFerry(tester);
+    await tester.tap(find.byTooltip('More actions').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Keep only this version…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Keep only “Midnight Ferry v1”?'), findsOne);
+    expect(
+      find.text(
+        'The 4 other versions of this title are moved to its trash, with '
+        'their folders.',
+      ),
+      findsOne,
+    );
+    await tester.tap(find.text('Move the others to the trash'));
+    await tester.pumpAndSettle();
+    expect(versions.keptOnly, ['Midnight Ferry v1/Midnight Ferry v1.rpp']);
+    expect(find.text('Other versions moved to the trash'), findsOne);
+  });
+
+  testWidgets('offers to keep only a version among several', (tester) async {
+    final single = demoTitles().first;
+    expect(single.versions, hasLength(1));
+    await pumpApp(tester, titles: [single]);
+    await tester.tap(find.text(single.tags['title']!));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('More actions').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Move to the trash'), findsOne);
+    expect(find.text('Keep only this version…'), findsNothing);
   });
 
   testWidgets('shows the trash of a title', (tester) async {
@@ -1633,8 +1712,25 @@ void main() {
     await tester.tap(find.text('TRASH'));
     await tester.pumpAndSettle();
     expect(find.text('Empty the trash'), findsOne);
-    expect(find.text('old.rpp'), findsOne);
+    // Version folders and assets, a folder by the size of its files.
+    expect(find.text('old take'), findsOne);
+    expect(find.byIcon(Icons.folder_outlined), findsOne);
+    expect(find.textContaining('3.0 MB'), findsWidgets);
+    expect(find.text('score.pdf'), findsOne);
     expect(find.textContaining('2.0 KB'), findsWidgets);
+
+    await tester.tap(find.text('Empty the trash'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 2 items permanently?'), findsOne);
+    await tester.tap(find.text('Empty the trash').last);
+    await tester.pumpAndSettle();
+    expect(versions.purged, [
+      [
+        'Sample Artist/Album 2/Midnight Ferry/.trash/old take',
+        'Sample Artist/Album 2/Midnight Ferry/.trash/score.pdf',
+      ],
+    ]);
+    expect(find.text('Deleted permanently'), findsOne);
   });
 
   testWidgets('groups the issues by kind and moves misplaced projects', (

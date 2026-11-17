@@ -891,8 +891,11 @@ Title _title(
   libraryId: _library,
   path: tags.values.join('/'),
   tags: tags,
-  status: status,
-  versionStatuses: versionStatuses,
+  // The title status is derived: [status] goes to the first version.
+  versionStatuses: {
+    if (status != null && versions > 0) '$id-0': status,
+    ...versionStatuses,
+  },
   versions: [
     for (var v = 0; v < versions; v++)
       Version(
@@ -972,9 +975,7 @@ final _alerts = Title(
     'album': 'Album 2',
     'title': 'Copper Sky',
   },
-  // The overview shows the most advanced status of the versions instead:
-  // recording.
-  status: 'idea',
+  // The title shows the most advanced status of its versions: recording.
   versionStatuses: const {
     'alerts-dup': 'recording',
     'Copper Sky rough.rpp': 'idea',

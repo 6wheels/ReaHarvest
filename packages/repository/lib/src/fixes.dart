@@ -174,9 +174,9 @@ Future<Report> _moveFolder(
 /// recursively (an artist, an album, a title's `Media/`); any other name
 /// collision gets a free name (`name (2).ext`) and the references of the
 /// moved projects are rewritten to follow it. The projects of two titles
-/// thus become versions of one title. Node files are merged: the target's
-/// title status wins (the dropped one is reported), version statuses,
-/// labels and owners are added (the target's win on a same id). What is left of [source] (its node files, empty folders) is
+/// thus become versions of one title. Node files are merged: version
+/// statuses, labels, owners and tags are added (the target's win on a same
+/// id). What is left of [source] (its node files, empty folders) is
 /// moved into the migration folder. Only moves and targeted rewrites: no
 /// file is read except projects and node files.
 Future<Report> mergeFolder(
@@ -202,7 +202,6 @@ Future<Report> mergeFolder(
   return Report({
     ReportKind.folderMerged: [ReportItem(target, source)],
     ReportKind.fileRenamed: merge.renamed,
-    ReportKind.titleStatusDropped: merge.dropped,
   });
 }
 
@@ -213,7 +212,6 @@ final class _Merge {
   final RepositoryStorage storage;
   final moves = <(String, String)>[];
   final renamed = <ReportItem>[];
-  final dropped = <ReportItem>[];
 
   /// Moves the entries of [source] into [target], recursively.
   Future<void> into(String source, String target) async {
@@ -250,11 +248,6 @@ final class _Merge {
       into = (await readNodeFile(storage, target))!;
     } on FormatException {
       return;
-    }
-    if (into.status != null &&
-        from.status != null &&
-        from.status != into.status) {
-      dropped.add(ReportItem(target, from.status));
     }
     final merged = into.mergedWith(from);
     if (jsonEncode(merged.toJson()) != jsonEncode(into.toJson())) {

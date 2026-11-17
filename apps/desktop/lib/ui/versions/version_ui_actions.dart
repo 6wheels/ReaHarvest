@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../state/version_actions.dart';
+import '../formats.dart';
 import '../widgets.dart';
 
+/// Asks to confirm [action]; [danger] marks an action that moves or deletes
+/// several things at once.
 Future<bool?> confirm(
   BuildContext context, {
   required String title,
   required String content,
   required String action,
   String? cancel,
+  bool danger = false,
 }) {
   final l10n = AppLocalizations.of(context);
+  final scheme = Theme.of(context).colorScheme;
   return showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -26,6 +30,12 @@ Future<bool?> confirm(
           child: Text(cancel ?? l10n.cancel),
         ),
         FilledButton(
+          style: danger
+              ? FilledButton.styleFrom(
+                  backgroundColor: scheme.error,
+                  foregroundColor: scheme.onError,
+                )
+              : null,
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(action),
         ),
@@ -66,7 +76,7 @@ Future<void> deleteVersionFromUi(
   final messenger = ScaffoldMessenger.of(context);
   final confirmed = await confirm(
     context,
-    title: l10n.deleteVersionTitle(p.posix.withoutExtension(version.fileName)),
+    title: l10n.deleteVersionTitle(versionName(version)),
     content: l10n.deleteVersionHint,
     action: l10n.deleteVersion,
   );
@@ -78,5 +88,33 @@ Future<void> deleteVersionFromUi(
   );
   if (done) {
     messenger.showSnackBar(SnackBar(content: Text(l10n.versionDeleted)));
+  }
+}
+
+/// Moves every other version of [title] than [version] to the trash, after
+/// one confirmation and the REAPER warning (SPEC §5.4).
+Future<void> keepOnlyVersionFromUi(
+  BuildContext context,
+  WidgetRef ref,
+  Title title,
+  Version version,
+) async {
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final confirmed = await confirm(
+    context,
+    title: l10n.keepOnlyVersionTitle(versionName(version)),
+    content: l10n.keepOnlyVersionHint(versionFolderCount(title) - 1),
+    action: l10n.keepOnlyVersionAction,
+    danger: true,
+  );
+  if (confirmed != true || !context.mounted) return;
+  final done = await runProjectChange(
+    context,
+    ref,
+    () => ref.read(versionActionsProvider).keepOnly(title, version),
+  );
+  if (done) {
+    messenger.showSnackBar(SnackBar(content: Text(l10n.onlyVersionKept)));
   }
 }

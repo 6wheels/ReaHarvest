@@ -221,7 +221,9 @@ final class MemoryStorage implements RepositoryStorage {
   @override
   Future<void> delete(String path) async {
     _change('delete $path');
-    files.remove(path);
+    bool inside(String p) => p == path || p.startsWith('$path/');
+    files.removeWhere((p, _) => inside(p));
+    dirs.removeWhere(inside);
   }
 
   @override

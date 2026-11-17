@@ -52,7 +52,7 @@ void main() {
   group('read-only connection', () {
     test('reads what a writing connection stored', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
       final lib = library();
       await scanIntoIndex(indexPath, root, lib);
       expect(ui.libraries().single.id, lib.id);
@@ -75,8 +75,8 @@ void main() {
       'stores the scan and reports its issues relative to the root',
       () async {
         final root = folder('Band');
-        project(root, 'A/B/Song/v1.rpp');
-        project(root, 'A/loose.rpp');
+        project(root, 'A/B/Song/v1/v1.rpp');
+        project(root, 'A/loose/loose.rpp');
         final lib = library();
         final report = await scanIntoIndex(indexPath, root, lib);
         expect(paths(lib.id), {'A/B/Song'});
@@ -94,10 +94,10 @@ void main() {
 
     test('rescans incrementally, or fully on demand', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
       final lib = library();
       await scanIntoIndex(indexPath, root, lib);
-      project(root, 'A/B/Song/v2.rpp');
+      project(root, 'A/B/Song/v2/v2.rpp');
       await scanIntoIndex(indexPath, root, lib);
       expect(ui.titles(library: lib.id).single.versions, hasLength(2));
       await scanIntoIndex(indexPath, root, lib, full: true);
@@ -106,7 +106,7 @@ void main() {
 
     test('writes no node file without writeNodes', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
       final lib = library();
       await scanIntoIndex(indexPath, root, lib, writeNodes: false);
       expect(paths(lib.id), isEmpty);
@@ -120,7 +120,7 @@ void main() {
       'a failed scan keeps the stored state and closes its connection',
       () async {
         final root = folder('Band');
-        project(root, 'A/B/Song/v1.rpp');
+        project(root, 'A/B/Song/v1/v1.rpp');
         final lib = library();
         await scanIntoIndex(indexPath, root, lib);
         await expectLater(
@@ -130,7 +130,7 @@ void main() {
         expect(paths(lib.id), {'A/B/Song'});
 
         // Recovery: the next scan is stored.
-        project(root, 'A/B/Other/v1.rpp');
+        project(root, 'A/B/Other/v1/v1.rpp');
         await scanIntoIndex(indexPath, root, lib);
         expect(paths(lib.id), {'A/B/Song', 'A/B/Other'});
 
@@ -144,7 +144,7 @@ void main() {
 
     test('waits for another writer instead of failing', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
       final lib = library();
       final other = sqlite3.open(indexPath, mode: OpenMode.readWrite);
       other.execute('BEGIN IMMEDIATE');
@@ -160,8 +160,8 @@ void main() {
     test('scans of two libraries at once are both stored', () async {
       final a = folder('A');
       final b = folder('B');
-      project(a, 'X/Y/One/v1.rpp');
-      project(b, 'X/Y/Two/v1.rpp');
+      project(a, 'X/Y/One/v1/v1.rpp');
+      project(b, 'X/Y/Two/v1/v1.rpp');
       final (libA, libB) = (library(), library());
       await Future.wait([
         scanIntoIndex(indexPath, a, libA),
@@ -175,14 +175,14 @@ void main() {
       const count = 150;
       final root = folder('Band');
       for (var i = 0; i < count; i++) {
-        project(root, 'A/B/Old$i/v1.rpp');
+        project(root, 'A/B/Old$i/v1/v1.rpp');
       }
       final lib = library();
       await scanIntoIndex(indexPath, root, lib);
       for (var i = 0; i < count; i++) {
         Directory(p.join(root, 'A', 'B', 'Old$i')).deleteSync(recursive: true);
-        project(root, 'A/B/New$i/v1.rpp');
-        project(root, 'A/B/New$i/v2.rpp');
+        project(root, 'A/B/New$i/v1/v1.rpp');
+        project(root, 'A/B/New$i/v2/v2.rpp');
       }
 
       String state() {
@@ -224,11 +224,11 @@ void main() {
   group('scanTitleIntoIndex', () {
     test('stores the rescanned title', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
-      project(root, 'A/B/Other/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
+      project(root, 'A/B/Other/v1/v1.rpp');
       final lib = library();
       await scanIntoIndex(indexPath, root, lib);
-      project(root, 'A/B/Song/v2.rpp');
+      project(root, 'A/B/Song/v2/v2.rpp');
       expect(
         await scanTitleIntoIndex(indexPath, root, lib, 'A/B/Song'),
         isTrue,
@@ -240,7 +240,7 @@ void main() {
 
     test('is false for a title not indexed, writing nothing', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
       final lib = library();
       expect(
         await scanTitleIntoIndex(indexPath, root, lib, 'A/B/Song'),
@@ -251,10 +251,10 @@ void main() {
 
     test('is false for a folder no longer a title, writing nothing', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
       final lib = library();
       await scanIntoIndex(indexPath, root, lib);
-      File(p.join(root, 'A', 'B', 'Song', 'v1.rpp')).deleteSync();
+      File(p.join(root, 'A', 'B', 'Song', 'v1', 'v1.rpp')).deleteSync();
       expect(
         await scanTitleIntoIndex(indexPath, root, lib, 'A/B/Song'),
         isFalse,
@@ -264,7 +264,7 @@ void main() {
 
     test('a failed rescan keeps the stored state', () async {
       final root = folder('Band');
-      project(root, 'A/B/Song/v1.rpp');
+      project(root, 'A/B/Song/v1/v1.rpp');
       final lib = library();
       await scanIntoIndex(indexPath, root, lib);
       Directory(p.join(root, 'A', 'B', 'Song')).deleteSync(recursive: true);
@@ -278,7 +278,7 @@ void main() {
 
   test('removeLibraryFromIndex forgets the library', () async {
     final root = folder('Band');
-    project(root, 'A/B/Song/v1.rpp');
+    project(root, 'A/B/Song/v1/v1.rpp');
     final lib = library();
     await scanIntoIndex(indexPath, root, lib);
     await removeLibraryFromIndex(indexPath, lib.id);

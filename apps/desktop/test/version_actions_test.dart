@@ -13,89 +13,99 @@ void main() {
   setUpLibraryEnv();
 
   test('manages the versions of a title', () async {
-    final band = folder('Band');
-    final song = Directory(p.join(band, 'Artist', 'Album', 'Song'))
-      ..createSync(recursive: true);
-    File('../../test/fixtures/tracks.rpp')
-        .copySync(p.join(song.path, 'v1.rpp'));
-    File(p.join(song.path, 'Media', 'unused.wav'))
+    final song = await bandWithSong();
+    File(p.join(song, 'v1', 'Media', 'kick.wav'))
       ..createSync(recursive: true)
       ..writeAsStringSync('x');
-    await catalog.addLocal(
-      folder: band,
-      displayName: '',
-      layout: Layout.classic(),
-    );
-    Title title() => index.titles().single;
-    Version version(String name) =>
-        title().versions.firstWhere((v) => v.fileName == name);
 
     expect(
-      await versions.addVersion(title(), 'Song - a.RPP', ' a '),
-      'Song - a.RPP',
+      await versions.addVersion(title(), 'Song - a', ' a '),
+      'Song - a/Song - a.RPP',
     );
     final blank = version('Song - a.RPP').metadata!;
     // No declared members: no owner (SPEC §4.2).
     expect((blank.owner, blank.label), (null, 'a'));
-    await versions.addVersion(
-      title(),
-      'copy.RPP',
-      'b',
-      source: version('Song - a.RPP'),
-    );
-    final copy = version('copy.RPP').metadata!;
+    expect(Directory(p.join(song, 'Song - a', 'Media')).existsSync(), isTrue);
+    await versions.addVersion(title(), 'copy', 'b', source: version('v1.rpp'));
+    final copy = version('copy.rpp').metadata!;
     expect(copy.id, isNot(blank.id));
     expect(copy.label, 'b');
+    expect(
+      File(p.join(song, 'copy', 'Media', 'kick.wav')).existsSync(),
+      isTrue,
+    );
+    // The size of a version is the one of its folder.
+    expect(
+      version('copy.rpp').size,
+      File(p.join(song, 'copy', 'copy.rpp')).lengthSync() + 1,
+    );
 
     expect(
       await versions.editVersion(
         title(),
-        version('copy.RPP'),
-        fileName: 'Song - c.RPP',
+        version('copy.rpp'),
+        name: 'Song - c',
         label: 'c',
       ),
-      'Song - c.RPP',
+      'Song - c/Song - c.rpp',
     );
-    final edited = version('Song - c.RPP').metadata!;
+    final edited = version('Song - c.rpp').metadata!;
     expect((edited.id, edited.label), (copy.id, 'c'));
+    expect(Directory(p.join(song, 'copy')).existsSync(), isFalse);
 
     // A label edit leaves the project byte for byte, with its date.
-    final file = File(p.join(song.path, 'Song - c.RPP'));
+    final file = File(p.join(song, 'Song - c', 'Song - c.rpp'));
     final bytes = file.readAsBytesSync();
     final date = DateTime(2025, 3, 4);
     file.setLastModifiedSync(date);
     await versions.editVersion(
       title(),
-      version('Song - c.RPP'),
-      fileName: 'Song - c.RPP',
+      version('Song - c.rpp'),
+      name: 'Song - c',
       label: 'd',
     );
-    expect(version('Song - c.RPP').metadata!.label, 'd');
+    expect(version('Song - c.rpp').metadata!.label, 'd');
     expect(file.readAsBytesSync(), bytes);
     expect(file.lastModifiedSync(), date);
 
-    await versions.setStatusOf(title(), version('Song - c.RPP'), 'mixing');
-    expect(title().statusOf(version('Song - c.RPP')), 'mixing');
+    await versions.setStatusOf(title(), version('Song - c.rpp'), 'mixing');
+    expect(title().statusOf(version('Song - c.rpp')), 'mixing');
+    expect(title().status, 'mixing');
 
-    await versions.trashVersion(title(), version('Song - c.RPP'));
-    expect(
-      title().versions.map((v) => v.fileName),
-      isNot(contains('Song - c.RPP')),
-    );
+    await versions.keepOnly(title(), version('Song - c.rpp'));
+    expect(title().versions.map((v) => v.folder), ['Song - c']);
+
+    await versions.trashVersion(title(), version('Song - c.rpp'));
+    // Its versions all in the trash, the title stays.
+    expect(title().versions, isEmpty);
     final trash = await container.read(trashProvider(title().id).future);
-    expect(trash.map((e) => e.path), ['Artist/Album/Song/.trash/Song - c.RPP']);
+    const trashed = 'Artist/Album/Song/.trash';
+    expect(
+      trash.map((e) => e.path),
+      unorderedEquals([
+        '$trashed/v1',
+        '$trashed/Song - a',
+        '$trashed/Song - c',
+      ]),
+    );
 
-    final unused = await versions.purge(title(), [trash.single.path]);
-    expect(
-      File(p.join(song.path, '.trash', 'Song - c.RPP')).existsSync(),
-      isFalse,
-    );
-    expect(unused.map((e) => e.path), ['Artist/Album/Song/Media/unused.wav']);
-    await versions.purgeUnusedMedia(title(), [unused.single.path]);
-    expect(
-      File(p.join(song.path, 'Media', 'unused.wav')).existsSync(),
-      isFalse,
-    );
+    await versions.purge(title(), [for (final e in trash) e.path]);
+    expect(Directory(p.join(song, '.trash', 'v1')).existsSync(), isFalse);
+    expect(await container.read(trashProvider(title().id).future), isEmpty);
+  });
+
+  test('rescans the title when keeping only a version fails', () async {
+    final song = await bandWithSong();
+    Directory(p.join(song, 'v2')).createSync();
+    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v2', 'v2.rpp'));
+    await scans.scanAll();
+    final kept = version('v1.rpp');
+    // Gone since the last scan: refused, nothing moved.
+    Directory(p.join(song, 'v1')).deleteSync(recursive: true);
+
+    await expectLater(versions.keepOnly(title(), kept), throwsStateError);
+
+    expect(title().versions.map((v) => v.folder), ['v2']);
   });
 
   test('lists the project templates of a library', () async {
@@ -119,7 +129,7 @@ void main() {
     final adopted = version('v1.rpp').metadata!;
     expect((adopted.owner, adopted.label), (null, 'main'));
 
-    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'dup.rpp'));
+    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v1', 'dup.rpp'));
     await scans.scanAll();
     expect(duplicateVersions(index.titles()).keys, [adopted.id]);
 
@@ -132,7 +142,8 @@ void main() {
 
   test('keeps both changes of one node file asked together', () async {
     final song = await bandWithSong();
-    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v2.rpp'));
+    Directory(p.join(song, 'v2')).createSync();
+    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v2', 'v2.rpp'));
     await scans.scanAll();
     await versions.adopt(title(), version('v1.rpp'), 'one');
 
@@ -153,9 +164,9 @@ void main() {
     final entry = container.read(settingsProvider).libraries.single;
     await catalog.setMembers(entry, const [Member(MemberId('M'), 'Me')]);
 
-    await versions.addVersion(title(), 'b.RPP', 'b');
+    await versions.addVersion(title(), 'b', 'b');
     expect(version('b.RPP').metadata!.owner, const MemberId('M'));
-    File(p.join(song, 'b.RPP')).copySync(p.join(song, 'c.RPP'));
+    File(p.join(song, 'b', 'b.RPP')).copySync(p.join(song, 'b', 'c.RPP'));
     await scans.scanAll();
     await versions.separateDuplicate(title(), version('c.RPP'));
     expect(version('c.RPP').metadata!.owner, const MemberId('M'));
@@ -174,7 +185,8 @@ void main() {
       id,
       null,
     );
-    File(p.join(song, 'v1.rpp')).copySync(p.join(song, 'v1 copy.rpp'));
+    File(p.join(song, 'v1', 'v1.rpp'))
+        .copySync(p.join(song, 'v1', 'v1 copy.rpp'));
     await scans.scanAll();
     expect(version('v1.rpp').metadata!.label, 'v1');
 
@@ -194,15 +206,17 @@ void main() {
       null,
     );
     await scans.scanAll();
-    // Shown from the file name fallback, confirmed unchanged in the dialog.
+    // Shown from the folder name fallback, confirmed unchanged in the
+    // dialog.
     expect(version('v1.rpp').metadata!.label, 'v1');
 
     await versions.editVersion(
       title(),
       version('v1.rpp'),
-      fileName: 'final.rpp',
+      name: 'final',
       label: 'v1',
     );
+    expect(version('final.rpp').fileName, 'final/final.rpp');
     expect(version('final.rpp').metadata!.label, 'v1');
   });
 
@@ -210,15 +224,16 @@ void main() {
     await bandWithSong();
     await versions.adopt(title(), version('v1.rpp'), 'main');
     final id = version('v1.rpp').metadata!.id;
-    Future<List<Backup>> backups() async =>
-        (await container.read(historyProvider(title().id).future))[id] ?? [];
+    Future<List<Backup>> backups() => container.read(
+      historyProvider((title().id, version('v1.rpp').fileName)).future,
+    );
 
     await versions.backup(title(), version('v1.rpp'));
     final saved = (await backups()).single;
     await versions.editVersion(
       title(),
       version('v1.rpp'),
-      fileName: 'v1.rpp',
+      name: 'v1',
       label: 'changed',
     );
 

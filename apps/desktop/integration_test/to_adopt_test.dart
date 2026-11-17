@@ -77,9 +77,9 @@ void main() {
   }
 
   testWidgets('adopts versions and separates Save As copies', (tester) async {
-    final song = h.copyCleanProject('Band/Artist/Album/Song/v1.rpp');
-    h.copyCleanProject('Band/Artist/Album/Song/v2.rpp');
-    final ballad = h.copyCleanProject('Band/Artist/Album/Ballad/v1.rpp');
+    final song = h.copyCleanProject('Band/Artist/Album/Song/v1/v1.rpp');
+    h.copyCleanProject('Band/Artist/Album/Song/v2/v2.rpp');
+    final ballad = h.copyCleanProject('Band/Artist/Album/Ballad/v1/v1.rpp');
     await h.writeSettings();
     await h.start(tester);
     await tapText(tester, 'Later');
@@ -97,7 +97,7 @@ void main() {
 
     // Adoption in the detail, on the selected version.
     await openDetail(tester, 'Ballad');
-    expect(find.text('v1.rpp'), findsOne);
+    expect(find.text('v1/v1.rpp'), findsOne);
     expect(find.text('NOT ADOPTED'), findsWidgets);
     await adopt(tester, 'first take');
     expect(find.text('NOT ADOPTED'), findsNothing);
@@ -135,8 +135,8 @@ void main() {
     await adopt(tester, 'intro');
     expect(find.text('1 version not adopted'), findsOne);
     await back(tester);
-    File(song).copySync(h.path('Band/Artist/Album/Song/v1 copy.rpp'));
-    final copy = h.path('Band/Artist/Album/Song/v1 copy.rpp');
+    File(song).copySync(h.path('Band/Artist/Album/Song/v1/v1 copy.rpp'));
+    final copy = h.path('Band/Artist/Album/Song/v1/v1 copy.rpp');
     final before = h.tasks.length;
     final scanning = h.scans.scanAll();
     await waitFor(

@@ -27,8 +27,8 @@ void main() {
   testWidgets('opens versions in REAPER and waits for it to close', (
     tester,
   ) async {
-    final older = h.copyCleanProject('Band/Artist/Album/Song/v1.rpp');
-    final latest = h.copyCleanProject('Band/Artist/Album/Song/v2.rpp');
+    final older = h.copyCleanProject('Band/Artist/Album/Song/v1/v1.rpp');
+    final latest = h.copyCleanProject('Band/Artist/Album/Song/v2/v2.rpp');
     File(older).setLastModifiedSync(DateTime(2026, 1, 1));
     File(latest).setLastModifiedSync(DateTime(2026, 2, 1));
     await h.writeSettings();

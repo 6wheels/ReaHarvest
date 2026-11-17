@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -82,7 +81,7 @@ class VersionPane extends ConsumerWidget {
                 alerts.notAdopted
                     ? version.fileName
                     : m == null
-                    ? p.posix.withoutExtension(version.fileName)
+                    ? versionName(version)
                     : m.label,
                 style: text.titleLarge?.copyWith(
                   fontStyle: alerts.notAdopted ? FontStyle.italic : null,
@@ -97,9 +96,20 @@ class VersionPane extends ConsumerWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          versionDetails(ref, l10n, version, withLabel: false),
+          versionDetails(
+            ref,
+            l10n,
+            version,
+            withLabel: false,
+            withSize: version.folder != null,
+          ),
           style: text.bodyMedium?.copyWith(color: c.muted),
         ),
+        if (version.folder != null && version.sizes.isNotEmpty)
+          Text(
+            sizeBreakdown(l10n, version),
+            style: text.bodySmall?.copyWith(color: c.muted),
+          ),
         if (entry != null)
           Row(
             children: [
@@ -220,6 +230,13 @@ class VersionPane extends ConsumerWidget {
                       deleteVersionFromUi(context, ref, title, version),
                   child: Text(l10n.deleteVersion),
                 ),
+                if (!freeTree && versionFolderCount(title) > 1)
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.filter_1_rounded),
+                    onPressed: () =>
+                        keepOnlyVersionFromUi(context, ref, title, version),
+                    child: Text(l10n.keepOnlyVersion),
+                  ),
               ],
               builder: (context, controller, _) => IconButton(
                 tooltip: l10n.moreActions,
@@ -282,7 +299,7 @@ class VersionPane extends ConsumerWidget {
           const SizedBox(height: Space.l),
           SectionLabel(l10n.history),
           const SizedBox(height: Space.xs),
-          History(title, version, m.id),
+          History(title, version),
         ],
       ],
     );

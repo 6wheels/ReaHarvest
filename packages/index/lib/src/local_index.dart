@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 10;
+const _schemaVersion = 12;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -40,7 +40,6 @@ CREATE TABLE titles (
   path TEXT NOT NULL,
   id TEXT NOT NULL,
   tags TEXT NOT NULL,
-  status TEXT,
   version_statuses TEXT NOT NULL,
   version_labels TEXT NOT NULL,
   version_owners TEXT NOT NULL,
@@ -50,7 +49,10 @@ CREATE TABLE versions (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
   title_path TEXT NOT NULL,
   file_name TEXT NOT NULL,
+  folder TEXT,
   size INTEGER NOT NULL,
+  sizes TEXT NOT NULL,
+  sample_rate INTEGER,
   modified INTEGER NOT NULL,
   version_id TEXT,
   owner TEXT,
@@ -73,12 +75,7 @@ CREATE TABLE files (
   hash TEXT,
   PRIMARY KEY (library_id, path)
 );
-CREATE TABLE subprojects (
-  library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
-  path TEXT NOT NULL,
-  media TEXT NOT NULL,
-  PRIMARY KEY (library_id, path)
-);
+
 CREATE TABLE issues (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
   kind TEXT NOT NULL,
@@ -92,6 +89,7 @@ CREATE TABLE issues (
 
 const _tables = [
   'issues',
+  // Dropped in schema 11; kept here so that an older index drops it.
   'subprojects',
   'files',
   'versions',
@@ -164,26 +162,19 @@ final class LocalIndex {
           scan.journalPosition?.line,
         ],
       );
-      for (final t in [
-        'nodes',
-        'titles',
-        'versions',
-        'subprojects',
-        'issues',
-      ]) {
+      for (final t in ['nodes', 'titles', 'versions', 'issues']) {
         _db.execute('DELETE FROM $t WHERE library_id = ?', [id]);
       }
       _insertNodes(id, scan.nodes);
       _insertTitles(id, scan.titles, scan.nodes);
-      _insertSubprojects(id, scan.subprojects);
       _insertIssues(id, scan.issues, scan.corrupted, scan.orphanNodes);
       _updateFiles(id, scan.stamps);
     });
   }
 
   /// Stores the result of [scanTitle] for the title folder [titlePath] of
-  /// [library] (SPEC §8): its node, title and versions, and the files,
-  /// subprojects and issues below its folder replace the stored ones; the
+  /// [library] (SPEC §8): its node, title and versions, and the files and
+  /// issues below its folder replace the stored ones; the
   /// issues of the folder itself (its level) are left. Duplicated version
   /// identifiers, which span titles, are then found again from the indexed
   /// versions. File hashes are kept for files whose stamp did not change.
@@ -206,12 +197,10 @@ final class LocalIndex {
         'DELETE FROM versions WHERE library_id = ? AND title_path = ?',
         [id, titlePath],
       );
-      _db.execute('DELETE FROM subprojects WHERE $below', [id, prefix]);
       _db.execute('DELETE FROM issues WHERE $below', [id, prefix]);
       final nodes = {titlePath: ?scan.node};
       _insertNodes(id, nodes);
       _insertTitles(id, [?scan.title], nodes);
-      _insertSubprojects(id, scan.subprojects);
       _insertIssues(id, scan.issues, scan.corrupted, scan.orphanNodes);
       _updateFiles(id, scan.stamps, prefix: prefix);
       _db.execute('DELETE FROM issues WHERE library_id = ? AND kind = ?', [
@@ -254,9 +243,9 @@ final class LocalIndex {
     Map<String, NodeFile> nodes,
   ) {
     _insertAll(
-      'INSERT INTO titles (library_id, path, id, tags, status, '
+      'INSERT INTO titles (library_id, path, id, tags, '
       'version_statuses, version_labels, version_owners) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         for (final t in titles)
           [
@@ -264,7 +253,6 @@ final class LocalIndex {
             t.path,
             t.id,
             jsonEncode(t.tags),
-            t.status,
             jsonEncode(t.versionStatuses),
             // Raw node entries: the next scan reuses them while the node
             // file is unchanged (SPEC §4.2).
@@ -274,10 +262,11 @@ final class LocalIndex {
       ],
     );
     _insertAll(
-      'INSERT INTO versions (library_id, title_path, file_name, size, '
-      'modified, version_id, owner, label, tempo, length, track_count, '
-      'item_count, plugins, media, record_path, render_file) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO versions (library_id, title_path, file_name, folder, '
+      'size, sizes, sample_rate, modified, version_id, owner, label, tempo, '
+      'length, track_count, item_count, plugins, media, record_path, '
+      'render_file) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         for (final t in titles)
           for (final v in t.versions)
@@ -285,7 +274,12 @@ final class LocalIndex {
               id,
               t.path,
               v.fileName,
+              v.folder,
               v.size,
+              jsonEncode({
+                for (final e in v.sizes.entries) e.key.name: e.value,
+              }),
+              v.sampleRate,
               v.modified.microsecondsSinceEpoch,
               v.metadata?.id,
               v.metadata?.owner,
@@ -302,17 +296,6 @@ final class LocalIndex {
       ],
     );
   }
-
-  void _insertSubprojects(
-    LibraryId id,
-    Map<String, List<String>> subprojects,
-  ) => _insertAll(
-    'INSERT INTO subprojects (library_id, path, media) VALUES (?, ?, ?)',
-    [
-      for (final MapEntry(:key, :value) in subprojects.entries)
-        [id, key, jsonEncode(value)],
-    ],
-  );
 
   void _insertIssues(
     LibraryId id,
@@ -422,7 +405,6 @@ final class LocalIndex {
           path: r['path'] as String,
           tags: (jsonDecode(r['tags'] as String) as Map).cast(),
           versions: versions[(r['library_id'], r['path'])] ?? const [],
-          status: r['status'] as String?,
           versionStatuses: _stringMap(r['version_statuses'] as String),
         ),
     ];
@@ -460,15 +442,14 @@ final class LocalIndex {
       corrupted: paths(ReportKind.corrupted),
       orphanNodes: paths(ReportKind.orphanNode),
       stamps: _stamps(id),
-      subprojects: _subprojects(id),
       freeTree: library.isFreeTree,
       journalPosition: journalPosition(id),
     );
   }
 
   /// The stored rows that [scanTitle] reuses for the title [titlePath] of
-  /// [id]: the title, its node, and the stamps and subprojects below its
-  /// folder, without loading the rest of the library (SPEC §8). Null if no
+  /// [id]: the title, its node, and the stamps below its folder, without
+  /// loading the rest of the library (SPEC §8). Null if no
   /// such title is indexed.
   ScanResult? storedTitle(LibraryId id, String titlePath) =>
       _snapshot(() => _storedTitle(id, titlePath));
@@ -481,12 +462,11 @@ final class LocalIndex {
       titles: [title],
       nodes: _nodes(id, [title], path: titlePath),
       stamps: _stamps(id, prefix: prefix),
-      subprojects: _subprojects(id, prefix: prefix),
     );
   }
 
   /// Stored node files of [id] (only the one at [path] when set), with the
-  /// statuses of [titles] and the raw label and owner entries.
+  /// version statuses of [titles] and the raw label and owner entries.
   Map<String, NodeFile> _nodes(
     LibraryId id,
     List<Title> titles, {
@@ -512,7 +492,6 @@ final class LocalIndex {
         r['path'] as String: NodeFile(
           NodeId(r['node_id'] as String),
           r['level'] as String,
-          status: byPath[r['path']]?.status,
           versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
           versionLabels: entries[r['path']]?.labels ?? const {},
           versionOwners: entries[r['path']]?.owners ?? const {},
@@ -531,19 +510,6 @@ final class LocalIndex {
         size: r['size'] as int,
         modified: DateTime.fromMicrosecondsSinceEpoch(r['modified'] as int),
       ),
-  };
-
-  /// Stored subprojects of [id] whose path starts with [prefix].
-  Map<String, List<String>> _subprojects(
-    LibraryId id, {
-    String prefix = '',
-  }) => {
-    for (final r in _db.select(
-      'SELECT path, media FROM subprojects WHERE library_id = ?1 '
-      'AND substr(path, 1, length(?2)) = ?2',
-      [id, prefix],
-    ))
-      r['path'] as String: (jsonDecode(r['media'] as String) as List).cast(),
   };
 
   /// Issues ("To sort", SPEC §5.2) of [library], or of all libraries, of
@@ -652,6 +618,12 @@ final class LocalIndex {
       fileName: r['file_name'] as String,
       modified: DateTime.fromMicrosecondsSinceEpoch(r['modified'] as int),
       size: r['size'] as int,
+      folder: r['folder'] as String?,
+      sizes: {
+        for (final e in (jsonDecode(r['sizes'] as String) as Map).entries)
+          SizeCategory.values.byName(e.key as String): e.value as int,
+      },
+      sampleRate: r['sample_rate'] as int?,
       metadata: versionId == null
           ? null
           : VersionMetadata(

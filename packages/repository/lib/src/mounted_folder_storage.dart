@@ -117,7 +117,14 @@ final class MountedFolderStorage implements RepositoryStorage {
   }
 
   @override
-  Future<void> delete(String path) => File(_abs(path)).delete();
+  Future<void> delete(String path) async {
+    final abs = _abs(path);
+    if (await FileSystemEntity.isDirectory(abs)) {
+      await Directory(abs).delete(recursive: true);
+    } else {
+      await File(abs).delete();
+    }
+  }
 
   @override
   Future<void> setModified(String path, DateTime modified) =>

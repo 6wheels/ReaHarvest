@@ -3,7 +3,6 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../l10n/app_localizations.dart';
@@ -233,7 +232,7 @@ class _Identity extends ConsumerWidget {
                   style: context.readout,
                 ),
               ),
-              if (leadStatus(title) case final status?) ...[
+              if (title.status case final status?) ...[
                 const SizedBox(width: Space.s),
                 Pill(statusLabel(l10n, status), color: c.accent),
               ],
@@ -346,16 +345,6 @@ class _Recent extends StatelessWidget {
   }
 }
 
-/// Most advanced status of the versions of [t] along the trail, else a
-/// custom one, else the status of the title itself.
-String? leadStatus(Title t) {
-  const steps = Title.defaultStatuses;
-  final statuses = [for (final v in t.versions) ?t.statusOf(v)];
-  final known = statuses.where(steps.contains);
-  if (known.isEmpty) return statuses.firstOrNull ?? t.status;
-  return known.reduce((a, b) => steps.indexOf(a) >= steps.indexOf(b) ? a : b);
-}
-
 /// Line of a recent version: its label and owner, date and tempo, icons
 /// of what needs attention, its status and its actions.
 class _RecentVersion extends ConsumerWidget {
@@ -404,7 +393,7 @@ class _RecentVersion extends ConsumerWidget {
                   // The file name stands for a version without label.
                   label.isEmpty
                       ? TextSpan(
-                          text: p.posix.withoutExtension(version.fileName),
+                          text: versionName(version),
                           style: TextStyle(color: c.muted),
                         )
                       : TextSpan(

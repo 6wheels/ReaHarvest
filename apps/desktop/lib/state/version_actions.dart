@@ -3,7 +3,6 @@ import 'dart:isolate';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
@@ -18,7 +17,8 @@ import 'tasks.dart';
 final _log = Logger('library.versions');
 
 /// Actions on the versions of a title: adopt, separate a duplicate, create,
-/// edit, status, trash, purge, backup and restore (SPEC §4.2, §5.4, §5.9),
+/// edit, status, trash, keep only one, purge, backup and restore (SPEC
+/// §4.2, §5.4, §5.9),
 /// each in the turn of its library ([_turn]). "Then rescans": the folder of
 /// the title only ([LibraryScans.rescanTitle], SPEC §8).
 class VersionActions {
@@ -111,7 +111,7 @@ class VersionActions {
       ),
     );
     _log.info('Version ${_at(title, version)} backed up');
-    ref.invalidate(historyProvider(title.id));
+    ref.invalidate(historyProvider);
   }
 
   /// Restores [backup] into [version] of [title], after backing up its
@@ -132,30 +132,30 @@ class VersionActions {
       ),
     );
     _log.info('Version ${_at(title, version)} restored from $path');
-    ref.invalidate(historyProvider(title.id));
+    ref.invalidate(historyProvider);
     await ref.rescanTitle(entry, title);
   }
 
-  /// Creates the version [fileName] of [title] with [label], owned by the
-  /// local member when the library declares it ([localOwnerProvider], SPEC
-  /// §5.4): a copy of [source] when given, else from the project file
-  /// [template], else blank (REAPER's default template for new
-  /// projects when set). Then rescans. Returns its file name.
+  /// Creates the version [name] of [title] (its folder and its `.RPP`) with
+  /// [label], owned by the local member when the library declares it
+  /// ([localOwnerProvider], SPEC §5.4): a copy of [source] when given, else
+  /// from the project file [template], else blank (REAPER's default
+  /// template for new projects when set). Then rescans. Returns its
+  /// [Version.fileName].
   Future<String> addVersion(
     Title title,
-    String fileName,
+    String name,
     String label, {
     Version? source,
     String? template,
   }) => _turn(
     title,
-    () =>
-        _addVersion(title, fileName, label, source: source, template: template),
+    () => _addVersion(title, name, label, source: source, template: template),
   );
 
   Future<String> _addVersion(
     Title title,
-    String fileName,
+    String name,
     String label, {
     Version? source,
     String? template,
@@ -170,13 +170,12 @@ class VersionActions {
     );
     final String path;
     if (source != null) {
-      final from = source.fileName;
       path = await Isolate.run(
         () => duplicateVersion(
           MountedFolderStorage(root),
           dir,
-          from,
-          fileName,
+          source,
+          name,
           metadata,
         ),
       );
@@ -187,7 +186,7 @@ class VersionActions {
         () => createVersion(
           MountedFolderStorage(root),
           dir,
-          fileName,
+          name,
           metadata,
           template: text,
         ),
@@ -200,7 +199,7 @@ class VersionActions {
       ', label "${metadata.label}"',
     );
     await ref.rescanTitle(entry, title);
-    return p.posix.basename(path);
+    return _inTitle(title, path);
   }
 
   Future<String?> _defaultTemplate() async {
@@ -209,48 +208,49 @@ class VersionActions {
   }
 
   /// Sets the [label] of [version] of [title] (adopted versions only), in
-  /// the title's node file, and renames its file to [fileName] (SPEC §5.4);
-  /// the label is written when changed or on a rename. Then rescans.
-  /// Returns its file name.
+  /// the title's node file, and renames its folder and its `.RPP` to [name]
+  /// (SPEC §5.4); the label is written when changed or on a rename. Then
+  /// rescans. Returns its [Version.fileName].
   Future<String> editVersion(
     Title title,
     Version version, {
-    required String fileName,
+    required String name,
     required String label,
   }) => _turn(
     title,
-    () => _editVersion(title, version, fileName: fileName, label: label),
+    () => _editVersion(title, version, name: name, label: label),
   );
 
   Future<String> _editVersion(
     Title title,
     Version version, {
-    required String fileName,
+    required String name,
     required String label,
   }) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
     final old = version.fileName;
+    final rename = name != version.folder;
     final id = version.metadata?.id;
-    // Also written on a rename: a label shown from the file name fallback
+    // Also written on a rename: a label shown from the folder name fallback
     // would otherwise follow the new name (SPEC §4.2).
     final relabel =
-        id != null &&
-        (version.metadata!.label != label.trim() || fileName != old);
-    final name = await Isolate.run(() async {
+        id != null && (version.metadata!.label != label.trim() || rename);
+    final path = await Isolate.run(() async {
       final storage = MountedFolderStorage(root);
       if (relabel) await setVersionLabel(storage, dir, id, label.trim());
-      if (fileName == old) return old;
-      return p.posix.basename(await renameVersion(storage, dir, old, fileName));
+      if (!rename) return null;
+      return renameVersion(storage, dir, version, name);
     });
+    final fileName = path == null ? old : _inTitle(title, path);
     _log.info(
       'Version ${_at(title, version)} edited'
       '${relabel ? ', label "${label.trim()}"' : ''}'
-      '${name != old ? ', renamed to $name' : ''}',
+      '${rename ? ', renamed to $fileName' : ''}',
     );
     await ref.rescanTitle(entry, title);
-    return name;
+    return fileName;
   }
 
   /// Sets the [status] of [version] of [title] (null clears it), in the
@@ -274,7 +274,8 @@ class VersionActions {
     await ref.rescanTitle(entry, title);
   }
 
-  /// Moves [version] of [title] to the trash (SPEC §5.4). Then rescans.
+  /// Moves [version] of [title] to the trash: its whole folder (SPEC §5.4).
+  /// Then rescans.
   Future<void> trashVersion(Title title, Version version) =>
       _turn(title, () => _trashVersion(title, version));
 
@@ -282,47 +283,50 @@ class VersionActions {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
-    final name = version.fileName;
     await Isolate.run(
-      () => deleteVersion(MountedFolderStorage(root), dir, name),
+      () => deleteVersion(MountedFolderStorage(root), dir, version),
     );
     _log.info('Version ${_at(title, version)} moved to the trash');
     ref.invalidate(trashProvider(title.id));
     await ref.rescanTitle(entry, title);
   }
 
-  /// Permanently deletes the trash files [paths] of [title] (SPEC §5.4).
-  /// Then returns the media of its pool used by no project any more, to
-  /// offer their purge; empty in a free tree, which has no pool. Throws
-  /// [FormatException] if a project cannot be read.
-  Future<List<StorageEntry>> purge(Title title, List<String> paths) =>
-      _turn(title, () => _purge(title, paths));
+  /// Moves every other version folder of [title] than the one of [version]
+  /// to the trash (SPEC §5.4). Then rescans.
+  Future<void> keepOnly(Title title, Version version) =>
+      _turn(title, () => _keepOnly(title, version));
 
-  Future<List<StorageEntry>> _purge(Title title, List<String> paths) async {
-    final root = ref.libraryEntry(title.libraryId).libraryRoot;
-    final dir = title.path;
-    final freeTree = _isFreeTree(title);
-    await Isolate.run(() => purgeTrash(MountedFolderStorage(root), dir, paths));
-    _log.info('Trash of $dir in $root purged: ${paths.join(', ')}');
-    ref.invalidate(trashProvider(title.id));
-    if (freeTree) return const [];
-    return Isolate.run(
-      () => unreferencedMedia(MountedFolderStorage(root), dir),
-    );
-  }
-
-  /// Permanently deletes the media [paths] of the pool of [title], as
-  /// returned by [purge]. Then rescans.
-  Future<void> purgeUnusedMedia(Title title, List<String> paths) =>
-      _turn(title, () => _purgeUnusedMedia(title, paths));
-
-  Future<void> _purgeUnusedMedia(Title title, List<String> paths) async {
+  Future<void> _keepOnly(Title title, Version version) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
-    await Isolate.run(() => purgeMedia(MountedFolderStorage(root), dir, paths));
-    _log.info('Unused media of $dir in $root purged: ${paths.join(', ')}');
-    await ref.rescanTitle(entry, title);
+    try {
+      final trashed = await Isolate.run(
+        () => keepOnlyVersion(MountedFolderStorage(root), dir, version),
+      );
+      _log.info(
+        'Only version ${_at(title, version)} kept, moved to the trash: '
+        '${trashed.join(', ')}',
+      );
+    } finally {
+      // Also after a failure: the folders already moved are shown in the
+      // trash, the others stay.
+      ref.invalidate(trashProvider(title.id));
+      await ref.rescanTitle(entry, title);
+    }
+  }
+
+  /// Permanently deletes the trash entries [paths] of [title], version
+  /// folders and assets (SPEC §5.4).
+  Future<void> purge(Title title, List<String> paths) =>
+      _turn(title, () => _purge(title, paths));
+
+  Future<void> _purge(Title title, List<String> paths) async {
+    final root = ref.libraryEntry(title.libraryId).libraryRoot;
+    final dir = title.path;
+    await Isolate.run(() => purgeTrash(MountedFolderStorage(root), dir, paths));
+    _log.info('Trash of $dir in $root purged: ${paths.join(', ')}');
+    ref.invalidate(trashProvider(title.id));
   }
 
   /// Runs [change] of [title] in the turn of its library ([LibraryTurns]):
@@ -336,34 +340,44 @@ class VersionActions {
       '${title.path}/${version.fileName} of '
       '${ref.libraryEntry(title.libraryId).displayName}';
 
-  bool _isFreeTree(Title title) =>
-      ref.read(indexedLibrariesProvider)[title.libraryId]?.isFreeTree ?? true;
+  /// The library path [path] relative to the folder of [title].
+  static String _inTitle(Title title, String path) =>
+      title.path.isEmpty ? path : path.substring(title.path.length + 1);
 }
 
 final versionActionsProvider = Provider<VersionActions>(VersionActions.new);
 
-/// Backups of the versions of a title, by version, newest first (SPEC
-/// §5.4); empty for free tree titles, which have no history.
+/// Backups of the version of [Version.fileName] in the title of [NodeId],
+/// read in the `.history/` of its own folder only, newest first (SPEC
+/// §5.4); empty for a version without folder (free tree) or not adopted.
 final historyProvider = FutureProvider.autoDispose
-    .family<Map<VersionId, List<Backup>>, NodeId>((ref, id) async {
+    .family<List<Backup>, (NodeId, String)>((ref, key) async {
+      final (id, fileName) = key;
       final title = ref
           .watch(titlesProvider)
           .where((t) => t.id == id)
           .firstOrNull;
-      if (title == null ||
-          ref.watch(indexedLibrariesProvider)[title.libraryId]?.isFreeTree !=
-              false) {
-        return const {};
+      final version = title?.versions
+          .where((v) => v.fileName == fileName)
+          .firstOrNull;
+      final folder = version?.folder;
+      final versionId = version?.metadata?.id;
+      if (title == null || folder == null || versionId == null) {
+        return const [];
       }
       final root = ref.watch(
         settingsProvider.select((s) => s.library(title.libraryId)?.libraryRoot),
       );
-      if (root == null) return const {};
-      final dir = title.path;
-      return Isolate.run(() => readHistory(MountedFolderStorage(root), dir));
+      if (root == null) return const [];
+      final dir = joinPath(title.path, folder);
+      final history = await Isolate.run(
+        () => readHistory(MountedFolderStorage(root), dir),
+      );
+      return history[versionId] ?? const [];
     });
 
-/// Files in the trash of a title, versions and assets (SPEC §5.4).
+/// Entries in the trash of a title: version folders and assets (SPEC
+/// §5.4).
 final trashProvider = FutureProvider.autoDispose
     .family<List<StorageEntry>, NodeId>((ref, id) async {
       final title = ref
