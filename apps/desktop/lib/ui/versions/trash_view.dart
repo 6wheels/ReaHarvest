@@ -22,15 +22,16 @@ class TrashView extends ConsumerWidget {
   Future<void> _purge(
     BuildContext context,
     WidgetRef ref,
-    List<StorageEntry> files,
-  ) async {
+    List<StorageEntry> files, {
+    required String action,
+  }) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await confirm(
       context,
       title: l10n.purgeTitle(files.length),
       content: l10n.purgeHint,
-      action: l10n.deleteForever,
+      action: action,
     );
     if (confirmed != true || !context.mounted) return;
     final service = ref.read(versionActionsProvider);
@@ -133,7 +134,8 @@ class TrashView extends ConsumerWidget {
             ),
             OutlinedButton.icon(
               icon: const Icon(Icons.delete_forever_outlined, size: 18),
-              onPressed: () => _purge(context, ref, files),
+              onPressed: () =>
+                  _purge(context, ref, files, action: l10n.emptyTrash),
               label: Text(l10n.emptyTrash),
             ),
           ],
@@ -162,7 +164,8 @@ class TrashView extends ConsumerWidget {
               ),
               IconButton(
                 tooltip: l10n.deleteForever,
-                onPressed: () => _purge(context, ref, [e]),
+                onPressed: () =>
+                    _purge(context, ref, [e], action: l10n.deleteForever),
                 icon: const Icon(Icons.close_rounded, size: 18),
               ),
             ],

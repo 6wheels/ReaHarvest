@@ -8,8 +8,10 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'labels.dart';
+import 'overview.dart';
 import 'status_trail.dart';
 import 'title_actions.dart';
+import 'widgets.dart';
 
 enum _Column { name, tags, versions, tempo, status, modified }
 
@@ -77,11 +79,11 @@ class _TitleListState extends ConsumerState<TitleList> {
         Divider(height: 1, color: c.border),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               Space.xl,
               Space.xs,
               Space.xl,
-              Space.xl,
+              libraryBottomPadding(overviewOpen: selected != null),
             ),
             itemCount: titles.length,
             itemExtent: 40,
@@ -177,9 +179,8 @@ class _HeaderCell extends StatelessWidget {
               child: Text(
                 label.toUpperCase(),
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                style: context.legend.copyWith(
                   color: sorted == null ? c.muted : c.text,
-                  letterSpacing: 0.8,
                 ),
               ),
             ),
@@ -234,10 +235,7 @@ class _Text extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: context.colors.muted,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
+      style: context.readout,
     ),
   );
 }
@@ -250,12 +248,15 @@ class _Swatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lights = AuroraPalette.of(id).lights;
+    final lights = AuroraPalette.of(
+      id,
+      light: Theme.of(context).brightness == Brightness.light,
+    ).lights;
     return Container(
       width: 18,
       height: 18,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(Radii.xs),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -288,6 +289,16 @@ class _TitleRowState extends ConsumerState<TitleRow> {
   var _hovered = false;
 
   @override
+  void didUpdateWidget(TitleRow old) {
+    super.didUpdateWidget(old);
+    if (widget.selected && !old.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) revealSelectedTitle(context);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return MouseRegion(
@@ -295,15 +306,22 @@ class _TitleRowState extends ConsumerState<TitleRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: Material(
         color: widget.selected
-            ? c.accent.withValues(alpha: 0.12)
+            ? c.accent.withValues(alpha: 0.10)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(Radii.xs),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(Radii.xs),
           onTap: () =>
               ref.read(overviewProvider.notifier).toggle(widget.title.id),
           child: Row(
             children: [
+              // Lit edge of the selected strip.
+              AnimatedContainer(
+                duration: Motion.fast,
+                width: 2,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                color: widget.selected ? c.accent : Colors.transparent,
+              ),
               Expanded(child: widget.child),
               TitleActions(widget.title, visible: _hovered || widget.selected),
               const SizedBox(width: Space.s),
@@ -389,7 +407,12 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
     final selected = ref.watch(overviewProvider);
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xl),
+      padding: EdgeInsets.fromLTRB(
+        Space.xl,
+        0,
+        Space.xl,
+        libraryBottomPadding(overviewOpen: selected != null),
+      ),
       itemCount: rows.length,
       itemExtent: 36,
       itemBuilder: (context, i) {
@@ -415,7 +438,7 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
         final collapsed = _collapsed.contains(row.key);
         return InkWell(
           key: ValueKey(row.key),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(Radii.xs),
           onTap: () => setState(
             () => collapsed
                 ? _collapsed.remove(row.key)
@@ -425,18 +448,14 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
             padding: EdgeInsets.only(left: indent),
             child: Row(
               children: [
-                AnimatedRotation(
-                  turns: collapsed ? -0.25 : 0,
-                  duration: Motion.fast,
-                  child: Icon(Icons.expand_more_rounded, color: c.muted),
-                ),
+                Disclosure(collapsed ? Disclosure.right : Disclosure.down),
                 const SizedBox(width: Space.xs),
                 Expanded(
                   child: Text(
                     row.group!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
+                    style: context.legend.copyWith(color: c.text),
                   ),
                 ),
               ],

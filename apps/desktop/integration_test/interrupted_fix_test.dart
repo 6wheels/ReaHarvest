@@ -111,10 +111,10 @@ void main() {
     );
 
     // Its item is to sort again, and can be fixed.
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     await openSectionFix(tester, tooDeep);
-    await confirmFix(tester, h, 1);
+    await confirmFix(tester, h);
     expect(find.text('Project moved · 1'), findsOne);
     expect(h.tasks.last.state, TaskState.done);
     await tapText(tester, 'Close');

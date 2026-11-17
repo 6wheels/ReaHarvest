@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/state/navigation.dart';
+import 'package:reaharvest/theme/app_theme.dart';
 import 'package:reaharvest/ui/filter_bar.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_card.dart';
@@ -73,13 +74,13 @@ void main() {
     expect(
       find.descendant(
         of: card('Demo'),
-        matching: find.textContaining('Unassigned'),
+        matching: find.textContaining('UNASSIGNED'),
       ),
       findsOne,
     );
 
     // The misplaced project is to sort.
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     expect(find.text('PROJECTS ABOVE THE TITLE LEVEL · 1'), findsOne);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -87,17 +88,20 @@ void main() {
 
     // One filter per level, labelled by level; a common key is shared
     // across layouts.
-    Finder chip(String label) => find.widgetWithText(Pill, label);
+    Finder chip(String label) => find.widgetWithText(
+      Pill,
+      label.toUpperCase().replaceAll(': ', labelSeparator),
+    );
     for (final label in ['Artist', 'Album', 'Project', 'Chapter', 'Library']) {
       expect(chip(label), findsOne, reason: label);
     }
     expect(chip('Title'), findsNothing);
     await tester.tap(chip('Artist'));
     await tester.pumpAndSettle();
-    final menu = find.byType(CheckboxMenuButton);
-    expect(find.widgetWithText(CheckboxMenuButton, 'Other Artist'), findsOne);
+    final menu = find.byType(MenuItemButton);
+    expect(find.widgetWithText(MenuItemButton, 'Other Artist'), findsOne);
     expect(menu, findsNWidgets(3));
-    await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Unassigned'));
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Unassigned'));
     await tester.pumpAndSettle();
     // The chip closes its menu.
     await tester.tap(chip('Artist: Unassigned'));
@@ -105,7 +109,7 @@ void main() {
     expect(menu, findsNothing);
     await waitFor(tester, () => cards(tester).length == 1, reason: 'filtered');
     expect(cards(tester), {'Demo'});
-    await tapText(tester, 'Clear filters');
+    await tapText(tester, 'CLEAR FILTERS');
     await waitFor(tester, () => cards(tester).length == 8, reason: 'cleared');
 
     // Tree: libraries, then the levels above the titles; a collapsed group
@@ -160,6 +164,6 @@ void main() {
       expect(chip(label), findsOne, reason: label);
     }
     expect(find.text('Non classé'), findsWidgets);
-    expect(find.textContaining('À ranger ·'), findsOne);
+    expect(find.textContaining('À RANGER //'), findsOne);
   });
 }

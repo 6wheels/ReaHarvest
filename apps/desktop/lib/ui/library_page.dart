@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,29 +11,80 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
+import '../state/tasks.dart';
 import '../theme/app_theme.dart';
 import 'filter_bar.dart';
 import 'settings_dialog.dart';
 import 'overview.dart';
 import 'title_detail/title_detail_page.dart';
 import 'title_card.dart';
+import 'studio_title_bar.dart';
 import 'title_views.dart';
 
 /// Main window: the library (SPEC §5.2). Search bar at the top, filters
 /// below, then the titles as cards, list or tree, and the overview docked
 /// at the bottom.
-class LibraryPage extends ConsumerWidget {
+class LibraryPage extends ConsumerStatefulWidget {
   const LibraryPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryPage> createState() => _LibraryPageState();
+}
+
+class _LibraryPageState extends ConsumerState<LibraryPage> {
+  final _searchFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  /// Keys handled wherever the focus is, while no dialog covers the page:
+  /// Ctrl+F (⌘F) focuses the search, Escape does what it does in the page
+  /// when nothing has the focus.
+  bool _onKey(KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        !mounted ||
+        !(ModalRoute.isCurrentOf(context) ?? true)) {
+      return false;
+    }
+    final keyboard = HardwareKeyboard.instance;
+    if (event.logicalKey == LogicalKeyboardKey.keyF &&
+        (keyboard.isControlPressed || keyboard.isMetaPressed)) {
+      _searchFocus.requestFocus();
+      return true;
+    }
+    final focus = FocusManager.instance.primaryFocus;
+    if (event.logicalKey == LogicalKeyboardKey.escape &&
+        (focus == null || focus == FocusManager.instance.rootScope)) {
+      _escape();
+      return true;
+    }
+    return false;
+  }
+
+  /// Folds the tasks zone, or else closes the overview.
+  void _escape() {
+    if (!ref.read(tasksZoneUnfoldedProvider.notifier).fold()) {
+      ref.read(overviewProvider.notifier).close();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final titles = ref.watch(visibleTitlesProvider);
     final navigation = ref.watch(navigationProvider);
     final hasTitles = ref.watch(titlesProvider).isNotEmpty;
-    // Without titles, the filter bar still leads to the items to sort.
     final hasIssues = ref.watch(issuesProvider).isNotEmpty;
     final overview = ref.watch(overviewProvider);
-    final pinned = navigation.overviewPinned;
     final l10n = AppLocalizations.of(context);
 
     final Widget content;
@@ -61,76 +113,50 @@ class LibraryPage extends ConsumerWidget {
 
     return Scaffold(
       body: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): () =>
-              ref.read(overviewProvider.notifier).close(),
-        },
-        // The content takes its final size at once and the overview slides
-        // over it: no relayout of the titles during the animation. Pinned,
-        // the titles end above the overview; otherwise it floats over them
-        // and a click outside of it closes it (cards and controls win their
-        // own clicks).
-        child: Stack(
-          children: [
-            Positioned.fill(
-              bottom: overview == null || !pinned
-                  ? 0
-                  : overviewHeight + Space.l,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: pinned || overview == null
-                    ? null
-                    : ref.read(overviewProvider.notifier).close,
-                child: RepaintBoundary(
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          Space.xl,
-                          Space.l,
-                          Space.l,
-                          Space.m,
+        bindings: {const SingleActivator(LogicalKeyboardKey.escape): _escape},
+        // A scope inside the shortcuts: when the search loses the focus (a
+        // click elsewhere), the focus falls back here and Escape still
+        // reaches the page.
+        child: FocusScope(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: overview == null
+                      ? null
+                      : ref.read(overviewProvider.notifier).close,
+                  child: RepaintBoundary(
+                    child: Column(
+                      children: [
+                        StudioTitleBar(
+                          center: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 480),
+                            child: LibrarySearchField(focusNode: _searchFocus),
+                          ),
+                          trailing: const _SettingsButton(),
                         ),
-                        child: Row(
-                          children: [
-                            // Balances the gear so that the search bar stays
-                            // centered.
-                            const SizedBox(width: 40),
-                            Expanded(
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 560,
-                                  ),
-                                  child: const _SearchBar(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: Space.s),
-                            const _SettingsButton(),
-                          ],
+                        if (hasTitles || hasIssues) const FilterBar(),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: Motion.medium,
+                            child: content,
+                          ),
                         ),
-                      ),
-                      if (hasTitles || hasIssues) const FilterBar(),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: Motion.medium,
-                          child: content,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: Space.xl,
-              right: Space.xl,
-              bottom: Space.l,
-              height: overviewHeight,
-              child: _OverviewHost(overview),
-            ),
-          ],
+              Positioned(
+                left: Space.xl,
+                right: Space.xl,
+                bottom: overviewBottom,
+                height: overviewHeight,
+                child: _OverviewHost(overview),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -177,14 +203,25 @@ class _OverviewHostState extends State<_OverviewHost> {
 }
 
 /// Search bar, focused on startup; shows the restored or applied query.
-class _SearchBar extends ConsumerStatefulWidget {
-  const _SearchBar();
+/// Search field of the library title bar: filters the titles as one types;
+/// a discreet button or Escape clears it.
+class LibrarySearchField extends ConsumerStatefulWidget {
+  const LibrarySearchField({
+    super.key,
+    required this.focusNode,
+    this.autofocus = true,
+  });
+
+  final FocusNode focusNode;
+
+  /// Focused on startup (the showcase turns it off).
+  final bool autofocus;
 
   @override
-  ConsumerState<_SearchBar> createState() => _SearchBarState();
+  ConsumerState<LibrarySearchField> createState() => _LibrarySearchFieldState();
 }
 
-class _SearchBarState extends ConsumerState<_SearchBar> {
+class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
   late final _controller = TextEditingController(
     text: ref.read(navigationProvider).query,
   );
@@ -195,67 +232,105 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
     super.dispose();
   }
 
+  void _clear() {
+    _controller.clear();
+    ref.read(navigationProvider.notifier).setQuery('');
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(navigationProvider.select((n) => n.query), (_, query) {
       if (query != _controller.text) _controller.text = query;
     });
+    final l10n = AppLocalizations.of(context);
+    final empty = ref.watch(navigationProvider.select((n) => n.query.isEmpty));
     final c = context.colors;
-    OutlineInputBorder border(Color color) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: color),
-    );
-    return TextField(
-      controller: _controller,
-      autofocus: true,
-      onChanged: ref.read(navigationProvider.notifier).setQuery,
-      // Enter opens the detail of the title in the overview.
-      onSubmitted: (_) {
-        if (ref.read(overviewProvider) case final title?) {
-          openTitleDetail(context, title);
-        }
-      },
-      style: Theme.of(context).textTheme.bodyLarge,
-      cursorColor: c.accent,
-      decoration: InputDecoration(
-        hintText: AppLocalizations.of(context).searchHint,
-        hintStyle: TextStyle(color: c.muted),
-        prefixIcon: const Icon(Icons.search_rounded),
-        filled: true,
-        fillColor: c.raised,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        enabledBorder: border(c.border),
-        focusedBorder: border(c.accent.withValues(alpha: 0.7)),
+    final shortcut = defaultTargetPlatform == TargetPlatform.macOS
+        ? '⌘F'
+        : 'CTRL+F';
+    // Natural height, centered in the title bar.
+    return Center(
+      // Escape clears the search; once empty, it goes on to the page
+      // (closes the overview).
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent ||
+              event.logicalKey != LogicalKeyboardKey.escape ||
+              _controller.text.isEmpty) {
+            return KeyEventResult.ignored;
+          }
+          _clear();
+          return KeyEventResult.handled;
+        },
+        child: TextField(
+          controller: _controller,
+          focusNode: widget.focusNode,
+          textAlignVertical: TextAlignVertical.center,
+          autofocus: widget.autofocus,
+          onChanged: ref.read(navigationProvider.notifier).setQuery,
+          // Enter opens the detail of the title in the overview.
+          onSubmitted: (_) {
+            if (ref.read(overviewProvider) case final title?) {
+              openTitleDetail(context, title);
+            }
+          },
+          style: Theme.of(context).textTheme.bodyMedium,
+          cursorColor: c.accent,
+          decoration: InputDecoration(
+            hintText: l10n.searchHint,
+            hintStyle: TextStyle(color: c.muted, fontSize: 13),
+            prefixIcon: const Icon(Icons.search_rounded, size: 16),
+            prefixIconConstraints: const BoxConstraints(minWidth: 32),
+            // The shortcut while empty, then a discreet button clearing it.
+            suffixIcon: empty
+                ? Padding(
+                    padding: const EdgeInsets.only(right: Space.s),
+                    child: Text(
+                      shortcut,
+                      style: context.legend.copyWith(fontSize: 9.5),
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(right: 2),
+                    child: IconButton(
+                      tooltip: l10n.clearSearch,
+                      onPressed: _clear,
+                      // Explicit: the field restyles its suffix buttons.
+                      // Smaller than the theme size, so that the field
+                      // keeps its height.
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size.square(22),
+                        minimumSize: Size.zero,
+                        padding: EdgeInsets.zero,
+                        iconSize: 14,
+                      ).merge(Theme.of(context).iconButtonTheme.style),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
+            suffixIconConstraints: const BoxConstraints(),
+            fillColor: c.background,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 6,
+              horizontal: Space.s,
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-class _SettingsButton extends StatefulWidget {
+class _SettingsButton extends StatelessWidget {
   const _SettingsButton();
 
   @override
-  State<_SettingsButton> createState() => _SettingsButtonState();
-}
-
-class _SettingsButtonState extends State<_SettingsButton> {
-  var _hovered = false;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    onEnter: (_) => setState(() => _hovered = true),
-    onExit: (_) => setState(() => _hovered = false),
-    child: IconButton(
-      tooltip: AppLocalizations.of(context).settings,
-      onPressed: () => showSettings(context),
-      icon: AnimatedRotation(
-        turns: _hovered ? 0.125 : 0,
-        duration: Motion.medium,
-        curve: Motion.curve,
-        child: const Icon(Icons.settings_outlined),
-      ),
-    ),
+  Widget build(BuildContext context) => IconButton(
+    tooltip: AppLocalizations.of(context).settings,
+    iconSize: 16,
+    onPressed: () => showSettings(context),
+    icon: const Icon(Icons.settings_outlined),
   );
 }
 
@@ -360,24 +435,24 @@ class _TitleGridState extends ConsumerState<_TitleGrid> {
         // Fixed card size: resizing only changes the column count, the
         // remaining width stays on the right.
         final available = constraints.maxWidth - 2 * Space.xl;
-        final columns = ((available + Space.l) / (_cardSize + Space.l))
+        final columns = ((available + Space.m) / (_cardSize + Space.m))
             .floor()
             .clamp(1, 1 << 10);
-        final used = columns * _cardSize + (columns - 1) * Space.l;
+        final used = columns * _cardSize + (columns - 1) * Space.m;
         return GridView.builder(
           padding: EdgeInsets.fromLTRB(
             Space.xl,
-            Space.s,
+            Space.l,
             (constraints.maxWidth - Space.xl - used).clamp(
               Space.xl,
               double.infinity,
             ),
-            Space.xl,
+            libraryBottomPadding(overviewOpen: overview != null),
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            mainAxisSpacing: Space.l,
-            crossAxisSpacing: Space.l,
+            mainAxisSpacing: Space.m,
+            crossAxisSpacing: Space.m,
           ),
           itemCount: titles.length,
           itemBuilder: (_, i) => _Appear(

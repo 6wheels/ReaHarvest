@@ -16,6 +16,7 @@ import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/ui/overview.dart';
+import 'package:reaharvest/ui/widgets.dart' show Dropdown;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -166,10 +167,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(field('Song - bridge.RPP'), findsOne);
     await tapText(tester, 'From a template');
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(Dropdown<String>));
     await tester.pumpAndSettle();
     await tapText(tester, 'Band template');
-    await tapText(tester, 'Create');
+    await tapText(tester, 'New version');
     await waitFor(
       tester,
       // Adopted versions are shown by their label.
@@ -196,7 +197,7 @@ void main() {
     await tapText(tester, 'Copy of “Song - bridge”');
     await tester.enterText(field('Label'), 'solo');
     await tester.pumpAndSettle();
-    await tapText(tester, 'Create');
+    await tapText(tester, 'Duplicate');
     await waitFor(
       tester,
       () =>
@@ -216,7 +217,7 @@ void main() {
     await tester.enterText(field('File name'), 'Song - guitar solo');
     await tester.enterText(field('Label'), 'guitar');
     await tester.pumpAndSettle();
-    await tapText(tester, 'Save');
+    await tapText(tester, 'Rename');
     await waitFor(
       tester,
       () =>
@@ -237,7 +238,7 @@ void main() {
     await tapText(tester, 'Rename…');
     await tester.enterText(field('Label'), 'lead');
     await tester.pumpAndSettle();
-    await tapText(tester, 'Save');
+    await tapText(tester, 'Rename');
     expect(find.text('REAPER is open'), findsNothing);
     await waitFor(
       tester,
@@ -285,7 +286,7 @@ void main() {
     );
 
     // Empty the trash, then purge the unused media.
-    await tapText(tester, 'Trash');
+    await tapText(tester, 'TRASH');
     await waitFor(
       tester,
       () => find.text('Song - guitar solo.RPP').evaluate().isNotEmpty,
@@ -293,7 +294,7 @@ void main() {
     );
     await tapText(tester, 'Empty the trash');
     expect(find.text('Delete 1 file permanently?'), findsOne);
-    await tapText(tester, 'Delete permanently');
+    await tapText(tester, 'Empty the trash');
     await waitFor(
       tester,
       () => find.text('Unused media').evaluate().isNotEmpty,
@@ -436,7 +437,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Libraries scanned · 2'), findsOne);
     await tapText(tester, 'Close');
-    await tapText(tester, 'Tasks · 4');
+    await tapText(tester, 'TASKS // 4');
     expect(find.text('Scan of “Other”'), findsOne);
     await tapText(tester, 'Clear finished');
     expect(tasks(), isEmpty);
@@ -496,7 +497,7 @@ void main() {
     await scanning;
 
     // Render targets are only reported here (#84).
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     expect(find.text("MEDIA OUTSIDE THE TITLE'S MEDIA FOLDER · 1"), findsOne);
     expect(find.text(r'Alice\audio\02-Kick-261108_1909.wav'), findsOne);
@@ -509,7 +510,7 @@ void main() {
       ),
       findsOne,
     );
-    await tapText(tester, 'Fix 1 item');
+    await tapText(tester, 'Fix');
     await waitFor(
       tester,
       () => find.text('Media moved · ${names.length}').evaluate().isNotEmpty,

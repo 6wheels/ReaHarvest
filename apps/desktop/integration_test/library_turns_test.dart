@@ -39,7 +39,7 @@ void main() {
         KnownValue('Artist', [KnownValue('Album'), KnownValue('Live')]),
       ],
     );
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     final library = h.settings.libraries.single.id;
     final moved = h.path('Band/Artist/Live/Ballad/v1.rpp');
@@ -53,7 +53,7 @@ void main() {
     // starts; nothing moved.
     final before = h.tasks.length;
     await openSectionFix(tester, wrongLevel);
-    await tester.tap(find.widgetWithText(FilledButton, 'Fix 1 item'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await waitFor(
       tester,
       () => h.tasks.length > before && h.tasks.last.isQueued,
@@ -74,7 +74,7 @@ void main() {
     holding = turns.run(library, () => hold.future);
     final queued = h.tasks.length;
     await openSectionFix(tester, wrongLevel);
-    await tester.tap(find.widgetWithText(FilledButton, 'Fix 1 item'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await waitFor(
       tester,
       () => h.tasks.length > queued && h.tasks.last.isQueued,

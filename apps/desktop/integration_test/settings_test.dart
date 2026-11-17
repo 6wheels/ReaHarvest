@@ -106,7 +106,7 @@ void main() {
     expect(h.settings.textScale, 1.3);
     await tester.ensureVisible(find.text(h.logs));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Open'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Open'));
     expect(h.openedFolders, [h.logs]);
     await tester.ensureVisible(find.text('Français'));
     await tester.pumpAndSettle();

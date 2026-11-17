@@ -342,13 +342,13 @@ class _LayoutChoice extends StatelessWidget {
       child: Material(
         color: selected ? c.accent.withValues(alpha: 0.10) : c.raised,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(Radii.s),
           side: BorderSide(
             color: selected ? c.accent.withValues(alpha: 0.6) : c.border,
           ),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(Radii.s),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(

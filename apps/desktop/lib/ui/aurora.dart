@@ -3,25 +3,46 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 
 /// Colors of an aurora visual, derived from a stable seed (the title id),
-/// so that a title always looks the same and titles look different.
+/// so that a title always looks the same and titles look different. A
+/// [light] palette is a pale dawn sky with deep lights standing out on it,
+/// for the light theme.
 @immutable
 final class AuroraPalette {
-  const AuroraPalette._(this.sky, this.lights, this.seed);
+  const AuroraPalette._(this.sky, this.lights, this.shade, this.seed);
 
-  factory AuroraPalette.of(String seed) {
+  factory AuroraPalette.of(String seed, {bool light = false}) {
     final hash = _fnv1a(seed);
     final hue = (hash % 360).toDouble();
     HSLColor at(double offset, double s, double l) =>
         HSLColor.fromAHSL(1, (hue + offset) % 360, s, l);
-    return AuroraPalette._(at(200, 0.45, 0.09).toColor(), [
-      at(0, 0.72, 0.58).toColor(),
-      at(38, 0.68, 0.55).toColor(),
-      at(78, 0.62, 0.62).toColor(),
-    ], hash);
+    return light
+        ? AuroraPalette._(
+            at(200, 0.35, 0.90).toColor(),
+            [
+              at(0, 0.85, 0.52).toColor(),
+              at(38, 0.80, 0.48).toColor(),
+              at(78, 0.75, 0.55).toColor(),
+            ],
+            const Color(0x99FFFFFF),
+            hash,
+          )
+        : AuroraPalette._(
+            at(200, 0.45, 0.09).toColor(),
+            [
+              at(0, 0.72, 0.58).toColor(),
+              at(38, 0.68, 0.55).toColor(),
+              at(78, 0.62, 0.62).toColor(),
+            ],
+            const Color(0xB0000000),
+            hash,
+          );
   }
 
-  /// Night sky behind the lights.
+  /// Sky behind the lights: night, or dawn when light.
   final Color sky;
+
+  /// Bottom shade, for the legibility of the title name.
+  final Color shade;
 
   /// Light curtains, back to front.
   final List<Color> lights;
@@ -39,10 +60,10 @@ final class AuroraPalette {
 
   @override
   bool operator ==(Object other) =>
-      other is AuroraPalette && other.seed == seed;
+      other is AuroraPalette && other.seed == seed && other.shade == shade;
 
   @override
-  int get hashCode => seed;
+  int get hashCode => Object.hash(seed, shade);
 }
 
 /// Paints soft light curtains over a night sky. [phase] drifts the curtains
@@ -92,11 +113,15 @@ final class AuroraPainter extends CustomPainter {
     canvas.drawRect(
       rect,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0x00000000), Color(0x00000000), Color(0xB0000000)],
-          stops: [0, 0.4, 1],
+          colors: [
+            palette.shade.withValues(alpha: 0),
+            palette.shade.withValues(alpha: 0),
+            palette.shade,
+          ],
+          stops: const [0, 0.4, 1],
         ).createShader(rect),
     );
   }

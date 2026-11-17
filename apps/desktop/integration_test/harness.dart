@@ -92,6 +92,11 @@ class Harness {
   /// (created on first run), index opened, then the app pumped.
   Future<void> start(WidgetTester tester) async {
     await _fitWindow(tester);
+    // Lights stay still (a failed task blinks for ever otherwise), so that
+    // the tests can wait for the animations to end.
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     final settings = (await tester.runAsync(
       () => SettingsFile(settingsPath).load(),
     ))!;
@@ -315,17 +320,12 @@ Future<void> openSectionFix(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
-/// Confirms the open fix preview of [count] items, then waits for the end
-/// of its batch, whose report opens.
-Future<void> confirmFix(WidgetTester tester, Harness h, int count) async {
+/// Confirms the open fix preview, then waits for the end of its batch,
+/// whose report opens.
+Future<void> confirmFix(WidgetTester tester, Harness h) async {
   final before = h.tasks.length;
   // The tasks zone may show an earlier batch under the same label.
-  await tester.tap(
-    find.widgetWithText(
-      FilledButton,
-      count == 1 ? 'Fix 1 item' : 'Fix $count items',
-    ),
-  );
+  await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
   await waitFor(
     tester,
     () => h.tasks.length > before && !h.tasks[before].isRunning,

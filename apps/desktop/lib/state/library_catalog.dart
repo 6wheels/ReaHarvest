@@ -165,20 +165,17 @@ class LibraryCatalog {
     List<KnownValue> values, {
     required List<KnownValue> read,
   }) async {
-    final merged = await ref.read(libraryTurnsProvider).run(
-      entry.id,
-      () async {
-        final storage = MountedFolderStorage(entry.libraryRoot);
-        final library = await readLibrary(storage);
-        if (library == null) return null;
-        var result = values;
-        for (final path in library.knownValues.paths) {
-          if (!read.knows(path)) result = result.withPath(path);
-        }
-        await writeLibrary(storage, library.withKnownValues(result));
-        return result;
-      },
-    );
+    final merged = await ref.read(libraryTurnsProvider).run(entry.id, () async {
+      final storage = MountedFolderStorage(entry.libraryRoot);
+      final library = await readLibrary(storage);
+      if (library == null) return null;
+      var result = values;
+      for (final path in library.knownValues.paths) {
+        if (!read.knows(path)) result = result.withPath(path);
+      }
+      await writeLibrary(storage, library.withKnownValues(result));
+      return result;
+    });
     if (merged == null) return;
     _log.info(
       'Known values of ${entry.displayName} set: '

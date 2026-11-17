@@ -128,15 +128,14 @@ class _ToSortListState extends ConsumerState<ToSortList> {
     final selected = _selectedOf(issues);
     return Row(
       children: [
-        Checkbox(
-          tristate: true,
+        LightCheckbox(
           value: selected.isEmpty
               ? false
               : selected.length == issues.length
               ? true
               : null,
-          semanticLabel: l10n.selectAll,
-          onChanged: (_) => _toggleAll(issues),
+          tooltip: l10n.selectAll,
+          onPressed: () => _toggleAll(issues),
         ),
         Expanded(child: label),
         if (selected.isNotEmpty)
@@ -145,7 +144,7 @@ class _ToSortListState extends ConsumerState<ToSortList> {
             style: Theme.of(context).textTheme.bodySmall
                 ?.copyWith(color: context.colors.muted),
           ),
-        TextButton(
+        OutlinedButton(
           onPressed: () =>
               _fixAll(context, ref, kind, selected.isEmpty ? issues : selected),
           child: Text(l10n.fixAction),

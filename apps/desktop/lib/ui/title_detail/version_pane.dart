@@ -25,7 +25,7 @@ class VersionPane extends ConsumerWidget {
     this.version, {
     super.key,
     required this.onSelect,
-    required this.onNewVersion,
+    required this.onDuplicate,
   });
 
   final Title title;
@@ -34,8 +34,8 @@ class VersionPane extends ConsumerWidget {
   /// Selects the version of this file name (after a rename).
   final ValueChanged<String> onSelect;
 
-  /// Opens the new version dialog, this version offered as source.
-  final VoidCallback onNewVersion;
+  /// Opens the new version dialog, a copy of this version chosen.
+  final VoidCallback onDuplicate;
 
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
     final name = await showEditVersionDialog(context, ref, title, version);
@@ -90,7 +90,7 @@ class VersionPane extends ConsumerWidget {
               ),
             ),
             if (alerts.notAdopted) ...[
-              const SizedBox(width: Space.s),
+              const SizedBox(width: Space.m),
               Pill(l10n.notAdopted, color: c.muted),
             ],
           ],
@@ -151,10 +151,16 @@ class VersionPane extends ConsumerWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             FilledButton.icon(
-              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              icon: const ReaperIcon(),
               onPressed: () =>
                   openVersionInReaper(context, ref, title, version),
               label: Text(l10n.openInReaper),
+            ),
+            // Not wired yet: renders are played from phase 3 (SPEC §5).
+            OutlinedButton.icon(
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              onPressed: null,
+              label: Text(l10n.playRender),
             ),
             if (hasHistory)
               OutlinedButton.icon(
@@ -167,7 +173,7 @@ class VersionPane extends ConsumerWidget {
                 if (!freeTree) ...[
                   MenuItemButton(
                     leadingIcon: const Icon(Icons.copy_rounded),
-                    onPressed: onNewVersion,
+                    onPressed: onDuplicate,
                     child: Text(l10n.duplicateVersion),
                   ),
                   MenuItemButton(
@@ -259,7 +265,7 @@ class VersionPane extends ConsumerWidget {
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
+            child: OutlinedButton.icon(
               icon: const Icon(Icons.call_split_rounded, size: 18),
               onPressed: () => runProjectChange(
                 context,

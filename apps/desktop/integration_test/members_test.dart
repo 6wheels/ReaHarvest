@@ -8,6 +8,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/ui/title_card.dart';
+import 'package:reaharvest/ui/widgets.dart' show Dropdown;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import 'harness.dart';
@@ -118,7 +119,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<MemberId>));
+    await tester.tap(find.byType(Dropdown<MemberId>));
     await tester.pumpAndSettle();
     await tapText(tester, 'Alice');
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'demo');

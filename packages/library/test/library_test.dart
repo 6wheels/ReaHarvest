@@ -282,11 +282,11 @@ void main() {
             reaperResources: '/home/alice/.config/REAPER',
             templatesFolder: '/templates',
             theme: ThemePreference.dark,
+            accent: AccentPreference.violet,
             textScale: 1.2,
             language: 'fr',
             navigation: const NavigationSettings(
               displayMode: DisplayMode.tree,
-              overviewPinned: true,
               query: 'tide',
               filter: TitleFilter(
                 tags: {
@@ -331,12 +331,11 @@ void main() {
       expect(read.reaperResources, '/home/alice/.config/REAPER');
       expect(read.templatesFolder, '/templates');
       expect(
-        (read.theme, read.textScale, read.language),
-        (ThemePreference.dark, 1.2, 'fr'),
+        (read.theme, read.accent, read.textScale, read.language),
+        (ThemePreference.dark, AccentPreference.violet, 1.2, 'fr'),
       );
       final nav = read.navigation;
       expect((nav.displayMode, nav.query), (DisplayMode.tree, 'tide'));
-      expect(nav.overviewPinned, isTrue);
       expect(nav.filter.toJson(), settings.navigation.filter.toJson());
       expect(nav.filter.isEmpty, isFalse);
       expect(nav.savedViews.single.name, 'Mixing');

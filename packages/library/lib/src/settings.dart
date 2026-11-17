@@ -197,7 +197,6 @@ final class NavigationSettings {
     this.query = '',
     this.filter = const TitleFilter(),
     this.savedViews = const [],
-    this.overviewPinned = false,
   });
 
   final DisplayMode displayMode;
@@ -205,22 +204,16 @@ final class NavigationSettings {
   final TitleFilter filter;
   final List<SavedView> savedViews;
 
-  /// Whether the side panel is docked beside the titles rather than
-  /// floating over them.
-  final bool overviewPinned;
-
   NavigationSettings copyWith({
     DisplayMode? displayMode,
     String? query,
     TitleFilter? filter,
     List<SavedView>? savedViews,
-    bool? overviewPinned,
   }) => NavigationSettings(
     displayMode: displayMode ?? this.displayMode,
     query: query ?? this.query,
     filter: filter ?? this.filter,
     savedViews: savedViews ?? this.savedViews,
-    overviewPinned: overviewPinned ?? this.overviewPinned,
   );
 
   Map<String, Object?> toJson() => {
@@ -228,7 +221,6 @@ final class NavigationSettings {
     'query': query,
     'filter': filter.toJson(),
     'savedViews': [for (final v in savedViews) v.toJson()],
-    'overviewPinned': overviewPinned,
   };
 
   static NavigationSettings fromJson(Map<String, Object?> json) =>
@@ -244,12 +236,14 @@ final class NavigationSettings {
           for (final v in json['savedViews'] as List? ?? const [])
             SavedView.fromJson((v as Map).cast()),
         ],
-        overviewPinned: json['overviewPinned'] as bool? ?? false,
       );
 }
 
 /// Light, dark or system theme (SPEC §7.1).
 enum ThemePreference { system, light, dark }
+
+/// Accent color of the interface (SPEC §7.1).
+enum AccentPreference { neutral, orange, yellow, teal, blue, violet }
 
 /// Application settings (SPEC §5.1). Null paths mean "use the default".
 final class AppSettings {
@@ -260,6 +254,7 @@ final class AppSettings {
     this.reaperResources,
     this.templatesFolder,
     this.theme = ThemePreference.system,
+    this.accent = AccentPreference.neutral,
     this.textScale = 1.0,
     this.language = systemLanguage,
     this.navigation = const NavigationSettings(),
@@ -280,6 +275,7 @@ final class AppSettings {
   final String? templatesFolder;
 
   final ThemePreference theme;
+  final AccentPreference accent;
 
   /// Font size factor (1.0 = default).
   final double textScale;
@@ -298,6 +294,7 @@ final class AppSettings {
     Object? reaperResources = _keep,
     Object? templatesFolder = _keep,
     ThemePreference? theme,
+    AccentPreference? accent,
     double? textScale,
     String? language,
     NavigationSettings? navigation,
@@ -308,6 +305,7 @@ final class AppSettings {
     reaperResources: _path(reaperResources, this.reaperResources),
     templatesFolder: _path(templatesFolder, this.templatesFolder),
     theme: theme ?? this.theme,
+    accent: accent ?? this.accent,
     textScale: textScale ?? this.textScale,
     language: language ?? this.language,
     navigation: navigation ?? this.navigation,
@@ -367,6 +365,7 @@ final class AppSettings {
     'reaperResources': ?reaperResources,
     'templatesFolder': ?templatesFolder,
     'theme': theme.name,
+    'accent': accent.name,
     'textScale': textScale,
     'language': language,
     'navigation': navigation.toJson(),
@@ -389,6 +388,9 @@ final class AppSettings {
       theme:
           ThemePreference.values.asNameMap()[json['theme']] ??
           ThemePreference.system,
+      accent:
+          AccentPreference.values.asNameMap()[json['accent']] ??
+          AccentPreference.neutral,
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
       language: json['language'] as String? ?? systemLanguage,
       navigation: NavigationSettings.fromJson(

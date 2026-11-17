@@ -6,16 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../state/tasks.dart';
 import '../theme/app_theme.dart';
 import 'report_dialog.dart';
-
-/// Background tasks zone at the bottom of the application (SPEC §5.2): the
-/// latest task, expandable into the list of all of them. Hidden when there
-/// is no task.
-class TasksZone extends ConsumerStatefulWidget {
-  const TasksZone({super.key});
-
-  @override
-  ConsumerState<TasksZone> createState() => _TasksZoneState();
-}
+import 'widgets.dart';
 
 /// Navigator of the application, for the tasks zone which sits outside of
 /// it.
@@ -28,12 +19,16 @@ void _openReport(String title, Report report) {
   }
 }
 
-class _TasksZoneState extends ConsumerState<TasksZone> {
-  var _expanded = false;
+/// Background tasks zone at the bottom of the application (SPEC §5.2): the
+/// latest task, expandable into the list of all of them. Hidden when there
+/// is no task.
+class TasksZone extends ConsumerWidget {
+  const TasksZone({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tasks = ref.watch(tasksProvider);
+    final expanded = ref.watch(tasksZoneUnfoldedProvider);
     final c = context.colors;
     final l10n = AppLocalizations.of(context);
     // Reports of the actions launched by the user open when they end.
@@ -59,23 +54,21 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
         orElse: () => tasks.last,
       );
       final toggle = TextButton.icon(
-        onPressed: () => setState(() => _expanded = !_expanded),
+        onPressed: ref.read(tasksZoneUnfoldedProvider.notifier).toggle,
         iconAlignment: IconAlignment.end,
-        icon: Icon(
-          _expanded ? Icons.expand_more_rounded : Icons.expand_less_rounded,
-          size: 18,
+        // The zone unfolds upwards.
+        icon: Disclosure(expanded ? Disclosure.down : Disclosure.up),
+        label: Text(
+          '${l10n.tasks.toUpperCase()}$labelSeparator${tasks.length}',
+          style: context.legend.copyWith(color: c.text),
         ),
-        label: Text('${l10n.tasks} · ${tasks.length}'),
       );
       content = Material(
         color: c.surface,
         shape: Border(top: BorderSide(color: c.border)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Space.xl,
-            vertical: Space.xs,
-          ),
-          child: _expanded
+          padding: const EdgeInsets.symmetric(horizontal: Space.m),
+          child: expanded
               ? Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -123,6 +116,10 @@ class _TasksZoneState extends ConsumerState<TasksZone> {
   }
 }
 
+/// Width of the state and report columns of a task, with room for the
+/// longer labels of the supported languages.
+const _actionWidth = 104.0;
+
 class _TaskRow extends ConsumerWidget {
   const _TaskRow(this.task, {this.detailed = false});
 
@@ -145,31 +142,13 @@ class _TaskRow extends ConsumerWidget {
         : task.isRunning
         ? task.step?.call(l10n)
         : null;
-    final icon = switch (task.state) {
-      TaskState.queued => Icon(
-        Icons.schedule_rounded,
-        size: 16,
-        color: c.muted,
-      ),
-      TaskState.running => SizedBox.square(
-        dimension: 14,
-        child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
-      ),
-      TaskState.done => Icon(
-        Icons.check_circle_outline_rounded,
-        size: 16,
-        color: c.accent,
-      ),
-      TaskState.failed => Icon(
-        Icons.error_outline_rounded,
-        size: 16,
-        color: error,
-      ),
-      TaskState.cancelled => Icon(
-        Icons.block_rounded,
-        size: 16,
-        color: c.muted,
-      ),
+    // Status light: off while waiting, breathing amber while running,
+    // green once done, blinking red on failure.
+    final light = switch (task.state) {
+      TaskState.queued || TaskState.cancelled => Led(c.muted, lit: false),
+      TaskState.running => Led(c.ledAmber, mode: LedMode.pulse),
+      TaskState.done => Led(c.ledGreen),
+      TaskState.failed => Led(c.ledRed, mode: LedMode.blink),
     };
     final Widget trailing = switch (task.state) {
       TaskState.running when task.cancelling => Text(
@@ -188,10 +167,10 @@ class _TaskRow extends ConsumerWidget {
       TaskState.cancelled => Text(l10n.taskCancelled, style: muted),
     };
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 40),
+      constraints: const BoxConstraints(minHeight: 34),
       child: Row(
         children: [
-          SizedBox(width: 20, child: Center(child: icon)),
+          SizedBox(width: 20, child: Center(child: light)),
           const SizedBox(width: Space.s),
           Expanded(
             child: Column(
@@ -226,26 +205,40 @@ class _TaskRow extends ConsumerWidget {
           ),
           if (task.isRunning) ...[
             const SizedBox(width: Space.m),
+            SizedBox(width: 120, child: Meter(task.progress)),
+            const SizedBox(width: Space.s),
             SizedBox(
-              width: 160,
-              child: LinearProgressIndicator(
-                value: task.progress,
-                minHeight: 3,
-                borderRadius: BorderRadius.circular(2),
-                color: c.accent,
-                backgroundColor: c.border,
+              width: 36,
+              child: Text(
+                task.progress == null
+                    ? '---'
+                    : '${(task.progress! * 100).round()}%'.padLeft(4),
+                textAlign: TextAlign.end,
+                style: context.readout.copyWith(color: c.text),
               ),
             ),
           ],
           const SizedBox(width: Space.m),
-          trailing,
-          if (task.report case final report?) ...[
-            const SizedBox(width: Space.s),
-            TextButton(
-              onPressed: () => _openReport(task.label(l10n), report),
-              child: Text(l10n.report),
-            ),
-          ],
+          // State and report in columns of one width, the report slot kept
+          // empty: the rows line up whatever the state or the language.
+          SizedBox(
+            width: _actionWidth,
+            // A button fills its column, a state is centered in it.
+            child: trailing is ButtonStyleButton
+                ? trailing
+                : Center(child: trailing),
+          ),
+          const SizedBox(width: Space.xs),
+          SizedBox(
+            width: _actionWidth,
+            child: switch (task.report) {
+              final report? => TextButton(
+                onPressed: () => _openReport(task.label(l10n), report),
+                child: Text(l10n.report),
+              ),
+              null => null,
+            },
+          ),
         ],
       ),
     );

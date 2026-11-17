@@ -25,6 +25,8 @@ import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest/ui/title_card.dart';
+import 'package:reaharvest/ui/title_detail/version_list_item.dart';
+import 'package:reaharvest/ui/widgets.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -299,6 +301,9 @@ class FakeReaperActions extends ReaperActions {
 }
 
 void main() {
+  /// A button label hidden behind its busy light.
+  final busyLabel = find.byWidgetPredicate((w) => w is BusyLabel && w.busy);
+
   late MemorySettings settings;
   late FakeLibraryCatalog catalog;
   late FakeVersionActions versions;
@@ -411,7 +416,7 @@ void main() {
     await pumpApp(tester, titles: demoTitles());
     expect(find.byType(TitleCard), findsWidgets);
     expect(find.text('Northern Lights'), findsOneWidget);
-    expect(find.text('Mixing'), findsWidgets);
+    expect(find.text('MIXING'), findsWidgets);
 
     await tester.enterText(find.byType(TextField), 'tide');
     await tester.pumpAndSettle();
@@ -421,6 +426,15 @@ void main() {
     await tester.enterText(find.byType(TextField), 'zzzz');
     await tester.pumpAndSettle();
     expect(find.text('No title matches “zzzz”'), findsOneWidget);
+
+    // The button clears the search, and so does Escape.
+    await tester.tap(find.byTooltip('Clear the search (Esc)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Northern Lights'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'tide');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Northern Lights'), findsOneWidget);
   });
 
   testWidgets('settings popup changes and saves the theme', (tester) async {
@@ -432,6 +446,9 @@ void main() {
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
     expect(settings.saved.last.theme, ThemePreference.dark);
+    await tester.tap(find.byTooltip('Violet'));
+    await tester.pumpAndSettle();
+    expect(settings.saved.last.accent, AccentPreference.violet);
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.dark);
 
@@ -439,7 +456,7 @@ void main() {
     openedFolders.clear();
     await tester.ensureVisible(find.text('/data/logs'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Open'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Open'));
     expect(openedFolders, ['/data/logs']);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -688,17 +705,17 @@ void main() {
         title('Live', 'Other song'),
       ],
     );
-    expect(find.text('Artist'), findsNothing);
-    expect(find.text('To adopt · 2'), findsOneWidget);
+    expect(find.text('ARTIST'), findsNothing);
+    expect(find.text('TO ADOPT // 2'), findsOneWidget);
     // The card counts the versions to adopt of its title.
     expect(
       find.descendant(
         of: find.widgetWithText(TitleCard, 'First song'),
-        matching: find.textContaining('2 to adopt'),
+        matching: find.textContaining('2 TO ADOPT'),
       ),
       findsOneWidget,
     );
-    await tester.tap(find.text('Album'));
+    await tester.tap(find.text('ALBUM'));
     await tester.pumpAndSettle();
     expect(find.text('Unassigned'), findsOneWidget);
   });
@@ -716,7 +733,7 @@ void main() {
         ),
       ],
     );
-    expect(find.text('To sort · 1'), findsOneWidget);
+    expect(find.text('TO SORT // 1'), findsOneWidget);
   });
 
   testWidgets('settings edit the known values of a library', (tester) async {
@@ -808,21 +825,21 @@ void main() {
     await pumpApp(tester, titles: demoTitles());
     expect(find.byType(TitleCard), findsNWidgets(12));
 
-    await tester.tap(find.text('Artist'));
+    await tester.tap(find.text('ARTIST'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Other Artist'));
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Other Artist'));
     await tester.pumpAndSettle();
     await tester.tapAt(const Offset(1200, 790));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CheckboxMenuButton), findsNothing);
+    expect(find.widgetWithText(MenuItemButton, 'Other Artist'), findsNothing);
     expect(find.byType(TitleCard), findsNWidgets(6));
-    expect(find.text('Artist: Other Artist'), findsOneWidget);
+    expect(find.text('ARTIST // OTHER ARTIST'), findsOneWidget);
     expect(settings.saved.last.navigation.filter.tags, {
       'artist': {'Other Artist'},
     });
 
-    await tester.tap(find.text('Clear filters'));
+    await tester.tap(find.text('CLEAR FILTERS'));
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsNWidgets(12));
   });
@@ -862,29 +879,29 @@ void main() {
     Future<void> toggle(String chip, String value) async {
       await tester.tap(find.text(chip));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(CheckboxMenuButton, value));
+      await tester.tap(find.widgetWithText(MenuItemButton, value));
       await tester.pumpAndSettle();
       await tester.tapAt(const Offset(1200, 790));
       await tester.pumpAndSettle();
     }
 
-    await toggle('Library: 3', 'gone');
-    await toggle('Library: 2', 'Empty');
+    await toggle('LIBRARY // 3', 'gone');
+    await toggle('LIBRARY // 2', 'Empty');
     expect(filter().libraries, {const LibraryId('demo')});
-    await toggle('Library: Demo', 'Demo');
+    await toggle('LIBRARY // DEMO', 'Demo');
     expect(filter().libraries, isEmpty);
-    await toggle('Mode: Local', 'Local');
+    await toggle('MODE // LOCAL', 'Local');
     expect(filter().modes, isEmpty);
     // An owner without a known name is shown as unknown, never as an id.
-    await toggle('Owner: Unknown', 'Unknown');
+    await toggle('OWNER // UNKNOWN', 'Unknown');
     expect(filter().owners, isEmpty);
-    await toggle('Status', 'Mixing');
+    await toggle('STATUS', 'Mixing');
     expect(filter().statuses, {'mixing'});
 
-    await tester.tap(find.text('Missing plugins'));
+    await tester.tap(find.text('MISSING PLUGINS'));
     await tester.pumpAndSettle();
     expect(filter().missingPlugins, isFalse);
-    expect(find.text('Missing plugins'), findsNothing);
+    expect(find.text('MISSING PLUGINS'), findsNothing);
   });
 
   testWidgets('list view sorts by every column and opens the overview', (
@@ -1125,36 +1142,55 @@ void main() {
     await tester.tap(find.text('Midnight Ferry'));
     await tester.pumpAndSettle();
     expect(find.byType(Overview), findsOneWidget);
-    expect(find.text('Midnight Ferry v1'), findsOneWidget);
-    expect(find.text('Midnight Ferry v3'), findsOneWidget);
-    expect(find.text('Midnight Ferry v4'), findsNothing);
+    // One line per version, named by its label.
+    expect(find.textContaining('take 1'), findsOneWidget);
+    expect(find.textContaining('take 4'), findsOneWidget);
+    expect(find.textContaining('take 5'), findsNothing);
     expect(find.text('All 5 versions'), findsOneWidget);
     expect(find.text('Create a backup point'), findsNothing);
 
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
-    expect(find.text('Midnight Ferry v1'), findsNothing);
+    expect(find.textContaining('take 1'), findsNothing);
   });
 
-  testWidgets('floating overview closes on a click outside, pinned stays', (
-    tester,
-  ) async {
+  testWidgets('overview closes on a click outside', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     await tester.tap(find.text('Midnight Ferry'));
     await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsOneWidget);
     await tester.tapAt(const Offset(20, 300));
     await tester.pumpAndSettle();
     expect(find.byType(Overview), findsNothing);
+  });
 
-    await tester.tap(find.text('Midnight Ferry').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Pin below the titles'));
-    await tester.pumpAndSettle();
-    expect(settings.saved.last.navigation.overviewPinned, isTrue);
-    await tester.tapAt(const Offset(20, 300));
+  testWidgets('Escape clears the search first, then closes the overview', (
+    tester,
+  ) async {
+    await pumpApp(tester, titles: demoTitles());
+    // A click on a card takes the focus from the search (desktop, mouse).
+    await tester.tap(
+      find.text('Midnight Ferry'),
+      kind: PointerDeviceKind.mouse,
+    );
     await tester.pumpAndSettle();
     expect(find.byType(Overview), findsOneWidget);
-  });
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsNothing);
+
+    await tester.tap(find.text('Midnight Ferry'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Midnight');
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Northern Lights'), findsOneWidget);
+    expect(find.byType(Overview), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(Overview), findsNothing);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
 
   testWidgets('opens the title detail over the library and goes back', (
     tester,
@@ -1222,19 +1258,19 @@ void main() {
   testWidgets('saves and applies a view', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     await tester.enterText(find.byType(TextField), 'tide');
-    await tester.tap(find.text('Views'));
+    await tester.tap(find.text('VIEWS'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save current view…'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, 'Tide');
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save current view'));
     await tester.pumpAndSettle();
     expect(settings.saved.last.navigation.savedViews.single.query, 'tide');
 
     await tester.enterText(find.byType(TextField), '');
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsNWidgets(12));
-    await tester.tap(find.text('Views'));
+    await tester.tap(find.text('VIEWS'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Tide'));
     await tester.pumpAndSettle();
@@ -1245,15 +1281,15 @@ void main() {
   testWidgets('adopts a version after the REAPER warning', (tester) async {
     await pumpApp(tester, titles: demoTitles(), reaperRunning: true);
     // Hidden on the cards of titles without versions to adopt.
-    expect(find.textContaining('to adopt'), findsOneWidget);
+    expect(find.textContaining(' TO ADOPT'), findsOneWidget);
     expect(
       find.descendant(
         of: find.widgetWithText(TitleCard, 'Glass Garden'),
-        matching: find.textContaining('1 to adopt'),
+        matching: find.textContaining('1 TO ADOPT'),
       ),
       findsOneWidget,
     );
-    await tester.tap(find.text('To adopt · 1'));
+    await tester.tap(find.text('TO ADOPT // 1'));
     await tester.pumpAndSettle();
     expect(find.byType(TitleCard), findsOneWidget);
     await tester.tap(find.text('Glass Garden'));
@@ -1289,14 +1325,14 @@ void main() {
     await tester.tap(find.text('Adopt'));
     await tester.pumpAndSettle();
     expect(find.text('REAPER is open'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(busyLabel, findsNothing);
     await tester.tap(find.text('Continue anyway'));
     await tester.pump();
     await tester.pump();
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(busyLabel, findsOneWidget);
     slow.complete();
     await tester.pumpAndSettle();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(busyLabel, findsNothing);
     expect(versions.adopted, [('Glass Garden v1.rpp', 'intro')]);
   });
 
@@ -1396,13 +1432,18 @@ void main() {
     expect(find.text('Opening raw'), findsOneWidget);
     expect(find.textContaining('· Opening raw.rpp'), findsNothing);
     expect(find.textContaining('· Opening old.rpp'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle_outline_rounded), findsNWidgets(2));
-    expect(find.text('Mixing'), findsWidgets);
+    // Adopted versions: their light is lit.
+    final lights = tester.widgetList<Led>(
+      find.descendant(of: find.byType(VersionItem), matching: find.byType(Led)),
+    );
+    expect(lights.where((l) => l.lit), hasLength(2));
+    expect(find.text('MIXING'), findsWidgets);
 
     // Not adopted: list label and badge next to the version name.
     await tester.tap(find.textContaining('· Opening old.rpp'));
     await tester.pumpAndSettle();
-    expect(find.text('Not adopted'), findsNWidgets(2));
+    expect(find.text('Not adopted'), findsOneWidget);
+    expect(find.text('NOT ADOPTED'), findsOneWidget);
     // Pane heading: the file name with its extension, in italic.
     expect(
       tester.widget<Text>(find.text('Opening old.rpp')).style?.fontStyle,
@@ -1421,7 +1462,7 @@ void main() {
         ]),
       },
     );
-    await tester.tap(find.text('To adopt · 1'));
+    await tester.tap(find.text('TO ADOPT // 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Glass Garden'));
     await tester.pumpAndSettle();
@@ -1500,7 +1541,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, 'Midnight Ferry.RPP'), findsOne);
     // The label is required.
-    Finder createButton() => find.widgetWithText(FilledButton, 'Create');
+    Finder createButton() => find.widgetWithText(FilledButton, 'New version');
     expect(tester.widget<FilledButton>(createButton()).onPressed, isNull);
     await tester.enterText(find.widgetWithText(TextField, 'Label'), ' ');
     await tester.pump();
@@ -1514,10 +1555,12 @@ void main() {
       findsOne,
     );
     await tester.tap(find.text('Copy of “Midnight Ferry v1”'));
-    final slow = pending = Completer<void>();
-    await tester.tap(find.text('Create'));
     await tester.pump();
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    final slow = pending = Completer<void>();
+    // The button follows the chosen action.
+    await tester.tap(find.widgetWithText(FilledButton, 'Duplicate'));
+    await tester.pump();
+    expect(busyLabel, findsOneWidget);
     slow.complete();
     await tester.pumpAndSettle();
     expect(versions.created, [
@@ -1549,13 +1592,13 @@ void main() {
     expect(find.text('A label is required'), findsOne);
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Save'))
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Rename'))
           .onPressed,
       isNull,
     );
     await tester.enterText(find.widgetWithText(TextField, 'Label'), 'first');
     await tester.pump();
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
     await tester.pumpAndSettle();
     expect(versions.edited, [('Midnight Ferry v1.rpp', 'intro.RPP', 'first')]);
   });
@@ -1587,7 +1630,7 @@ void main() {
   testWidgets('shows the trash of a title', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     await openMidnightFerry(tester);
-    await tester.tap(find.text('Trash'));
+    await tester.tap(find.text('TRASH'));
     await tester.pumpAndSettle();
     expect(find.text('Empty the trash'), findsOne);
     expect(find.text('old.rpp'), findsOne);
@@ -1642,7 +1685,7 @@ void main() {
         issue(band.id, ReportKind.corrupted, const ReportItem('A/bad.rpp')),
       ],
     );
-    await tester.tap(find.text('To sort · 5'));
+    await tester.tap(find.text('TO SORT // 5'));
     await tester.pumpAndSettle();
 
     expect(
@@ -1739,7 +1782,7 @@ void main() {
         deep('Alice/d.rpp'),
       ],
     );
-    await tester.tap(find.text('To sort · 4'));
+    await tester.tap(find.text('TO SORT // 4'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Fix…'));
@@ -1764,7 +1807,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Artist/Album/Song/old/c.rpp'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Fix 3 items'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await tester.pumpAndSettle();
 
     final (library, fixes) = migration.fixed.single;
@@ -1841,14 +1884,14 @@ void main() {
         deep(const LibraryId('L3'), 'mix/c.rpp'),
       ],
     );
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
     expect(find.text('→ Song · b · Bob · Mixing'), findsOne);
     // No declared members: no owner.
     expect(find.text('→ Song · c · Mixing'), findsOne);
-    await tester.tap(find.text('Fix 3 items'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await tester.pumpAndSettle();
 
     expect(
@@ -1884,7 +1927,7 @@ void main() {
         outside('Artist/Album/Other/Media/sub.rpp'),
       ],
     );
-    await tester.tap(find.text('To sort · 4'));
+    await tester.tap(find.text('TO SORT // 4'));
     await tester.pumpAndSettle();
     // The references are listed on the card.
     expect(find.text('audio-files\\snare.wav'), findsNWidgets(4));
@@ -1897,7 +1940,7 @@ void main() {
       ),
       findsNWidgets(2),
     );
-    await tester.tap(find.text('Fix 4 items'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await tester.pumpAndSettle();
 
     final (library, fixes) = migration.fixed.single;
@@ -1943,7 +1986,7 @@ void main() {
         }),
       ),
     };
-    await tester.tap(find.text('To sort · 3'));
+    await tester.tap(find.text('TO SORT // 3'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
@@ -1999,17 +2042,14 @@ void main() {
       ],
     );
     previewPending = Completer();
-    await tester.tap(find.text('To sort · 1'));
+    await tester.tap(find.text('TO SORT // 1'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pump();
     await tester.pump();
 
     FilledButton fix() => tester.widget(
-      find.ancestor(
-        of: find.text('Fix 1 item'),
-        matching: find.byType(FilledButton),
-      ),
+      find.ancestor(of: find.text('Fix'), matching: find.byType(FilledButton)),
     );
     expect(find.text('Preparing the preview of the operations…'), findsOne);
     expect(fix().onPressed, isNull);
@@ -2058,7 +2098,7 @@ void main() {
       ],
     );
     previewErrors = {other.id: StateError('unreadable')};
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
@@ -2103,7 +2143,7 @@ void main() {
         folder(ReportKind.unknownValue, 'Sample Artist/Odd', 'album'),
       ],
     );
-    await tester.tap(find.text('To sort · 4'));
+    await tester.tap(find.text('TO SORT // 4'));
     await tester.pumpAndSettle();
     Finder field(String label) => find.widgetWithText(TextField, label);
     String fieldText(String label) =>
@@ -2124,7 +2164,7 @@ void main() {
     await tester.enterText(field('Artist'), 'a/b');
     await tester.pumpAndSettle();
     expect(find.text('Invalid folder name'), findsOne);
-    expect(confirm('Fix 2 items').onPressed, isNull);
+    expect(confirm('Fix').onPressed, isNull);
     await tester.enterText(field('Artist'), 'Sample');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sample Artist').last);
@@ -2132,7 +2172,7 @@ void main() {
     // Unchecked: left as it is.
     await tester.tap(find.text('Band/Loose'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Fix 1 item'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await tester.pumpAndSettle();
     final batch = migration.fixed.single.$2.single as MoveFolder;
     expect((batch.path, batch.target), ('Old', 'Sample Artist/Live/Old'));
@@ -2145,7 +2185,7 @@ void main() {
     expect(find.byType(TextField), findsNothing);
     await tester.tap(find.text('Sample Artist/Odd'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Fix 1 item'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await tester.pumpAndSettle();
     final declared = migration.fixed.last.$2.single as MoveFolder;
     expect((declared.path, declared.target), ('Stranger', 'Stranger'));
@@ -2159,7 +2199,7 @@ void main() {
     expect(fieldText('Album'), '_Unassigned');
     await tester.enterText(field('Artist'), 'Band');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Fix 2 items'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await tester.pumpAndSettle();
     expect(
       [
@@ -2202,7 +2242,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Move…').at(2));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButton<int>));
+    await tester.tap(find.byType(Dropdown<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Title').last);
     await tester.pumpAndSettle();
@@ -2233,13 +2273,16 @@ void main() {
       titles: demoTitles(),
       issues: [high('A'), high('B'), high('C')],
     );
-    await tester.tap(find.text('To sort · 3'));
+    await tester.tap(find.text('TO SORT // 3'));
     await tester.pumpAndSettle();
-    Checkbox box(int i) => tester.widget(find.byType(Checkbox).at(i));
+    LightCheckbox box(int i) => tester.widget(find.byType(LightCheckbox).at(i));
+    // The first light is the one of the section box.
+    bool? light(int i) =>
+        tester.widget<ChoiceLight>(find.byType(ChoiceLight).at(i + 1)).checked;
 
-    // Box 0 selects the section, then one box per card.
-    await tester.tap(find.byType(Checkbox).at(1));
-    await tester.tap(find.byType(Checkbox).at(2));
+    // The box selects the section, then one light per card.
+    await tester.tap(find.byType(ChoiceLight).at(1));
+    await tester.tap(find.byType(ChoiceLight).at(2));
     await tester.pump();
     expect(find.text('2 selected'), findsOne);
     expect(box(0).value, isNull);
@@ -2249,27 +2292,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining(' · 2'), findsOne);
     expect(find.text('1 selected'), findsOne);
-    expect([box(1).value, box(2).value], [true, false]);
+    expect([light(0), light(1)], [true, false]);
 
     // "Fix…" previews the selected items only.
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
     expect(find.text('C'), findsOne);
-    await tester.tap(find.text('Fix 1 item'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
     await tester.pumpAndSettle();
     expect([for (final f in migration.fixed.single.$2) f.path], ['B']);
 
     // Select all, then none: "Fix…" applies to the whole section again.
-    await tester.tap(find.byType(Checkbox).first);
+    await tester.tap(find.byType(LightCheckbox).first);
     await tester.pump();
     expect(find.text('2 selected'), findsOne);
     expect(box(0).value, isTrue);
-    await tester.tap(find.byType(Checkbox).first);
+    await tester.tap(find.byType(LightCheckbox).first);
     await tester.pump();
     expect(find.textContaining('selected'), findsNothing);
     await tester.tap(find.text('Fix…'));
     await tester.pumpAndSettle();
-    expect(find.text('Fix 2 items'), findsOne);
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
+    await tester.pumpAndSettle();
+    expect([for (final f in migration.fixed.last.$2) f.path], ['B', 'C']);
   });
 
   testWidgets('lists and deletes node files without project', (tester) async {
@@ -2283,7 +2328,7 @@ void main() {
         orphan('locked/sub/.node.json'),
       ],
     );
-    await tester.tap(find.text('To sort · 2'));
+    await tester.tap(find.text('TO SORT // 2'));
     await tester.pumpAndSettle();
     expect(find.text('REAHARVEST FILES WITHOUT PROJECT · 2'), findsOne);
     expect(find.text('render'), findsOne);

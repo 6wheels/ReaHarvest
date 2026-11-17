@@ -98,9 +98,9 @@ class History extends ConsumerWidget {
               IconButton(
                 tooltip: l10n.openInReaper,
                 onPressed: () => _open(context, ref, b),
-                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                icon: const ReaperIcon(),
               ),
-              TextButton(
+              OutlinedButton(
                 onPressed: () =>
                     _restore(context, ref, b, format.format(b.created)),
                 child: Text(l10n.restore),

@@ -9,6 +9,7 @@ import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../theme/app_theme.dart';
 import 'layout_labels.dart';
+import 'widgets.dart';
 
 /// Editor of the known values of the intermediate levels of [layout] (SPEC
 /// §3.1), as a tree: values can be removed, unless [used], and added at
@@ -93,7 +94,10 @@ class KnownValuesEditor extends StatelessWidget {
         if (!last) ..._level(context, v.children, [...parent, v.value]),
       ],
       Padding(
-        padding: indent,
+        // Apart from the tree above it at the first level.
+        padding: indent.copyWith(
+          top: depth == 0 && level.isNotEmpty ? Space.s : 0,
+        ),
         child: Row(
           children: [
             Expanded(
@@ -110,6 +114,7 @@ class KnownValuesEditor extends StatelessWidget {
             // A level below a value may be left unassigned (no album).
             if (depth > 0 && !level.any((v) => v.value == Layout.unassigned))
               TextButton(
+                style: glowButtonStyle(context),
                 onPressed: () =>
                     onChanged(values.withPath([...parent, Layout.unassigned])),
                 child: Text(l10n.unassigned),
@@ -177,14 +182,17 @@ class _AddValueState extends State<_AddValue> {
     decoration: InputDecoration(
       isDense: true,
       hintText: widget.label,
+      errorText: _controller.text.trim().isEmpty || _valid
+          ? null
+          : AppLocalizations.of(context).invalidLevelName,
       prefixIcon: const Icon(Icons.add_rounded, size: 16),
       prefixIconConstraints: const BoxConstraints(minWidth: 28),
       border: InputBorder.none,
-      suffixIcon: _controller.text.trim().isEmpty
+      suffixIcon: !_valid
           ? null
-          : IconButton(
+          // Smaller than the field, so that it keeps its height.
+          : IconAction(
               tooltip: widget.label,
-              iconSize: 16,
               icon: const Icon(Icons.check_rounded),
               onPressed: _valid ? _add : null,
             ),
@@ -244,7 +252,7 @@ class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
       content: SizedBox(
         width: 480,
         child: values == null
-            ? const Center(child: CircularProgressIndicator())
+            ? const BusyLight()
             : SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

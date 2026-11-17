@@ -10,6 +10,7 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import '../l10n/app_localizations.dart';
 import '../logs.dart';
 import '../theme/app_theme.dart';
+import 'studio_title_bar.dart';
 
 final _log = Logger('settings');
 
@@ -100,51 +101,58 @@ class SettingsRecoveryApp extends StatelessWidget {
       builder: (context) {
         final l10n = AppLocalizations.of(context);
         return Scaffold(
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Padding(
-                padding: const EdgeInsets.all(Space.l),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      newer
-                          ? l10n.settingsNewerTitle
-                          : l10n.settingsUnreadableTitle,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: Space.m),
-                    SelectableText(
-                      newer
-                          ? l10n.settingsNewerBody(path)
-                          : l10n.settingsUnreadableBody(path),
-                    ),
-                    const SizedBox(height: Space.l),
-                    Wrap(
-                      spacing: Space.s,
-                      runSpacing: Space.s,
-                      children: [
-                        if (onStartNew case final startNew?)
-                          FilledButton(
-                            onPressed: startNew,
-                            child: Text(l10n.settingsStartNew),
+          body: Column(
+            children: [
+              const StudioTitleBar(),
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Padding(
+                      padding: const EdgeInsets.all(Space.l),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            newer
+                                ? l10n.settingsNewerTitle
+                                : l10n.settingsUnreadableTitle,
+                            style: Theme.of(context).textTheme.headlineSmall,
                           ),
-                        OutlinedButton(
-                          onPressed: onOpenFolder,
-                          child: Text(l10n.settingsOpenFolder),
-                        ),
-                        OutlinedButton(
-                          onPressed: onQuit,
-                          child: Text(l10n.quit),
-                        ),
-                      ],
+                          const SizedBox(height: Space.m),
+                          SelectableText(
+                            newer
+                                ? l10n.settingsNewerBody(path)
+                                : l10n.settingsUnreadableBody(path),
+                          ),
+                          const SizedBox(height: Space.l),
+                          Wrap(
+                            spacing: Space.s,
+                            runSpacing: Space.s,
+                            children: [
+                              if (onStartNew case final startNew?)
+                                FilledButton(
+                                  onPressed: startNew,
+                                  child: Text(l10n.settingsStartNew),
+                                ),
+                              OutlinedButton(
+                                onPressed: onOpenFolder,
+                                child: Text(l10n.settingsOpenFolder),
+                              ),
+                              OutlinedButton(
+                                onPressed: onQuit,
+                                child: Text(l10n.quit),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         );
       },

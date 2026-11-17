@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:reaharvest/theme/app_theme.dart';
 import 'package:reaharvest/ui/filter_bar.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/overview.dart';
@@ -28,7 +29,10 @@ void main() {
 
   Finder search() =>
       find.widgetWithText(TextField, 'Search titles, tags, versions…');
-  Finder chip(String label) => find.widgetWithText(Pill, label);
+  Finder chip(String label) => find.widgetWithText(
+    Pill,
+    label.toUpperCase().replaceAll(': ', labelSeparator),
+  );
 
   /// Names of the title cards shown.
   Set<String> cards(WidgetTester tester) => {
@@ -72,7 +76,7 @@ void main() {
     // Tag filter, saved as a view.
     await tester.tap(chip('Artist'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CheckboxMenuButton, 'Other'));
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Other'));
     await tester.pumpAndSettle();
     await tester.tap(chip('Artist: Other'));
     await tester.pumpAndSettle();
@@ -81,18 +85,16 @@ void main() {
     await tester.pumpAndSettle();
     await tapText(tester, 'Save current view…');
     await tester.enterText(dialogField('View name'), 'Live');
-    await tapText(tester, 'Save');
-    await tapText(tester, 'Clear filters');
+    await tapText(tester, 'Save current view');
+    await tapText(tester, 'CLEAR FILTERS');
     await showsCards(tester, {'Song', 'Ballad', 'Encore'});
 
-    // List: a click on a row opens the overview, pinned below the titles.
+    // List: a click on a row opens the overview.
     await tapTooltip(tester, 'List');
     expect(find.byType(TitleList), findsOne);
     await tapText(tester, 'Song');
     expect(find.byType(Overview), findsOne);
     expect(find.text('RECENT VERSIONS'), findsOne);
-    await tapTooltip(tester, 'Pin below the titles');
-    expect(h.settings.navigation.overviewPinned, isTrue);
 
     // Title detail, and back with Escape, the back button or the mouse.
     Future<void> openDetail() async {
@@ -150,7 +152,6 @@ void main() {
     expect(find.text('Ballad'), findsNothing);
     final navigation = h.settings.navigation;
     expect(navigation.displayMode, DisplayMode.list);
-    expect(navigation.overviewPinned, isTrue);
     await tester.tap(chip('Views'));
     await tester.pumpAndSettle();
     await tapText(tester, 'Live');

@@ -81,7 +81,7 @@ class _SettingsPanel extends ConsumerWidget {
         child: Material(
           color: c.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(Radii.m),
             side: BorderSide(color: c.border),
           ),
           elevation: 24,
@@ -138,6 +138,35 @@ class _SettingsPanel extends ConsumerWidget {
                             selected: {settings.theme},
                             onSelectionChanged: (s) => notifier.change(
                               (a) => a.copyWith(theme: s.first),
+                            ),
+                          ),
+                        ),
+                        FormRow(
+                          label: l10n.accentColor,
+                          child: SegmentedButton<AccentPreference>(
+                            showSelectedIcon: false,
+                            // Swatches only, named by their tooltip.
+                            segments: [
+                              for (final (value, label) in [
+                                (AccentPreference.neutral, l10n.accentNeutral),
+                                (AccentPreference.orange, l10n.accentOrange),
+                                (AccentPreference.yellow, l10n.accentYellow),
+                                (AccentPreference.teal, l10n.accentTeal),
+                                (AccentPreference.blue, l10n.accentBlue),
+                                (AccentPreference.violet, l10n.accentViolet),
+                              ])
+                                ButtonSegment(
+                                  value: value,
+                                  tooltip: label,
+                                  label: _Swatch(
+                                    accentOf(value)
+                                        .on(Theme.of(context).brightness),
+                                  ),
+                                ),
+                            ],
+                            selected: {settings.accent},
+                            onSelectionChanged: (s) => notifier.change(
+                              (a) => a.copyWith(accent: s.first),
                             ),
                           ),
                         ),
@@ -213,7 +242,7 @@ class _SettingsPanel extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(width: Space.s),
-                              TextButton(
+                              OutlinedButton(
                                 onPressed: () => ref.read(openFolderProvider)(
                                   ref.read(logFolderProvider),
                                 ),
@@ -334,15 +363,15 @@ class _Libraries extends ConsumerWidget {
                 // Known values of the intermediate levels (SPEC §3.1).
                 if (indexed[library.id]?.layout case final layout?
                     when layout.levels.length > 1)
-                  TextButton(
+                  OutlinedButton(
                     onPressed: () => showKnownValues(context, library, layout),
                     child: Text(l10n.knownValues),
                   ),
-                TextButton(
+                OutlinedButton(
                   onPressed: () => showMembers(context, library),
                   child: Text(l10n.members),
                 ),
-                TextButton(
+                OutlinedButton(
                   onPressed: () => _confirmRemoval(context, ref, library),
                   child: Text(l10n.removeLibrary),
                 ),
@@ -413,5 +442,23 @@ class _Libraries extends ConsumerWidget {
         ],
       );
     },
+  );
+}
+
+/// Small square of an accent color.
+class _Swatch extends StatelessWidget {
+  const _Swatch(this.color);
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 12,
+    height: 12,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(Radii.xs),
+      border: Border.all(color: context.colors.border),
+    ),
   );
 }

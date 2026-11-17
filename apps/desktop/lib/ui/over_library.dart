@@ -1,7 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../state/tasks.dart';
 import '../theme/app_theme.dart';
 
 /// Route of a page shown over the library (title detail, "To sort").
@@ -25,22 +27,27 @@ PageRouteBuilder<void> overLibraryRoute(WidgetBuilder builder) =>
       },
     );
 
-/// Goes back from a page over the library with Escape or the mouse back
-/// button.
-class BackNavigation extends StatelessWidget {
+/// Goes back from a page over the library with Escape (once the tasks zone
+/// is folded) or the mouse back button.
+class BackNavigation extends ConsumerWidget {
   const BackNavigation({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     void back() => Navigator.of(context).maybePop();
     return Listener(
       onPointerDown: (e) {
         if (e.buttons & kBackMouseButton != 0) back();
       },
       child: CallbackShortcuts(
-        bindings: {const SingleActivator(LogicalKeyboardKey.escape): back},
+        // Escape folds the tasks zone first.
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            if (!ref.read(tasksZoneUnfoldedProvider.notifier).fold()) back();
+          },
+        },
         // A scope: when a focused field leaves (an adoption form), the
         // focus falls back here and Escape still goes back.
         child: FocusScope(autofocus: true, child: child),

@@ -6,7 +6,9 @@ import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
+import '../labels.dart';
 import '../over_library.dart';
+import '../studio_title_bar.dart';
 import '../versions/new_version_dialog.dart';
 import '../versions/trash_view.dart';
 import 'title_header.dart';
@@ -38,8 +40,17 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
 
   void _select(String fileName) => setState(() => _selected = fileName);
 
-  Future<void> _newVersion(Title title, Version? selected) async {
-    final name = await showNewVersionDialog(context, title, selected);
+  Future<void> _newVersion(
+    Title title,
+    Version? selected, {
+    bool duplicate = false,
+  }) async {
+    final name = await showNewVersionDialog(
+      context,
+      title,
+      selected,
+      duplicate: duplicate,
+    );
     if (name != null) _select(name);
   }
 
@@ -64,10 +75,14 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            StudioTitleBar(
+              location: title == null ? null : titleName(title),
+              onBack: () => Navigator.of(context).maybePop(),
+            ),
             Header(title, selected),
             if (title != null)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Space.m),
+                padding: const EdgeInsets.symmetric(horizontal: Space.s),
                 child: Row(
                   children: [
                     _Tab(
@@ -124,8 +139,11 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                                 title,
                                 selected,
                                 onSelect: _select,
-                                onNewVersion: () =>
-                                    _newVersion(title, selected),
+                                onDuplicate: () => _newVersion(
+                                  title,
+                                  selected,
+                                  duplicate: true,
+                                ),
                                 key: ValueKey(selected.fileName),
                               ),
                       ),
@@ -168,9 +186,8 @@ class _Tab extends StatelessWidget {
           ),
         ),
         child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge
-              ?.copyWith(color: selected ? null : c.muted),
+          label.toUpperCase(),
+          style: context.legend.copyWith(color: selected ? c.text : c.muted),
         ),
       ),
     );

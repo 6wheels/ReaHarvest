@@ -54,7 +54,7 @@ void main() {
 
   /// Opens the "To sort" page.
   Future<void> openToSort(WidgetTester tester) async {
-    await tester.tap(find.textContaining('To sort ·'));
+    await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
   }
 
@@ -100,7 +100,7 @@ void main() {
     await tester.enterText(dialogField('Album'), 'Singles');
     await tester.pumpAndSettle();
     expect(find.text('→ Artist/Singles/Lonely'), findsOne);
-    await confirmFix(tester, h, 1);
+    await confirmFix(tester, h);
     expect(find.text('Folders moved · 1'), findsOne);
     await closeReport(tester);
     expect(
@@ -114,7 +114,7 @@ void main() {
         '· 1';
     await openSectionFix(tester, unknown);
     expect(find.text('→ Stranger'), findsOne);
-    await confirmFix(tester, h, 1);
+    await confirmFix(tester, h);
     expect(
       find.text('Folders kept in place, added to the known values · 1'),
       findsOne,
@@ -150,7 +150,7 @@ void main() {
       findsOne,
     );
     expect(find.text('→ Artist/Album/Song · idea · Bob · No status'), findsOne);
-    await confirmFix(tester, h, 3);
+    await confirmFix(tester, h);
     expect(find.text('Project moved · 3'), findsOne);
     expect(
       find.text('Status folders matching no status: no status set · 1'),
@@ -188,7 +188,7 @@ void main() {
     );
     final song = find.widgetWithText(TitleCard, 'Song');
     expect(
-      find.descendant(of: song, matching: find.textContaining('1 to adopt')),
+      find.descendant(of: song, matching: find.textContaining('1 TO ADOPT')),
       findsOne,
     );
     await tester.tap(song);
@@ -204,7 +204,7 @@ void main() {
     for (final owner in ['Alice', 'Bob']) {
       expect(find.textContaining(owner), findsWidgets, reason: owner);
     }
-    expect(find.text('Mixing'), findsWidgets);
+    expect(find.text('MIXING'), findsWidgets);
   });
 
   testWidgets('merges a folder moved onto an existing one', (tester) async {
@@ -222,7 +222,7 @@ void main() {
       find.text('→ Artist/Album · merged with the existing folder'),
       findsOne,
     );
-    await confirmFix(tester, h, 1);
+    await confirmFix(tester, h);
     expect(find.text('Folders merged into an existing folder · 1'), findsOne);
     expect(find.textContaining('Renamed on merge'), findsOne);
     await closeReport(tester);
@@ -255,7 +255,7 @@ void main() {
     expect(
       find.descendant(
         of: find.widgetWithText(TitleCard, 'Song'),
-        matching: find.textContaining('2 versions'),
+        matching: find.textContaining('VER 2'),
       ),
       findsOne,
     );

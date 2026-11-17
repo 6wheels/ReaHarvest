@@ -195,7 +195,7 @@ class _SortDialogState extends ConsumerState<_SortDialog> {
         ),
         FilledButton(
           onPressed: _valid ? _move : null,
-          child: Text(l10n.sortConfirm),
+          child: Text(actionLabel(l10n.sortAction)),
         ),
       ],
     );

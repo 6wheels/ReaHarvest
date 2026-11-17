@@ -12,6 +12,7 @@ import '../labels.dart';
 import '../layout_labels.dart';
 import '../media_plan_preview.dart';
 import '../report_dialog.dart';
+import '../widgets.dart';
 
 /// Previews the batch fix of [issues], all of [kind] (dry run): each item
 /// with its target, checked by default. Folders get optional values for
@@ -177,7 +178,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
       return [
         Text(l10n.fixPreviewLoading, style: muted),
         const SizedBox(height: Space.s),
-        const LinearProgressIndicator(),
+        const Meter(null, height: 8),
       ];
     }
     final checked = {
@@ -373,7 +374,7 @@ class _FixDialogState extends ConsumerState<_FixDialog> {
           onPressed: _checked.isEmpty || !_valid || _waitingPreview
               ? null
               : confirm,
-          child: Text(l10n.taskFix(_checked.length)),
+          child: Text(actionLabel(l10n.fixAction)),
         ),
       ],
     );
@@ -401,13 +402,13 @@ class Choice<T> extends StatelessWidget {
     child: Row(
       children: [
         Expanded(child: Text(label)),
-        DropdownButton<T>(
-          value: value,
-          items: [
-            for (final MapEntry(:key, value: text) in options.entries)
-              DropdownMenuItem(value: key, child: Text(text)),
-          ],
-          onChanged: (v) => onChanged(v as T),
+        SizedBox(
+          width: 200,
+          child: Dropdown<T>(
+            value: value,
+            options: options,
+            onChanged: onChanged,
+          ),
         ),
       ],
     ),
@@ -457,38 +458,105 @@ class _LevelFieldState extends State<LevelField> {
       return widget.options().where((o) => o.toLowerCase().contains(typed));
     },
     onSelected: (_) => widget.onChanged(),
-    fieldViewBuilder: (context, controller, focusNode, _) => TextField(
-      controller: controller,
-      focusNode: focusNode,
-      onChanged: (_) => widget.onChanged(),
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hint,
-        errorText: widget.error,
-      ),
-    ),
+    // Up and down move through the options, Enter picks the highlighted
+    // one, Escape hides them.
+    fieldViewBuilder: (context, controller, focusNode, onSubmitted) =>
+        TextField(
+          controller: controller,
+          focusNode: focusNode,
+          onChanged: (_) => widget.onChanged(),
+          onSubmitted: (_) => onSubmitted(),
+          decoration: InputDecoration(
+            labelText: widget.label,
+            hintText: widget.hint,
+            // Room kept for the error: the dialog keeps its size.
+            helperText: ' ',
+            errorText: widget.error,
+          ),
+        ),
+    // A console menu, like the other ones of the application.
     optionsViewBuilder: (context, onSelected, options) => Align(
       alignment: Alignment.topLeft,
-      child: Material(
-        elevation: 4,
-        color: context.colors.raised,
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 420),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            children: [
-              for (final o in options)
-                ListTile(
-                  dense: true,
-                  title: Text(o),
-                  onTap: () => onSelected(o),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Material(
+          color: context.colors.surface,
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Radii.s),
+            side: BorderSide(color: context.colors.border),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 160,
+              maxWidth: 360,
+              maxHeight: 200,
+            ),
+            child: IntrinsicWidth(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(Space.xs),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final (i, o) in options.indexed)
+                      _Option(
+                        highlighted:
+                            AutocompleteHighlightedOption.of(context) == i,
+                        onPressed: () => onSelected(o),
+                        label: o,
+                      ),
+                  ],
                 ),
-            ],
+              ),
+            ),
           ),
         ),
       ),
     ),
   );
+}
+
+/// Option of a [LevelField]: lit like a hovered menu entry while
+/// highlighted with the keyboard, and scrolled into view.
+class _Option extends StatefulWidget {
+  const _Option({
+    required this.highlighted,
+    required this.onPressed,
+    required this.label,
+  });
+
+  final bool highlighted;
+  final VoidCallback onPressed;
+  final String label;
+
+  @override
+  State<_Option> createState() => _OptionState();
+}
+
+class _OptionState extends State<_Option> {
+  @override
+  void didUpdateWidget(_Option old) {
+    super.didUpdateWidget(old);
+    if (widget.highlighted && !old.highlighted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Scrollable.ensureVisible(context);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return MenuItemButton(
+      onPressed: widget.onPressed,
+      style: widget.highlighted
+          ? MenuItemButton.styleFrom(
+              backgroundColor: c.accent.withValues(alpha: 0.10),
+              foregroundColor: c.accent,
+            )
+          : null,
+      child: Text(widget.label),
+    );
+  }
 }
