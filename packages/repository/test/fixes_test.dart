@@ -487,6 +487,29 @@ void main() {
     },
   );
 
+  test('forced, a valid reference outside a moved title follows', () async {
+    title('Artist/Lonely');
+    put('Artist/Lonely/a.rpp', rpp([r'..\shared.wav', 'gone.wav']));
+    put('Artist/shared.wav', 'shared');
+    final m = await migration();
+
+    await applyFixes(m, [
+      OrganizeTitle(
+        'Artist/Lonely',
+        'Artist/_Unassigned/Lonely',
+        [version('Artist/Lonely/a.rpp')],
+        level: 'title',
+        force: true,
+      ),
+    ]);
+
+    const moved = 'Artist/_Unassigned/Lonely/a';
+    // Only the reference already wrong is left as written.
+    expect(media('$moved/a.rpp'), r'Media\shared.wav|gone.wav');
+    expect(file('$moved/Media/shared.wav').readAsStringSync(), 'shared');
+    expect(await noLoss(m), isTrue);
+  });
+
   test('a subproject takes its proxy along, its references follow', () async {
     title(song);
     put('$song/a.rpp', rpp(['sub.rpp']));
