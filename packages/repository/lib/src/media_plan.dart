@@ -291,8 +291,19 @@ final class _Planner {
   /// project moved.
   String get root => fix is MoveProject ? parentOf(fix.path) : fix.path;
 
+  /// Current path of each known path (the entries of the folder and the
+  /// referenced files), by lowercase original path.
+  late final _now = <String, String>{
+    for (final e in facts.entries) e.path.toLowerCase(): e.path,
+    for (final path in facts.files.keys) path.toLowerCase(): path,
+  };
+
+  /// Lowercase original path of each known path, by lowercase current path.
+  late final _origin = {for (final k in _now.keys) k: k};
+
   /// Current path of [path], following the moves planned so far.
   String locate(String path) {
+    if (_now[path.toLowerCase()] case final now?) return now;
     var current = path;
     for (final (from, to) in moves) {
       if (current.toLowerCase() == from.toLowerCase()) {
@@ -307,15 +318,32 @@ final class _Planner {
   void move(String from, String to, FileRole role) {
     operations.add(MoveFile(from, to, role: role));
     moves.add((from, to));
+    final key = from.toLowerCase();
+    if (role != FileRole.folder) {
+      final origin = _origin.remove(key) ?? key;
+      _now[origin] = to;
+      _origin[to.toLowerCase()] = origin;
+      return;
+    }
+    // A folder: everything known in it follows, rare enough to scan.
+    _origin.clear();
+    for (final MapEntry(key: origin, value: now) in _now.entries.toList()) {
+      final lower = now.toLowerCase();
+      final moved = lower == key
+          ? to
+          : lower.startsWith('$key/')
+          ? '$to${now.substring(from.length)}'
+          : now;
+      _now[origin] = moved;
+      _origin[moved.toLowerCase()] = origin;
+    }
   }
 
   /// Whether [path] (current, lowercase compared) exists once the
   /// operations planned so far are made.
   bool exists(String path) {
     final key = path.toLowerCase();
-    if (created.contains(key)) return true;
-    return facts.entries.any((e) => locate(e.path).toLowerCase() == key) ||
-        moves.any((m) => m.$2.toLowerCase() == key);
+    return created.contains(key) || _origin.containsKey(key);
   }
 
   void report(ReportKind kind, ReportItem item) =>
@@ -385,10 +413,17 @@ final class _Planner {
       }
     }
     for (final (v, files) in versions) {
-      _organize(v, files);
+      final failure = _organize(v, files);
+      // Its project moved with the title: its references would break.
+      if (failure != null && movesFolder && !sameFolder) {
+        return blocked(ReportKind.fixFailed, '${v.source}: $failure');
+      }
       for (final file in files.keys) {
         users[file]?.remove(v.source.toLowerCase());
       }
+    }
+    for (final (file, to, written) in subprojects) {
+      _rewriteSubproject(file, to, written);
     }
     return (operations: operations, blocked: Report(reported));
   }
@@ -462,6 +497,10 @@ final class _Planner {
     if (fix is! MoveProject && (dir == root || parentOf(dir) != root)) {
       return false;
     }
+    // Its folder cannot move into itself: the project moves alone.
+    final into = target.toLowerCase();
+    final lower = dir.toLowerCase();
+    if (into == lower || into.startsWith('$lower/')) return false;
     final projects = facts.entries.where(
       (e) =>
           !e.isDirectory &&
@@ -489,9 +528,23 @@ final class _Planner {
   /// Lowercase paths of the version folders given so far.
   final claimed = <String>{};
 
+  /// Version ids given so far: a second project with the same id (a *Save
+  /// As* copy) gets a new one.
+  final ids = <VersionId>{};
+
+  /// References rewritten in each version organized, by lowercase path of
+  /// its project: what its text holds afterwards.
+  final rewrittenRefs = <String, Map<String, String>>{};
+
+  /// Subprojects brought into a media folder: their path before the plan,
+  /// where they are brought and the references their text holds then. Their
+  /// references are rewritten once every file is placed.
+  final subprojects = <(String, String, Map<String, String>)>[];
+
   /// Plans the organization of the version [v], whose files are [files]
-  /// (by lowercase path, as found before the plan).
-  void _organize(FixVersion v, Map<String, String> files) {
+  /// (by lowercase path, as found before the plan). Returns why it is left
+  /// as it is, if so.
+  String? _organize(FixVersion v, Map<String, String> files) {
     final source = v.source;
     final project = facts.projects[source]!;
     final alone = _alone(source);
@@ -530,12 +583,10 @@ final class _Planner {
           !names.add(name.toLowerCase()) ||
           (holds != null && exists(joinPath(holds, '$mediaFolderName/$name')));
       if (clash) {
-        report(
-          ReportKind.fixFailed,
-          ReportItem(source, 'Name taken in its media folder: $name'),
-        );
+        final failure = 'Name taken in its media folder: $name';
+        report(ReportKind.fixFailed, ReportItem(source, failure));
         pinned.addAll(files.keys);
-        return;
+        return failure;
       }
       placed[key] = joinPath(media, name);
     }
@@ -578,7 +629,10 @@ final class _Planner {
         ? null
         : [mediaFolderName, params.elementAtOrNull(1) ?? ''];
     final adopted = project.versionId;
-    final id = adopted ?? VersionId.generate();
+    final id = adopted != null && ids.add(adopted)
+        ? adopted
+        : VersionId.generate();
+    ids.add(id);
     operations.add(
       SetVersionEntries(
         target,
@@ -589,37 +643,50 @@ final class _Planner {
       ),
     );
     final path = locate(source);
-    if (references.isNotEmpty || record != null || adopted == null) {
+    if (references.isNotEmpty || record != null || id != adopted) {
       operations.add(
         RewriteProject(
           path,
           references,
           recordPath: record,
-          versionId: adopted == null ? id : null,
+          versionId: id != adopted ? id : null,
         ),
       );
     }
+    rewrittenRefs[source.toLowerCase()] = references;
     if (v.statusFolder case final folder? when v.status == null) {
       report(ReportKind.statusFolderUnmatched, ReportItem(path, folder));
     }
+    return null;
   }
 
+  /// Lowercase paths of the projects of the fix.
+  late final sources = {for (final v in fix.versions) v.source.toLowerCase()};
+
+  /// Projects using each file outside the fix, by lowercase path.
+  late final usedBy = <String, List<String>>{
+    for (final MapEntry(key: file, value: projects) in usage.entries)
+      file.toLowerCase(): projects,
+  };
+
   /// Whether the file [key] (lowercase path) is used by another project
-  /// than [source]: it is copied, not moved.
+  /// than [source], or is a project outside a reserved folder (a version of
+  /// a title): it is copied, not moved.
   bool _shared(String key, String source) {
     if (pinned.contains(key)) return true;
+    if (isProjectFile(key) && !parentOf(key).split('/').any(isReservedFolder)) {
+      return true;
+    }
     final others = users[key] ?? const {};
     if (others.any((s) => s != source.toLowerCase())) return true;
-    final sources = {for (final v in fix.versions) v.source.toLowerCase()};
-    for (final MapEntry(key: file, value: projects) in usage.entries) {
-      if (file.toLowerCase() != key) continue;
-      if (projects.any((p) => !sources.contains(p.toLowerCase()))) return true;
-    }
-    return false;
+    return (usedBy[key] ?? const []).any(
+      (p) => !sources.contains(p.toLowerCase()),
+    );
   }
 
   /// Brings [file] to [to]: copied if [keep], moved otherwise; a subproject
-  /// takes its proxy file along, and its references follow it.
+  /// takes its proxy file along, and its references follow it once every
+  /// file is placed.
   void _bring(String file, String to, {required bool keep}) {
     final now = locate(file);
     void bring(String from, String target, FileRole role) {
@@ -637,18 +704,28 @@ final class _Planner {
     if (facts.files[proxy] case StorageEntry(isDirectory: false)) {
       bring(locate(proxy), '$to$proxySuffix', FileRole.proxy);
     }
-    final sub = facts.projects[file];
-    if (sub == null) return;
+    if (facts.projects.containsKey(file)) {
+      // Its text as it is now: rewritten already if it is a version of the
+      // fix organized before.
+      subprojects.add((file, to, {...?rewrittenRefs[file.toLowerCase()]}));
+    }
+  }
+
+  /// Rewrites the references of the subproject [file] brought to [to],
+  /// whose text holds them as [written] (original reference to the one
+  /// written, if rewritten), towards where their files end.
+  void _rewriteSubproject(String file, String to, Map<String, String> written) {
     final references = <String, String>{};
-    for (final ref in sub.references) {
+    for (final ref in facts.projects[file]!.references) {
       final target = resolveReference(parentOf(file), ref);
       if (target == null) continue;
+      final now = written[ref] ?? ref;
       final rewritten = relativeReference(
         parentOf(to),
         locate(target),
-        like: ref,
+        like: now,
       );
-      if (rewritten != ref) references[ref] = rewritten;
+      if (rewritten != now) references[now] = rewritten;
     }
     if (references.isNotEmpty) {
       operations.add(RewriteProject(to, references, reported: false));

@@ -5,7 +5,6 @@ import 'package:test/test.dart';
 import 'memory_storage.dart';
 
 const _lib = LibraryId('L1');
-const _other = LibraryId('L2');
 const _alice = Member(MemberId('alice'), 'Alice');
 const _statuses = {
   'idea': 'Idea',
@@ -25,13 +24,6 @@ Library _library({List<Member> members = const []}) => Library(
   members: members,
 );
 
-Title _title(String path, {LibraryId library = _lib}) => Title(
-  id: NodeId(path),
-  libraryId: library,
-  path: path,
-  tags: Layout.classic().tagsOf(path.split('/')) ?? {},
-);
-
 const _project = '<REAPER_PROJECT 0.1 "7.0" 0\n  RECORD_PATH "Media" ""\n>\n';
 
 void main() {
@@ -43,17 +35,6 @@ void main() {
       expect(proposeStatus({'writing': 'Écriture'}, 'écriture'), 'writing');
       expect(proposeStatus(_statuses, 'demo'), isNull);
       expect(proposeStatus(_statuses, 'mi'), isNull);
-    });
-  });
-
-  group('levelValues', () {
-    test('lists the values of a level under the values above it', () {
-      final titles = [_title('a/x/s1'), _title('a/y/s2'), _title('b/z/s3')];
-      final layout = Layout.classic();
-      expect(levelValues(titles, {_lib}, layout, 0, []), ['a', 'b']);
-      expect(levelValues(titles, {_lib}, layout, 1, ['a']), ['x', 'y']);
-      expect(levelValues(titles, {_lib}, layout, 1, ['']), ['x', 'y', 'z']);
-      expect(levelValues(titles, {_other}, layout, 0, []), isEmpty);
     });
   });
 
@@ -70,7 +51,7 @@ void main() {
       return proposeFix(
         candidate,
         lib,
-        node: result.nodes[root],
+        nodes: result.nodes,
         statusLabels: _statuses,
       );
     }
@@ -229,6 +210,39 @@ organizeTitle Artist/Album/Song -> Artist/Album/Song
 
       expect(fix, isA<AttachVersions>());
       expect(fix.target, 'Artist/Album/Song');
+      // The label the title knows it by, not its file name.
+      expect(fix.versions.single.label, 'Moved');
+    });
+
+    test('the moves of a title and of its ancestors are composed', () {
+      final layout = Layout.classic();
+      final fix = proposeFix(
+        ScanCandidate(
+          root: 'Jazz/Song',
+          versions: [
+            Version(fileName: 'v.rpp', modified: DateTime(2020), size: 0),
+          ],
+          issues: Report({
+            ReportKind.titleTooHigh: [
+              ReportItem.misplaced(
+                'Jazz/Song',
+                level: layout.leaf,
+                target: 'Jazz/_Unassigned/Song',
+              ),
+            ],
+            ReportKind.misplacedLevel: [
+              ReportItem.misplaced(
+                'Jazz',
+                level: layout.levels.first,
+                target: 'Rock',
+              ),
+            ],
+          }),
+        ),
+        _library(),
+      );
+
+      expect(fix.target, 'Rock/_Unassigned/Song');
     });
   });
 }

@@ -63,7 +63,7 @@ void main() {
           proposeFix(
             candidate,
             library,
-            node: result.nodes[candidate.root],
+            nodes: result.nodes,
             statusLabels: {for (final s in Title.defaultStatuses) s: s},
           ),
     ];

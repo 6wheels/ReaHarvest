@@ -23,55 +23,37 @@ String? proposeStatus(Map<String, String> statusLabels, String folder) {
   return null;
 }
 
-/// Existing values of level [i] of [layout] among the [titles] of
-/// [libraries], under the values [above] (an empty value matches any).
-List<String> levelValues(
-  Iterable<Title> titles,
-  Set<LibraryId> libraries,
-  Layout layout,
-  int i,
-  List<String> above,
-) {
-  final keys = [for (final l in layout.levels) l.key];
-  return {
-    for (final t in titles)
-      if (libraries.contains(t.libraryId) &&
-          [
-            for (final (j, value) in above.indexed)
-              value.isEmpty || t.tags[keys[j]] == value,
-          ].every((ok) => ok))
-        ?t.tags[keys[i]],
-  }.toList()..sort();
-}
-
 /// Fix proposed for the title [candidate] of a layout [library] (SPEC §5.8
 /// step 4, #148): its versions attached to the title it is matched to (one
 /// of its versions known by that title), or
 /// organized at its layout position (the target of its position issue,
 /// else where it is; a candidate placed above the title level gets a new
-/// title named after its first project, missing levels unassigned). Each
-/// version is pre-filled: label from [node] (the node file of the candidate
-/// root), else its file name; folder named after its label; owner from its
-/// member subfolder, else from [node], when the library declares members;
-/// status from its status subfolder through [statusLabels]
-/// ([proposeStatus]), else from [node].
+/// title named after its first project, missing levels unassigned; the
+/// moves of the folder and of its ancestors composed). Each version is
+/// pre-filled from the [nodes] (node files by folder path, as scanned) of
+/// the title it is matched to, then of the candidate root: label, else its file
+/// name; folder named after its label; owner from its member subfolder,
+/// else from the node files, when the library declares members; status
+/// from its status subfolder through [statusLabels] ([proposeStatus]), else
+/// from the node files.
 MigrationFix proposeFix(
   ScanCandidate candidate,
   Library library, {
-  NodeFile? node,
+  Map<String, NodeFile> nodes = const {},
   Map<String, String> statusLabels = const {},
 }) {
   final layout = library.layout!;
   final root = candidate.root;
   final level = layout.leaf.key;
-  final versions = [
-    for (final v in candidate.versions)
-      _version(candidate, v, library, node, statusLabels),
-  ];
   final issues = candidate.issues.items;
   final matched = candidate.title != root
       ? candidate.title
       : issues[ReportKind.knownVersionElsewhere]?.firstOrNull?.target;
+  final known = [?nodes[matched], ?nodes[root]];
+  final versions = [
+    for (final v in candidate.versions)
+      _version(candidate, v, library, known, statusLabels),
+  ];
   if (matched != null) {
     return AttachVersions(root, matched, versions, level: level);
   }
@@ -94,13 +76,18 @@ MigrationFix proposeFix(
       titleFolder: false,
     );
   }
+  // The deepest move first: those of its ancestors keep its place in them.
+  final moves = [
+    for (final kind in [ReportKind.titleTooHigh, ReportKind.misplacedLevel])
+      for (final item in issues[kind] ?? const <ReportItem>[])
+        if (item.target != null &&
+            (root == item.path || isWithin(root, item.path)))
+          item,
+  ]..sort((a, b) => b.path.length.compareTo(a.path.length));
   var target = root;
-  for (final kind in [ReportKind.titleTooHigh, ReportKind.misplacedLevel]) {
-    for (final item in issues[kind] ?? const <ReportItem>[]) {
-      if (item.target case final to?
-          when root == item.path || isWithin(root, item.path)) {
-        target = '$to${root.substring(item.path.length)}';
-      }
+  for (final item in moves) {
+    if (target == item.path || isWithin(target, item.path)) {
+      target = '${item.target}${target.substring(item.path.length)}';
     }
   }
   return OrganizeTitle(root, target, versions, level: level);
@@ -110,13 +97,15 @@ FixVersion _version(
   ScanCandidate candidate,
   Version version,
   Library library,
-  NodeFile? node,
+  List<NodeFile> nodes,
   Map<String, String> statusLabels,
 ) {
   final source = joinPath(candidate.root, version.fileName);
   final id = version.metadata?.id;
+  String? known(Map<String, String> Function(NodeFile) values) =>
+      nodes.map((n) => values(n)[id]).nonNulls.firstOrNull;
   final stem = p.posix.basenameWithoutExtension(source);
-  final label = node?.versionLabels[id] ?? stem;
+  final label = known((n) => n.versionLabels) ?? stem;
   // Subfolders between the root and the project.
   final rest = version.fileName.split('/')..removeLast();
   final member = rest.isEmpty
@@ -133,7 +122,7 @@ FixVersion _version(
   final owner = library.members.isEmpty
       ? null
       : member?.id ??
-            switch (node?.versionOwners[id]) {
+            switch (known((n) => n.versionOwners)) {
               final owner? => MemberId(owner),
               null => null,
             };
@@ -143,7 +132,7 @@ FixVersion _version(
     label: label,
     owner: owner,
     status: statusFolder == null
-        ? node?.versionStatuses[id]
+        ? known((n) => n.versionStatuses)
         : proposeStatus(statusLabels, statusFolder),
     statusFolder: statusFolder,
   );

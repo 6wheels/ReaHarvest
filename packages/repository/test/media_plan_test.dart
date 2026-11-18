@@ -215,6 +215,39 @@ void main() {
       expect(plan.blocked.items[ReportKind.missingMedia], hasLength(1));
     });
 
+    test('a name taken after the title moved fails the whole fix', () {
+      final plan = planFix(
+        OrganizeTitle(song, 'Band/Other/Song', [
+          version('$song/a.rpp', 'a'),
+        ], level: 'title'),
+        facts(
+          files: {'$song/one/x.wav', '$song/two/x.wav'},
+          projects: {
+            '$song/a.rpp': project([r'one\x.wav', r'two\x.wav']),
+          },
+        ),
+      );
+
+      expect(plan.operations, isEmpty);
+      expect(
+        plan.blocked.items[ReportKind.fixFailed]!.single.detail,
+        '$song/a.rpp: Name taken in its media folder: x.wav',
+      );
+    });
+
+    test('a project moved into its own folder moves alone', () {
+      final plan = planFix(
+        MoveProject(
+          version('Loose/v1/v1.rpp', 'Take'),
+          'Loose/v1/New',
+          level: 'title',
+        ),
+        facts(root: 'Loose', projects: {'Loose/v1/v1.rpp': project(const [])}),
+      );
+
+      expect(files(plan), ['move Loose/v1/v1.rpp -> Loose/v1/New/Take/v1.rpp']);
+    });
+
     test('a project in a reserved folder never moves it', () {
       final plan = planFix(
         organize([version('$song/Media/a.rpp', 'a')]),
@@ -419,22 +452,25 @@ void main() {
       final report = await applyPlan(storage, plan);
 
       expect(report.items[ReportKind.mediaMoved], [
-        const ReportItem('$song/a/Media/sub.rpp', '$song/sub.rpp'),
         const ReportItem('$song/b/Media/x.wav', '$song/audio/x.wav'),
         const ReportItem('$song/b/Media/bass.wav', '$song/old/bass.wav'),
       ]);
+      // A project outside a media folder is a version: copied.
       expect(report.items[ReportKind.mediaCopied], [
         const ReportItem('$song/a/Media/x.wav', '$song/audio/x.wav'),
+        const ReportItem('$song/a/Media/sub.rpp', '$song/sub.rpp'),
       ]);
       expect(report.items[ReportKind.mediaNormalized], [
         const ReportItem('$song/a/a.rpp'),
         const ReportItem('$song/b/b.rpp'),
       ]);
-      // Each project read once: the subproject, then each version.
+      // Each project read once: the subproject copied, each version, then
+      // the copy, once every file is placed.
       expect(storage.reads.where(isProjectFile), [
-        '$song/a/Media/sub.rpp',
+        '$song/sub.rpp',
         '$song/a/a.rpp',
         '$song/b/b.rpp',
+        '$song/a/Media/sub.rpp',
       ]);
       expect(storage.maxOpenProjectReads, 1);
       expect(storage.text('$song/a/Media/sub.rpp-PROX'), 'proxy');

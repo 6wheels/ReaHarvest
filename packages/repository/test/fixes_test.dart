@@ -531,6 +531,67 @@ void main() {
     expect(await noLoss(m), isTrue);
   });
 
+  test('a subproject follows a media moved after it', () async {
+    title(song);
+    put('$song/a.rpp', rpp([r'Media\sub.rpp', r'audio\v.wav']));
+    put('$song/Media/sub.rpp', rpp([r'..\audio\v.wav']));
+    put('$song/audio/v.wav', 'voice');
+    final m = await migration();
+
+    await applyFixes(m, [
+      organize(song, [version('$song/a.rpp')]),
+    ]);
+
+    // In a media folder, not a version: moved.
+    expect(file('$song/Media/sub.rpp').existsSync(), isFalse);
+    expect(media('$song/a/a.rpp'), r'Media\sub.rpp|Media\v.wav');
+    expect(media('$song/a/Media/sub.rpp'), 'v.wav');
+    expect(file('$song/a/Media/v.wav').readAsStringSync(), 'voice');
+    expect(await noLoss(m), isTrue);
+  });
+
+  for (final subFirst in [false, true]) {
+    test('a subproject that is a version of the fix keeps its media'
+        '${subFirst ? ', organized first' : ''}', () async {
+      title(song);
+      put('$song/a.rpp', rpp(['sub.rpp']));
+      put('$song/sub.rpp', rpp([r'audio\v.wav']));
+      put('$song/audio/v.wav', 'voice');
+      final m = await migration();
+      final versions = [version('$song/a.rpp'), version('$song/sub.rpp')];
+
+      await applyFixes(m, [
+        organize(song, subFirst ? versions.reversed.toList() : versions),
+      ]);
+
+      expect(media('$song/sub/sub.rpp'), r'Media\v.wav');
+      expect(media('$song/a/Media/sub.rpp'), r'..\..\sub\Media\v.wav');
+      expect(file('$song/sub/Media/v.wav').readAsStringSync(), 'voice');
+      expect(await noLoss(m), isTrue);
+    });
+  }
+
+  test('a Save As copy in the fix gets its own version id', () async {
+    const id = VersionId('01JKNOWNVERSION0000000003');
+    final text = rpp([]).replaceFirst(
+      RegExp(r'>\n$'),
+      '  <EXTSTATE\n    <REAHARVEST\n      VERSIONID $id\n    >\n  >\n>\n',
+    );
+    title(song);
+    put('$song/a.rpp', text);
+    put('$song/b.rpp', text);
+    final m = await migration();
+
+    await applyFixes(m, [
+      organize(song, [version('$song/a.rpp'), version('$song/b.rpp')]),
+    ]);
+
+    expect(idOf('$song/a/a.rpp'), id);
+    final copy = idOf('$song/b/b.rpp');
+    expect(copy, isNot(anyOf(isNull, id)));
+    expect(node(song)['versionLabels'], {'$id': 'a', '$copy': 'b'});
+  });
+
   test('a subproject that is a version too is copied', () async {
     title(song);
     put('$song/a.rpp', rpp(['sub.rpp']));
