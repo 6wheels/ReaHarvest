@@ -154,7 +154,7 @@ class VersionActions {
   /// from the project file [template], else blank (REAPER's default
   /// template for new projects when set). Then rescans. Returns its
   /// [Version.fileName].
-  Future<String?> addVersion(
+  Future<String> addVersion(
     Title title,
     String name,
     String label, {
@@ -224,7 +224,7 @@ class VersionActions {
   /// the title's node file, and renames its folder and its `.RPP` to [name]
   /// (SPEC §5.4); the label is written when changed or on a rename. Then
   /// rescans. Returns its [Version.fileName].
-  Future<String?> editVersion(
+  Future<String> editVersion(
     Title title,
     Version version, {
     required String name,
@@ -386,35 +386,26 @@ class VersionActions {
   /// Runs [change] of [title] as a foreground task labelled [label], in the
   /// turn of its library ([LibraryTurns]): the interface is blocked by its
   /// popup, the change waits for the scan or the other action of the
-  /// library, never runs with another change of the same node file, and
-  /// leaves nothing in the tasks zone, its caller tells the outcome. Returns
-  /// null when cancelled while it waits; rethrows what [change] throws.
-  Future<T?> _turn<T>(
+  /// library and never runs with another change of the same node file. Its
+  /// caller tells the outcome: rethrows what [change] throws, and throws
+  /// [TaskCancelled] when cancelled while it waits; once started, the change
+  /// goes to its end.
+  Future<T> _turn<T>(
     Title title,
     String Function(AppLocalizations l10n) label,
     Future<T> Function() change,
-  ) async {
-    Object? error;
-    StackTrace? stack;
-    final result = await ref
-        .read(tasksProvider.notifier)
-        .run<T>(
-          label,
-          (_) async {
-            try {
-              return await change();
-            } on Object catch (e, s) {
-              (error, stack) = (e, s);
-              rethrow;
-            }
-          },
-          foreground: true,
-          quiet: true,
-          library: title.libraryId,
-        );
-    if (error case final e?) Error.throwWithStackTrace(e, stack!);
-    return result;
-  }
+  ) async =>
+      await ref
+              .read(tasksProvider.notifier)
+              .run<T>(
+                label,
+                (_) => change(),
+                foreground: true,
+                quiet: true,
+                cancellable: false,
+                library: title.libraryId,
+              )
+          as T;
 
   /// [version] of [title], with its library, for the logs.
   String _at(Title title, Version version) =>

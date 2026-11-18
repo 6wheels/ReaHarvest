@@ -6,8 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../state/tasks.dart';
 import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
-import 'tasks_zone.dart' show appNavigatorKey;
-import 'widgets.dart';
+import 'tasks_zone.dart';
 
 /// Shows the foreground tasks ([BackgroundTask.foreground]) one after the
 /// other, each in a popup over the glass pane that blocks the interface
@@ -38,10 +37,14 @@ class _ForegroundTaskHostState extends ConsumerState<ForegroundTaskHost> {
     }
     if (_shown != null || active.isEmpty) return;
     final id = _shown = active.first.id;
-    showGlassDialog<void>(navigator.context, (context) {
-      _route = ModalRoute.of(context) as Route<void>?;
-      return _ProgressPopup(id);
-    }, barrierDismissible: false);
+    // Known at once, before the popup is built: a task ending before the
+    // next frame still removes it.
+    final route = _route = glassDialogRoute<void>(
+      navigator.context,
+      (_) => _ProgressPopup(id),
+      barrierDismissible: false,
+    );
+    navigator.push(route);
   }
 
   @override
@@ -62,20 +65,10 @@ class _ProgressPopup extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final task = ref.watch(tasksProvider).where((t) => t.id == id).firstOrNull;
-    if (task == null || task.isFinished) {
-      // Ended before its popup was first built: the host had no route to
-      // remove yet.
-      final route = ModalRoute.of(context);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (route != null && route.isActive && context.mounted) {
-          Navigator.of(context).removeRoute(route);
-        }
-      });
-      return const SizedBox.shrink();
-    }
+    // Ended: the host removes the popup.
+    if (task == null) return const SizedBox.shrink();
     void cancel() => ref.read(tasksProvider.notifier).cancel(id);
-    final step = task.isQueued ? l10n.taskWaiting : task.step?.call(l10n);
-    final progress = task.progress;
+    final action = taskAction(context, ref, task);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => cancel(),
@@ -92,23 +85,16 @@ class _ProgressPopup extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    step ?? '',
+                    taskStep(task, l10n) ?? '',
                     style: Theme.of(context).textTheme.bodySmall
                         ?.copyWith(color: context.colors.muted),
                   ),
                   const SizedBox(height: Space.s),
-                  Meter(task.isQueued ? 0 : progress),
+                  TaskProgress(task),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: task.cancelling ? null : cancel,
-                child: Text(
-                  task.cancelling ? l10n.taskCancelling : l10n.cancel,
-                ),
-              ),
-            ],
+            actions: [?action],
           ),
         ),
       ),

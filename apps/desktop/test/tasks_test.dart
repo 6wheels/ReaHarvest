@@ -356,38 +356,60 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  test(
-    'a quiet task leaves the list when it ends, failed or cancelled',
-    () async {
-      const band = LibraryId('band');
-      expect(await tasks().run((l10n) => 'A', (_) async => 1, quiet: true), 1);
-      expect(
-        await tasks().run<int>(
-          (l10n) => 'B',
-          (_) async => throw 'boom',
-          quiet: true,
-        ),
-        isNull,
-      );
-      final hold = Completer<void>();
-      final running = tasks().run(
-        (l10n) => 'C',
-        (_) => hold.future,
-        library: band,
-      );
-      final queued = tasks().run(
-        (l10n) => 'D',
-        (_) async {},
-        quiet: true,
-        library: band,
-      );
-      tasks().cancel(container.read(tasksProvider).last.id);
-      expect(await queued, isNull);
-      hold.complete();
-      await running;
-      expect(states(), [TaskState.done], reason: 'only the one not quiet');
-    },
-  );
+  test('a quiet task leaves the list when it ends and throws its failure or '
+      'cancel', () async {
+    const band = LibraryId('band');
+    expect(await tasks().run((l10n) => 'A', (_) async => 1, quiet: true), 1);
+    await expectLater(
+      tasks().run<int>((l10n) => 'B', (_) async => throw 'boom', quiet: true),
+      throwsA('boom'),
+    );
+    final hold = Completer<void>();
+    final running = tasks().run(
+      (l10n) => 'C',
+      (_) => hold.future,
+      library: band,
+    );
+    final queued = tasks().run(
+      (l10n) => 'D',
+      (_) async {},
+      quiet: true,
+      library: band,
+    );
+    tasks().cancel(container.read(tasksProvider).last.id);
+    await expectLater(queued, throwsA(isA<TaskCancelled>()));
+    hold.complete();
+    await running;
+    expect(states(), [TaskState.done], reason: 'only the one not quiet');
+  });
+
+  test('a task not cancellable is only cancelled while queued', () async {
+    const band = LibraryId('band');
+    final hold = Completer<void>();
+    final running = tasks().run(
+      (l10n) => 'A',
+      (_) => hold.future,
+      cancellable: false,
+      library: band,
+    );
+    final queued = tasks().run(
+      (l10n) => 'B',
+      (_) async {},
+      cancellable: false,
+      library: band,
+    );
+    await Future<void>.delayed(Duration.zero);
+    final [a, b] = container.read(tasksProvider);
+    expect(a.canCancel, isFalse);
+    expect(b.canCancel, isTrue);
+    tasks().cancel(a.id);
+    tasks().cancel(b.id);
+    expect(container.read(tasksProvider).first.cancelling, isFalse);
+    expect(await queued, isNull);
+    hold.complete();
+    await running;
+    expect(states(), [TaskState.done, TaskState.cancelled]);
+  });
 
   test('a report with errors fails its task', () async {
     const report = Report({
@@ -567,8 +589,38 @@ void main() {
     expect(find.text('Fix'), findsNothing);
     expect(states().last, TaskState.cancelled);
 
-    // Ended before its popup was built: the popup closes by itself.
+    // Not cancellable: no Cancel once running, Escape does nothing.
+    final slow = Completer<void>();
+    final change = tasks().run(
+      (l10n) => 'Trash',
+      (_) => slow.future,
+      foreground: true,
+      cancellable: false,
+    );
+    await settle(tester);
+    expect(find.text('Trash'), findsOneWidget);
+    expect(find.text('Cancel'), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(find.text('Cancelling…'), findsNothing);
+    slow.complete();
+    await change;
+    await settle(tester);
+    expect(states().last, TaskState.done);
+
+    // Ended before its popup was built: its route is removed at once, a
+    // dialog under it stays the top route.
+    final under = Completer<String?>();
+    final navigator = appNavigatorKey.currentState!;
+    unawaited(
+      navigator
+          .push<String>(MaterialPageRoute(builder: (_) => const Text('Under')))
+          .then(under.complete),
+    );
+    await settle(tester);
     await tasks().run((l10n) => 'Quick', (_) async {}, foreground: true);
+    navigator.pop('created');
+    expect(await under.future, 'created');
     await settle(tester);
     expect(find.text('Quick'), findsNothing);
     expect(find.byType(AlertDialog), findsNothing);

@@ -11,8 +11,17 @@ Future<T?> showGlassDialog<T>(
   BuildContext context,
   WidgetBuilder builder, {
   bool barrierDismissible = true,
-}) => showGeneralDialog<T>(
-  context: context,
+}) => Navigator.of(context).push(
+  glassDialogRoute(context, builder, barrierDismissible: barrierDismissible),
+);
+
+/// Route of the popup [builder] of [showGlassDialog], for a caller that
+/// removes it itself.
+RawDialogRoute<T> glassDialogRoute<T>(
+  BuildContext context,
+  WidgetBuilder builder, {
+  bool barrierDismissible = true,
+}) => RawDialogRoute<T>(
   barrierDismissible: barrierDismissible,
   barrierLabel: AppLocalizations.of(context).close,
   barrierColor: Colors.transparent,

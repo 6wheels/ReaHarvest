@@ -659,6 +659,7 @@ class SectionLabel extends StatelessWidget {
 
 /// Runs [change] of a project file, after a confirmation when REAPER is
 /// running (SPEC §5.7); failures are reported in the notification zone.
+/// Returns whether [change] was done: not on a failure or a cancel.
 Future<bool> runProjectChange(
   BuildContext context,
   WidgetRef ref,
@@ -690,6 +691,8 @@ Future<bool> runProjectChange(
   try {
     await change();
     return true;
+  } on TaskCancelled {
+    return false;
   } on Object catch (error) {
     tasks.notify(failureMessage(l10n, error), level: NoticeLevel.error);
     return false;

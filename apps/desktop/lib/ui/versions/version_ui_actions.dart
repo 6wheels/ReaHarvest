@@ -46,8 +46,12 @@ Future<bool?> confirm(
   );
 }
 
-void fail(TasksNotifier tasks, AppLocalizations l10n, Object e) =>
-    tasks.notify(failureMessage(l10n, e), level: NoticeLevel.error);
+/// Reports the failure [e] of an action in the notification zone; a cancel
+/// ([TaskCancelled]) is no failure.
+void fail(TasksNotifier tasks, AppLocalizations l10n, Object e) {
+  if (e is TaskCancelled) return;
+  tasks.notify(failureMessage(l10n, e), level: NoticeLevel.error);
+}
 
 /// Sets the [status] of [version] of [title]; failures in the notification zone.
 Future<void> setVersionStatusFromUi(
