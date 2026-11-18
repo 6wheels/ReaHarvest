@@ -364,6 +364,20 @@ void main() {
       expect(reset.reaperResources, '/home/alice/.config/REAPER');
     });
 
+    test('clamps a stored text scale to the supported range', () {
+      double scaleOf(Object? value) => AppSettings.fromJson({
+        'schemaVersion': 1,
+        'identity': {'memberId': 'M', 'displayName': 'Alice'},
+        'libraries': <Object?>[],
+        'textScale': value,
+      }).textScale;
+
+      expect(scaleOf(0.5), 0.75);
+      expect(scaleOf(2), 1.5);
+      expect(scaleOf(1.1), 1.1);
+      expect(scaleOf(null), 1.0);
+    });
+
     test('rejects an unsupported schema', () {
       expect(
         () => AppSettings.fromJson({'schemaVersion': 2}),

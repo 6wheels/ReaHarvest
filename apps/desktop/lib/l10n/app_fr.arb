@@ -331,5 +331,10 @@
   },
   "referencedMedia": "Médias référencés",
   "mediaAbsent": "absent",
-  "quit": "Quitter"
+  "quit": "Quitter",
+  "pageSystem": "Système",
+  "about": "À propos",
+  "applicationVersion": "Version",
+  "licenses": "Licences",
+  "showLicenses": "Afficher les licences"
 }

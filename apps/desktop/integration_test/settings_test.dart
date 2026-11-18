@@ -91,28 +91,35 @@ void main() {
     // Settings popup.
     await tapTooltip(tester, 'Settings');
     expect(find.text('APPEARANCE'), findsOne);
+    await tapText(tester, 'Libraries');
     expect(find.text(band), findsOne);
+    await tapText(tester, 'Profile');
     await tester.enterText(find.widgetWithText(TextField, 'Alice'), 'Alice B');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
+    await tapText(tester, 'Appearance');
     await tapText(tester, 'Dark');
     expect(
       tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
       ThemeMode.dark,
     );
-    // Dragged across every step: each one is saved (#59).
-    await tester.drag(find.byType(Slider), const Offset(600, 0));
+    // Dragged across every step, up to 150 %: each one is saved (#59).
+    await tester.drag(find.byType(Slider), const Offset(800, 0));
     await tester.pumpAndSettle();
-    expect(h.settings.textScale, 1.3);
-    await tester.ensureVisible(find.text(h.logs));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Open'));
-    expect(h.openedFolders, [h.logs]);
+    expect(h.settings.textScale, 1.5);
     await tester.ensureVisible(find.text('Français'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Français'));
     await tester.pumpAndSettle();
     expect(find.text('APPARENCE'), findsOne);
+    await tester.tap(find.text('Système').first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(h.logs));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Ouvrir'));
+    expect(h.openedFolders, [h.logs]);
+    await tapText(tester, 'À propos');
+    expect(find.text('0.1.0'), findsOne);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
 
@@ -124,13 +131,14 @@ void main() {
     expect(saved.reaperResources, resources);
     expect(saved.templatesFolder, templates);
     expect(saved.theme, ThemePreference.dark);
-    expect(saved.textScale, 1.3);
+    expect(saved.textScale, 1.5);
     expect(saved.language, 'fr');
     await h.restart(tester);
     expect(find.byType(FirstRunWizard), findsNothing);
     expect(find.widgetWithText(TitleCard, 'Song'), findsOne);
     await tapTooltip(tester, 'Paramètres');
     expect(find.text('APPARENCE'), findsOne);
+    await tapText(tester, 'Profil');
     expect(find.widgetWithText(TextField, 'Alice B'), findsOne);
   });
 

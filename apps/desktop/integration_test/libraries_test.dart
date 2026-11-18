@@ -73,6 +73,7 @@ void main() {
     await h.start(tester);
     await tapText(tester, 'Later');
     await tapTooltip(tester, 'Settings');
+    await tapText(tester, 'Libraries');
     expect(find.text('No library yet.'), findsOne);
 
     // New library, with the recommended organization.
@@ -121,6 +122,7 @@ void main() {
 
     // Removal, after confirmation: the projects stay.
     await tapTooltip(tester, 'Settings');
+    await tapText(tester, 'Libraries');
     await tapText(tester, 'Remove');
     expect(find.text('Remove “Shared”?'), findsOne);
     await tapText(tester, 'Cancel');
