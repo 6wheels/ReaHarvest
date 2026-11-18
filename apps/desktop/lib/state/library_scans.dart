@@ -51,9 +51,9 @@ class LibraryScans {
   /// Scans [entry]; failures are only logged, the library stays configured
   /// and is scanned again on next start. Takes no turn: for the rescan that
   /// ends a change, inside the turn of [entry] ([LibraryTurns]).
-  Future<void> scan(LibraryEntry entry) async {
+  Future<void> scan(LibraryEntry entry, {bool full = false}) async {
     try {
-      await _scanReport(entry);
+      await _scanReport(entry, full: full);
     } on Object catch (error) {
       _log.warning('Scan of ${entry.displayName} failed', error);
     }
@@ -64,10 +64,16 @@ class LibraryScans {
   /// scanned instead ([scan]) when the title is not indexed, when its folder
   /// is no longer a title (the folders around it may have changed), or when
   /// its scan fails (folder moved meanwhile…). Failures are only logged.
-  /// Takes no turn: inside the turn of [entry].
-  Future<void> rescanTitle(LibraryEntry entry, Title title) async {
+  /// Takes no turn: inside the turn of [entry]. The projects of [reread]
+  /// (library paths), rewritten by the action keeping their size and date
+  /// (SPEC §4.2), are read again: by a full scan in the fallback.
+  Future<void> rescanTitle(
+    LibraryEntry entry,
+    Title title, {
+    Set<String> reread = const {},
+  }) async {
     try {
-      if (await _rescanTitle(entry, title)) return;
+      if (await _rescanTitle(entry, title, reread)) return;
     } on Object catch (error) {
       _log.warning(
         'Rescan of ${title.path} of ${entry.displayName} failed, '
@@ -75,13 +81,17 @@ class LibraryScans {
         error,
       );
     }
-    await scan(entry);
+    await scan(entry, full: reread.isNotEmpty);
   }
 
   /// Rescans the folder of [title] from its stored rows only, in an
   /// isolate that writes the index; false when the whole library must be
   /// scanned instead.
-  Future<bool> _rescanTitle(LibraryEntry entry, Title title) async {
+  Future<bool> _rescanTitle(
+    LibraryEntry entry,
+    Title title,
+    Set<String> reread,
+  ) async {
     final root = entry.libraryRoot;
     final library = await readLibrary(MountedFolderStorage(root));
     if (library == null) return false;
@@ -90,6 +100,7 @@ class LibraryScans {
       root,
       library,
       title.path,
+      reread: reread,
     );
     if (!stored) return false;
     ref.read(indexRevisionProvider.notifier).bump();
@@ -155,6 +166,9 @@ extension LibraryScan on Ref {
 
   /// Scans again the folder of [title] of [entry] only, failures only
   /// logged ([LibraryScans.rescanTitle]), inside the turn of [entry].
-  Future<void> rescanTitle(LibraryEntry entry, Title title) =>
-      read(libraryScansProvider).rescanTitle(entry, title);
+  Future<void> rescanTitle(
+    LibraryEntry entry,
+    Title title, {
+    Set<String> reread = const {},
+  }) => read(libraryScansProvider).rescanTitle(entry, title, reread: reread);
 }

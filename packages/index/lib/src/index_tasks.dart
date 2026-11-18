@@ -48,12 +48,14 @@ Future<Report> scanIntoIndex(
 /// ([scanTitle]), from its rows stored at [indexPath], and stores the
 /// result. False, with nothing stored, when the title is not indexed or the
 /// folder is no longer a title: the whole library must be scanned instead.
+/// The files of [reread] are read again, changed or not.
 Future<bool> scanTitleIntoIndex(
   String indexPath,
   String root,
   Library library,
-  String titlePath,
-) => _withIndex(indexPath, (index) async {
+  String titlePath, {
+  Set<String> reread = const {},
+}) => _withIndex(indexPath, (index) async {
   final stored = index.storedTitle(library.id, titlePath);
   if (stored == null) return false;
   final result = await scanTitle(
@@ -61,6 +63,7 @@ Future<bool> scanTitleIntoIndex(
     library,
     stored.titles.single,
     stored: stored,
+    reread: reread,
   );
   if (result.title == null) return false;
   index.updateTitle(library, titlePath, result);

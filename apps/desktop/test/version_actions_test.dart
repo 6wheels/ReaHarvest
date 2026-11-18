@@ -129,12 +129,17 @@ void main() {
     final adopted = version('v1.rpp').metadata!;
     expect((adopted.owner, adopted.label), (null, 'main'));
 
-    File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v1', 'dup.rpp'));
+    final dup = File(p.join(song, 'v1', 'v1.rpp'))
+        .copySync(p.join(song, 'v1', 'dup.rpp'));
+    final date = DateTime(2020, 5, 6, 7, 8, 9);
+    dup.setLastModifiedSync(date);
     await scans.scanAll();
     expect(duplicateVersions(index.titles()).keys, [adopted.id]);
 
     await versions.separateDuplicate(title(), version('dup.rpp'));
     final separated = version('dup.rpp').metadata!;
+    // Same size and date (SPEC §4.2): the rescan reads it again.
+    expect(dup.lastModifiedSync(), date);
     expect(separated.id, isNot(adopted.id));
     expect((separated.label, separated.owner), ('main', null));
     expect(duplicateVersions(index.titles()), isEmpty);

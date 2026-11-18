@@ -80,6 +80,9 @@ void main() {
     final song = h.copyCleanProject('Band/Artist/Album/Song/v1/v1.rpp');
     h.copyCleanProject('Band/Artist/Album/Song/v2/v2.rpp');
     final ballad = h.copyCleanProject('Band/Artist/Album/Ballad/v1/v1.rpp');
+    // Adoption keeps the date of the project (SPEC §4.2, #146).
+    final date = DateTime(2020, 5, 6, 7, 8, 9);
+    File(ballad).setLastModifiedSync(date);
     await h.writeSettings();
     await h.start(tester);
     await tapText(tester, 'Later');
@@ -104,7 +107,15 @@ void main() {
     // Nothing left to adopt: no count in the header.
     expect(find.textContaining('not adopted'), findsNothing);
     expect(versionId(ballad), isNotNull);
+    expect(File(ballad).lastModifiedSync(), date);
     await back(tester);
+    expect(
+      find.descendant(
+        of: find.widgetWithText(TitleCard, 'Ballad'),
+        matching: find.text('May 2020'),
+      ),
+      findsOne,
+    );
 
     // The filter keeps the titles having a version to adopt.
     final pill = find.widgetWithText(Pill, 'TO ADOPT // 1');

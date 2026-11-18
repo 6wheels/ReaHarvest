@@ -212,7 +212,8 @@ Future<TitleScan> scanTitleFolder(
 ///
 /// The files a migration rewrote after the journal position of [stored]
 /// are read again ([rewrittenSince]); that position is left as it is, for
-/// the next full scan.
+/// the next full scan. So are the files of [reread]: projects the action
+/// rewrote keeping their size and date (SPEC §4.2).
 ///
 /// Writes nothing: a title whose node file is missing or unreadable is no
 /// longer a title, nor is a folder without a project in it or below it (a
@@ -224,6 +225,7 @@ Future<TitleScan> scanTitle(
   Library library,
   Title previous, {
   ScanResult stored = const ScanResult(),
+  Set<String> reread = const {},
 }) async {
   final position = stored.journalPosition;
   final paths = position == null
@@ -232,7 +234,7 @@ Future<TitleScan> scanTitle(
   return _Scanner(
     storage,
     library,
-    stored.withoutStamps(paths),
+    stored.withoutStamps({...paths, ...reread}),
     null,
     false,
   ).runTitle(previous);

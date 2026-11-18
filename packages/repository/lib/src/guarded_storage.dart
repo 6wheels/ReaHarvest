@@ -4,6 +4,7 @@ import 'conventions.dart';
 import 'free_names.dart';
 import 'inventory.dart';
 import 'migration_journal.dart';
+import 'project_file.dart';
 
 /// [RepositoryStorage] given to the fixes of a migration (SPEC §5.8 step
 /// 5): every move and write is recorded in the [MigrationJournal] before it
@@ -55,7 +56,7 @@ final class GuardedStorage implements RepositoryStorage {
     if (origin == null || _inventory.entryOf(origin) == null) return null;
     final copy = _inventory.originalPath(origin);
     if (await _inner.stat(copy) != null) return null;
-    await _inner.write(copy, _inner.read(path));
+    await copyKeepingProjectDate(_inner, path, copy);
     return copy;
   }
 
@@ -67,7 +68,7 @@ final class GuardedStorage implements RepositoryStorage {
       _inner,
       '${_inventory.folder}/fixes/$fix/$path',
     );
-    await _inner.write(copy, _inner.read(path));
+    await copyKeepingProjectDate(_inner, path, copy);
     return copy;
   }
 

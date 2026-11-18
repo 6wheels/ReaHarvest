@@ -93,7 +93,8 @@ class VersionActions {
       ),
     );
     _log.info('Version ${_at(title, version)} separated: id $id');
-    await ref.rescanTitle(entry, title);
+    // Same size and date: read again (SPEC §4.2).
+    await ref.rescanTitle(entry, title, reread: {joinPath(dir, name)});
   }
 
   /// Backs up [version] of [title] into its `.history/` (UI: « Créer un

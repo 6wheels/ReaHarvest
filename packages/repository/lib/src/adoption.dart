@@ -22,7 +22,7 @@ Future<void> adoptVersion(
 /// Makes the *Save As* copy [fileName] of the title [titleDir] a new version
 /// (SPEC §4.2): a new id in the file, [label] (the label of the original, as
 /// shown, its file name fallback included) and [owner], if any, set for it.
-/// Returns the new id. Throws [StateError] if the project is not adopted.
+/// The file keeps its date. Returns the new id. Throws [StateError] if the project is not adopted.
 Future<VersionId> separateDuplicateVersion(
   RepositoryStorage storage,
   String titleDir,
@@ -31,6 +31,7 @@ Future<VersionId> separateDuplicateVersion(
   MemberId? owner,
 }) async {
   final path = joinPath(titleDir, fileName);
+  final modified = (await storage.stat(path))?.modified;
   final (:text, :encoding) = await readProject(storage, path);
   if (VersionMetadata.fromExtState(
         RppProject.parse(text).extState(VersionMetadata.section),
@@ -53,6 +54,7 @@ Future<VersionId> separateDuplicateVersion(
       VersionMetadata(id: id).toExtState(),
     ),
     encoding,
+    modified: modified,
   );
   return id;
 }
@@ -67,17 +69,19 @@ Future<NodeFile> writeVersionEntries(
 
 /// Writes the version [id] into the EXTSTATE section of the project at
 /// [path]: targeted patch, atomic write, in the encoding of the project
-/// (SPEC §7.3). Other keys of the section are kept.
+/// (SPEC §7.3), keeping its date (SPEC §4.2). Other keys of the section are
+/// kept.
 Future<void> writeVersionId(
   RepositoryStorage storage,
   String path,
   VersionId id,
 ) async {
+  final modified = (await storage.stat(path))?.modified;
   final (:text, :encoding) = await readProject(storage, path);
   final patched = setExtState(
     text,
     VersionMetadata.section,
     VersionMetadata(id: id).toExtState(),
   );
-  await writeProject(storage, path, patched, encoding);
+  await writeProject(storage, path, patched, encoding, modified: modified);
 }
