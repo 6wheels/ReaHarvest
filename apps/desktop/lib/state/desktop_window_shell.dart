@@ -75,6 +75,7 @@ class DesktopWindowShell
       );
     }
     _labels = labels;
+    await trayManager.setToolTip('ReaHarvest');
     await trayManager.setContextMenu(
       Menu(
         items: [

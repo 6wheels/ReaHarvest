@@ -73,9 +73,8 @@ class WindowBehavior {
 
   /// The window is asked to close: hidden to the tray, or the application
   /// quits.
-  Future<void> closeRequested() => ref.read(settingsProvider).showInTray
-      ? _shell.hide()
-      : quit();
+  Future<void> closeRequested() =>
+      ref.read(settingsProvider).showInTray ? _shell.hide() : quit();
 
   /// Tray menu "Open ReaHarvest".
   Future<void> open() => _shell.show();

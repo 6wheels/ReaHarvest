@@ -70,7 +70,8 @@ class _WindowSettings extends ConsumerWidget {
             alignment: Alignment.centerLeft,
             child: Switch(
               value: settings.showInTray,
-              onChanged: (v) => notifier.change((s) => s.copyWith(showInTray: v)),
+              onChanged: (v) =>
+                  notifier.change((s) => s.copyWith(showInTray: v)),
             ),
           ),
         ),
@@ -89,7 +90,9 @@ class _WindowSettings extends ConsumerWidget {
               ),
               ButtonSegment(
                 value: ProjectOpenAction.close,
-                label: Text(l10n.onOpenClose),
+                label: Text(
+                  settings.showInTray ? l10n.onOpenToTray : l10n.onOpenClose,
+                ),
               ),
             ],
             selected: {settings.onProjectOpen},

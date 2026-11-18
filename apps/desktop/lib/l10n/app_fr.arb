@@ -365,5 +365,6 @@
   "quitTasksTitle": "Quitter pendant que des tâches s’exécutent ?",
   "quitTasksBody": "Ces tâches sont en cours ou en attente :",
   "keepRunning": "Continuer",
-  "cancelTasksAndQuit": "Annuler les tâches et quitter"
+  "cancelTasksAndQuit": "Annuler les tâches et quitter",
+  "onOpenToTray": "Réduire dans la zone de notification"
 }

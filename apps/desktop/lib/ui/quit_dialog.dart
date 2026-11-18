@@ -10,10 +10,7 @@ import 'tasks_zone.dart' show appNavigatorKey;
 Future<bool> confirmQuit(List<BackgroundTask> tasks) async {
   final context = appNavigatorKey.currentContext;
   if (context == null) return true;
-  final cancel = await showGlassDialog<bool>(
-    context,
-    (_) => QuitDialog(tasks),
-  );
+  final cancel = await showGlassDialog<bool>(context, (_) => QuitDialog(tasks));
   return cancel ?? false;
 }
 

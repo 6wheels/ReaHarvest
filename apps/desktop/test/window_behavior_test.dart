@@ -157,6 +157,9 @@ void main() {
     await tester.tap(find.byType(Switch));
     await tester.pump();
     expect(container.read(settingsProvider).showInTray, isTrue);
+    // With the tray, "Close" becomes "Minimize to tray".
+    expect(find.text('Close ReaHarvest'), findsNothing);
+    expect(find.text('Minimize to tray'), findsOneWidget);
     await tester.tap(find.text('Minimize ReaHarvest'));
     await tester.pump();
     expect(

@@ -466,5 +466,6 @@
   "quitTasksTitle": "Quit while tasks are running?",
   "quitTasksBody": "These tasks are running or waiting:",
   "keepRunning": "Keep running",
-  "cancelTasksAndQuit": "Cancel the tasks and quit"
+  "cancelTasksAndQuit": "Cancel the tasks and quit",
+  "onOpenToTray": "Minimize to tray"
 }
