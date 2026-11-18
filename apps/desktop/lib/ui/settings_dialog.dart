@@ -1,5 +1,3 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -8,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 import 'known_values_editor.dart';
 import 'library_form.dart';
 import 'members_editor.dart';
@@ -15,54 +14,8 @@ import 'path_row.dart';
 import 'reaper_settings.dart';
 
 /// Opens the settings as a popup over the blurred application (SPEC §5.2).
-Future<void> showSettings(BuildContext context) => showGeneralDialog(
-  context: context,
-  barrierDismissible: true,
-  barrierLabel: AppLocalizations.of(context).close,
-  barrierColor: Colors.transparent,
-  transitionDuration: Motion.medium,
-  pageBuilder: (_, _, _) => const _SettingsPanel(),
-  transitionBuilder: (context, animation, _, child) {
-    final t = CurvedAnimation(
-      parent: animation,
-      curve: Motion.curve,
-      reverseCurve: Curves.easeInCubic,
-    );
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedBuilder(
-              animation: t,
-              builder: (context, _) => BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: 16 * t.value,
-                  sigmaY: 16 * t.value,
-                ),
-                child: ColoredBox(
-                  color: context.colors.scrim.withValues(alpha: 0.45 * t.value),
-                ),
-              ),
-            ),
-          ),
-        ),
-        FadeTransition(
-          opacity: t,
-          child: ScaleTransition(
-            scale: Tween(begin: 0.96, end: 1.0).animate(t),
-            child: SlideTransition(
-              position: Tween(
-                begin: const Offset(0, 0.02),
-                end: Offset.zero,
-              ).animate(t),
-              child: child,
-            ),
-          ),
-        ),
-      ],
-    );
-  },
-);
+Future<void> showSettings(BuildContext context) =>
+    showGlassDialog<void>(context, (_) => const _SettingsPanel());
 
 class _SettingsPanel extends ConsumerWidget {
   const _SettingsPanel();
@@ -394,9 +347,9 @@ class _Libraries extends ConsumerWidget {
     LibraryEntry library,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+    final confirmed = await showGlassDialog<bool>(
+      context,
+      (context) => AlertDialog(
         title: Text(l10n.removeLibraryTitle(library.displayName)),
         content: Text(l10n.removeLibraryHint),
         actions: [
@@ -416,33 +369,31 @@ class _Libraries extends ConsumerWidget {
     }
   }
 
-  Future<void> _add(BuildContext context) => showDialog<void>(
-    context: context,
-    builder: (context) {
-      final l10n = AppLocalizations.of(context);
-      return AlertDialog(
-        title: Text(l10n.addLibrary),
-        content: SizedBox(
-          width: 560,
-          child: SingleChildScrollView(
-            child: LibraryForm(
-              submitLabel: l10n.addLibrary,
-              // The report of the scan is already open over this dialog:
-              // close this dialog, not the top route.
-              onAdded: () =>
-                  Navigator.of(context).removeRoute(ModalRoute.of(context)!),
+  Future<void> _add(BuildContext context) =>
+      showGlassDialog<void>(context, (context) {
+        final l10n = AppLocalizations.of(context);
+        return AlertDialog(
+          title: Text(l10n.addLibrary),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: LibraryForm(
+                submitLabel: l10n.addLibrary,
+                // The report of the scan is already open over this dialog:
+                // close this dialog, not the top route.
+                onAdded: () =>
+                    Navigator.of(context).removeRoute(ModalRoute.of(context)!),
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.cancel),
-          ),
-        ],
-      );
-    },
-  );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l10n.cancel),
+            ),
+          ],
+        );
+      });
 }
 
 /// Small square of an accent color.

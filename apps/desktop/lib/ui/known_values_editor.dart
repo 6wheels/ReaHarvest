@@ -8,6 +8,7 @@ import 'package:reaharvest_repository/reaharvest_repository.dart'
 import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 import 'layout_labels.dart';
 import 'widgets.dart';
 
@@ -206,10 +207,7 @@ Future<void> showKnownValues(
   BuildContext context,
   LibraryEntry entry,
   Layout layout,
-) => showDialog(
-  context: context,
-  builder: (context) => _KnownValuesDialog(entry, layout),
-);
+) => showGlassDialog(context, (context) => _KnownValuesDialog(entry, layout));
 
 class _KnownValuesDialog extends ConsumerStatefulWidget {
   const _KnownValuesDialog(this.entry, this.layout);

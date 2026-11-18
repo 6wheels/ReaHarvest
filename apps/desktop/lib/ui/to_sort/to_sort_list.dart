@@ -10,6 +10,7 @@ import '../../state/migration_actions.dart';
 import '../../state/navigation.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
+import '../glass_dialog.dart';
 import '../layout_labels.dart';
 import '../report_dialog.dart';
 import '../widgets.dart';
@@ -137,9 +138,9 @@ class _ToSortListState extends ConsumerState<ToSortList> {
     final path = issue.item.path;
     final l10n = AppLocalizations.of(context);
     final tasks = ref.read(tasksProvider.notifier);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+    final confirmed = await showGlassDialog<bool>(
+      context,
+      (context) => AlertDialog(
         title: Text(l10n.deleteOrphanNodeTitle),
         content: Text(l10n.deleteOrphanNodeHint(p.posix.dirname(path))),
         actions: [

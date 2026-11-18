@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
 import 'to_sort/to_sort_page.dart';
@@ -445,9 +446,9 @@ class _SavedViewsChipState extends ConsumerState<_SavedViewsChip> {
       if (name.isNotEmpty) Navigator.of(context).pop(name);
     }
 
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
+    return showGlassDialog<String>(
+      context,
+      (context) => AlertDialog(
         title: Text(l10n.saveView),
         content: TextField(
           controller: controller,
