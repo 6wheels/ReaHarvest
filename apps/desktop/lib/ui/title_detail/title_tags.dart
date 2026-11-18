@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
@@ -42,7 +44,9 @@ class _TitleTagsState extends ConsumerState<TitleTags> {
   }
 
   void _add(String text) {
-    _controller.clear();
+    // Cleared once a picked option is set: the options then follow the
+    // empty field.
+    scheduleMicrotask(_controller.clear);
     if (text.trim().isEmpty) return;
     _edit((actions) => actions.addTag(widget.title, text));
   }

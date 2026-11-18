@@ -382,8 +382,11 @@ void main() {
     expect(find.byType(InputChip), findsOne);
     expect(stored(), ['standard C']);
 
-    // Removed, the key leaves the node file.
+    // Removed after confirmation, the key leaves the node file.
     await tester.tap(find.byTooltip('Remove the tag standard C'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove the tag “standard C”?'), findsOne);
+    await tester.tap(find.text('Remove'));
     await waitFor(
       tester,
       () => find.byType(InputChip).evaluate().isEmpty,

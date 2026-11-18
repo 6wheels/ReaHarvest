@@ -63,6 +63,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.text, 'Samples');
     expect(submitted, ['sam', 'Samples']);
+
+    // The page keys browse too; a picked option is submitted once.
+    await tester.enterText(find.byType(TextField), 'sam');
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(controller.text, 'Samples');
+    expect(submitted, ['sam', 'Samples', 'Samples']);
+    // Enter keeps the focus.
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isTrue,
+    );
     await tester.enterText(find.byType(TextField), 'sam');
     await tester.pumpAndSettle();
 

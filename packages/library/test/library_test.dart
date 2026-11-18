@@ -351,6 +351,13 @@ void main() {
       expect(legacy.levels, {
         'artist': {'A'},
       });
+      // A list under 'tags' is not a level filter.
+      expect(
+        TitleFilter.fromJson({
+          'tags': ['live'],
+        }).levels,
+        isEmpty,
+      );
       expect(read.libraries.map((l) => l.id), ['L1', 'L2']);
       expect(read.libraries[0].libraryRoot, '/drive/band');
       expect(read.libraries[0].templatesFolder, '/work/band-templates');

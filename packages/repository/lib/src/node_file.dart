@@ -215,8 +215,9 @@ Future<NodeFile> removeTitleTag(
   ]),
 );
 
-/// Applies [change] to the node file of [dir], read again first. Throws
-/// [StateError] when [dir] has no node file.
+/// Applies [change] to the node file of [dir], read again first; the file
+/// is not written when nothing changed. Throws [StateError] when [dir] has
+/// no node file.
 Future<NodeFile> updateNodeFile(
   RepositoryStorage storage,
   String dir,
@@ -227,6 +228,7 @@ Future<NodeFile> updateNodeFile(
     throw StateError('No $nodeFileName in "$dir"; scan the library first');
   }
   final updated = change(node);
+  if (jsonEncode(updated.toJson()) == jsonEncode(node.toJson())) return node;
   await writeNodeFile(storage, dir, updated);
   return updated;
 }

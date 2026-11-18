@@ -61,10 +61,10 @@ class LevelField extends StatefulWidget {
   final String? error;
   final VoidCallback onChanged;
 
-  /// Called with the text when the user presses Enter or picks an option.
-  /// Enter keeps the typed text (in the spelling of an option equal to it
-  /// ignoring case), unless the user moved through the options with the
-  /// arrow keys: it then picks the highlighted one.
+  /// Called once with the text when the user presses Enter or picks an
+  /// option. Enter keeps the typed text (in the spelling of an option equal
+  /// to it ignoring case), unless the user moved through the options with
+  /// the arrow or page keys: it then picks the highlighted one.
   final ValueChanged<String>? onSubmit;
 
   /// Compact field, without the room kept for an error.
@@ -77,21 +77,41 @@ class LevelField extends StatefulWidget {
 class _LevelFieldState extends State<LevelField> {
   final _focus = FocusNode();
 
-  /// Whether the options were browsed with the arrow keys since the last
+  /// Whether the options were browsed with the keyboard since the last
   /// edit.
   var _browsed = false;
+
+  /// Whether the last Enter picked an option.
+  var _picked = false;
+
+  static final _browsingKeys = {
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.pageDown,
+    LogicalKeyboardKey.pageUp,
+  };
 
   @override
   void initState() {
     super.initState();
     _focus.onKeyEvent = (node, event) {
-      if (event is! KeyUpEvent &&
-          (event.logicalKey == LogicalKeyboardKey.arrowDown ||
-              event.logicalKey == LogicalKeyboardKey.arrowUp)) {
+      if (event is! KeyUpEvent && _browsingKeys.contains(event.logicalKey)) {
         _browsed = true;
       }
       return KeyEventResult.ignored;
     };
+  }
+
+  /// Submits the typed text, in the spelling of an option equal to it
+  /// ignoring case.
+  void _submitTyped(TextEditingController controller) {
+    final typed = controller.text.trim().toLowerCase();
+    final same = widget.options().where((o) => o.toLowerCase() == typed);
+    if (same.firstOrNull case final o? when o != controller.text) {
+      controller.text = o;
+      widget.onChanged();
+    }
+    widget.onSubmit?.call(controller.text);
   }
 
   @override
@@ -109,11 +129,13 @@ class _LevelFieldState extends State<LevelField> {
       return widget.options().where((o) => o.toLowerCase().contains(typed));
     },
     onSelected: (value) {
+      _picked = true;
+      _browsed = false;
       widget.onChanged();
       widget.onSubmit?.call(value);
     },
-    // Up and down move through the options, Enter then picks the
-    // highlighted one, Escape hides them.
+    // Up, down and the page keys move through the options, Enter then
+    // picks the highlighted one, Escape hides them.
     fieldViewBuilder: (context, controller, focusNode, onSubmitted) =>
         TextField(
           controller: controller,
@@ -122,20 +144,13 @@ class _LevelFieldState extends State<LevelField> {
             _browsed = false;
             widget.onChanged();
           },
-          onSubmitted: (value) {
-            if (_browsed) {
-              onSubmitted();
-            } else {
-              final typed = controller.text.trim().toLowerCase();
-              final same = widget.options().where(
-                (o) => o.toLowerCase() == typed,
-              );
-              if (same.firstOrNull case final o? when o != controller.text) {
-                controller.text = o;
-                widget.onChanged();
-              }
-            }
-            widget.onSubmit?.call(controller.text);
+          // Enter keeps the focus: several values can be entered in a row.
+          onEditingComplete: () {},
+          onSubmitted: (_) {
+            _picked = false;
+            // Picks the highlighted option, when the options are shown.
+            if (_browsed) onSubmitted();
+            if (!_picked) _submitTyped(controller);
           },
           decoration: InputDecoration(
             labelText: widget.label,

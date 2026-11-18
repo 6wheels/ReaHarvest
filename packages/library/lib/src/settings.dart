@@ -150,11 +150,13 @@ final class TitleFilter {
   static TitleFilter fromJson(Map<String, Object?> json) {
     Set<String> strings(Object? list) => {...?(list as List?)?.cast<String>()};
     final modes = LibraryMode.values.asNameMap();
+    // Level values were saved under 'tags' before the free tags of titles
+    // took the word (#132); a list there is a filter of free tags.
+    final legacy = json['tags'];
+    final levels = json['levels'] ?? (legacy is Map ? legacy : null);
     return TitleFilter(
       levels: {
-        // 'tags' before the free tags of titles took the word (#132).
-        for (final e
-            in ((json['levels'] ?? json['tags']) as Map? ?? const {}).entries)
+        for (final e in ((levels as Map?) ?? const {}).entries)
           e.key as String: strings(e.value),
       },
       libraries: {for (final id in strings(json['libraries'])) LibraryId(id)},

@@ -1006,6 +1006,16 @@ void main() {
       expect(saved['tags'], ['live', 'standard C']);
       expect(saved['nodeId'], first.titles.single.id);
 
+      // Nothing to change: the node file is not written again.
+      final nodeFile = File(
+        p.join(root.path, 'band', 'album', 'song', '.node.json'),
+      );
+      final before = DateTime(2020);
+      nodeFile.setLastModifiedSync(before);
+      await addTitleTag(storage, dir, 'STANDARD c');
+      await removeTitleTag(storage, dir, 'absent');
+      expect(nodeFile.lastModifiedSync(), before);
+
       final second = await scan(storage, lib, previous: first);
       expect(second.titles.single.tags, ['live', 'standard C']);
 

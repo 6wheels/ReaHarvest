@@ -11,7 +11,7 @@ import '../labels.dart';
 import '../status_trail.dart';
 import 'title_tags.dart';
 
-/// Title name with its first parent tag (e.g. the artist) on the same
+/// Title name with its first parent level (e.g. the artist) on the same
 /// line, the other levels (e.g. the album) and the library below; stats of
 /// the selected [version] on the right; status trail across the width.
 class Header extends ConsumerWidget {

@@ -13,7 +13,7 @@ String statusLabel(AppLocalizations l10n, String status) => switch (status) {
   _ => status,
 };
 
-/// Displayed tag value: the reserved unassigned value is translated.
+/// Displayed level value: the reserved unassigned value is translated.
 String levelValueLabel(AppLocalizations l10n, String value) =>
     value == Layout.unassigned ? l10n.unassigned : value;
 
