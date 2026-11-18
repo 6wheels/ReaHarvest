@@ -9,12 +9,10 @@ String _absolute(String root, String path) =>
 /// Kinds whose detail is a path of the library, one per line.
 const _pathDetails = {
   ReportKind.targetExists,
-  ReportKind.folderMerged,
-  ReportKind.fileRenamed,
+  ReportKind.folderMoved,
+  ReportKind.projectMoved,
   ReportKind.mediaMoved,
   ReportKind.mediaCopied,
-  ReportKind.mediaTrashed,
-  ReportKind.mediaUsedElsewhere,
   ReportKind.referencedByPlugin,
 };
 

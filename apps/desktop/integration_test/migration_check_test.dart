@@ -27,7 +27,6 @@ void main() {
 
   const lost = 'Files missing or changed since the inventory';
   const wrongLevel = 'FOLDERS AT THE WRONG LEVEL · 1';
-  const tooDeep = 'PROJECTS BELOW A VERSION FOLDER · 1';
 
   String band() => h.path('Band');
 
@@ -63,12 +62,23 @@ void main() {
       if (e is Directory) p.basename(e.path),
   ];
 
-  /// Fixes the single item of the section [header], and waits for the
-  /// report.
-  Future<void> fixSection(WidgetTester tester, String header) async {
-    await openSectionFix(tester, header);
-    await confirmFix(tester, h);
-  }
+  /// The album placed at the artist level, moved with its title.
+  final ballad = OrganizeTitle('Live/Ballad', 'Artist/Live/Ballad', [
+    const FixVersion('Live/Ballad/v1/v1.rpp', folder: 'v1', label: 'v1'),
+  ], level: 'title');
+
+  /// The project below a version folder, given its own.
+  final lift = OrganizeTitle('Artist/Album/Song', 'Artist/Album/Song', [
+    const FixVersion(
+      'Artist/Album/Song/v1/Alice/take.rpp',
+      folder: 'take',
+      label: 'take',
+    ),
+  ], level: 'title');
+
+  /// Runs [fix] on the library, and waits for the report.
+  Future<void> fixSection(WidgetTester tester, MigrationFix fix) =>
+      runFixes(tester, h, h.settings.libraries.single.id, [fix]);
 
   testWidgets('inventories, keeps the originals and checks the batch', (
     tester,
@@ -77,8 +87,8 @@ void main() {
     final take = h.path('Band/Artist/Album/Song/v1/Alice/take.rpp');
     final original = File(take).readAsBytesSync();
 
-    await fixSection(tester, tooDeep);
-    expect(find.text('Project moved · 1'), findsOne);
+    await fixSection(tester, lift);
+    expect(find.text('Projects moved into their version folder · 1'), findsOne);
     expect(find.textContaining(lost), findsNothing);
     expect(h.tasks.last.state, TaskState.done);
     await tapText(tester, 'Close');
@@ -130,9 +140,7 @@ void main() {
       }
     });
     addTearDown(cancelling.close);
-    final fixing = h.migration.fix(library, [
-      const MoveFolder('Live', 'Artist/Live'),
-    ]);
+    final fixing = h.migration.fix(library, [ballad]);
     await waitFor(tester, () => h.tasks.length > before, reason: 'started');
     cancelling.close();
     await waitFor(tester, () => !h.tasks.last.isRunning, reason: 'cancelled');
@@ -148,7 +156,7 @@ void main() {
     expect(find.text(wrongLevel), findsOne);
 
     // The next batch resumes that inventory instead of starting another.
-    await fixSection(tester, wrongLevel);
+    await fixSection(tester, ballad);
     expect(find.text('Folders moved · 1'), findsOne);
     expect(find.textContaining(lost), findsNothing);
     await tapText(tester, 'Close');
@@ -184,7 +192,7 @@ void main() {
     });
     addTearDown(listening.close);
 
-    await fixSection(tester, wrongLevel);
+    await fixSection(tester, ballad);
     expect(changed, isTrue);
     // The gap is an error: the batch failed, the move it did is kept.
     expect(find.text('$lost · 1'), findsOne);
@@ -201,8 +209,8 @@ void main() {
     );
 
     // The next batch takes a fresh inventory, holding the change: no gap.
-    await fixSection(tester, tooDeep);
-    expect(find.text('Project moved · 1'), findsOne);
+    await fixSection(tester, lift);
+    expect(find.text('Projects moved into their version folder · 1'), findsOne);
     expect(find.textContaining(lost), findsNothing);
     expect(h.tasks.last.state, TaskState.done);
     await tapText(tester, 'Close');

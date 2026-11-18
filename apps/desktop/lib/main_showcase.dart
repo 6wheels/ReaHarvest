@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
-import 'package:reaharvest_repository/reaharvest_repository.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'l10n/app_localizations.dart';
@@ -20,7 +19,6 @@ import 'ui/aurora.dart';
 import 'ui/filter_bar.dart' as filter show Pill;
 import 'ui/known_values_editor.dart';
 import 'ui/library_page.dart' show LibrarySearchField;
-import 'ui/media_plan_preview.dart';
 import 'ui/overview.dart';
 import 'ui/path_row.dart';
 import 'ui/status_trail.dart';
@@ -91,7 +89,11 @@ class _ShowcaseTasks extends TasksNotifier {
       id: 3,
       label: (l10n) => l10n.taskFix(2),
       state: TaskState.done,
-      report: _plan.blocked,
+      report: const Report({
+        ReportKind.corrupted: [
+          ReportItem('Slow Tide/broken.rpp', 'bad header'),
+        ],
+      }),
     ),
     BackgroundTask(
       id: 4,
@@ -810,11 +812,6 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             ],
           ),
         ),
-        const _Specimen(
-          'MediaPlanPreview — click to expand',
-          width: 480,
-          child: MediaPlanPreview(title: 'Slow Tide', plan: _plan),
-        ),
       ]),
       _Section('Chrome', 'StudioTitleBar at a bounded width.', [
         _Specimen(
@@ -1019,21 +1016,6 @@ final _alerts = Title(
 );
 
 final _titles = [_nominal, _alerts];
-
-const _plan = (
-  operations: <MediaOperation>[
-    MoveFile('Slow Tide/Audio/vox.wav', 'Slow Tide/Media/vox.wav'),
-    MoveFile('Slow Tide/bass.wav', 'Slow Tide/Media/bass.wav'),
-    TrashDuplicate(
-      'Slow Tide/old/drums.wav',
-      'Slow Tide/Media/drums.wav',
-      'Slow Tide/Media/drums.wav',
-    ),
-  ],
-  blocked: Report({
-    ReportKind.corrupted: [ReportItem('Slow Tide/broken.rpp', 'bad header')],
-  }),
-);
 
 // --- Showcase layout -------------------------------------------------------
 

@@ -284,7 +284,13 @@ void main() {
     File('../../test/fixtures/render-file.rpp')
         .copySync(p.join(band, 'loose.rpp'));
     await scans.scanAll();
-    await migration.moveToTitle(entry.id, 'loose.rpp', ['Solo', 'Demo', 'X']);
+    await migration.fix(entry.id, [
+      MoveProject(
+        const FixVersion('loose.rpp', folder: 'loose', label: 'loose'),
+        'Solo/Demo/X',
+        level: 'title',
+      ),
+    ]);
     expect((await readLibrary(storage))!.knownValues, [
       ...values,
       const KnownValue('Solo', [KnownValue('Demo')]),
@@ -293,7 +299,13 @@ void main() {
     File('../../test/fixtures/render-file.rpp')
         .copySync(p.join(band, 'other.rpp'));
     await scans.scanAll();
-    await migration.moveToTitle(entry.id, 'other.rpp', ['Solo', 'Demo', 'Y']);
+    await migration.fix(entry.id, [
+      MoveProject(
+        const FixVersion('other.rpp', folder: 'other', label: 'other'),
+        'Solo/Demo/Y',
+        level: 'title',
+      ),
+    ]);
     expect((await readLibrary(storage))!.knownValues, hasLength(2));
 
     // A library without known values keeps none, and one without

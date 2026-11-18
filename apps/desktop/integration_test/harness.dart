@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import 'package:reaharvest/ui/to_sort/to_sort_page.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import 'window.dart';
 
@@ -307,25 +309,16 @@ Future<void> showToSort(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-/// Header row of the "To sort" section labelled [label].
-Finder toSortSection(String label) =>
-    find.ancestor(of: find.text(label), matching: find.byType(Row)).first;
-
-/// Opens the batch fix preview of the "To sort" section labelled [label].
-Future<void> openSectionFix(WidgetTester tester, String label) async {
-  await showToSort(tester, find.text(label));
-  await tester.tap(
-    find.descendant(of: toSortSection(label), matching: find.text('Fix…')),
-  );
-  await tester.pumpAndSettle();
-}
-
-/// Confirms the open fix preview, then waits for the end of its batch,
-/// whose report opens.
-Future<void> confirmFix(WidgetTester tester, Harness h) async {
+/// Runs [fixes] on [library] as the "To sort" page does (#149), then waits
+/// for the end of its batch, whose report opens.
+Future<void> runFixes(
+  WidgetTester tester,
+  Harness h,
+  LibraryId library,
+  List<MigrationFix> fixes,
+) async {
   final before = h.tasks.length;
-  // The tasks zone may show an earlier batch under the same label.
-  await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
+  unawaited(h.migration.fix(library, fixes));
   await waitFor(
     tester,
     () => h.tasks.length > before && !h.tasks[before].isRunning,

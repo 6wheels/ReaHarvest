@@ -16,8 +16,8 @@ import 'tasks.dart';
 
 final _log = Logger('library.migration');
 
-/// Migration of a library: fixes, guided move, orphan node deletion and
-/// undo of an interrupted fix (SPEC §5.8).
+/// Migration of a library: fixes, orphan node deletion and undo of an
+/// interrupted fix (SPEC §5.8).
 class MigrationActions {
   MigrationActions(this.ref);
 
@@ -27,34 +27,6 @@ class MigrationActions {
   /// for a fix left to undo never run together on a library (a fix being
   /// applied looks interrupted), nor with another writer.
   LibraryTurns get _turns => ref.read(libraryTurnsProvider);
-
-  /// Moves the misplaced project [path] of [library] into the title at
-  /// [folders] (one folder name per layout level), with its media ("To
-  /// sort", SPEC §5.2), as a task whose report is shown at the end. Then
-  /// rescans. Returns the report, or null if the move failed.
-  Future<Report?> moveToTitle(
-    LibraryId library,
-    String path,
-    List<String> folders,
-  ) {
-    return _fix(ref.libraryEntry(library), [
-      MoveProject(path, folders.join('/')),
-    ], (l10n) => l10n.taskMove(p.posix.basename(path)));
-  }
-
-  /// Plans of the media normalization of the [titles] of [library] (dry
-  /// run of the fix, SPEC §5.8 step 4), by title, computed in an isolate
-  /// that can be cancelled ([planNormalizationOn]).
-  PlanPreview previewNormalization(LibraryId library, List<String> titles) {
-    final entry = ref.libraryEntry(library);
-    return planNormalizationOn(
-      entry.libraryRoot,
-      titles,
-      usage: mediaUsage(
-        ref.read(localIndexProvider).scanResult(library) ?? const ScanResult(),
-      ),
-    );
-  }
 
   /// Applies the migration [fixes] to [library] (SPEC §5.8 step 4), as a
   /// task whose report is shown at the end. Then rescans.

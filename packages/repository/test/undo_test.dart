@@ -30,12 +30,27 @@ String rpp(List<String> media, {String record = 'audio-files'}) => [
 String node(String id) =>
     '${jsonEncode(NodeFile(NodeId(id), 'title').toJson())}\n';
 
+FixVersion version(String source, String folder, {MemberId? owner}) =>
+    FixVersion(source, folder: folder, label: folder, owner: owner);
+
 /// A fix of each kind (SPEC §5.8 step 4) on the library of [library].
-const fixes = <String, MigrationFix>{
-  'normalization': NormalizeMedia(song),
-  'lift': LiftProject('$song/Alice/take.rpp', song, owner: MemberId('alice')),
-  'merge': MoveFolder('Band/Song', song),
-  'guided move': MoveProject('Band/loose.rpp', song),
+final fixes = <String, MigrationFix>{
+  'organization': OrganizeTitle(song, song, [
+    version('$song/a.rpp', 'a'),
+    version('$song/b.rpp', 'b'),
+    version('$song/Alice/take.rpp', 'take', owner: const MemberId('alice')),
+  ], level: 'title'),
+  'title move': OrganizeTitle('Band/Song', 'Band/Moved/Song', [
+    version('Band/Song/a.rpp', 'a'),
+  ], level: 'title'),
+  'attachment': AttachVersions('Band/Song', song, [
+    version('Band/Song/a.rpp', 'a'),
+  ], level: 'title'),
+  'project move': MoveProject(
+    version('Band/loose.rpp', 'loose'),
+    'Band/New',
+    level: 'title',
+  ),
 };
 
 void main() {
@@ -44,8 +59,8 @@ void main() {
   Future<String> hash(String path) async =>
       base64.encode(await storage.read(path).expand((c) => c).toList());
 
-  /// A title with media to normalize and a member subfolder, a copy of it
-  /// at the root to merge, and a loose project to move into it.
+  /// A title to organize, with a member subfolder, a copy of it at the
+  /// root to attach to it, and a loose project to move.
   void library() => storage
     ..put('$song/.node.json', node('01JC0000000000000000000001'))
     ..put('$song/a.rpp', rpp([r'audio\x.wav', r'.\sub.rpp']))
@@ -97,12 +112,25 @@ void main() {
   });
 
   test('each fix of the tests completes without failure', () async {
-    final result = await batch([...fixes.values], Reporter());
+    final done = <String>{};
+    for (final fix in fixes.values) {
+      storage = MemoryStorage();
+      library();
+      final result = await batch([fix], Reporter());
+      expect(result.report.hasErrors, isFalse, reason: '${result.report}');
+      done.addAll(storage.files.keys);
+    }
 
-    expect(result.report.hasErrors, isFalse, reason: '${result.report}');
-    expect(storage.files.keys, contains('$song/take.rpp'));
-    expect(storage.files.keys, contains('$song/loose.rpp'));
-    expect(storage.files.keys, contains('$song/Media/t.wav'));
+    expect(
+      done,
+      containsAll([
+        '$song/take/take.rpp',
+        '$song/take/Media/t.wav',
+        'Band/Moved/Song/a/a.rpp',
+        '$song/a/a.rpp',
+        'Band/New/loose/loose.rpp',
+      ]),
+    );
   });
 
   for (final partial in [null, 0.5, 1.0]) {
@@ -154,7 +182,7 @@ void main() {
           storage.failAfter = true;
 
           try {
-            await applyFixes(m, [fix], hash: hash);
+            await applyFixes(m, [fix]);
           } on InjectedFailure {
             // The application stopped: nothing more is written.
           }
@@ -204,7 +232,7 @@ void main() {
       // Changes of the fix, its start and end lines included.
       final m = await migration();
       final from = storage.changes;
-      await applyFixes(m, [fix], hash: hash);
+      await applyFixes(m, [fix]);
       final fixChanges = storage.changes - from;
 
       for (var j = 1; ; j++) {
@@ -217,7 +245,7 @@ void main() {
           ..failAt = storage.changes + fixChanges
           ..failAfter = true;
         await expectLater(
-          applyFixes(m, [fix], hash: hash),
+          applyFixes(m, [fix]),
           throwsA(isA<InjectedFailure>()),
         );
         expect(storage.failed, startsWith('append'));
@@ -257,25 +285,27 @@ void main() {
     });
   }
 
-  test('a lift whose write fails after its move is undone (#91)', () async {
-    const lift = LiftProject('$song/Alice/take.rpp', song);
+  test('a project whose rewrite fails after its move is undone', () async {
+    final fix = OrganizeTitle(song, song, [
+      version('$song/Alice/take.rpp', 'take'),
+    ], level: 'title');
     for (var k = 1; ; k++) {
       storage = MemoryStorage();
       library();
       final before = tree();
       final result = await batch(
-        [lift],
+        [fix],
         Reporter(
           onStep: (step) {
             if (step == 'fix 1/1') storage.failAt = storage.changes + k;
           },
         ),
       );
-      if (storage.failed != 'write $song/take.rpp') continue;
+      if (storage.failed != 'write $song/take/take.rpp') continue;
 
-      expect(storage.log, contains('move $song/Alice/take.rpp $song/take.rpp'));
+      expect(storage.log, contains('move $song/Alice $song/take'));
       expect(result.report.items[ReportKind.fixUndone], [
-        const ReportItem('$song/Alice/take.rpp'),
+        const ReportItem(song),
       ]);
       expect(tree(), before);
       break;
@@ -329,9 +359,13 @@ void main() {
   });
 
   test('two fixes rewriting one project: the second undone alone', () async {
-    const fixes = [
-      LiftProject('$song/Alice/take.rpp', song),
-      NormalizeMedia(song),
+    final fixes = [
+      OrganizeTitle(song, song, [
+        version('$song/Alice/take.rpp', 'take'),
+      ], level: 'title'),
+      AttachVersions('Band/Song', song, [
+        version('Band/Song/a.rpp', 'take'),
+      ], level: 'title'),
     ];
     for (var k = 1; ; k++) {
       storage = MemoryStorage();
@@ -354,11 +388,11 @@ void main() {
         expect(result.report.hasErrors, isFalse, reason: reason);
         break;
       }
-      // The first fix's rewrite of the lifted project is kept.
-      expect(afterFirst!['$song/take.rpp']!.$1, contains(r'Alice\Media'));
+      // The first fix is kept, its node file rewritten by both.
+      expect(afterFirst!['$song/take/take.rpp']!.$1, contains('VERSIONID'));
       expect(tree(), afterFirst, reason: reason);
-      expect(result.report.items[ReportKind.projectMoved], [
-        const ReportItem('$song/take.rpp'),
+      expect(result.report.items[ReportKind.folderMoved], [
+        const ReportItem('$song/take', '$song/Alice'),
       ]);
     }
   });
@@ -628,23 +662,30 @@ void main() {
   });
 
   group('in a batch', () {
+    final gone = OrganizeTitle('Band/Gone', 'Band/New', [
+      version('Band/Gone/g.rpp', 'g'),
+    ], level: 'title');
+    final moveSong = OrganizeTitle('Band/Song', 'Band/Other', [
+      version('Band/Song/a.rpp', 'a'),
+    ], level: 'title');
+    final lift = OrganizeTitle(song, song, [
+      version('$song/Alice/take.rpp', 'take'),
+    ], level: 'title');
+
     test('a failing fix among others: the others applied', () async {
       final before = tree();
-      final result = await batch(const [
-        MoveFolder('Band/Gone', 'Band/New'),
-        LiftProject('$song/Alice/take.rpp', song),
-      ], Reporter());
+      final result = await batch([gone, lift], Reporter());
 
       final report = result.report;
       expect(report.items[ReportKind.fixFailed]!.single.path, 'Band/Gone');
       expect(report.items[ReportKind.fixUndone], [
         const ReportItem('Band/Gone'),
       ]);
-      expect(report.items[ReportKind.projectMoved], [
-        const ReportItem('$song/take.rpp'),
+      expect(report.items[ReportKind.folderMoved], [
+        const ReportItem('$song/take', '$song/Alice'),
       ]);
       expect(report.items[ReportKind.fileLost], isNull);
-      expect(tree().keys, contains('$song/take.rpp'));
+      expect(tree().keys, contains('$song/take/take.rpp'));
       expect(tree().keys, isNot(contains('$song/Alice/take.rpp')));
       expect(before.keys, contains('$song/Alice/take.rpp'));
       // Its journal: fix 1 undone, fix 2 completed.
@@ -658,7 +699,7 @@ void main() {
         // A batch stamped after this one (clock set back since).
         final earlier = await runMigrationBatch(
           storage,
-          const [MoveFolder('Band/Song', 'Band/Other')],
+          [moveSong],
           usage: const {},
           hash: hash,
           reporter: Reporter(),
@@ -666,16 +707,14 @@ void main() {
         );
         expect(earlier.report.hasErrors, isFalse);
 
-        final result = await batch(const [
-          MoveFolder('Band/Gone', 'Band/New'),
-        ], Reporter());
+        final result = await batch([gone], Reporter());
 
         final report = result.report;
         expect(report.items[ReportKind.fixUndone], [
           const ReportItem('Band/Gone'),
         ]);
         expect(report.items[ReportKind.fileLost], isNull);
-        expect(tree().keys, contains('Band/Other/a.rpp'));
+        expect(tree().keys, contains('Band/Other/a/a.rpp'));
         expect(tree().keys, isNot(contains('Band/Song/a.rpp')));
       },
     );
@@ -693,10 +732,7 @@ void main() {
         },
       );
 
-      final result = await batch(const [
-        NormalizeMedia(song),
-        MoveFolder('Band/Song', 'Band/Other'),
-      ], reporter);
+      final result = await batch([fixes['organization']!, moveSong], reporter);
 
       final report = result.report;
       expect(report.items[ReportKind.fixFailed]!.single.path, song);
@@ -714,7 +750,7 @@ void main() {
         ..failAfter = false;
       expect((await unfinishedFixIn(storage))?.path, song);
       await expectLater(
-        batch(const [MoveFolder('Band/Song', 'Band/Other')], Reporter()),
+        batch([moveSong], Reporter()),
         throwsA(isA<FixToUndo>().having((e) => e.path, 'path', song)),
       );
 
@@ -722,17 +758,19 @@ void main() {
       expect(undone.items[ReportKind.fixUndone], [const ReportItem(song)]);
       expect(undone.items[ReportKind.fileLost], isNull);
       expect(tree(), before);
-      final next = await batch(const [
-        MoveFolder('Band/Song', 'Band/Other'),
-      ], Reporter());
+      final next = await batch([moveSong], Reporter());
       expect(next.report.items[ReportKind.folderMoved], [
-        const ReportItem('Band/Other'),
+        const ReportItem('Band/Other', 'Band/Song'),
       ]);
     });
 
     test('a cancelled batch started again runs only what remains', () async {
-      const first = MoveFolder('Band/Song', 'Band/Other');
-      const second = MoveProject('Band/loose.rpp', song);
+      final first = moveSong;
+      final second = MoveProject(
+        version('Band/loose.rpp', 'loose'),
+        song,
+        level: 'title',
+      );
       final cancelled = await batch([
         first,
         second,
@@ -745,7 +783,10 @@ void main() {
 
       expect(reporter.steps, ['inventory', 'fix 1/1', 'check']);
       expect(result.report.hasErrors, isFalse);
-      expect(tree().keys, containsAll(['Band/Other/a.rpp', '$song/loose.rpp']));
+      expect(
+        tree().keys,
+        containsAll(['Band/Other/a/a.rpp', '$song/loose/loose.rpp']),
+      );
     });
 
     test('nothing to undo: an empty report', () async {

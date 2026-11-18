@@ -147,41 +147,23 @@ void main() {
         ..writeAsStringSync('wav');
     });
 
-    test('the normalization rewrites the reference in Windows-1252', () async {
+    test('the organization rewrites the reference in Windows-1252', () async {
       final m = await migration();
 
-      final report = await applyFixes(m, const [NormalizeMedia(_title)]);
+      final report = await applyFixes(m, [
+        OrganizeTitle(_title, _title, [
+          const FixVersion('$_title/a.rpp', folder: 'a', label: 'a'),
+        ], level: 'title'),
+      ]);
 
       expect(report.hasErrors, isFalse);
-      expect(file('$_title/Media/Café.wav').existsSync(), isTrue);
-      final after = file('$_title/a.rpp').readAsBytesSync();
+      expect(file('$_title/a/Media/Café.wav').existsSync(), isTrue);
+      final after = file('$_title/a/a.rpp').readAsBytesSync();
       expect(_isUtf8(after), isFalse);
       final text = latin1.decode(after);
       expect(text, contains(r'FILE "Media\Café.wav"'));
       expect(text, contains('NAME "Café tête"'));
     });
-
-    test(
-      'a name Windows-1252 cannot hold leaves the project as it is',
-      () async {
-        final original = File(_fixture).readAsBytesSync();
-        putBytes('$_title/日/a.rpp', original);
-        await scaffoldTitle(storage, _title, 'title');
-
-        await expectLater(
-          liftProject(
-            storage,
-            '$_title/日/a.rpp',
-            _title,
-            owner: const MemberId('alice'),
-          ),
-          throwsA(isA<ProjectEncodingException>()),
-        );
-
-        // The title already holds an a.rpp: the lifted one takes a free name.
-        expect(file('$_title/a (2).rpp').readAsBytesSync(), original);
-      },
-    );
 
     test('backup and restore keep the encoding', () async {
       final when = DateTime(2026, 11, 7, 15, 30, 12);

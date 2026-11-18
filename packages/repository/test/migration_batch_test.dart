@@ -56,6 +56,18 @@ Future<String> Function(String) sizeHasher(RepositoryStorage storage) =>
 Future<String> Function(String) failingHasher(RepositoryStorage storage) =>
     (path) async => throw StateError('No hash for $path');
 
+/// A minimal project.
+const project = '<REAPER_PROJECT 0.1 "7.0" 0\n  RECORD_PATH "Media" ""\n>\n';
+
+/// Moves the title folder [name] (holding `<lowercase name>.rpp`) to
+/// `New/<name>`.
+OrganizeTitle move(String name) {
+  final file = name.toLowerCase();
+  return OrganizeTitle(name, 'New/$name', [
+    FixVersion('$name/$file.rpp', folder: file, label: file),
+  ], level: 'title');
+}
+
 void main() {
   late MemoryStorage storage;
   late List<String> hashed;
@@ -81,44 +93,37 @@ void main() {
       if (p.posix.dirname(d) == migrationFolderName) d,
   ];
 
-  const moves = [MoveFolder('One', 'New/One'), MoveFolder('Two', 'New/Two')];
+  final moves = [move('One'), move('Two')];
 
   setUp(() {
     storage = MemoryStorage()
-      ..put('One/one.rpp', 'one')
-      ..put('Two/two.rpp', 'two')
-      ..put('Live/Three/three.rpp', 'three');
+      ..put('One/one.rpp', project)
+      ..put('Two/two.rpp', project)
+      ..put('Live/Three/three.rpp', project);
     hashed = [];
   });
 
   test('runs the fixes between an inventory and its check', () async {
     final reporter = Reporter();
 
-    final result = await run([
-      ...moves,
-      const MoveFolder('Live', 'Live'),
-    ], reporter);
+    final result = await run(moves, reporter);
 
     expect(result.cancelled, isFalse);
     expect(result.report.hasErrors, isFalse);
     expect(result.report.items[ReportKind.folderMoved], [
-      const ReportItem('New/One'),
-      const ReportItem('New/Two'),
+      const ReportItem('New/One', 'One'),
+      const ReportItem('New/Two', 'Two'),
     ]);
-    expect(result.report.items[ReportKind.valueDeclared], [
-      const ReportItem('Live'),
-    ]);
-    expect(result.knownPaths, ['Live', 'New/One', 'New/Two']);
+    expect(result.knownPaths, ['New/One', 'New/Two']);
     expect(
       storage.files.keys,
-      containsAll(['New/One/one.rpp', 'New/Two/two.rpp']),
+      containsAll(['New/One/one/one.rpp', 'New/Two/two/two.rpp']),
     );
     expect(reporter.steps, ['inventory', 'fix 1/2', 'fix 2/2', 'check']);
     expect(reporter.progresses.last, 1);
     expect(reporter.logs, [
-      'I folder Live kept in place',
-      startsWith('I Move folder One to New/One\n'),
-      startsWith('I Move folder Two to New/Two\n'),
+      startsWith('I organizeTitle One -> New/One\n'),
+      startsWith('I organizeTitle Two -> New/Two\n'),
       'I inventory checked, no file lost',
     ]);
     // One inventory for the batch: every file hashed once.
@@ -129,13 +134,13 @@ void main() {
     );
   });
 
-  test('only declares the folders kept in place, without inventory', () async {
+  test('no fix: no inventory', () async {
     final reporter = Reporter();
 
-    final result = await run([const MoveFolder('Live', 'Live')], reporter);
+    final result = await run(const [], reporter);
 
-    expect(result.report.items.keys, [ReportKind.valueDeclared]);
-    expect(result.knownPaths, ['Live']);
+    expect(result.report.isEmpty, isTrue);
+    expect(result.knownPaths, isEmpty);
     expect(reporter.steps, isEmpty);
     expect(storage.log, isEmpty);
   });
@@ -143,18 +148,15 @@ void main() {
   test('a failed fix is reported and undone, the others go on', () async {
     final reporter = Reporter();
 
-    final result = await run([
-      const MoveFolder('Gone', 'New/Gone'),
-      moves.first,
-    ], reporter);
+    final result = await run([move('Gone'), moves.first], reporter);
 
     expect(result.cancelled, isFalse);
     expect(result.report.items[ReportKind.fixFailed]!.single.path, 'Gone');
     expect(result.report.items[ReportKind.folderMoved], [
-      const ReportItem('New/One'),
+      const ReportItem('New/One', 'One'),
     ]);
-    expect(reporter.logs[0], startsWith('W Move folder Gone to New/Gone\n'));
-    expect(reporter.logs[1], startsWith('I Move folder One to New/One\n'));
+    expect(reporter.logs[0], startsWith('W organizeTitle Gone -> New/Gone\n'));
+    expect(reporter.logs[1], startsWith('I organizeTitle One -> New/One\n'));
     expect(result.report.items[ReportKind.fixUndone], [
       const ReportItem('Gone'),
     ]);
@@ -181,14 +183,11 @@ void main() {
     test('during the inventory: nothing moved, resumed next time', () async {
       final reporter = Reporter(cancelAt: 'inventory');
 
-      final result = await run([
-        ...moves,
-        const MoveFolder('Live', 'Live'),
-      ], reporter);
+      final result = await run(moves, reporter);
 
       expect(result.cancelled, isTrue);
-      expect(result.report.items.keys, [ReportKind.valueDeclared]);
-      expect(result.knownPaths, ['Live']);
+      expect(result.report.isEmpty, isTrue);
+      expect(result.knownPaths, isEmpty);
       expect(reporter.steps, ['inventory']);
       expect(reporter.logs.last, 'W cancelled after 0 of 2 fixes');
       expect(storage.files.keys, contains('One/one.rpp'));
@@ -213,7 +212,7 @@ void main() {
 
       expect(result.cancelled, isTrue);
       expect(result.report.items[ReportKind.folderMoved], [
-        const ReportItem('New/One'),
+        const ReportItem('New/One', 'One'),
       ]);
       expect(result.knownPaths, ['New/One']);
       expect(storage.files.keys, contains('Two/two.rpp'));
@@ -240,9 +239,9 @@ void main() {
     setUp(() {
       dir = Directory.systemTemp.createTempSync('reaharvest_batch_');
       for (final name in ['One', 'Two']) {
-        File(p.join(dir.path, name, '$name.rpp'))
+        File(p.join(dir.path, name, '${name.toLowerCase()}.rpp'))
           ..createSync(recursive: true)
-          ..writeAsStringSync(name);
+          ..writeAsStringSync(project);
       }
     });
 
@@ -263,7 +262,7 @@ void main() {
       expect(result.report.hasErrors, isFalse);
       expect(result.knownPaths, ['New/One', 'New/Two']);
       expect(
-        File(p.join(dir.path, 'New', 'Two', 'Two.rpp')).existsSync(),
+        File(p.join(dir.path, 'New', 'Two', 'two', 'two.rpp')).existsSync(),
         isTrue,
       );
       expect(reporter.steps, ['inventory', 'fix 1/2', 'fix 2/2', 'check']);

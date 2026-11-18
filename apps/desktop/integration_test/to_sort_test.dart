@@ -3,15 +3,13 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
-import 'package:reaharvest/ui/to_sort/to_sort_item.dart';
-import 'package:reaharvest/ui/widgets.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'harness.dart';
 
 /// "To sort" of a misorganized folder: typed issues with a counter per
-/// kind, their expected level and proposed place (#67); items selected
-/// across a section, kept through a rescan, fixed in bulk (#82). SPEC
+/// kind, their expected level and proposed place (#67); their fixes are
+/// offered per title candidate by #149. SPEC
 /// §5.2, §5.8 steps 3 and 4: `flutter test integration_test/to_sort_test.dart
 /// -d windows`.
 void main() {
@@ -23,29 +21,7 @@ void main() {
 
   tearDown(() => h.dispose());
 
-  /// Selection light of the item [title].
-  Finder box(String title) => find.descendant(
-    of: find.ancestor(of: find.text(title), matching: find.byType(Item)),
-    matching: find.byType(ChoiceLight),
-  );
-
-  bool? checked(WidgetTester tester, Finder light) =>
-      tester.widget<ChoiceLight>(light).checked;
-
-  /// Rescans every library from the page, and waits for the end.
-  Future<void> fullScan(WidgetTester tester) async {
-    final before = h.tasks.length;
-    await tester.tap(find.text('Full scan'));
-    await waitFor(
-      tester,
-      () => h.tasks.length > before && !h.tasks.last.isRunning,
-      reason: 'rescanned',
-    );
-  }
-
-  testWidgets('lists typed issues and fixes a selection in bulk', (
-    tester,
-  ) async {
+  testWidgets('lists typed issues', (tester) async {
     for (final path in [
       'Band/Artist/Album/Song/v1/v1.rpp',
       // Member and status subfolders in a version folder.
@@ -118,63 +94,7 @@ void main() {
       }
     }
 
-    // Two items of a section selected, with their counter; "select all"
-    // is then partly checked.
-    await showToSort(tester, find.text(tooHigh));
-    final all = find.descendant(
-      of: find.descendant(
-        of: toSortSection(tooHigh),
-        matching: find.byType(LightCheckbox),
-      ),
-      matching: find.byType(ChoiceLight),
-    );
-    await tester.tap(box('Lonely'));
-    await tester.pumpAndSettle();
-    await showToSort(tester, box('Single'));
-    await tester.tap(box('Single'));
-    await tester.pumpAndSettle();
-    await showToSort(tester, find.text(tooHigh));
-    expect(find.text('2 selected'), findsOne);
-    expect(checked(tester, all), isNull);
-    // Select all, then none.
-    await tester.tap(all);
-    await tester.pumpAndSettle();
-    expect(find.text('3 selected'), findsOne);
-    expect(checked(tester, all), isTrue);
-    await tester.tap(all);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('selected'), findsNothing);
-    await tester.tap(box('Lonely'));
-    await showToSort(tester, box('Single'));
-    await tester.tap(box('Single'));
-    await tester.pumpAndSettle();
-
-    // The selection is kept through a rescan.
-    await fullScan(tester);
-    await showToSort(tester, find.text(tooHigh));
-    expect(find.text('2 selected'), findsOne);
-    expect(checked(tester, box('Lonely')), isTrue);
-    expect(checked(tester, box('Bside')), isFalse);
-
-    // "Fix…" previews the selected items only, then fixes them.
-    await openSectionFix(tester, tooHigh);
-    expect(find.text('Artist/Lonely'), findsOne);
-    expect(find.text('Artist/Single'), findsOne);
-    expect(find.text('Artist/Bside'), findsNothing);
-    expect(find.text('→ Artist/_Unassigned/Lonely'), findsOne);
-    await confirmFix(tester, h);
-    expect(find.text('Folders moved · 2'), findsOne);
-    expect(find.textContaining('Files missing or changed'), findsNothing);
-    await tapText(tester, 'Close');
-    await waitForText(tester, 'TITLES PLACED TOO HIGH · 1');
-    // The fixed items left the selection.
-    expect(find.textContaining('selected'), findsNothing);
-    for (final name in ['Lonely', 'Single']) {
-      expect(
-        File(h.path('Band/Artist/_Unassigned/$name/v1/v1.rpp')).existsSync(),
-        isTrue,
-      );
-    }
-    expect(File(h.path('Band/Artist/Bside/v1/v1.rpp')).existsSync(), isTrue);
+    // Fixed from the page of #149: no fix offered meanwhile.
+    expect(find.text('Fix…'), findsNothing);
   });
 }

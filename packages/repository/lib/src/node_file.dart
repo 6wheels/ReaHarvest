@@ -56,42 +56,15 @@ final class NodeFile {
   NodeFile withVersionOwner(String id, String? owner) =>
       _copy(versionOwners: _with(versionOwners, id, owner));
 
-  /// Copy with the label and owner of the version [metadata]; only where the
-  /// version has none if [onlyMissing]. A null owner is not written.
-  NodeFile withVersion(VersionMetadata metadata, {bool onlyMissing = false}) {
-    final id = metadata.id;
-    var updated = this;
-    if (!onlyMissing || !versionLabels.containsKey(id)) {
-      updated = updated.withVersionLabel(id, metadata.label);
-    }
-    if (metadata.owner case final owner?
-        when !onlyMissing || !versionOwners.containsKey(id)) {
-      updated = updated.withVersionOwner(id, owner);
-    }
-    return updated;
+  /// Copy with the label and owner of the version [metadata]. A null owner
+  /// is not written.
+  NodeFile withVersion(VersionMetadata metadata) {
+    final updated = withVersionLabel(metadata.id, metadata.label);
+    return switch (metadata.owner) {
+      final owner? => updated.withVersionOwner(metadata.id, owner),
+      null => updated,
+    };
   }
-
-  /// This node with the entries of [other] it lacks: the version statuses,
-  /// labels and owners of the ids it does not know, and the tags it does not
-  /// have (folder merge, SPEC §5.8). Its own values win.
-  NodeFile mergedWith(NodeFile other) => NodeFile(
-    id,
-    level,
-    versionStatuses: _withMissing(versionStatuses, other.versionStatuses),
-    versionLabels: _withMissing(versionLabels, other.versionLabels),
-    versionOwners: _withMissing(versionOwners, other.versionOwners),
-    tags: {...tags, ...other.tags}.toList(),
-  );
-
-  /// [map] followed by the entries of [other] whose key it lacks.
-  static Map<String, String> _withMissing(
-    Map<String, String> map,
-    Map<String, String> other,
-  ) => {
-    ...map,
-    for (final e in other.entries)
-      if (!map.containsKey(e.key)) e.key: e.value,
-  };
 
   NodeFile _copy({
     Map<String, String>? versionStatuses,

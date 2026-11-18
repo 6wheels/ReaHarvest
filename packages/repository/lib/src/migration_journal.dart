@@ -100,8 +100,8 @@ final class MigrationJournal {
     }
   }
 
-  /// Records the start of a fix of [kind] (`moveFolder`, `moveProject`,
-  /// `liftProject`, `normalizeMedia`) on [path]; returns its number.
+  /// Records the start of a fix of [kind] (`organizeTitle`,
+  /// `attachVersions`, `moveProject`) on [path]; returns its number.
   Future<int> startFix(String kind, String path) async {
     final fix = (_fixes.lastOrNull ?? 0) + 1;
     await _append({'op': 'fixStart', 'fix': fix, 'kind': kind, 'path': path});
