@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import '../glass_dialog.dart';
 import '../path_row.dart';
 import 'settings_section.dart';
 
@@ -46,9 +47,9 @@ class AboutPage extends StatelessWidget {
 
 /// Licenses in a popup smaller than the settings one; Escape closes it. The
 /// package pages stay inside it (own navigator).
-Future<void> _showLicenses(BuildContext context) => showDialog<void>(
-  context: context,
-  builder: (context) => Dialog(
+Future<void> _showLicenses(BuildContext context) => showGlassDialog<void>(
+  context,
+  (context) => Dialog(
     clipBehavior: Clip.antiAlias,
     child: CallbackShortcuts(
       bindings: {
