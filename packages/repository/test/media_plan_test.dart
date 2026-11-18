@@ -248,6 +248,109 @@ void main() {
       expect(files(plan), ['move Loose/v1/v1.rpp -> Loose/v1/New/Take/v1.rpp']);
     });
 
+    test('a title used from outside is not moved', () {
+      final plan = planFix(
+        OrganizeTitle(song, 'Band/Other/Song', [
+          version('$song/a.rpp', 'a'),
+        ], level: 'title'),
+        facts(
+          files: {'$song/x.wav'},
+          projects: {
+            '$song/a.rpp': project(['x.wav']),
+          },
+        ),
+        usage: {
+          '$song/x.wav': ['$song/a.rpp', 'Band/Album/B/b.rpp'],
+        },
+      );
+
+      expect(plan.operations, isEmpty);
+      expect(
+        plan.blocked.items[ReportKind.fixFailed]!.single.detail,
+        contains('uses $song/x.wav'),
+      );
+    });
+
+    test('a reserved or invalid version folder name is not used', () {
+      final plan = planFix(
+        organize([
+          version('$song/a.rpp', 'Media'),
+          version('$song/b.rpp', 'b/c'),
+        ]),
+        facts(
+          projects: {
+            '$song/a.rpp': project(const []),
+            '$song/b.rpp': project(const []),
+          },
+        ),
+      );
+
+      expect(files(plan), ['move $song/a.rpp -> $song/Media (2)/a.rpp']);
+      expect(
+        plan.blocked.items[ReportKind.fixFailed]!.single,
+        const ReportItem('$song/b.rpp', 'Invalid folder name: b/c'),
+      );
+    });
+
+    test('a version folder with a subproject moves whole', () {
+      final plan = planFix(
+        organize([version('$song/v1/v1.rpp', 'Verse')]),
+        facts(
+          files: {'$song/v1/Renders/mix.wav'},
+          projects: {
+            '$song/v1/v1.rpp': project([r'Media\sub.rpp']),
+            '$song/v1/Media/sub.rpp': project(const []),
+          },
+        ),
+      );
+
+      expect(files(plan), ['move $song/v1 -> $song/Verse']);
+    });
+
+    test('a project used as a subproject outside stays, unless forced', () {
+      MediaPlan planned({bool force = false}) => planFix(
+        OrganizeTitle(
+          song,
+          song,
+          [version('$song/a.rpp', 'a')],
+          level: 'title',
+          force: force,
+        ),
+        facts(
+          files: {'$song/a.rpp-PROX'},
+          projects: {'$song/a.rpp': project(const [])},
+        ),
+        usage: {
+          '$song/a.rpp': ['Band/Other/T/m.rpp'],
+        },
+      );
+
+      final plan = planned();
+      expect(plan.operations, isEmpty);
+      expect(
+        plan.blocked.items[ReportKind.fixFailed]!.single.detail,
+        contains('Used as a subproject by Band/Other/T/m.rpp'),
+      );
+      // Forced: it moves, its proxy file along.
+      expect(files(planned(force: true)), [
+        'move $song/a.rpp -> $song/a/a.rpp',
+        'move $song/a.rpp-PROX -> $song/a/a.rpp-PROX',
+      ]);
+    });
+
+    test('counts only what is left as it is', () {
+      final counts = countPlan((
+        operations: const [],
+        blocked: Report({
+          ReportKind.fileRenamed: [const ReportItem('$song/a (2)', 'a')],
+          ReportKind.statusFolderUnmatched: [const ReportItem('$song/b')],
+          ReportKind.fixFailed: [const ReportItem('$song/c.rpp')],
+        }),
+      ));
+
+      expect(counts.blocked, 1);
+    });
+
     test('a project in a reserved folder never moves it', () {
       final plan = planFix(
         organize([version('$song/Media/a.rpp', 'a')]),
@@ -376,7 +479,7 @@ void main() {
         '$song/sub.rpp-PROX',
       ]);
       expect(gathered.targetNames, {'.node.json'});
-      expect(storage.listed, ['$song/**', 'Band/Album/Other']);
+      expect(storage.listed, ['$song/**', 'Band/Album/Other/**']);
     });
 
     test('stops at an unreadable or missing project', () async {

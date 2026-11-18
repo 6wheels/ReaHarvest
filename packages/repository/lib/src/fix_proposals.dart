@@ -128,7 +128,11 @@ FixVersion _version(
             };
   return FixVersion(
     source,
-    folder: isValidFolderName(label) ? label : stem,
+    folder: isValidFolderName(label)
+        ? label
+        : isValidFolderName(stem)
+        ? stem
+        : 'Version',
     label: label,
     owner: owner,
     status: statusFolder == null

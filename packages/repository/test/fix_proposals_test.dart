@@ -155,6 +155,14 @@ organizeTitle Artist/Album/Song -> Artist/Album/Song
       expect(fix.versions.single.folder, 'v');
     });
 
+    test('no valid name: a default folder name', () async {
+      storage.put('Artist/Album/Song/take..rpp', _project);
+
+      final fix = await propose('Artist/Album/Song');
+
+      expect(fix.versions.single.folder, 'Version');
+    });
+
     test('a title placed too high goes to its target', () async {
       storage.put('Artist/Lonely/v1/v1.rpp', _project);
 

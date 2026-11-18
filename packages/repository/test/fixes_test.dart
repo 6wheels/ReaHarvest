@@ -592,6 +592,46 @@ void main() {
     expect(node(song)['versionLabels'], {'$id': 'a', '$copy': 'b'});
   });
 
+  test('a copy attached to its title gets its own version id', () async {
+    const id = VersionId('01JKNOWNVERSION0000000004');
+    final text = rpp([]).replaceFirst(
+      RegExp(r'>\n$'),
+      '  <EXTSTATE\n    <REAHARVEST\n      VERSIONID $id\n    >\n  >\n>\n',
+    );
+    title(song);
+    put('$song/v1/v1.rpp', text);
+    put('Band/Album/Copy/v.rpp', text);
+    final m = await migration();
+
+    await applyFixes(m, [
+      AttachVersions('Band/Album/Copy', song, [
+        version('Band/Album/Copy/v.rpp'),
+      ], level: 'title'),
+    ]);
+
+    expect(idOf('$song/v1/v1.rpp'), id);
+    final copy = idOf('$song/v/v.rpp');
+    expect(copy, isNot(anyOf(isNull, id)));
+    expect(node(song)['versionLabels'], {'$copy': 'v'});
+  });
+
+  test('a subproject in the media folder follows a media moved', () async {
+    title(song);
+    put('$song/X/x.rpp', rpp([r'Media\sub.rpp', 'loop.wav']));
+    put('$song/X/Media/sub.rpp', rpp([r'..\loop.wav']));
+    put('$song/X/loop.wav', 'loop');
+    final m = await migration();
+
+    await applyFixes(m, [
+      organize(song, [version('$song/X/x.rpp', folder: 'X')]),
+    ]);
+
+    expect(media('$song/X/x.rpp'), r'Media\sub.rpp|Media\loop.wav');
+    expect(media('$song/X/Media/sub.rpp'), 'loop.wav');
+    expect(file('$song/X/Media/loop.wav').readAsStringSync(), 'loop');
+    expect(await noLoss(m), isTrue);
+  });
+
   test('a subproject that is a version too is copied', () async {
     title(song);
     put('$song/a.rpp', rpp(['sub.rpp']));

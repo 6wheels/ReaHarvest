@@ -68,11 +68,39 @@ Future<FixFacts> gatherFix(RepositoryStorage storage, MigrationFix fix) async {
   final unreadable = <String, String>{};
   final files = <String, StorageEntry>{};
   final target = await storage.stat(fix.target);
+  // Another title: its projects are read for their ids.
+  final other = fix.target.toLowerCase() != root.toLowerCase();
+  final targetEntries = target != null && target.isDirectory
+      ? await storage.list(fix.target, recursive: other)
+      : const <StorageEntry>[];
   final targetNames = {
-    if (target != null && target.isDirectory)
-      for (final e in await storage.list(fix.target))
+    for (final e in targetEntries)
+      if (parentOf(e.path) == fix.target)
         p.posix.basename(e.path).toLowerCase(),
   };
+  final targetIds = <VersionId>{};
+  final sources = {for (final v in fix.versions) v.source.toLowerCase()};
+  if (other) {
+    for (final e in targetEntries) {
+      final rest = relativeTo(fix.target, e.path).split('/')..removeLast();
+      if (e.isDirectory ||
+          !isProjectFile(e.path) ||
+          sources.contains(e.path.toLowerCase()) ||
+          rest.any((s) => isExcludedFolder(s) || isReservedFolder(s))) {
+        continue;
+      }
+      try {
+        final (:text, encoding: _) = await readProject(storage, e.path);
+        final project = RppProject.parse(text);
+        final id = VersionMetadata.fromExtState(
+          project.extState(VersionMetadata.section),
+        )?.id;
+        if (id != null) targetIds.add(id);
+      } on FormatException {
+        // Unreadable: no id to keep.
+      }
+    }
+  }
   FixFacts facts() => FixFacts(
     entries: entries,
     projects: projects,
@@ -80,6 +108,7 @@ Future<FixFacts> gatherFix(RepositoryStorage storage, MigrationFix fix) async {
     files: files,
     target: target,
     targetNames: targetNames,
+    targetIds: targetIds,
   );
 
   Future<bool> gather(String path) async {

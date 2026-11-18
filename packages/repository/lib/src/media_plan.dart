@@ -50,6 +50,7 @@ final class FixFacts {
     this.files = const {},
     this.target,
     this.targetNames = const {},
+    this.targetIds = const {},
   });
 
   /// Every entry of the folder of the fix (its candidate root, or the
@@ -73,6 +74,10 @@ final class FixFacts {
 
   /// Lowercase names of the entries of the target title folder.
   final Set<String> targetNames;
+
+  /// Version ids of the projects of the target title, when it is another
+  /// folder than the one of the fix.
+  final Set<VersionId> targetIds;
 }
 
 /// What a moved or copied file is, for the report.
@@ -187,8 +192,17 @@ typedef MediaPlan = ({List<MediaOperation> operations, Report blocked});
 /// Counts of a [MediaPlan], for its preview.
 typedef MediaPlanCounts = ({int moved, int copied, int rewritten, int blocked});
 
+/// Kinds of a [MediaPlan] report that leave a path as it is.
+const blockingKinds = {
+  ReportKind.missingMedia,
+  ReportKind.externalMedia,
+  ReportKind.referencedByPlugin,
+  ReportKind.targetExists,
+  ReportKind.fixFailed,
+};
+
 /// Counts of [plan]: media moved, media copied, projects rewritten and
-/// paths left intact or reported.
+/// paths left intact or reported as such ([blockingKinds]).
 MediaPlanCounts countPlan(MediaPlan plan) {
   var (moved, copied, rewritten) = (0, 0, 0);
   for (final op in plan.operations) {
@@ -208,8 +222,9 @@ MediaPlanCounts countPlan(MediaPlan plan) {
     copied: copied,
     rewritten: rewritten,
     blocked: {
-      for (final list in plan.blocked.items.values)
-        for (final item in list) item.path,
+      for (final MapEntry(:key, value: list) in plan.blocked.items.entries)
+        if (blockingKinds.contains(key))
+          for (final item in list) item.path,
     }.length,
   );
 }
@@ -217,18 +232,25 @@ MediaPlanCounts countPlan(MediaPlan plan) {
 /// Plans [fix] (SPEC §5.8 step 4, #148) from its [facts]:
 ///
 /// - [OrganizeTitle] of a title folder moves it to its target first, if
-///   free; the projects of a candidate placed above the title level move
+///   free and none of its files is used from outside it; the projects of a candidate placed above the title level move
 ///   one by one into the target, created. [AttachVersions] needs an
 ///   existing title. A target without node file gets one.
 /// - Each version gets the folder named [FixVersion.folder] in the target
 ///   title, or a free `name (n)` variant: a project alone in a folder of
 ///   the title (no other project in or below it, none of its files used
 ///   from outside it) moves with its folder; any other project moves alone
-///   into a new folder. Its file keeps its name.
+///   into a new folder, its proxy file along. Its file keeps its name. A
+///   reserved folder name gets a `name (n)` variant too. A project used as
+///   a subproject outside the fix is left intact, unless the fix is forced.
+///   A project id already used in the fix or in the target title is
+///   replaced by a new one.
 /// - Each media outside the `Media/` of its version is moved there when no
 ///   other project uses it (the versions of the fix still to organize,
-///   [usage] for the others), copied otherwise. A subproject takes its
-///   proxy file along, its own references rewritten from its new place.
+///   [usage] for the others), copied otherwise; a project outside a
+///   reserved folder (a version) is always copied. A subproject takes its
+///   proxy file along; its own references, as those of a subproject
+///   already in the `Media/` of a version, are rewritten once every file
+///   is placed.
 ///   References are rewritten, the record path set to `Media`, the version
 ///   adopted when it has no id, and its label, owner and status set in the
 ///   node file of the title.
@@ -376,6 +398,15 @@ final class _Planner {
       if (isWithin(target, root)) {
         return blocked(ReportKind.fixFailed, 'Target inside $root: $target');
       }
+      for (final MapEntry(key: file, value: users) in usedUnderRoot.entries) {
+        if (users.any((p) => !_inside(p, root))) {
+          return blocked(
+            ReportKind.fixFailed,
+            'A project outside the title uses $file: moving the title '
+            'would break it',
+          );
+        }
+      }
       // A version left intact would lose the files it reaches outside.
       for (final file in intact.values) {
         if (!isWithin(file, root)) {
@@ -506,20 +537,45 @@ final class _Planner {
           !e.isDirectory &&
           isWithin(e.path, dir) &&
           isProjectFile(e.path) &&
-          !relativeTo(dir, e.path).split('/').any(isExcludedFolder),
+          !relativeTo(
+            dir,
+            e.path,
+          ).split('/').any((s) => isExcludedFolder(s) || isReservedFolder(s)),
     );
     if (projects.length != 1) return false;
     final node = joinPath(dir, nodeFileName).toLowerCase();
     if (facts.entries.any((e) => e.path.toLowerCase() == node)) return false;
-    return !usage.entries.any(
-      (e) => isWithin(e.key, dir) && e.value.any((p) => !isWithin(p, dir)),
+    return !usedUnderRoot.entries.any(
+      (e) => _inside(e.key, dir) && e.value.any((p) => !_inside(p, dir)),
     );
   }
+
+  /// Whether [path] lies in [dir], case-insensitive.
+  static bool _inside(String path, String dir) =>
+      path.toLowerCase().startsWith('${dir.toLowerCase()}/');
+
+  /// Users of the files under the root of the fix, by path.
+  late final usedUnderRoot = {
+    for (final e in usage.entries)
+      if (_inside(e.key, root)) e.key: e.value,
+  };
+
+  /// Projects outside the fix using the project [source], as a subproject.
+  List<String> _usersOutside(String source) => [
+    for (final p in usedBy[source.toLowerCase()] ?? const <String>[])
+      if (!sources.contains(p.toLowerCase())) p,
+  ];
+
+  /// Whether [name] can name a version folder: a valid name, not reserved.
+  static bool _usable(String name) =>
+      isValidFolderName(name) &&
+      !isReservedFolder(name) &&
+      !isExcludedFolder(name);
 
   /// [wanted], or its first free `name (n)` variant in the target title,
   /// which it takes.
   String _free(String wanted) {
-    for (var i = 1; ; i++) {
+    for (var i = _usable(wanted) ? 1 : 2; ; i++) {
       final name = i == 1 ? wanted : '$wanted ($i)';
       if (taken.add(name.toLowerCase())) return name;
     }
@@ -528,9 +584,9 @@ final class _Planner {
   /// Lowercase paths of the version folders given so far.
   final claimed = <String>{};
 
-  /// Version ids given so far: a second project with the same id (a *Save
-  /// As* copy) gets a new one.
-  final ids = <VersionId>{};
+  /// Version ids given so far, those of the target title first: a second
+  /// project with the same id (a *Save As* copy) gets a new one.
+  late final ids = {...facts.targetIds};
 
   /// References rewritten in each version organized, by lowercase path of
   /// its project: what its text holds afterwards.
@@ -547,18 +603,30 @@ final class _Planner {
   String? _organize(FixVersion v, Map<String, String> files) {
     final source = v.source;
     final project = facts.projects[source]!;
+    if (!isValidFolderName(v.folder)) {
+      return _leave(v, files, 'Invalid folder name: ${v.folder}');
+    }
     final alone = _alone(source);
     // What moves: the folder of a project alone in it, else the project.
     final current = locate(alone ? parentOf(source) : source);
     final currentDir = alone ? current : parentOf(current);
-    final String versionDir;
-    if (parentOf(currentDir).toLowerCase() == target.toLowerCase() &&
+    final stays =
+        parentOf(currentDir).toLowerCase() == target.toLowerCase() &&
         p.posix.basename(currentDir).toLowerCase() == v.folder.toLowerCase() &&
-        !claimed.contains(currentDir.toLowerCase())) {
-      versionDir = currentDir;
-    } else {
-      versionDir = joinPath(target, _free(v.folder));
+        _usable(v.folder) &&
+        !claimed.contains(currentDir.toLowerCase());
+    // A project using it as a subproject would lose it.
+    if (!stays && !alone && !fix.force) {
+      if (_usersOutside(source) case final users when users.isNotEmpty) {
+        return _leave(
+          v,
+          files,
+          'Used as a subproject by ${users.join(', ')}: '
+          'moving it would break them',
+        );
+      }
     }
+    final versionDir = stays ? currentDir : joinPath(target, _free(v.folder));
     claimed.add(versionDir.toLowerCase());
     final relocated = versionDir != currentDir;
     // What the version folder holds now: its current folder, unless the
@@ -576,6 +644,10 @@ final class _Planner {
       // Already its own: kept for it.
       if (isWithin(after, media)) {
         pinned.add(key);
+        // A subproject: its references follow the files moved.
+        if (facts.projects.containsKey(file)) {
+          subprojects.add((file, after, const {}));
+        }
         continue;
       }
       final name = p.posix.basename(file);
@@ -583,10 +655,7 @@ final class _Planner {
           !names.add(name.toLowerCase()) ||
           (holds != null && exists(joinPath(holds, '$mediaFolderName/$name')));
       if (clash) {
-        final failure = 'Name taken in its media folder: $name';
-        report(ReportKind.fixFailed, ReportItem(source, failure));
-        pinned.addAll(files.keys);
-        return failure;
+        return _leave(v, files, 'Name taken in its media folder: $name');
       }
       placed[key] = joinPath(media, name);
     }
@@ -599,6 +668,14 @@ final class _Planner {
           joinPath(versionDir, p.posix.basename(source)),
           FileRole.project,
         );
+        final proxy = '$source$proxySuffix';
+        if (_now.containsKey(proxy.toLowerCase())) {
+          move(
+            locate(proxy),
+            joinPath(versionDir, p.posix.basename(proxy)),
+            FileRole.proxy,
+          );
+        }
       }
       if (p.posix.basename(versionDir) != v.folder) {
         report(ReportKind.fileRenamed, ReportItem(versionDir, v.folder));
@@ -658,6 +735,14 @@ final class _Planner {
       report(ReportKind.statusFolderUnmatched, ReportItem(path, folder));
     }
     return null;
+  }
+
+  /// Leaves the version [v], whose files are [files], as it is, reported
+  /// with the [failure] it returns.
+  String _leave(FixVersion v, Map<String, String> files, String failure) {
+    report(ReportKind.fixFailed, ReportItem(v.source, failure));
+    pinned.addAll(files.keys);
+    return failure;
   }
 
   /// Lowercase paths of the projects of the fix.

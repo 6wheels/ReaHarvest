@@ -81,7 +81,8 @@ class MigrationActions {
   ) async {
     final root = entry.libraryRoot;
     // From the index: stale for the titles changed by the previous fixes
-    // of the batch, which can only block more (SPEC §5.8).
+    // of the batch, which can only copy more, never break a reference
+    // (SPEC §5.8).
     final usage = mediaUsage(
       ref.read(localIndexProvider).scanResult(entry.id) ?? const ScanResult(),
     );
