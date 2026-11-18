@@ -4,9 +4,11 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
+import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../to_sort/fix_dialog.dart';
+import '../versions/version_ui_actions.dart';
 
 /// Free tags of a title (SPEC §5.9): one chip each, removable, and a field
 /// to add one, with autocompletion over the tags of the library.
@@ -28,20 +30,45 @@ class _TitleTagsState extends ConsumerState<TitleTags> {
     super.dispose();
   }
 
-  void _set(List<String> tags) =>
-      ref.read(versionActionsProvider).setTags(widget.title, tags);
+  /// Runs [edit]; failures in the notification zone.
+  Future<void> _edit(Future<void> Function(VersionActions) edit) async {
+    final l10n = AppLocalizations.of(context);
+    final tasks = ref.read(tasksProvider.notifier);
+    try {
+      await edit(ref.read(versionActionsProvider));
+    } on Object catch (e) {
+      fail(tasks, l10n, e);
+    }
+  }
 
   void _add(String text) {
     _controller.clear();
     if (text.trim().isEmpty) return;
-    _set([...widget.title.tags, text]);
+    _edit((actions) => actions.addTag(widget.title, text));
+  }
+
+  /// Removes [tag] after confirmation: the tag is shared by the members.
+  Future<void> _remove(String tag) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await confirm(
+      context,
+      title: l10n.tagRemoveTitle(tag),
+      content: l10n.tagRemoveHint,
+      action: l10n.tagRemoveAction,
+    );
+    if (confirmed != true || !mounted) return;
+    await _edit((actions) => actions.removeTag(widget.title, tag));
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final tags = widget.title.tags;
-    final known = knownTags(ref.watch(titlesProvider));
+    final library = widget.title.libraryId;
+    final known = knownTags([
+      for (final t in ref.watch(titlesProvider))
+        if (t.libraryId == library) t,
+    ]);
     // One line, scrolling sideways: the header stays low.
     return SizedBox(
       height: 32,
@@ -60,10 +87,7 @@ class _TitleTagsState extends ConsumerState<TitleTags> {
                       visualDensity: VisualDensity.compact,
                       label: Text(tag),
                       deleteButtonTooltipMessage: l10n.tagRemove(tag),
-                      onDeleted: () => _set([
-                        for (final t in tags)
-                          if (t != tag) t,
-                      ]),
+                      onDeleted: () => _remove(tag),
                     ),
                   ),
               ],

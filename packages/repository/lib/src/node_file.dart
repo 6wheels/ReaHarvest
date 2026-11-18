@@ -122,7 +122,7 @@ final class NodeFile {
       versionStatuses: map('versionStatuses'),
       versionLabels: map('versionLabels'),
       versionOwners: map('versionOwners'),
-      tags: tags.cast<String>(),
+      tags: normalizeTags(tags.cast<String>()),
     );
   }
 
@@ -190,14 +190,30 @@ Future<NodeFile> setVersionOwner(
   MemberId? owner,
 ) => updateNodeFile(storage, titlePath, (n) => n.withVersionOwner(id, owner));
 
-/// Sets the free tags of the title at [titlePath] (SPEC §5.9), normalized;
-/// none clears them. The node file is read again first, so that no
-/// concurrent change is lost.
-Future<NodeFile> setTitleTags(
+/// Adds the free [tag] to the title at [titlePath] (SPEC §5.9), unless it
+/// already has it ignoring case. The node file is read again first, so that
+/// no concurrent change is lost.
+Future<NodeFile> addTitleTag(
   RepositoryStorage storage,
   String titlePath,
-  Iterable<String> tags,
-) => updateNodeFile(storage, titlePath, (n) => n.withTags(tags));
+  String tag,
+) => updateNodeFile(storage, titlePath, (n) => n.withTags([...n.tags, tag]));
+
+/// Removes the free [tag] from the title at [titlePath] (SPEC §5.9),
+/// ignoring case. The node file is read again first, so that no concurrent
+/// change is lost.
+Future<NodeFile> removeTitleTag(
+  RepositoryStorage storage,
+  String titlePath,
+  String tag,
+) => updateNodeFile(
+  storage,
+  titlePath,
+  (n) => n.withTags([
+    for (final t in n.tags)
+      if (t.trim().toLowerCase() != tag.trim().toLowerCase()) t,
+  ]),
+);
 
 /// Applies [change] to the node file of [dir], read again first. Throws
 /// [StateError] when [dir] has no node file.

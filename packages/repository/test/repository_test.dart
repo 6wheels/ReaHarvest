@@ -977,6 +977,12 @@ void main() {
       expect(tagged.tags, ['live', 'rehearsal']);
       expect(tagged.toJson()['tags'], ['live', 'rehearsal']);
       expect(tagged.withVersionStatus('V', 'idea').tags, ['live', 'rehearsal']);
+      final messy = NodeFile.fromJson({
+        'nodeId': id,
+        'level': 'title',
+        'tags': ['Live', 'live ', ''],
+      });
+      expect(messy.tags, ['Live']);
     });
   });
 
@@ -987,12 +993,11 @@ void main() {
       final first = await scan(storage, lib);
       expect(first.titles.single.tags, isEmpty);
 
-      final node = await setTitleTags(storage, 'band/album/song', [
-        ' live ',
-        'Live',
-        'standard C',
-        '',
-      ]);
+      const dir = 'band/album/song';
+      await addTitleTag(storage, dir, ' live ');
+      await addTitleTag(storage, dir, 'Live');
+      await addTitleTag(storage, dir, '');
+      final node = await addTitleTag(storage, dir, 'standard C');
       expect(node.tags, ['live', 'standard C']);
       final saved = jsonDecode(
         File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
@@ -1004,7 +1009,10 @@ void main() {
       final second = await scan(storage, lib, previous: first);
       expect(second.titles.single.tags, ['live', 'standard C']);
 
-      await setTitleTags(storage, 'band/album/song', const []);
+      expect((await removeTitleTag(storage, dir, 'LIVE ')).tags, [
+        'standard C',
+      ]);
+      await removeTitleTag(storage, dir, 'standard C');
       final cleared = (await scan(storage, lib, previous: second)).titles;
       expect(cleared.single.tags, isEmpty);
       expect(
@@ -1016,7 +1024,7 @@ void main() {
 
     test('require an existing node file', () {
       expect(
-        setTitleTags(storage, 'missing', ['live']),
+        addTitleTag(storage, 'missing', 'live'),
         throwsA(isA<StateError>()),
       );
     });

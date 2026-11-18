@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
 import '../widgets.dart';
@@ -61,6 +62,9 @@ class LevelField extends StatefulWidget {
   final VoidCallback onChanged;
 
   /// Called with the text when the user presses Enter or picks an option.
+  /// Enter keeps the typed text (in the spelling of an option equal to it
+  /// ignoring case), unless the user moved through the options with the
+  /// arrow keys: it then picks the highlighted one.
   final ValueChanged<String>? onSubmit;
 
   /// Compact field, without the room kept for an error.
@@ -72,6 +76,23 @@ class LevelField extends StatefulWidget {
 
 class _LevelFieldState extends State<LevelField> {
   final _focus = FocusNode();
+
+  /// Whether the options were browsed with the arrow keys since the last
+  /// edit.
+  var _browsed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.onKeyEvent = (node, event) {
+      if (event is! KeyUpEvent &&
+          (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+              event.logicalKey == LogicalKeyboardKey.arrowUp)) {
+        _browsed = true;
+      }
+      return KeyEventResult.ignored;
+    };
+  }
 
   @override
   void dispose() {
@@ -91,15 +112,29 @@ class _LevelFieldState extends State<LevelField> {
       widget.onChanged();
       widget.onSubmit?.call(value);
     },
-    // Up and down move through the options, Enter picks the highlighted
-    // one, Escape hides them.
+    // Up and down move through the options, Enter then picks the
+    // highlighted one, Escape hides them.
     fieldViewBuilder: (context, controller, focusNode, onSubmitted) =>
         TextField(
           controller: controller,
           focusNode: focusNode,
-          onChanged: (_) => widget.onChanged(),
+          onChanged: (_) {
+            _browsed = false;
+            widget.onChanged();
+          },
           onSubmitted: (value) {
-            onSubmitted();
+            if (_browsed) {
+              onSubmitted();
+            } else {
+              final typed = controller.text.trim().toLowerCase();
+              final same = widget.options().where(
+                (o) => o.toLowerCase() == typed,
+              );
+              if (same.firstOrNull case final o? when o != controller.text) {
+                controller.text = o;
+                widget.onChanged();
+              }
+            }
             widget.onSubmit?.call(controller.text);
           },
           decoration: InputDecoration(

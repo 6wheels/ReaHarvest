@@ -339,5 +339,8 @@
   "showLicenses": "Afficher les licences",
   "tagsLabel": "Tags",
   "tagAddHint": "Ajouter un tag",
-  "tagRemove": "Retirer le tag {tag}"
+  "tagRemove": "Retirer le tag {tag}",
+  "tagRemoveTitle": "Retirer le tag « {tag} » ?",
+  "tagRemoveHint": "Le tag est retiré de ce titre pour tous les membres de la bibliothèque.",
+  "tagRemoveAction": "Retirer"
 }

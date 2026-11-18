@@ -97,7 +97,7 @@ class Header extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: context.legend,
                         ),
-                      TitleTags(t),
+                      TitleTags(t, key: ValueKey(t.id)),
                       if (toAdopt > 0)
                         Row(
                           children: [

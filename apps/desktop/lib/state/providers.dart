@@ -85,6 +85,7 @@ final titlesProvider = Provider<List<Title>>((ref) {
           libraryId: t.libraryId,
           path: t.path,
           levels: {'title': names[t.libraryId]!},
+          tags: t.tags,
           versions: t.versions,
           versionStatuses: t.versionStatuses,
         )

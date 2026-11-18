@@ -275,19 +275,27 @@ class VersionActions {
     await ref.rescanTitle(entry, title);
   }
 
-  /// Sets the free [tags] of [title] (normalized, none clears them), in the
-  /// title's `.node.json` (SPEC §5.9). Then rescans.
-  Future<void> setTags(Title title, List<String> tags) =>
-      _turn(title, () => _setTags(title, tags));
+  /// Adds the free [tag] to [title], in the title's `.node.json` (SPEC
+  /// §5.9): applied to the tags read again from the file, so that no
+  /// concurrent change is lost. Then rescans.
+  Future<void> addTag(Title title, String tag) =>
+      _turn(title, () => _editTags(title, tag, add: true));
 
-  Future<void> _setTags(Title title, List<String> tags) async {
+  /// Removes the free [tag] from [title] (ignoring case), like [addTag].
+  Future<void> removeTag(Title title, String tag) =>
+      _turn(title, () => _editTags(title, tag, add: false));
+
+  Future<void> _editTags(Title title, String tag, {required bool add}) async {
     final entry = ref.libraryEntry(title.libraryId);
     final root = entry.libraryRoot;
     final dir = title.path;
-    await Isolate.run(
-      () => setTitleTags(MountedFolderStorage(root), dir, tags),
-    );
-    _log.info('Tags of title $dir set to ${normalizeTags(tags)}');
+    final node = await Isolate.run(() {
+      final storage = MountedFolderStorage(root);
+      return add
+          ? addTitleTag(storage, dir, tag)
+          : removeTitleTag(storage, dir, tag);
+    });
+    _log.info('Tags of title $dir set to ${node.tags}');
     await ref.rescanTitle(entry, title);
   }
 

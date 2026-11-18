@@ -72,8 +72,12 @@ void main() {
     expect(title().statusOf(version('Song - c.rpp')), 'mixing');
     expect(title().status, 'mixing');
 
-    await versions.setTags(title(), [' live ', 'Live', 'standard C']);
+    await versions.addTag(title(), ' live ');
+    await versions.addTag(title(), 'Live');
+    await versions.addTag(title(), 'standard C');
     expect(title().tags, ['live', 'standard C']);
+    await versions.removeTag(title(), 'LIVE');
+    expect(title().tags, ['standard C']);
 
     await versions.keepOnly(title(), version('Song - c.rpp'));
     expect(title().versions.map((v) => v.folder), ['Song - c']);

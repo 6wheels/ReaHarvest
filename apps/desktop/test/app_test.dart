@@ -151,7 +151,7 @@ class FakeVersionActions extends VersionActions {
   final created = <(String, String, String?)>[];
   final edited = <(String, String, String)>[];
   final statuses = <(String, String?)>[];
-  final tagged = <List<String>>[];
+  final tagged = <String>[];
   final trashed = <String>[];
   final keptOnly = <String>[];
   final purged = <List<String>>[];
@@ -193,8 +193,10 @@ class FakeVersionActions extends VersionActions {
   ) async => statuses.add((version.fileName, status));
 
   @override
-  Future<void> setTags(Title title, List<String> tags) async =>
-      tagged.add(tags);
+  Future<void> addTag(Title title, String tag) async => tagged.add('+$tag');
+
+  @override
+  Future<void> removeTag(Title title, String tag) async => tagged.add('-$tag');
 
   @override
   Future<void> trashVersion(Title title, Version version) async =>
@@ -1671,13 +1673,21 @@ void main() {
     );
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
-    expect(versions.tagged, [
-      ['live', 'Mix 2'],
-    ]);
+    expect(versions.tagged, ['+Mix 2']);
+
+    // Removing a shared tag asks first.
+    await tester.tap(find.byTooltip('Remove the tag live'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove the tag “live”?'), findsOne);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(versions.tagged, ['+Mix 2']);
 
     await tester.tap(find.byTooltip('Remove the tag live'));
     await tester.pumpAndSettle();
-    expect(versions.tagged.last, isEmpty);
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+    expect(versions.tagged, ['+Mix 2', '-live']);
   });
 
   testWidgets('keeps only one version after one confirmation', (tester) async {

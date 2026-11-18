@@ -152,7 +152,9 @@ final class TitleFilter {
     final modes = LibraryMode.values.asNameMap();
     return TitleFilter(
       levels: {
-        for (final e in ((json['levels'] as Map?) ?? const {}).entries)
+        // 'tags' before the free tags of titles took the word (#132).
+        for (final e
+            in ((json['levels'] ?? json['tags']) as Map? ?? const {}).entries)
           e.key as String: strings(e.value),
       },
       libraries: {for (final id in strings(json['libraries'])) LibraryId(id)},

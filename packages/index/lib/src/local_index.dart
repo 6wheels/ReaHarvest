@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 15;
+const _schemaVersion = 16;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -33,6 +33,7 @@ CREATE TABLE nodes (
   path TEXT NOT NULL,
   node_id TEXT NOT NULL,
   level TEXT NOT NULL,
+  json TEXT NOT NULL,
   PRIMARY KEY (library_id, path)
 );
 CREATE TABLE titles (
@@ -42,8 +43,6 @@ CREATE TABLE titles (
   levels TEXT NOT NULL,
   tags TEXT NOT NULL,
   version_statuses TEXT NOT NULL,
-  version_labels TEXT NOT NULL,
-  version_owners TEXT NOT NULL,
   PRIMARY KEY (library_id, path)
 );
 CREATE TABLE versions (
@@ -177,7 +176,7 @@ final class LocalIndex {
         _db.execute('DELETE FROM $t WHERE library_id = ?', [id]);
       }
       _insertNodes(id, scan.nodes);
-      _insertTitles(id, scan.titles, scan.nodes);
+      _insertTitles(id, scan.titles);
       _insertCandidates(id, scan.candidates, scan.titles);
       _insertIssues(
         id,
@@ -226,7 +225,7 @@ final class LocalIndex {
       final titles = [?scan.title];
       final candidates = [?scan.candidate];
       _insertNodes(id, nodes);
-      _insertTitles(id, titles, nodes);
+      _insertTitles(id, titles);
       _insertCandidates(id, candidates, titles);
       _insertIssues(
         id,
@@ -255,22 +254,21 @@ final class LocalIndex {
     });
   }
 
+  /// Stores [nodes] with their raw content: the next scan reuses it while
+  /// the node file is unchanged, whether the node has a title or not.
   void _insertNodes(LibraryId id, Map<String, NodeFile> nodes) => _insertAll(
-    'INSERT INTO nodes (library_id, path, node_id, level) VALUES (?, ?, ?, ?)',
+    'INSERT INTO nodes (library_id, path, node_id, level, json) '
+    'VALUES (?, ?, ?, ?, ?)',
     [
-      for (final e in nodes.entries) [id, e.key, e.value.id, e.value.level],
+      for (final e in nodes.entries)
+        [id, e.key, e.value.id, e.value.level, jsonEncode(e.value.toJson())],
     ],
   );
 
-  void _insertTitles(
-    LibraryId id,
-    List<Title> titles,
-    Map<String, NodeFile> nodes,
-  ) {
+  void _insertTitles(LibraryId id, List<Title> titles) {
     _insertAll(
       'INSERT INTO titles (library_id, path, id, levels, tags, '
-      'version_statuses, version_labels, version_owners) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'version_statuses) VALUES (?, ?, ?, ?, ?, ?)',
       [
         for (final t in titles)
           [
@@ -280,10 +278,6 @@ final class LocalIndex {
             jsonEncode(t.levels),
             jsonEncode(t.tags),
             jsonEncode(t.versionStatuses),
-            // Raw node entries: the next scan reuses them while the node
-            // file is unchanged (SPEC §4.2).
-            jsonEncode(nodes[t.path]?.versionLabels ?? const {}),
-            jsonEncode(nodes[t.path]?.versionOwners ?? const {}),
           ],
       ],
     );
@@ -512,7 +506,7 @@ final class LocalIndex {
     return ScanResult(
       candidates: _candidates(id, layout: library.layout),
       titles: restored,
-      nodes: _nodes(id, restored),
+      nodes: _nodes(id),
       issues: Report({
         for (final kind in {
           for (final i in stored) i.kind,
@@ -543,7 +537,7 @@ final class LocalIndex {
     final prefix = titlePath.isEmpty ? '' : '$titlePath/';
     return ScanResult(
       titles: [title],
-      nodes: _nodes(id, [title], path: titlePath),
+      nodes: _nodes(id, path: titlePath),
       stamps: _stamps(id, prefix: prefix),
       candidates: _candidates(
         id,
@@ -612,40 +606,17 @@ final class LocalIndex {
     ];
   }
 
-  /// Stored node files of [id] (only the one at [path] when set), with the
-  /// version statuses of [titles] and the raw label and owner entries.
-  Map<String, NodeFile> _nodes(
-    LibraryId id,
-    List<Title> titles, {
-    String? path,
-  }) {
-    final byPath = {for (final t in titles) t.path: t};
-    final entries = {
-      for (final r in _db.select(
-        'SELECT path, version_labels, version_owners FROM titles '
-        'WHERE library_id = ?1 AND (?2 IS NULL OR path = ?2)',
-        [id, path],
-      ))
-        r['path'] as String: (
-          labels: _stringMap(r['version_labels'] as String),
-          owners: _stringMap(r['version_owners'] as String),
-        ),
-    };
-    return {
-      for (final r in _db.select(
-        'SELECT * FROM nodes WHERE library_id = ?1 AND (?2 IS NULL OR path = ?2)',
-        [id, path],
-      ))
-        r['path'] as String: NodeFile(
-          NodeId(r['node_id'] as String),
-          r['level'] as String,
-          versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
-          versionLabels: entries[r['path']]?.labels ?? const {},
-          versionOwners: entries[r['path']]?.owners ?? const {},
-          tags: byPath[r['path']]?.tags ?? const [],
-        ),
-    };
-  }
+  /// Stored node files of [id] (only the one at [path] when set).
+  Map<String, NodeFile> _nodes(LibraryId id, {String? path}) => {
+    for (final r in _db.select(
+      'SELECT path, json FROM nodes '
+      'WHERE library_id = ?1 AND (?2 IS NULL OR path = ?2)',
+      [id, path],
+    ))
+      r['path'] as String: NodeFile.fromJson(
+        (jsonDecode(r['json'] as String) as Map).cast(),
+      ),
+  };
 
   /// Stored stamps of the files of [id] whose path starts with [prefix].
   Map<String, FileStamp> _stamps(LibraryId id, {String prefix = ''}) => {
