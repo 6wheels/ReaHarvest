@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 import 'labels.dart';
 import 'formats.dart';
 import 'title_detail/title_detail_page.dart';
@@ -36,9 +37,9 @@ Future<void> openLatestInReaper(
   if (mode == LibraryMode.collab &&
       owner != null &&
       owner != identity.memberId) {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+    final confirmed = await showGlassDialog<bool>(
+      context,
+      (context) => AlertDialog(
         title: Text(l10n.notYourVersionTitle),
         content: Text(
           l10n.notYourVersionHint(

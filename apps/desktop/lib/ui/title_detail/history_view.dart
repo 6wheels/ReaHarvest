@@ -9,6 +9,7 @@ import '../../state/tasks.dart';
 import '../../state/reaper_actions.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
+import '../glass_dialog.dart';
 import '../widgets.dart';
 
 /// Backup points of a version: open and restore (SPEC §5.4).
@@ -26,9 +27,9 @@ class History extends ConsumerWidget {
   ) async {
     final l10n = AppLocalizations.of(context);
     final tasks = ref.read(tasksProvider.notifier);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+    final confirmed = await showGlassDialog<bool>(
+      context,
+      (context) => AlertDialog(
         title: Text(l10n.restoreTitle),
         content: Text(l10n.restoreHint(date)),
         actions: [

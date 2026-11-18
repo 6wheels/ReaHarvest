@@ -11,6 +11,7 @@ import '../../state/providers.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
+import '../glass_dialog.dart';
 import '../labels.dart';
 import '../widgets.dart';
 import 'version_ui_actions.dart';
@@ -26,9 +27,9 @@ Future<String?> showNewVersionDialog(
   Title title,
   Version? selected, {
   bool duplicate = false,
-}) => showDialog<String>(
-  context: context,
-  builder: (_) => _NewVersionDialog(title, selected, duplicate: duplicate),
+}) => showGlassDialog<String>(
+  context,
+  (_) => _NewVersionDialog(title, selected, duplicate: duplicate),
 );
 
 class _NewVersionDialog extends ConsumerStatefulWidget {

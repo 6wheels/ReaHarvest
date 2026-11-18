@@ -7,6 +7,7 @@ import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
+import '../glass_dialog.dart';
 import '../widgets.dart';
 import 'version_ui_actions.dart';
 
@@ -20,9 +21,9 @@ Future<String?> showEditVersionDialog(
   Title title,
   Version version,
 ) async {
-  final values = await showDialog<(String, String)>(
-    context: context,
-    builder: (_) => _EditVersionDialog(title, version),
+  final values = await showGlassDialog<(String, String)>(
+    context,
+    (_) => _EditVersionDialog(title, version),
   );
   if (values == null || !context.mounted) return null;
   final (name, label) = values;

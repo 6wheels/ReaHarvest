@@ -8,6 +8,7 @@ import '../state/tasks.dart';
 import '../state/reaper_actions.dart';
 import '../state/reaper.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 
 /// Color of warnings (missing plugins, duplicates).
 const warningColor = Color(0xFFE5A04D);
@@ -667,9 +668,9 @@ Future<bool> runProjectChange(
   final tasks = ref.read(tasksProvider.notifier);
   if (await ref.read(reaperRunningProvider)()) {
     if (!context.mounted) return false;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+    final confirmed = await showGlassDialog<bool>(
+      context,
+      (context) => AlertDialog(
         title: Text(l10n.reaperOpenTitle),
         content: Text(l10n.reaperOpenHint),
         actions: [

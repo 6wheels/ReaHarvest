@@ -6,6 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../formats.dart';
+import '../glass_dialog.dart';
 import '../widgets.dart';
 
 /// Asks to confirm [action]; [danger] marks an action that moves or deletes
@@ -20,9 +21,9 @@ Future<bool?> confirm(
 }) {
   final l10n = AppLocalizations.of(context);
   final scheme = Theme.of(context).colorScheme;
-  return showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
+  return showGlassDialog<bool>(
+    context,
+    (context) => AlertDialog(
       title: Text(title),
       content: Text(content),
       actions: [

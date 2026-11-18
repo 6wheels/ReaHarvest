@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 import 'tasks_zone.dart';
 
 var _shown = false;
@@ -16,9 +17,9 @@ void showErrorDialog(Object error, StackTrace? stack) {
   final context = appNavigatorKey.currentContext;
   if (_shown || context == null) return;
   _shown = true;
-  showDialog<void>(
-    context: context,
-    builder: (_) => ErrorDialog(error, stack),
+  showGlassDialog<void>(
+    context,
+    (_) => ErrorDialog(error, stack),
   ).whenComplete(() => _shown = false);
 }
 

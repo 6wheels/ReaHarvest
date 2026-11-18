@@ -3,15 +3,13 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 import 'layout_labels.dart';
 
 /// Shows [report] of the action [title] (SPEC §5.2): one section per kind of
 /// outcome, problems first and expanded, each item with its path.
 Future<void> showReport(BuildContext context, String title, Report report) =>
-    showDialog(
-      context: context,
-      builder: (context) => _ReportDialog(title, report),
-    );
+    showGlassDialog(context, (context) => _ReportDialog(title, report));
 
 String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
     switch (kind) {

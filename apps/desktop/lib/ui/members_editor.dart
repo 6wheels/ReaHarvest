@@ -7,11 +7,12 @@ import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'glass_dialog.dart';
 import 'widgets.dart';
 
 /// Edits the declared members of the library [entry] (SPEC §6.5).
 Future<void> showMembers(BuildContext context, LibraryEntry entry) =>
-    showDialog(context: context, builder: (_) => _MembersDialog(entry));
+    showGlassDialog(context, (_) => _MembersDialog(entry));
 
 class _MembersDialog extends ConsumerStatefulWidget {
   const _MembersDialog(this.entry);
