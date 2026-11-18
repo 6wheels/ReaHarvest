@@ -7,7 +7,7 @@ Collaborative REAPER project manager (Flutter desktop + Dart).
 `SPEC.md` is the single source of truth. Read the relevant sections before implementing any feature.
 - Items marked **[TO VALIDATE]** must be verified (on real files / real REAPER behavior) before implementing the related feature. Record the outcome in `SPEC.md`.
 - Open points are listed in §10; out-of-scope items in §11.
-- Deliver in milestone order (§9, re-oriented MVP): M0 (foundations) → M1 (migration) → M2 (join and sync) → M3 (shared statuses and activity). Progress is tracked in `PROGRESS.md`.
+- Deliver in milestone order (§9, re-oriented MVP): M0 (foundations) → M1 (migration) → M2 (join and sync) → M3 (shared statuses and activity). Progress is tracked in `PROGRESS.md` (brief common to every ticket) and `progress/M<n>.md` (tickets, order, lanes and advised models of each milestone); dated decisions and maintainer to-dos in `DECISIONS.md`.
 
 ## Workspace
 
