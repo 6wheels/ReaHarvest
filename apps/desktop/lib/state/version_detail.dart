@@ -61,7 +61,7 @@ Future<VersionDetail> readVersionDetail(String path) => Isolate.run(() async {
           size: _sizeOf(
             p.isAbsolute(reference)
                 ? reference
-                : p.joinAll([folder, ...reference.split(RegExp(r'[\/]'))]),
+                : p.joinAll([folder, ...reference.split(RegExp(r'[\\/]'))]),
           ),
         ),
     ],
