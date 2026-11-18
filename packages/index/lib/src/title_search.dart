@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
-/// Instant, typo-tolerant title search over tag values, version names,
+/// Instant, typo-tolerant title search over level values, tags, version names,
 /// labels and owners (SPEC §5.2). Built in memory from the index.
 final class TitleSearch {
   /// [memberNames] maps owners to display names; unknown owners are
@@ -43,7 +43,8 @@ final class TitleSearch {
   }
 
   static List<String> _wordsOf(Title t, Map<MemberId, String> names) => {
-    for (final value in t.tags.values) ..._words(value),
+    for (final value in t.levels.values) ..._words(value),
+    for (final tag in t.tags) ..._words(tag),
     for (final v in t.versions) ...[
       ..._words(p.withoutExtension(v.fileName)),
       if (v.metadata case final m?) ...[

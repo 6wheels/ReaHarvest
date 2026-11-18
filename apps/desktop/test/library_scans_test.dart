@@ -116,7 +116,7 @@ void main() {
     File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(other, 'v1', 'v1.rpp'));
     await scans.scanAll();
     Title titleAt(String name) =>
-        index.titles().singleWhere((t) => t.tags['title'] == name);
+        index.titles().singleWhere((t) => t.levels['title'] == name);
 
     // Changes outside the application, in both titles (Save As copies).
     File(p.join(song, 'v1', 'v1.rpp')).copySync(p.join(song, 'v1', 'v2.rpp'));

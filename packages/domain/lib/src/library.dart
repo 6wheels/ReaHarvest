@@ -6,12 +6,12 @@ enum LibraryMode { local, cloud, collab }
 /// Collab store implementation selected in `.library.json`.
 enum CollabStoreKind { journal, pocketbase }
 
-/// One layout level: a folder level bound to a language-independent tag key
+/// One layout level: a folder level bound to a language-independent key
 /// (a token, written `<key>`, SPEC §3.1).
 final class LayoutLevel {
   const LayoutLevel(this.key, {this.labels = const {}});
 
-  /// Technical tag key, in English (e.g. `artist`).
+  /// Technical level key, in English (e.g. `artist`).
   final String key;
 
   /// Translations of a custom key (language code -> label). Empty for the
@@ -70,14 +70,14 @@ final class Layout {
 
   final List<LayoutLevel> levels;
 
-  /// Tag key -> render metadata field (e.g. `artist` -> `artist`).
+  /// Level key -> render metadata field (e.g. `artist` -> `artist`).
   final Map<String, String> renderMetadata;
 
   LayoutLevel get leaf => levels.last;
 
-  /// Tags of a title located at [folders] (relative to the library root),
+  /// Level values of a title located at [folders] (relative to the library root),
   /// or null if the path does not match the layout depth.
-  Map<String, String>? tagsOf(List<String> folders) {
+  Map<String, String>? levelsOf(List<String> folders) {
     if (folders.length != levels.length) return null;
     return {for (var i = 0; i < levels.length; i++) levels[i].key: folders[i]};
   }

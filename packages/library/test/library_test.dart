@@ -289,7 +289,7 @@ void main() {
               displayMode: DisplayMode.tree,
               query: 'tide',
               filter: TitleFilter(
-                tags: {
+                levels: {
                   'artist': {'Band'},
                 },
                 libraries: {LibraryId('L1')},
@@ -340,8 +340,24 @@ void main() {
       expect(nav.filter.isEmpty, isFalse);
       expect(nav.savedViews.single.name, 'Mixing');
       expect(nav.savedViews.single.filter.statuses, {'mixing'});
-      expect(nav.filter.withTag('artist', const {}).tags, isEmpty);
+      expect(nav.filter.withLevel('artist', const {}).levels, isEmpty);
       expect(const TitleFilter().isEmpty, isTrue);
+      // Saved before the level values were renamed from tags.
+      final legacy = TitleFilter.fromJson({
+        'tags': {
+          'artist': ['A'],
+        },
+      });
+      expect(legacy.levels, {
+        'artist': {'A'},
+      });
+      // A list under 'tags' is not a level filter.
+      expect(
+        TitleFilter.fromJson({
+          'tags': ['live'],
+        }).levels,
+        isEmpty,
+      );
       expect(read.libraries.map((l) => l.id), ['L1', 'L2']);
       expect(read.libraries[0].libraryRoot, '/drive/band');
       expect(read.libraries[0].templatesFolder, '/work/band-templates');

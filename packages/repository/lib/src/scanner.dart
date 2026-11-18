@@ -42,7 +42,7 @@ final class ScanResult {
   /// and the folders whose node file has another level. Misplaced items
   /// name their expected level and, when known, their target. Titles
   /// below an unknown intermediate folder are not indexed, except titles
-  /// placed too high, indexed where they are with the tags of their target.
+  /// placed too high, indexed where they are with the level values of their target.
   final Report issues;
 
   /// Title candidates of a layout library (SPEC §5.8 step 3), sorted by
@@ -205,7 +205,7 @@ Future<TitleScan> scanTitleFolder(
 
 /// Scans again the folder of the title [previous] only, after an action on
 /// one of its versions (SPEC §8): lists that folder, and reports for it
-/// what [scan] reports below it. The title keeps the tags of [previous] (a
+/// what [scan] reports below it. The title keeps the levels of [previous] (a
 /// title placed too high keeps those of its target). Files whose stamp did
 /// not change since [stored], the last scan of the library, are not read
 /// again; a reference leaving the folder is checked with one `stat`.
@@ -359,7 +359,7 @@ final class _Scanner {
   }
 
   /// Scans the folder of [previous] only, as [run] would see it (SPEC §8):
-  /// its tags are kept, the references leaving it are checked with one
+  /// its levels are kept, the references leaving it are checked with one
   /// `stat` each, and nothing is written ([writeNodes] is false).
   Future<TitleScan> runTitle(Title previous) async {
     final dir = previous.path;
@@ -403,7 +403,7 @@ final class _Scanner {
     if (_projects(dir).isEmpty) return null;
     final node = await _node(dir, freeTreeLevel);
     if (node == null) return null;
-    return _title(dir, node, previous.tags, [
+    return _title(dir, node, previous.levels, [
       for (final entries in files.values)
         for (final e in entries.where(_isProject)) _version(dir, e),
     ]);
@@ -420,7 +420,7 @@ final class _Scanner {
     }
     final node = await _node(dir, layout.leaf.key);
     if (node == null || node.level != layout.leaf.key) return null;
-    return _title(dir, node, previous.tags, await _readVersions(dir));
+    return _title(dir, node, previous.levels, await _readVersions(dir));
   }
 
   /// Adds to [existing] the files outside the candidate folder [root] that
@@ -556,12 +556,12 @@ final class _Scanner {
       final node = await _node(dir, freeTreeLevel);
       if (node == null) continue;
       final segments = dir.isEmpty ? <String>[] : dir.split('/');
-      final tags = {
+      final levels = {
         for (var i = 0; i < segments.length - 1; i++)
           'folder${i + 1}': segments[i],
         if (segments.isNotEmpty) 'title': segments.last,
       };
-      titles.add(_title(dir, node, tags, titleVersions));
+      titles.add(_title(dir, node, levels, titleVersions));
     }
   }
 
@@ -597,13 +597,13 @@ final class _Scanner {
       if (d < depth && !_isKnown(segments)) {
         final (kind, item) = _levelIssue(segments, layout);
         skipped.add(dir);
-        // A title placed too high stays visible where it is, tagged as at
+        // A title placed too high stays visible where it is, placed as at
         // its target (missing levels unassigned), until it is moved.
         if (kind == ReportKind.titleTooHigh) {
           final node = await _node(dir, layout.leaf.key);
           if (node != null && node.level == layout.leaf.key) {
-            final tags = layout.tagsOf(item.target!.split('/'))!;
-            titles.add(_title(dir, node, tags, await _readVersions(dir)));
+            final levels = layout.levelsOf(item.target!.split('/'))!;
+            titles.add(_title(dir, node, levels, await _readVersions(dir)));
           }
         }
         continue;
@@ -624,7 +624,12 @@ final class _Scanner {
       }
       if (d == depth) {
         titles.add(
-          _title(dir, node, layout.tagsOf(segments)!, await _readVersions(dir)),
+          _title(
+            dir,
+            node,
+            layout.levelsOf(segments)!,
+            await _readVersions(dir),
+          ),
         );
       }
     }
@@ -1079,7 +1084,7 @@ final class _Scanner {
   Title _title(
     String dir,
     NodeFile node,
-    Map<String, String> tags,
+    Map<String, String> levels,
     List<Version> versions,
   ) {
     versions.sort((a, b) => a.fileName.compareTo(b.fileName));
@@ -1087,7 +1092,8 @@ final class _Scanner {
       id: node.id,
       libraryId: library.id,
       path: dir,
-      tags: tags,
+      levels: levels,
+      tags: node.tags,
       versions: [
         for (final v in versions)
           if (v.metadata case final m?)

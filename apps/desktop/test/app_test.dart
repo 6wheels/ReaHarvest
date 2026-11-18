@@ -151,6 +151,7 @@ class FakeVersionActions extends VersionActions {
   final created = <(String, String, String?)>[];
   final edited = <(String, String, String)>[];
   final statuses = <(String, String?)>[];
+  final tagged = <String>[];
   final trashed = <String>[];
   final keptOnly = <String>[];
   final purged = <List<String>>[];
@@ -190,6 +191,12 @@ class FakeVersionActions extends VersionActions {
     Version version,
     String? status,
   ) async => statuses.add((version.fileName, status));
+
+  @override
+  Future<void> addTag(Title title, String tag) async => tagged.add('+$tag');
+
+  @override
+  Future<void> removeTag(Title title, String tag) async => tagged.add('-$tag');
 
   @override
   Future<void> trashVersion(Title title, Version version) async =>
@@ -678,7 +685,7 @@ void main() {
       id: NodeId.generate(),
       libraryId: demoLibrary.id,
       path: 'Band/$album/$name',
-      tags: {'artist': 'Band', 'album': album, 'title': name},
+      levels: {'artist': 'Band', 'album': album, 'title': name},
       // Two versions to adopt: the counter still counts one title.
       versions: [
         for (final file in ['$name.rpp', '$name 2.rpp'])
@@ -826,7 +833,7 @@ void main() {
     expect(find.widgetWithText(MenuItemButton, 'Other Artist'), findsNothing);
     expect(find.byType(TitleCard), findsNWidgets(6));
     expect(find.text('ARTIST // OTHER ARTIST'), findsOneWidget);
-    expect(settings.saved.last.navigation.filter.tags, {
+    expect(settings.saved.last.navigation.filter.levels, {
       'artist': {'Other Artist'},
     });
 
@@ -960,7 +967,7 @@ void main() {
                 id: t.id,
                 libraryId: other.id,
                 path: t.path,
-                tags: t.tags,
+                levels: t.levels,
                 versions: t.versions,
                 versionStatuses: t.versionStatuses,
               ),
@@ -1400,7 +1407,7 @@ void main() {
       id: const NodeId('t'),
       libraryId: demoLibrary.id,
       path: 'Band/First album/Opening',
-      tags: const {
+      levels: const {
         'artist': 'Band',
         'album': 'First album',
         'title': 'Opening',
@@ -1504,7 +1511,7 @@ void main() {
           id: NodeId.generate(),
           libraryId: demoLibrary.id,
           path: 'Band/Album/Song',
-          tags: const {'artist': 'Band', 'album': 'Album', 'title': 'Song'},
+          levels: const {'artist': 'Band', 'album': 'Album', 'title': 'Song'},
           versions: [version('Song.rpp'), version('Song copy.rpp')],
         ),
       ],
@@ -1636,6 +1643,53 @@ void main() {
     expect(versions.trashed, ['Midnight Ferry v1/Midnight Ferry v1.rpp']);
   });
 
+  testWidgets('adds and removes the tags of a title', (tester) async {
+    final titles = demoTitles();
+    final ferry = titles.firstWhere((t) => titleName(t) == 'Midnight Ferry');
+    await pumpApp(
+      tester,
+      titles: [
+        for (final t in titles)
+          if (t == ferry)
+            Title(
+              id: t.id,
+              libraryId: t.libraryId,
+              path: t.path,
+              levels: t.levels,
+              tags: const ['live'],
+              versions: t.versions,
+              versionStatuses: t.versionStatuses,
+            )
+          else
+            t,
+      ],
+    );
+    await openMidnightFerry(tester);
+    expect(find.widgetWithText(InputChip, 'live'), findsOne);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Add a tag'),
+      'Mix 2',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(versions.tagged, ['+Mix 2']);
+
+    // Removing a shared tag asks first.
+    await tester.tap(find.byTooltip('Remove the tag live'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove the tag “live”?'), findsOne);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(versions.tagged, ['+Mix 2']);
+
+    await tester.tap(find.byTooltip('Remove the tag live'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+    expect(versions.tagged, ['+Mix 2', '-live']);
+  });
+
   testWidgets('keeps only one version after one confirmation', (tester) async {
     await pumpApp(tester, titles: demoTitles());
     await openMidnightFerry(tester);
@@ -1661,7 +1715,7 @@ void main() {
     final single = demoTitles().first;
     expect(single.versions, hasLength(1));
     await pumpApp(tester, titles: [single]);
-    await tester.tap(find.text(single.tags['title']!));
+    await tester.tap(find.text(single.levels['title']!));
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(

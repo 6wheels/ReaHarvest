@@ -35,14 +35,15 @@ class FilterBar extends ConsumerWidget {
     void set(TitleFilter f) => notifier.setFilter(f);
 
     final chips = <Widget>[
-      for (final (:level, :values) in options.tags)
-        if (values.length > 1 || (filter.tags[level.key]?.isNotEmpty ?? false))
+      for (final (:level, :values) in options.levels)
+        if (values.length > 1 ||
+            (filter.levels[level.key]?.isNotEmpty ?? false))
           _MultiChoiceChip<String>(
             label: layoutLevelLabel(l10n, level),
             options: values,
-            selected: filter.tags[level.key] ?? const {},
-            labelOf: (v) => tagValueLabel(l10n, v),
-            onChanged: (s) => set(filter.withTag(level.key, s)),
+            selected: filter.levels[level.key] ?? const {},
+            labelOf: (v) => levelValueLabel(l10n, v),
+            onChanged: (s) => set(filter.withLevel(level.key, s)),
           ),
       if (options.libraries.length > 1 || filter.libraries.isNotEmpty)
         _MultiChoiceChip(

@@ -234,7 +234,11 @@ void main() {
         'band/album/song',
       ]);
       final song = result.titles[1];
-      expect(song.tags, {'artist': 'band', 'album': 'album', 'title': 'song'});
+      expect(song.levels, {
+        'artist': 'band',
+        'album': 'album',
+        'title': 'song',
+      });
       expect(song.libraryId, lib.id);
       expect(song.versions.map((v) => v.fileName), ['v1/v1.rpp', 'v2/v2.RPP']);
       expect(song.versions.map((v) => v.folder), ['v1', 'v2']);
@@ -973,6 +977,66 @@ void main() {
       expect(tagged.tags, ['live', 'rehearsal']);
       expect(tagged.toJson()['tags'], ['live', 'rehearsal']);
       expect(tagged.withVersionStatus('V', 'idea').tags, ['live', 'rehearsal']);
+      final messy = NodeFile.fromJson({
+        'nodeId': id,
+        'level': 'title',
+        'tags': ['Live', 'live ', ''],
+      });
+      expect(messy.tags, ['Live']);
+    });
+  });
+
+  group('tags', () {
+    test('are written to the title node file and read by the scan', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1/v1.rpp', adopted);
+      final first = await scan(storage, lib);
+      expect(first.titles.single.tags, isEmpty);
+
+      const dir = 'band/album/song';
+      await addTitleTag(storage, dir, ' live ');
+      await addTitleTag(storage, dir, 'Live');
+      await addTitleTag(storage, dir, '');
+      final node = await addTitleTag(storage, dir, 'standard C');
+      expect(node.tags, ['live', 'standard C']);
+      final saved = jsonDecode(
+        File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
+            .readAsStringSync(),
+      );
+      expect(saved['tags'], ['live', 'standard C']);
+      expect(saved['nodeId'], first.titles.single.id);
+
+      // Nothing to change: the node file is not written again.
+      final nodeFile = File(
+        p.join(root.path, 'band', 'album', 'song', '.node.json'),
+      );
+      final before = DateTime(2020);
+      nodeFile.setLastModifiedSync(before);
+      await addTitleTag(storage, dir, 'STANDARD c');
+      await removeTitleTag(storage, dir, 'absent');
+      expect(nodeFile.lastModifiedSync(), before);
+
+      final second = await scan(storage, lib, previous: first);
+      expect(second.titles.single.tags, ['live', 'standard C']);
+
+      expect((await removeTitleTag(storage, dir, 'LIVE ')).tags, [
+        'standard C',
+      ]);
+      await removeTitleTag(storage, dir, 'standard C');
+      final cleared = (await scan(storage, lib, previous: second)).titles;
+      expect(cleared.single.tags, isEmpty);
+      expect(
+        File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
+            .readAsStringSync(),
+        isNot(contains('tags')),
+      );
+    });
+
+    test('require an existing node file', () {
+      expect(
+        addTitleTag(storage, 'missing', 'live'),
+        throwsA(isA<StateError>()),
+      );
     });
   });
 
@@ -1082,7 +1146,7 @@ void main() {
         'band/other',
       ]);
       final demo = result.titles.first;
-      expect(demo.tags, {
+      expect(demo.levels, {
         'folder1': 'band',
         'folder2': '2024',
         'title': 'demo',
@@ -2056,7 +2120,7 @@ void main() {
 
       final result = await scan(storage, lib);
 
-      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.tags, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v/v.rpp');      expect(result.titles[1].tags['artist'], 'Band');
+      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.levels, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v/v.rpp');      expect(result.titles[1].levels['artist'], 'Band');
       expect(layoutIssues(result), {
         ReportKind.misplacedLevel: [
           const ReportItem.misplaced(

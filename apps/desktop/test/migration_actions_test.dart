@@ -180,7 +180,7 @@ void main() {
       ),
     ]);
     expect(
-      index.titles().map((t) => t.tags['title']),
+      index.titles().map((t) => t.levels['title']),
       containsAll(['Song', 'Loose']),
     );
     final task = container.read(tasksProvider).last;

@@ -32,7 +32,7 @@ List<Title> demoTitles() {
         id: NodeId('demo-$i-$name'),
         libraryId: demoLibrary.id,
         path: 'Sample Artist/Album ${i ~/ 4 + 1}/$name',
-        tags: {
+        levels: {
           'artist': i.isEven ? 'Sample Artist' : 'Other Artist',
           'album': 'Album ${i ~/ 4 + 1}',
           'title': name,

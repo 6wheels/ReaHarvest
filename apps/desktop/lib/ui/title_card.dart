@@ -58,8 +58,8 @@ class _TitleCardState extends State<TitleCard> {
     final l10n = AppLocalizations.of(context);
     final light = Theme.of(context).brightness == Brightness.light;
     final palette = AuroraPalette.of(t.id, light: light);
-    final tags = [
-      for (final v in parentTags(t)) tagValueLabel(l10n, v).toUpperCase(),
+    final levels = [
+      for (final v in parentLevels(t)) levelValueLabel(l10n, v).toUpperCase(),
     ].join(labelSeparator);
     final bpm = tempoOf(t);
     final date = shortDate(l10n, lastModified(t));
@@ -107,7 +107,7 @@ class _TitleCardState extends State<TitleCard> {
                       const SizedBox(width: Space.s),
                       Expanded(
                         child: Text(
-                          tags,
+                          levels,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: context.legend.copyWith(fontSize: 9.5),

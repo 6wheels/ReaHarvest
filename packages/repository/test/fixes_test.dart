@@ -828,7 +828,7 @@ void main() {
             id: NodeId.generate(),
             libraryId: const LibraryId('L'),
             path: song,
-            tags: const {},
+            levels: const {},
             versions: [
               v('a/a.rpp', [r'Media\x.wav', r'C:\abs.wav']),
             ],

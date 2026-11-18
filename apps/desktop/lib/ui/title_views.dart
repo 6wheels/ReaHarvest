@@ -13,7 +13,7 @@ import 'status_trail.dart';
 import 'title_actions.dart';
 import 'widgets.dart';
 
-enum _Column { name, tags, versions, tempo, status, modified }
+enum _Column { name, levels, versions, tempo, status, modified }
 
 /// Dense table of titles, sortable by column (SPEC §5.2).
 class TitleList extends ConsumerStatefulWidget {
@@ -44,7 +44,7 @@ class _TitleListState extends ConsumerState<TitleList> {
     final selected = ref.watch(overviewProvider);
     final labels = {
       _Column.name: l10n.columnName,
-      _Column.tags: '',
+      _Column.levels: '',
       _Column.versions: l10n.versions,
       _Column.tempo: 'BPM',
       _Column.status: l10n.filterStatus,
@@ -97,8 +97,8 @@ class _TitleListState extends ConsumerState<TitleList> {
                   cells: [
                     _NameCell(t),
                     _Text(
-                      parentTags(t)
-                          .map((v) => tagValueLabel(l10n, v))
+                      parentLevels(t)
+                          .map((v) => levelValueLabel(l10n, v))
                           .join(' · '),
                     ),
                     _Text('${t.versions.length}'),
@@ -124,7 +124,10 @@ class _TitleListState extends ConsumerState<TitleList> {
         x == null ? (y == null ? 0 : 1) : (y == null ? -1 : x.compareTo(y));
     return switch (column) {
       _Column.name => text(titleName(a), titleName(b)),
-      _Column.tags => text(parentTags(a).join('/'), parentTags(b).join('/')),
+      _Column.levels => text(
+        parentLevels(a).join('/'),
+        parentLevels(b).join('/'),
+      ),
       _Column.versions => a.versions.length.compareTo(b.versions.length),
       _Column.tempo => nullable(tempoOf(a), tempoOf(b)),
       _Column.status => nullable(
@@ -369,13 +372,13 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
         if (_collapsed.contains(id)) continue;
       }
       titles.sort((a, b) {
-        final pa = [...parentTags(a), titleName(a)].join('\u0000');
-        final pb = [...parentTags(b), titleName(b)].join('\u0000');
+        final pa = [...parentLevels(a), titleName(a)].join('\u0000');
+        final pb = [...parentLevels(b), titleName(b)].join('\u0000');
         return pa.toLowerCase().compareTo(pb.toLowerCase());
       });
       var open = <String>[];
       for (final t in titles) {
-        final groups = parentTags(t);
+        final groups = parentLevels(t);
         var common = 0;
         while (common < open.length &&
             common < groups.length &&
@@ -389,7 +392,7 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
           rows.add((
             key: key,
             depth: rootDepth + d,
-            group: tagValueLabel(l10n, groups[d]),
+            group: levelValueLabel(l10n, groups[d]),
             title: null,
           ));
         }

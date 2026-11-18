@@ -275,6 +275,30 @@ class VersionActions {
     await ref.rescanTitle(entry, title);
   }
 
+  /// Adds the free [tag] to [title], in the title's `.node.json` (SPEC
+  /// §5.9): applied to the tags read again from the file, so that no
+  /// concurrent change is lost. Then rescans.
+  Future<void> addTag(Title title, String tag) =>
+      _turn(title, () => _editTags(title, tag, add: true));
+
+  /// Removes the free [tag] from [title] (ignoring case), like [addTag].
+  Future<void> removeTag(Title title, String tag) =>
+      _turn(title, () => _editTags(title, tag, add: false));
+
+  Future<void> _editTags(Title title, String tag, {required bool add}) async {
+    final entry = ref.libraryEntry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    final node = await Isolate.run(() {
+      final storage = MountedFolderStorage(root);
+      return add
+          ? addTitleTag(storage, dir, tag)
+          : removeTitleTag(storage, dir, tag);
+    });
+    _log.info('Tags of title $dir set to ${node.tags}');
+    await ref.rescanTitle(entry, title);
+  }
+
   /// Moves [version] of [title] to the trash: its whole folder (SPEC §5.4).
   /// Then rescans.
   Future<void> trashVersion(Title title, Version version) =>

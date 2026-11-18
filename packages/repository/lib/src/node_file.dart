@@ -56,6 +56,10 @@ final class NodeFile {
   NodeFile withVersionOwner(String id, String? owner) =>
       _copy(versionOwners: _with(versionOwners, id, owner));
 
+  /// Copy with the free tags of the title set to [tags], normalized (see
+  /// [normalizeTags]); none clears them.
+  NodeFile withTags(Iterable<String> tags) => _copy(tags: normalizeTags(tags));
+
   /// Copy with the label and owner of the version [metadata]. A null owner
   /// is not written.
   NodeFile withVersion(VersionMetadata metadata) {
@@ -70,13 +74,14 @@ final class NodeFile {
     Map<String, String>? versionStatuses,
     Map<String, String>? versionLabels,
     Map<String, String>? versionOwners,
+    List<String>? tags,
   }) => NodeFile(
     id,
     level,
     versionStatuses: versionStatuses ?? this.versionStatuses,
     versionLabels: versionLabels ?? this.versionLabels,
     versionOwners: versionOwners ?? this.versionOwners,
-    tags: tags,
+    tags: tags ?? this.tags,
   );
 
   Map<String, Object?> toJson() => {
@@ -117,7 +122,7 @@ final class NodeFile {
       versionStatuses: map('versionStatuses'),
       versionLabels: map('versionLabels'),
       versionOwners: map('versionOwners'),
-      tags: tags.cast<String>(),
+      tags: normalizeTags(tags.cast<String>()),
     );
   }
 
@@ -185,8 +190,34 @@ Future<NodeFile> setVersionOwner(
   MemberId? owner,
 ) => updateNodeFile(storage, titlePath, (n) => n.withVersionOwner(id, owner));
 
-/// Applies [change] to the node file of [dir], read again first. Throws
-/// [StateError] when [dir] has no node file.
+/// Adds the free [tag] to the title at [titlePath] (SPEC §5.9), unless it
+/// already has it ignoring case. The node file is read again first, so that
+/// no concurrent change is lost.
+Future<NodeFile> addTitleTag(
+  RepositoryStorage storage,
+  String titlePath,
+  String tag,
+) => updateNodeFile(storage, titlePath, (n) => n.withTags([...n.tags, tag]));
+
+/// Removes the free [tag] from the title at [titlePath] (SPEC §5.9),
+/// ignoring case. The node file is read again first, so that no concurrent
+/// change is lost.
+Future<NodeFile> removeTitleTag(
+  RepositoryStorage storage,
+  String titlePath,
+  String tag,
+) => updateNodeFile(
+  storage,
+  titlePath,
+  (n) => n.withTags([
+    for (final t in n.tags)
+      if (t.trim().toLowerCase() != tag.trim().toLowerCase()) t,
+  ]),
+);
+
+/// Applies [change] to the node file of [dir], read again first; the file
+/// is not written when nothing changed. Throws [StateError] when [dir] has
+/// no node file.
 Future<NodeFile> updateNodeFile(
   RepositoryStorage storage,
   String dir,
@@ -197,6 +228,7 @@ Future<NodeFile> updateNodeFile(
     throw StateError('No $nodeFileName in "$dir"; scan the library first');
   }
   final updated = change(node);
+  if (jsonEncode(updated.toJson()) == jsonEncode(node.toJson())) return node;
   await writeNodeFile(storage, dir, updated);
   return updated;
 }

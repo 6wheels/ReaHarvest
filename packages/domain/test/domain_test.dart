@@ -5,6 +5,34 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('tags', () {
+    test('are trimmed and unique ignoring case, the first spelling kept', () {
+      expect(
+        normalizeTags([' live ', 'Live', '', '  ', 'standard C', 'LIVE']),
+        ['live', 'standard C'],
+      );
+      expect(normalizeTags(const []), isEmpty);
+    });
+
+    test('known to a set of titles, sorted ignoring case', () {
+      Title titled(List<String> tags) => Title(
+        id: NodeId.generate(),
+        libraryId: LibraryId.generate(),
+        path: 'Song',
+        levels: const {},
+        tags: tags,
+      );
+      expect(
+        knownTags([
+          titled(['rehearsal', 'Live']),
+          titled(['live', 'cover']),
+          titled(const []),
+        ]),
+        ['cover', 'Live', 'rehearsal'],
+      );
+    });
+  });
+
   group('ulid', () {
     test('generates valid, time-sortable ids', () {
       final a = newUlid(now: DateTime.utc(2026, 1, 1));
@@ -114,12 +142,12 @@ void main() {
 
     test('derives tags from a matching path', () {
       final layout = Layout.classic();
-      expect(layout.tagsOf(['Artist', Layout.unassigned, 'Song']), {
+      expect(layout.levelsOf(['Artist', Layout.unassigned, 'Song']), {
         'artist': 'Artist',
         'album': '_Unassigned',
         'title': 'Song',
       });
-      expect(layout.tagsOf(['Artist', 'Song']), isNull);
+      expect(layout.levelsOf(['Artist', 'Song']), isNull);
     });
   });
 
@@ -260,7 +288,7 @@ void main() {
         id: NodeId.generate(),
         libraryId: LibraryId.generate(),
         path: 'Artist/Album/Song',
-        tags: const {'title': 'Song'},
+        levels: const {'title': 'Song'},
         versions: [adopted, free],
         versionStatuses: const {'V1': 'done', 'sub/b.rpp': 'idea'},
       );
@@ -276,7 +304,7 @@ void main() {
         id: const NodeId('T'),
         libraryId: const LibraryId('L'),
         path: 'Song',
-        tags: const {},
+        levels: const {},
         versions: [
           version('a/a.rpp', id: 'V1'),
           version('b/b.rpp', id: 'V2'),
@@ -302,7 +330,7 @@ void main() {
         id: NodeId.generate(),
         libraryId: const LibraryId('L'),
         path: path,
-        tags: const {},
+        levels: const {},
         versions: versions,
       );
       final first = title('A', [version('a.rpp', id: 'V1'), version('b.rpp')]);
