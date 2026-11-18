@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../theme/app_theme.dart';
 import '../path_row.dart';
 import 'settings_section.dart';
 
@@ -18,17 +20,21 @@ class AboutPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SettingsSection(l10n.about, first: true),
+        Padding(
+          padding: const EdgeInsets.only(bottom: Space.l),
+          child: Text(
+            'ReaHarvest',
+            style: Theme.of(context).textTheme.displaySmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
         FormRow(label: l10n.applicationVersion, child: const Text(appVersion)),
         FormRow(
           label: l10n.licenses,
           child: Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton(
-              onPressed: () => showLicensePage(
-                context: context,
-                applicationName: 'ReaHarvest',
-                applicationVersion: appVersion,
-              ),
+              onPressed: () => _showLicenses(context),
               child: Text(l10n.showLicenses),
             ),
           ),
@@ -37,3 +43,33 @@ class AboutPage extends StatelessWidget {
     );
   }
 }
+
+/// Licenses in a popup smaller than the settings one; Escape closes it. The
+/// package pages stay inside it (own navigator).
+Future<void> _showLicenses(BuildContext context) => showDialog<void>(
+  context: context,
+  builder: (context) => Dialog(
+    clipBehavior: Clip.antiAlias,
+    child: CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            Navigator.of(context).pop(),
+      },
+      child: Focus(
+        autofocus: true,
+        child: SizedBox(
+          width: 700,
+          height: 460,
+          child: Navigator(
+            onGenerateRoute: (_) => MaterialPageRoute<void>(
+              builder: (_) => const LicensePage(
+                applicationName: 'ReaHarvest',
+                applicationVersion: appVersion,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ),
+);

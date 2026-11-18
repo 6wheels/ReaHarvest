@@ -433,8 +433,14 @@ void main() {
     await tester.tap(find.text('Show the licenses'));
     await tester.pumpAndSettle();
     expect(find.byType(LicensePage), findsOneWidget);
-    await tester.pageBack();
+    expect(find.text('ReaHarvest'), findsWidgets);
+    final dialog = tester.getSize(find.byType(LicensePage));
+    expect(dialog.width, lessThan(820));
+    expect(dialog.height, lessThan(560));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
+    expect(find.byType(LicensePage), findsNothing);
+    expect(find.text('ABOUT'), findsOneWidget);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
