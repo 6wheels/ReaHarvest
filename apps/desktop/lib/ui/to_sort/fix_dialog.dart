@@ -47,6 +47,8 @@ class LevelField extends StatefulWidget {
     required this.error,
     required this.onChanged,
     this.hint,
+    this.onSubmit,
+    this.dense = false,
   });
 
   final String label;
@@ -57,6 +59,12 @@ class LevelField extends StatefulWidget {
   final List<String> Function() options;
   final String? error;
   final VoidCallback onChanged;
+
+  /// Called with the text when the user presses Enter or picks an option.
+  final ValueChanged<String>? onSubmit;
+
+  /// Compact field, without the room kept for an error.
+  final bool dense;
 
   @override
   State<LevelField> createState() => _LevelFieldState();
@@ -79,7 +87,10 @@ class _LevelFieldState extends State<LevelField> {
       final typed = value.text.trim().toLowerCase();
       return widget.options().where((o) => o.toLowerCase().contains(typed));
     },
-    onSelected: (_) => widget.onChanged(),
+    onSelected: (value) {
+      widget.onChanged();
+      widget.onSubmit?.call(value);
+    },
     // Up and down move through the options, Enter picks the highlighted
     // one, Escape hides them.
     fieldViewBuilder: (context, controller, focusNode, onSubmitted) =>
@@ -87,12 +98,16 @@ class _LevelFieldState extends State<LevelField> {
           controller: controller,
           focusNode: focusNode,
           onChanged: (_) => widget.onChanged(),
-          onSubmitted: (_) => onSubmitted(),
+          onSubmitted: (value) {
+            onSubmitted();
+            widget.onSubmit?.call(controller.text);
+          },
           decoration: InputDecoration(
             labelText: widget.label,
             hintText: widget.hint,
             // Room kept for the error: the dialog keeps its size.
-            helperText: ' ',
+            helperText: widget.dense ? null : ' ',
+            isDense: widget.dense,
             errorText: widget.error,
           ),
         ),

@@ -1093,6 +1093,7 @@ final class _Scanner {
       libraryId: library.id,
       path: dir,
       levels: levels,
+      tags: node.tags,
       versions: [
         for (final v in versions)
           if (v.metadata case final m?)

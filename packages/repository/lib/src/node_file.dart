@@ -56,6 +56,10 @@ final class NodeFile {
   NodeFile withVersionOwner(String id, String? owner) =>
       _copy(versionOwners: _with(versionOwners, id, owner));
 
+  /// Copy with the free tags of the title set to [tags], normalized (see
+  /// [normalizeTags]); none clears them.
+  NodeFile withTags(Iterable<String> tags) => _copy(tags: normalizeTags(tags));
+
   /// Copy with the label and owner of the version [metadata]. A null owner
   /// is not written.
   NodeFile withVersion(VersionMetadata metadata) {
@@ -70,13 +74,14 @@ final class NodeFile {
     Map<String, String>? versionStatuses,
     Map<String, String>? versionLabels,
     Map<String, String>? versionOwners,
+    List<String>? tags,
   }) => NodeFile(
     id,
     level,
     versionStatuses: versionStatuses ?? this.versionStatuses,
     versionLabels: versionLabels ?? this.versionLabels,
     versionOwners: versionOwners ?? this.versionOwners,
-    tags: tags,
+    tags: tags ?? this.tags,
   );
 
   Map<String, Object?> toJson() => {
@@ -184,6 +189,15 @@ Future<NodeFile> setVersionOwner(
   VersionId id,
   MemberId? owner,
 ) => updateNodeFile(storage, titlePath, (n) => n.withVersionOwner(id, owner));
+
+/// Sets the free tags of the title at [titlePath] (SPEC §5.9), normalized;
+/// none clears them. The node file is read again first, so that no
+/// concurrent change is lost.
+Future<NodeFile> setTitleTags(
+  RepositoryStorage storage,
+  String titlePath,
+  Iterable<String> tags,
+) => updateNodeFile(storage, titlePath, (n) => n.withTags(tags));
 
 /// Applies [change] to the node file of [dir], read again first. Throws
 /// [StateError] when [dir] has no node file.

@@ -980,6 +980,48 @@ void main() {
     });
   });
 
+  group('tags', () {
+    test('are written to the title node file and read by the scan', () async {
+      final lib = library(Layout.classic());
+      put('band/album/song/v1/v1.rpp', adopted);
+      final first = await scan(storage, lib);
+      expect(first.titles.single.tags, isEmpty);
+
+      final node = await setTitleTags(storage, 'band/album/song', [
+        ' live ',
+        'Live',
+        'standard C',
+        '',
+      ]);
+      expect(node.tags, ['live', 'standard C']);
+      final saved = jsonDecode(
+        File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
+            .readAsStringSync(),
+      );
+      expect(saved['tags'], ['live', 'standard C']);
+      expect(saved['nodeId'], first.titles.single.id);
+
+      final second = await scan(storage, lib, previous: first);
+      expect(second.titles.single.tags, ['live', 'standard C']);
+
+      await setTitleTags(storage, 'band/album/song', const []);
+      final cleared = (await scan(storage, lib, previous: second)).titles;
+      expect(cleared.single.tags, isEmpty);
+      expect(
+        File(p.join(root.path, 'band', 'album', 'song', '.node.json'))
+            .readAsStringSync(),
+        isNot(contains('tags')),
+      );
+    });
+
+    test('require an existing node file', () {
+      expect(
+        setTitleTags(storage, 'missing', ['live']),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
   group('version labels and owners', () {
     const title = 'band/album/song';
     const file = '$title/v1/v1.rpp';

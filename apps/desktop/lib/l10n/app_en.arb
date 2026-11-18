@@ -419,5 +419,13 @@
   "about": "About",
   "applicationVersion": "Version",
   "licenses": "Licenses",
-  "showLicenses": "Show the licenses"
+  "showLicenses": "Show the licenses",
+  "tagsLabel": "Tags",
+  "tagAddHint": "Add a tag",
+  "tagRemove": "Remove the tag {tag}",
+  "@tagRemove": {
+    "placeholders": {
+      "tag": {"type": "String"}
+    }
+  }
 }

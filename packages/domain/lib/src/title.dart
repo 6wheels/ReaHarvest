@@ -8,6 +8,7 @@ final class Title {
     required this.libraryId,
     required this.path,
     required this.levels,
+    this.tags = const [],
     this.versions = const [],
     this.versionStatuses = const {},
   });
@@ -30,6 +31,10 @@ final class Title {
 
   /// Level values derived from the path (e.g. `artist`, `album`, `title`).
   final Map<String, String> levels;
+
+  /// Free tags of the title, shared by the members (SPEC §5.9): trimmed,
+  /// unique ignoring case (see [normalizeTags]).
+  final List<String> tags;
 
   final List<Version> versions;
 
@@ -55,6 +60,22 @@ final class Title {
     return best;
   }
 }
+
+/// [tags] trimmed, without the empty ones and the duplicates ignoring case,
+/// the first spelling kept (SPEC §5.9).
+List<String> normalizeTags(Iterable<String> tags) {
+  final seen = <String>{};
+  return [
+    for (final t in tags.map((t) => t.trim()))
+      if (t.isNotEmpty && seen.add(t.toLowerCase())) t,
+  ];
+}
+
+/// The tags used by [titles], for autocompletion: unique ignoring case (the
+/// first spelling kept), sorted ignoring case.
+List<String> knownTags(Iterable<Title> titles) =>
+    normalizeTags([for (final t in titles) ...t.tags])
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
 /// Versions sharing a version id (manual duplicates, e.g. *Save As*,
 /// SPEC §4.2), by id. Each list holds at least two versions.

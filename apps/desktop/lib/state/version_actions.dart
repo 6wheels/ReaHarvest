@@ -275,6 +275,22 @@ class VersionActions {
     await ref.rescanTitle(entry, title);
   }
 
+  /// Sets the free [tags] of [title] (normalized, none clears them), in the
+  /// title's `.node.json` (SPEC §5.9). Then rescans.
+  Future<void> setTags(Title title, List<String> tags) =>
+      _turn(title, () => _setTags(title, tags));
+
+  Future<void> _setTags(Title title, List<String> tags) async {
+    final entry = ref.libraryEntry(title.libraryId);
+    final root = entry.libraryRoot;
+    final dir = title.path;
+    await Isolate.run(
+      () => setTitleTags(MountedFolderStorage(root), dir, tags),
+    );
+    _log.info('Tags of title $dir set to ${normalizeTags(tags)}');
+    await ref.rescanTitle(entry, title);
+  }
+
   /// Moves [version] of [title] to the trash: its whole folder (SPEC §5.4).
   /// Then rescans.
   Future<void> trashVersion(Title title, Version version) =>

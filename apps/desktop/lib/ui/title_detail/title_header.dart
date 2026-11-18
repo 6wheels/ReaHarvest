@@ -9,6 +9,7 @@ import '../aurora.dart';
 import '../formats.dart';
 import '../labels.dart';
 import '../status_trail.dart';
+import 'title_tags.dart';
 
 /// Title name with its first parent tag (e.g. the artist) on the same
 /// line, the other levels (e.g. the album) and the library below; stats of
@@ -96,6 +97,7 @@ class Header extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: context.legend,
                         ),
+                      TitleTags(t),
                       if (toAdopt > 0)
                         Row(
                           children: [

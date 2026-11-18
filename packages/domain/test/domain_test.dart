@@ -5,6 +5,34 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('tags', () {
+    test('are trimmed and unique ignoring case, the first spelling kept', () {
+      expect(
+        normalizeTags([' live ', 'Live', '', '  ', 'standard C', 'LIVE']),
+        ['live', 'standard C'],
+      );
+      expect(normalizeTags(const []), isEmpty);
+    });
+
+    test('known to a set of titles, sorted ignoring case', () {
+      Title titled(List<String> tags) => Title(
+        id: NodeId.generate(),
+        libraryId: LibraryId.generate(),
+        path: 'Song',
+        levels: const {},
+        tags: tags,
+      );
+      expect(
+        knownTags([
+          titled(['rehearsal', 'Live']),
+          titled(['live', 'cover']),
+          titled(const []),
+        ]),
+        ['cover', 'Live', 'rehearsal'],
+      );
+    });
+  });
+
   group('ulid', () {
     test('generates valid, time-sortable ids', () {
       final a = newUlid(now: DateTime.utc(2026, 1, 1));

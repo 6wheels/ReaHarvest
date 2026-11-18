@@ -336,6 +336,62 @@ void main() {
     expect(versions.where((v) => file(v).existsSync()), hasLength(1));
   });
 
+  testWidgets('tags a title, shared through its node file (#132)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const ReaHarvestApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Song');
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Overview),
+        matching: find.byTooltip('Open detail'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    List<Object?>? stored() =>
+        (jsonDecode(file('.node.json').readAsStringSync()) as Map)['tags']
+            as List?;
+
+    // A tag is added, trimmed and written in the node file.
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Add a tag'),
+      ' standard C ',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await waitFor(
+      tester,
+      () => find.widgetWithText(InputChip, 'standard C').evaluate().isNotEmpty,
+      reason: 'tag added',
+    );
+    expect(stored(), ['standard C']);
+
+    // The same tag with another case is not added twice.
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Add a tag'),
+      'STANDARD c',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.byType(InputChip), findsOne);
+    expect(stored(), ['standard C']);
+
+    // Removed, the key leaves the node file.
+    await tester.tap(find.byTooltip('Remove the tag standard C'));
+    await waitFor(
+      tester,
+      () => find.byType(InputChip).evaluate().isEmpty,
+      reason: 'tag removed',
+    );
+    expect(stored(), isNull);
+  });
+
   testWidgets('reports misplaced levels of a misorganized folder', (
     tester,
   ) async {

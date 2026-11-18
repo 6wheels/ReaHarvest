@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 14;
+const _schemaVersion = 15;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -40,6 +40,7 @@ CREATE TABLE titles (
   path TEXT NOT NULL,
   id TEXT NOT NULL,
   levels TEXT NOT NULL,
+  tags TEXT NOT NULL,
   version_statuses TEXT NOT NULL,
   version_labels TEXT NOT NULL,
   version_owners TEXT NOT NULL,
@@ -267,9 +268,9 @@ final class LocalIndex {
     Map<String, NodeFile> nodes,
   ) {
     _insertAll(
-      'INSERT INTO titles (library_id, path, id, levels, '
+      'INSERT INTO titles (library_id, path, id, levels, tags, '
       'version_statuses, version_labels, version_owners) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         for (final t in titles)
           [
@@ -277,6 +278,7 @@ final class LocalIndex {
             t.path,
             t.id,
             jsonEncode(t.levels),
+            jsonEncode(t.tags),
             jsonEncode(t.versionStatuses),
             // Raw node entries: the next scan reuses them while the node
             // file is unchanged (SPEC §4.2).
@@ -486,6 +488,7 @@ final class LocalIndex {
           libraryId: LibraryId(r['library_id'] as String),
           path: r['path'] as String,
           levels: (jsonDecode(r['levels'] as String) as Map).cast(),
+          tags: (jsonDecode(r['tags'] as String) as List).cast(),
           versions: versions[(r['library_id'], r['path'])] ?? const [],
           versionStatuses: _stringMap(r['version_statuses'] as String),
         ),
@@ -639,6 +642,7 @@ final class LocalIndex {
           versionStatuses: byPath[r['path']]?.versionStatuses ?? const {},
           versionLabels: entries[r['path']]?.labels ?? const {},
           versionOwners: entries[r['path']]?.owners ?? const {},
+          tags: byPath[r['path']]?.tags ?? const [],
         ),
     };
   }

@@ -336,5 +336,8 @@
   "about": "À propos",
   "applicationVersion": "Version",
   "licenses": "Licences",
-  "showLicenses": "Afficher les licences"
+  "showLicenses": "Afficher les licences",
+  "tagsLabel": "Tags",
+  "tagAddHint": "Ajouter un tag",
+  "tagRemove": "Retirer le tag {tag}"
 }

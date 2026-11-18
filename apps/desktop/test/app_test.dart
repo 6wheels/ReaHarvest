@@ -151,6 +151,7 @@ class FakeVersionActions extends VersionActions {
   final created = <(String, String, String?)>[];
   final edited = <(String, String, String)>[];
   final statuses = <(String, String?)>[];
+  final tagged = <List<String>>[];
   final trashed = <String>[];
   final keptOnly = <String>[];
   final purged = <List<String>>[];
@@ -190,6 +191,10 @@ class FakeVersionActions extends VersionActions {
     Version version,
     String? status,
   ) async => statuses.add((version.fileName, status));
+
+  @override
+  Future<void> setTags(Title title, List<String> tags) async =>
+      tagged.add(tags);
 
   @override
   Future<void> trashVersion(Title title, Version version) async =>
@@ -1634,6 +1639,45 @@ void main() {
     await tester.tap(find.text('Continue anyway'));
     await tester.pumpAndSettle();
     expect(versions.trashed, ['Midnight Ferry v1/Midnight Ferry v1.rpp']);
+  });
+
+  testWidgets('adds and removes the tags of a title', (tester) async {
+    final titles = demoTitles();
+    final ferry = titles.firstWhere((t) => titleName(t) == 'Midnight Ferry');
+    await pumpApp(
+      tester,
+      titles: [
+        for (final t in titles)
+          if (t == ferry)
+            Title(
+              id: t.id,
+              libraryId: t.libraryId,
+              path: t.path,
+              levels: t.levels,
+              tags: const ['live'],
+              versions: t.versions,
+              versionStatuses: t.versionStatuses,
+            )
+          else
+            t,
+      ],
+    );
+    await openMidnightFerry(tester);
+    expect(find.widgetWithText(InputChip, 'live'), findsOne);
+
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Add a tag'),
+      'Mix 2',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(versions.tagged, [
+      ['live', 'Mix 2'],
+    ]);
+
+    await tester.tap(find.byTooltip('Remove the tag live'));
+    await tester.pumpAndSettle();
+    expect(versions.tagged.last, isEmpty);
   });
 
   testWidgets('keeps only one version after one confirmation', (tester) async {

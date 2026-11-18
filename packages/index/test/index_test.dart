@@ -73,11 +73,13 @@ void main() {
     String album,
     String name, {
     List<Version> versions = const [],
+    List<String> tags = const [],
   }) => Title(
     id: NodeId.generate(),
     libraryId: lib,
     path: '$artist/$album/$name',
     levels: {'artist': artist, 'album': album, 'title': name},
+    tags: tags,
     versions: versions,
   );
 
@@ -825,6 +827,26 @@ void main() {
     });
   });
 
+  group('tags', () {
+    test('are stored with their title', () {
+      final lib = library();
+      index.update(
+        lib,
+        ScanResult(
+          titles: [
+            title(lib.id, 'A', 'B', 'C', tags: ['live', 'Standard C']),
+            title(lib.id, 'A', 'B', 'D'),
+          ],
+          nodes: const {},
+          issues: Report(const {}),
+        ),
+      );
+      final stored = index.titles();
+      expect(stored.first.tags, ['live', 'Standard C']);
+      expect(stored.last.tags, isEmpty);
+    });
+  });
+
   group('TitleSearch', () {
     final lib = LibraryId.generate();
     final alice = MemberId.generate();
@@ -837,7 +859,13 @@ void main() {
         versions: [version('Drums take.rpp', label: 'chorus B', by: alice)],
       ),
       title(lib, 'Southern Band', 'Second', 'Morning coffee'),
-      title(lib, 'Northern Lights', 'Second', 'Late night'),
+      title(
+        lib,
+        'Northern Lights',
+        'Second',
+        'Late night',
+        tags: ['standard C', 'live session'],
+      ),
     ];
     final search = TitleSearch(titles, memberNames: {alice: 'Alice'});
 
@@ -854,6 +882,12 @@ void main() {
       expect(find('chorus'), ['Dancing on a line']);
       expect(find('alice'), ['Dancing on a line']);
       expect(find('northern'), ['Dancing on a line', 'Late night']);
+    });
+
+    test('matches the free tags of a title', () {
+      expect(find('session'), ['Late night']);
+      expect(find('standard'), ['Late night']);
+      expect(find('standard live'), ['Late night']);
     });
 
     test('combines words, prefixes and diacritics', () {
