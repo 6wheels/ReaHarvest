@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
+import 'conventions.dart';
+
 /// Text encoding of a project file (SPEC §7.3).
 enum ProjectEncoding { utf8, windows1252 }
 
@@ -39,20 +41,36 @@ Future<({String text, ProjectEncoding encoding})> readProject(
   }
 }
 
-/// Writes [text] to the project at [path] in [encoding]. Throws
-/// [ProjectEncodingException], without writing, if [text] cannot be
-/// written in it.
+/// Writes [text] to the project at [path] in [encoding], then gives it the
+/// date [modified] when set (SPEC §4.2: only a new version takes the
+/// current date). Throws [ProjectEncodingException], without writing, if
+/// [text] cannot be written in it.
 Future<void> writeProject(
   RepositoryStorage storage,
   String path,
   String text,
-  ProjectEncoding encoding,
-) async {
+  ProjectEncoding encoding, {
+  DateTime? modified,
+}) async {
   final bytes = switch (encoding) {
     ProjectEncoding.utf8 => utf8.encode(text),
     ProjectEncoding.windows1252 => _encode1252(path, text),
   };
   await storage.write(path, Stream.value(bytes));
+  if (modified != null) await storage.setModified(path, modified);
+}
+
+/// Copies the file [from] to [to]; a project keeps its date (SPEC §4.2).
+Future<void> copyKeepingProjectDate(
+  RepositoryStorage storage,
+  String from,
+  String to,
+) async {
+  final modified = (await storage.stat(from))?.modified;
+  await storage.write(to, storage.read(from));
+  if (modified != null && isProjectFile(to)) {
+    await storage.setModified(to, modified);
+  }
 }
 
 /// Code points of the bytes 0x80 to 0x9F; the five undefined bytes map to

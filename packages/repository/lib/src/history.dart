@@ -30,8 +30,9 @@ final class Backup {
 /// Backs up the version [fileName] of the title [titleDir] (UI: « Créer un
 /// point de sauvegarde », SPEC §5.4): copies it into the `.history/` of its
 /// version folder as `<name> <yyyy-MM-dd HHmmss>.<ext>`, its relative paths
-/// rebased so that the backup opens in REAPER ([rebaseProjectPaths]); the
-/// version is unchanged. Returns the path of the backup.
+/// rebased so that the backup opens in REAPER ([rebaseProjectPaths]) and its
+/// date kept (SPEC §4.2); the version is unchanged. Returns the path of the
+/// backup.
 Future<String> backupVersion(
   RepositoryStorage storage,
   String titleDir,
@@ -48,15 +49,15 @@ Future<String> backupVersion(
     storage,
     joinPath(history, '$name ${_stamp(now ?? DateTime.now())}$ext'),
   );
-  final (:text, :encoding) = await readProject(
-    storage,
-    joinPath(titleDir, fileName),
-  );
+  final source = joinPath(titleDir, fileName);
+  final modified = (await storage.stat(source))?.modified;
+  final (:text, :encoding) = await readProject(storage, source);
   await writeProject(
     storage,
     target,
-    rebaseProjectPaths(text, parentOf(joinPath(titleDir, fileName)), history),
+    rebaseProjectPaths(text, parentOf(source), history),
     encoding,
+    modified: modified,
   );
   return target;
 }
@@ -96,8 +97,9 @@ Future<Map<VersionId, List<Backup>>> readHistory(
 
 /// Restores the backup [backup] into the version [fileName] of the title
 /// [titleDir] (SPEC §5.4): the current content is backed up first, then
-/// replaced, its relative paths rebased to the version folder. Returns the
-/// path of that new backup.
+/// replaced, its relative paths rebased to the version folder, and the
+/// version takes the date of the backup (SPEC §4.2). Returns the path of
+/// that new backup.
 Future<String> restoreBackup(
   RepositoryStorage storage,
   String titleDir,
@@ -107,24 +109,28 @@ Future<String> restoreBackup(
 }) async {
   final saved = await backupVersion(storage, titleDir, fileName, now: now);
   final version = joinPath(titleDir, fileName);
+  final modified = (await storage.stat(backup))?.modified;
   final (:text, :encoding) = await readProject(storage, backup);
   await writeProject(
     storage,
     version,
     rebaseProjectPaths(text, parentOf(backup), parentOf(version)),
     encoding,
+    modified: modified,
   );
   return saved;
 }
 
 /// Normalizes the relative paths of the backup [backup] before it is opened
 /// in REAPER, which lengthens them on every save of a backup (SPEC §5.4).
-/// The file is written only if a path changed.
+/// The file is written only if a path changed, and keeps its date.
 Future<void> cleanBackupPaths(RepositoryStorage storage, String backup) async {
+  final modified = (await storage.stat(backup))?.modified;
   final (:text, :encoding) = await readProject(storage, backup);
   final dir = parentOf(backup);
   final cleaned = rebaseProjectPaths(text, dir, dir);
-  if (cleaned != text) await writeProject(storage, backup, cleaned, encoding);
+  if (cleaned == text) return;
+  await writeProject(storage, backup, cleaned, encoding, modified: modified);
 }
 
 /// Rewrites the relative paths of a project written for the folder [from]

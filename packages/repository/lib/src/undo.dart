@@ -8,6 +8,7 @@ import 'library_path.dart';
 import 'migration.dart';
 import 'migration_journal.dart';
 import 'mounted_folder_storage.dart';
+import 'project_file.dart';
 
 /// A fix left to undo (SPEC §5.8 step 5, #94): failed and not undone, or
 /// interrupted. [folder] is its migration folder, [path] the library path
@@ -131,9 +132,10 @@ Future<Report> undoFix(
         if (await storage.stat(path) == null) continue;
         // What the copy replaces may hold work saved since the fix.
         if (!await _sameContent(storage, path, copy)) {
-          await storage.write(
+          await copyKeepingProjectDate(
+            storage,
+            path,
             await freePath(storage, '${migration.folder}/replaced/$path'),
-            storage.read(path),
           );
           await storage.write(path, storage.read(copy));
         }

@@ -74,8 +74,11 @@ void main() {
     // The first original only, under its inventory path.
     expect(storage.text('$folder/originals/a.rpp'), 'original');
     expect(storage.files.containsKey('$folder/originals/new.txt'), isFalse);
-    // A rewritten project keeps its date (version date).
+    // A rewritten project keeps its date (version date), and so do the
+    // copies of a project.
     expect(storage.files['song/a.rpp']!.modified, date);
+    expect(storage.files['$folder/originals/a.rpp']!.modified, date);
+    expect(storage.files['$folder/fixes/0/song/a.rpp']!.modified, date);
     expect(await guarded.stat('empty'), isNotNull);
     expect(await guarded.list(''), isNotEmpty);
     expect(await utf8.decodeStream(guarded.read('new.txt')), 'new, rewritten');

@@ -332,7 +332,7 @@ Future<Report> applyPlan(RepositoryStorage storage, MediaPlan plan) async {
             break;
         }
       case CopyFile(:final from, :final to, :final role):
-        await storage.write(to, storage.read(from));
+        await copyKeepingProjectDate(storage, from, to);
         if (role == FileRole.media) {
           add(ReportKind.mediaCopied, ReportItem(to, from));
         }
