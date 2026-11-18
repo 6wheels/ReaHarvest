@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import 'harness.dart';
 
@@ -42,7 +43,10 @@ void main() {
     await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
     final library = h.settings.libraries.single.id;
-    final moved = h.path('Band/Artist/Live/Ballad/v1.rpp');
+    final moved = h.path('Band/Artist/Live/Ballad/v1/v1.rpp');
+    final ballad = OrganizeTitle('Live/Ballad', 'Artist/Live/Ballad', [
+      const FixVersion('Live/Ballad/v1.rpp', folder: 'v1', label: 'v1'),
+    ], level: 'title');
 
     // Another writer holds the turn of the library.
     var hold = Completer<void>();
@@ -52,8 +56,7 @@ void main() {
     // Asked meanwhile: shown at once, waiting, then cancelled before it
     // starts; nothing moved.
     final before = h.tasks.length;
-    await openSectionFix(tester, wrongLevel);
-    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
+    unawaited(h.migration.fix(library, [ballad]));
     await waitFor(
       tester,
       () => h.tasks.length > before && h.tasks.last.isQueued,
@@ -73,8 +76,7 @@ void main() {
     hold = Completer<void>();
     holding = turns.run(library, () => hold.future);
     final queued = h.tasks.length;
-    await openSectionFix(tester, wrongLevel);
-    await tester.tap(find.widgetWithText(FilledButton, 'Fix'));
+    unawaited(h.migration.fix(library, [ballad]));
     await waitFor(
       tester,
       () => h.tasks.length > queued && h.tasks.last.isQueued,

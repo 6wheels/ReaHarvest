@@ -1,6 +1,5 @@
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
-import 'content_hash.dart';
 import 'conventions.dart';
 import 'guarded_storage.dart';
 import 'inventory.dart';
@@ -31,26 +30,6 @@ final class Migration {
   /// [RepositoryStorage] for the fixes of this migration ([GuardedStorage]);
   /// requires a complete inventory.
   RepositoryStorage get storage => GuardedStorage(_storage, inventory, journal);
-
-  /// [hash], answered from the inventory for a file other than a project
-  /// (projects are rewritten in place, keeping their date) found at its
-  /// inventory place, following the moves, with its size and date
-  /// unchanged.
-  ContentHash inventoryHash(ContentHash hash) => (path) async {
-    if (!isProjectFile(path)) {
-      final origin = journal.origin(path);
-      final entry = origin == null ? null : inventory.entryOf(origin);
-      if (entry != null) {
-        final found = await _storage.stat(path);
-        if (found != null &&
-            found.size == entry.size &&
-            found.modified == entry.modified) {
-          return entry.hash;
-        }
-      }
-    }
-    return hash(path);
-  };
 
   /// This migration, its journal read again from the storage: a line whose
   /// append threw may be on disk.

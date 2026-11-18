@@ -17,6 +17,15 @@ import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'library_env.dart';
 
+/// Moves the title folder [from] to [to]; its project [file] gets the
+/// version folder named after it.
+OrganizeTitle moveTitle(String from, String to, String file) {
+  final name = p.posix.basenameWithoutExtension(file);
+  return OrganizeTitle(from, to, [
+    FixVersion('$from/$file', folder: name, label: name),
+  ], level: 'title');
+}
+
 void main() {
   setUpLibraryEnv();
   final en = lookupAppLocalizations(const Locale('en'));
@@ -91,7 +100,7 @@ void main() {
     expect(File(p.join(band, path)).existsSync(), isTrue);
   });
 
-  test('normalizes a title, keeping the date of its projects', () async {
+  test('organizes a title, keeping the date of its projects', () async {
     final song = await bandWithSong();
     final other = p.join(p.dirname(song), 'Other');
     // Same size once normalized (audio -> Media): read again anyway.
@@ -111,24 +120,21 @@ void main() {
     await scans.scanAll();
     final id = container.read(settingsProvider).libraries.single.id;
 
-    // The media normalization still works on the pool of a title, whose
-    // projects the scan no longer reads as versions (reworked in #148).
-    // The preview plans the operations, without making them.
-    final preview = await migration.previewNormalization(id, const [
-      'Artist/Album/Other',
-    ]).plans;
-    expect(preview['Artist/Album/Other']!.operations.map((op) => '$op'), [
-      'move Artist/Album/Other/audio/a.wav -> Artist/Album/Other/Media/a.wav',
-      r'rewrite Artist/Album/Other/v.rpp, audio\a.wav -> Media\a.wav',
+    await migration.fix(id, [
+      moveTitle('Artist/Album/Other', 'Artist/Album/Other', 'v.rpp'),
     ]);
-    expect(File(p.join(other, 'audio', 'a.wav')).existsSync(), isTrue);
 
-    await migration.fix(id, const [NormalizeMedia('Artist/Album/Other')]);
-
-    final project = File(p.join(other, 'v.rpp'));
+    final project = File(p.join(other, 'v', 'v.rpp'));
     expect(project.readAsStringSync(), contains(r'FILE "Media\a.wav"'));
     expect(project.lastModifiedSync(), DateTime(2020, 1, 2));
-    expect(File(p.join(other, 'Media', 'a.wav')).existsSync(), isTrue);
+    expect(File(p.join(other, 'v', 'Media', 'a.wav')).existsSync(), isTrue);
+    // Read again by the scan: one version, adopted.
+    final versions = index
+        .titles()
+        .firstWhere((t) => t.path == 'Artist/Album/Other')
+        .versions;
+    expect(versions.single.fileName, 'v/v.rpp');
+    expect(versions.single.isAdopted, isTrue);
   });
 
   test('moves a misplaced project into a title', () async {
@@ -149,22 +155,27 @@ void main() {
     await scans.scanAll();
     final id = container.read(settingsProvider).libraries.single.id;
 
-    final report = await migration.moveToTitle(id, 'Artist/loose.rpp', [
-      'Artist',
-      'Album',
-      'Loose',
+    final report = await migration.fix(id, [
+      MoveProject(
+        const FixVersion('Artist/loose.rpp', folder: 'loose', label: 'loose'),
+        'Artist/Album/Loose',
+        level: 'title',
+      ),
     ]);
 
     final root = container.read(settingsProvider).libraries.single.libraryRoot;
     expect(container.read(tasksProvider).last.error, isNull);
     final title = p.join(root, 'Artist', 'Album', 'Loose');
-    expect(report!.items[ReportKind.projectMoved], [
-      ReportItem(p.join(title, 'loose.rpp')),
-    ]);
     // Paths in details are absolute too.
+    expect(report!.items[ReportKind.projectMoved], [
+      ReportItem(
+        p.join(title, 'loose', 'loose.rpp'),
+        p.join(root, 'Artist', 'loose.rpp'),
+      ),
+    ]);
     expect(report.items[ReportKind.mediaMoved], [
       ReportItem(
-        p.join(title, 'Media', 'a.wav'),
+        p.join(title, 'loose', 'Media', 'a.wav'),
         p.join(root, 'Artist', 'a.wav'),
       ),
     ]);
@@ -176,13 +187,15 @@ void main() {
     expect(task.openReport, isTrue);
     expect(task.report, same(report));
     final l10n = lookupAppLocalizations(const Locale('en'));
-    expect(task.label(l10n), 'Move of “loose.rpp”');
+    expect(task.label(l10n), 'Fix 1 item');
 
     // A failed move is reported; the inventory check still passes.
-    final failed = await migration.moveToTitle(id, 'Artist/gone.rpp', [
-      'A',
-      'B',
-      'C',
+    final failed = await migration.fix(id, [
+      MoveProject(
+        const FixVersion('Artist/gone.rpp', folder: 'gone', label: 'gone'),
+        'A/B/C',
+        level: 'title',
+      ),
     ]);
     expect(
       failed!.items[ReportKind.fixFailed]!.single.path,
@@ -214,42 +227,52 @@ void main() {
     ], read: const []);
     final id = entry.id;
 
-    final report = await migration.fix(id, const [
-      LiftProject(
-        'Artist/Album/Song/Bob/mix/take.rpp',
-        'Artist/Album/Song',
-        owner: MemberId('bob'),
-        status: 'mixing',
-      ),
-      MoveFolder('Old', 'Artist/_Unassigned/Old'),
+    final report = await migration.fix(id, [
+      OrganizeTitle('Artist/Album/Song', 'Artist/Album/Song', [
+        const FixVersion(
+          'Artist/Album/Song/Bob/mix/take.rpp',
+          folder: 'take',
+          label: 'take',
+          owner: MemberId('bob'),
+          status: 'mixing',
+        ),
+      ], level: 'title'),
+      moveTitle('Old', 'Artist/_Unassigned/Old', 'old.rpp'),
     ]);
 
     expect(report!.hasErrors, isFalse);
     expect(report.items[ReportKind.projectMoved], [
-      ReportItem(p.join(song, 'take.rpp')),
+      ReportItem(
+        p.join(song, 'take', 'take.rpp'),
+        p.join(song, 'Bob', 'mix', 'take.rpp'),
+      ),
     ]);
     expect(report.items[ReportKind.folderMoved], [
-      ReportItem(p.join(band, 'Artist', '_Unassigned', 'Old')),
+      ReportItem(
+        p.join(band, 'Artist', '_Unassigned', 'Old'),
+        p.join(band, 'Old'),
+      ),
     ]);
     final l10n = lookupAppLocalizations(const Locale('en'));
     expect(container.read(tasksProvider).last.label(l10n), 'Fix 2 items');
-    // Lifted into the title folder, not a version folder yet (#148).
     final lifted = VersionMetadata.fromExtState(
-      RppProject.parse(File(p.join(song, 'take.rpp')).readAsStringSync())
-          .extState(VersionMetadata.section),
+      RppProject.parse(
+        File(p.join(song, 'take', 'take.rpp')).readAsStringSync(),
+      ).extState(VersionMetadata.section),
     )!.id;
     final node = await readNodeFile(
       MountedFolderStorage(band),
       'Artist/Album/Song',
     );
     expect(node!.versionOwners[lifted], 'bob');
+    expect(node.versionStatuses[lifted], 'mixing');
     expect(
       index.titles().map((t) => t.path),
       contains('Artist/_Unassigned/Old'),
     );
   });
 
-  test('moved or declared folders join the known values, steps told', () async {
+  test('moved or kept titles join the known values, steps told', () async {
     final song = await bandWithSong();
     final band = p.dirname(p.dirname(p.dirname(song)));
     for (final name in ['One', 'Two']) {
@@ -285,17 +308,20 @@ void main() {
     );
     addTearDown(sub.cancel);
 
-    // Titles moved under a new album, an album declared in place.
-    final report = await migration.fix(entry.id, const [
-      MoveFolder('Artist/One', 'Artist/New/One'),
-      MoveFolder('Artist/Two', 'Artist/New/Two'),
-      MoveFolder('Artist/Live', 'Artist/Live'),
+    // Titles moved under a new album, one kept under its album.
+    final report = await migration.fix(entry.id, [
+      moveTitle('Artist/One/One', 'Artist/New/One', 'One.rpp'),
+      moveTitle('Artist/Two/Two', 'Artist/New/Two', 'Two.rpp'),
+      OrganizeTitle('Artist/Live/Three', 'Artist/Live/Three', [
+        const FixVersion(
+          'Artist/Live/Three/v/three.rpp',
+          folder: 'v',
+          label: 'v',
+        ),
+      ], level: 'title'),
     ]);
 
     expect(report!.hasErrors, isFalse);
-    expect(report.items[ReportKind.valueDeclared], [
-      ReportItem(p.join(band, 'Artist', 'Live')),
-    ]);
     expect(unknown(), isEmpty);
     expect(
       container.read(titlesProvider).map((t) => t.path),
@@ -306,8 +332,9 @@ void main() {
     expect(known.knows(['Artist', 'Live']), isTrue);
     expect(steps, [
       'Inventory of the files',
-      'Fix 1 of 2',
-      'Fix 2 of 2',
+      'Fix 1 of 3',
+      'Fix 2 of 3',
+      'Fix 3 of 3',
       'Checking that no file is lost',
       'Updating the library',
     ]);
@@ -317,20 +344,22 @@ void main() {
       logs,
       containsAllInOrder([
         'tasks Fix 3 items: started',
-        'library.migration $name: folder Artist/Live kept in place',
         'tasks Fix 3 items: Inventory of the files',
-        'tasks Fix 3 items: Fix 1 of 2',
+        'tasks Fix 3 items: Fix 1 of 3',
         startsWith(
-          'library.migration $name: Move folder Artist/One to Artist/New/One',
+          'library.migration $name: '
+          'organizeTitle Artist/One/One -> Artist/New/One',
         ),
-        'tasks Fix 3 items: Fix 2 of 2',
+        'tasks Fix 3 items: Fix 2 of 3',
         startsWith(
-          'library.migration $name: Move folder Artist/Two to Artist/New/Two',
+          'library.migration $name: '
+          'organizeTitle Artist/Two/Two -> Artist/New/Two',
         ),
+        'tasks Fix 3 items: Fix 3 of 3',
         'tasks Fix 3 items: Checking that no file is lost',
         'library.migration $name: inventory checked, no file lost',
         'tasks Fix 3 items: Updating the library',
-        'library.migration Known values of $name added: Artist/Live, Artist/New',
+        'library.migration Known values of $name added: Artist/New, Artist/Live',
         startsWith('library.scans Scanned $name: '),
         startsWith('tasks Fix 3 items: done'),
       ]),
@@ -356,11 +385,11 @@ void main() {
     // The second is asked while the first runs: it is not taken for an
     // interrupted fix, and its task is shown queued.
     final reports = await Future.wait([
-      migration.fix(entry.id, const [
-        MoveFolder('Artist/One', 'Artist/New/One'),
+      migration.fix(entry.id, [
+        moveTitle('Artist/One', 'Artist/New/One', 'One.rpp'),
       ]),
-      migration.fix(entry.id, const [
-        MoveFolder('Artist/Two', 'Artist/New/Two'),
+      migration.fix(entry.id, [
+        moveTitle('Artist/Two', 'Artist/New/Two', 'Two.rpp'),
       ]),
       migration.offerUndo(entry),
     ]);
@@ -394,8 +423,8 @@ void main() {
     addTearDown(sub.cancel);
 
     final starting = migration.startup();
-    final report = await migration.fix(entry.id, const [
-      MoveFolder('Artist/One', 'Artist/New/One'),
+    final report = await migration.fix(entry.id, [
+      moveTitle('Artist/One', 'Artist/New/One', 'One.rpp'),
     ]);
     await starting;
 
@@ -466,16 +495,19 @@ void main() {
       }
     });
 
-    final report = await migration.fix(entry.id, const [
-      MoveFolder('Artist/One', 'Artist/New/One'),
-      MoveFolder('Artist/Two', 'Artist/New/Two'),
+    final report = await migration.fix(entry.id, [
+      moveTitle('Artist/One', 'Artist/New/One', 'One.rpp'),
+      moveTitle('Artist/Two', 'Artist/New/Two', 'Two.rpp'),
     ]);
 
     expect(report, isNull);
     final task = container.read(tasksProvider).last;
     expect(task.state, TaskState.cancelled);
     expect(task.report!.items[ReportKind.folderMoved], [
-      ReportItem(p.join(band, 'Artist', 'New', 'One')),
+      ReportItem(
+        p.join(band, 'Artist', 'New', 'One'),
+        p.join(band, 'Artist', 'One'),
+      ),
     ], reason: 'what was done before stopping is reported');
     expect(
       Directory(p.join(band, 'Artist', 'New', 'One')).existsSync(),

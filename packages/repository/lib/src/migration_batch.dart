@@ -9,7 +9,8 @@ import 'mounted_folder_storage.dart';
 import 'undo.dart';
 
 /// Outcome of a batch of migration fixes: its [report] (library paths), the
-/// folders to add to the known values, and whether it was cancelled.
+/// targets of the fixes applied, to add to the known values, and whether it
+/// was cancelled.
 typedef BatchResult = ({
   Report report,
   List<String> knownPaths,
@@ -25,8 +26,8 @@ final class _Cancelled implements Exception {
 /// telling each step to [reporter]: first a new inventory (or the
 /// interrupted one resumed), reusing the hashes of the previous one; then
 /// the fixes one by one, one log line each; then the inventory check, whose
-/// gaps are reported as errors. A folder "moved" to its own place is only
-/// declared; with nothing else, no inventory is taken. Cancellable between
+/// gaps are reported as errors. With no fix, no inventory is taken.
+/// Cancellable between
 /// two files and between two fixes: the result then tells what was done,
 /// with `cancelled: true`. [usage] tells the projects referencing each
 /// media ([mediaUsage]). Runs in the calling isolate.
@@ -45,36 +46,18 @@ Future<BatchResult> runMigrationBatch(
   required TaskReporter reporter,
   DateTime? now,
 }) async {
-  bool inPlace(MigrationFix fix) => fix is MoveFolder && fix.target == fix.path;
-  final declared = [for (final f in fixes.where(inPlace)) f.path];
-  final moves = [...fixes.where((f) => !inPlace(f))];
   final applied = <MigrationFix>[];
-  var report = Report({
-    ReportKind.valueDeclared: [for (final path in declared) ReportItem(path)],
-  });
-  for (final path in declared) {
-    reporter.log('folder $path kept in place');
-  }
+  var report = const Report();
   BatchResult result({required bool cancelled}) => (
     report: report,
-    knownPaths: [
-      ...declared,
-      for (final f in applied)
-        ?switch (f) {
-          MoveFolder(:final target) => target,
-          MoveProject(:final titleDir) ||
-          LiftProject(:final titleDir) => titleDir,
-          // The title stays where it is.
-          NormalizeMedia() => null,
-        },
-    ],
+    knownPaths: [for (final f in applied) f.target],
     cancelled: cancelled,
   );
   void checkCancelled() {
     if (reporter.isCancelled) throw const _Cancelled();
   }
 
-  if (moves.isEmpty) return result(cancelled: false);
+  if (fixes.isEmpty) return result(cancelled: false);
   try {
     // A fresh inventory for each batch, unless one was interrupted: files
     // changed or added since the previous one are covered.
@@ -91,15 +74,15 @@ Future<BatchResult> runMigrationBatch(
       checkCancelled: checkCancelled,
       onProgress: reporter.progress,
     );
-    for (final (i, fix) in moves.indexed) {
+    for (final (i, fix) in fixes.indexed) {
       checkCancelled();
-      reporter.step(TaskStep.fix, index: i + 1, total: moves.length);
-      reporter.progress(i / moves.length);
+      reporter.step(TaskStep.fix, index: i + 1, total: fixes.length);
+      reporter.progress(i / fixes.length);
       final previousFix = migration.journal.lastFix;
       Report done;
       var threw = false;
       try {
-        done = await applyFixes(migration, [fix], usage: usage, hash: hash);
+        done = await applyFixes(migration, [fix], usage: usage);
       } on Object catch (error) {
         // A line of its journal could not be written.
         threw = true;
@@ -147,7 +130,7 @@ Future<BatchResult> runMigrationBatch(
     report += check;
   } on _Cancelled {
     reporter.log(
-      'cancelled after ${applied.length} of ${moves.length} fixes',
+      'cancelled after ${applied.length} of ${fixes.length} fixes',
       warning: true,
     );
     return result(cancelled: true);
