@@ -414,5 +414,10 @@
   },
   "referencedMedia": "Referenced media",
   "mediaAbsent": "absent",
-  "quit": "Quit"
+  "quit": "Quit",
+  "pageSystem": "System",
+  "about": "About",
+  "applicationVersion": "Version",
+  "licenses": "Licenses",
+  "showLicenses": "Show the licenses"
 }

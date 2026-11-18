@@ -277,6 +277,10 @@ final class AppSettings {
   final ThemePreference theme;
   final AccentPreference accent;
 
+  /// Range of [textScale]; a stored value outside it is clamped on load.
+  static const minTextScale = 0.75;
+  static const maxTextScale = 1.5;
+
   /// Font size factor (1.0 = default).
   final double textScale;
 
@@ -391,7 +395,10 @@ final class AppSettings {
       accent:
           AccentPreference.values.asNameMap()[json['accent']] ??
           AccentPreference.neutral,
-      textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
+      textScale: ((json['textScale'] as num?)?.toDouble() ?? 1.0).clamp(
+        minTextScale,
+        maxTextScale,
+      ),
       language: json['language'] as String? ?? systemLanguage,
       navigation: NavigationSettings.fromJson(
         (json['navigation'] as Map? ?? const {}).cast(),

@@ -19,6 +19,7 @@ import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
+import 'package:reaharvest/ui/settings/about_page.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
@@ -408,16 +409,42 @@ void main() {
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.dark);
 
-    // The log folder opens in the file manager.
+    // Text size: from 75 % to 150 %.
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect((slider.min, slider.max, slider.divisions), (0.75, 1.5, 15));
+
+    // The log folder, on the System page, opens in the file manager.
+    await tester.tap(find.text('System').first);
+    await tester.pumpAndSettle();
+    expect(find.text('APPEARANCE'), findsNothing);
     openedFolders.clear();
     await tester.ensureVisible(find.text('/data/logs'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(OutlinedButton, 'Open'));
     expect(openedFolders, ['/data/logs']);
 
+    // Profile and About pages.
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Alice'), findsOneWidget);
+    await tester.tap(find.text('About'));
+    await tester.pumpAndSettle();
+    expect(find.text(appVersion), findsOneWidget);
+    await tester.tap(find.text('Show the licenses'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LicensePage), findsOneWidget);
+    expect(find.text('ReaHarvest'), findsWidgets);
+    final dialog = tester.getSize(find.byType(LicensePage));
+    expect(dialog.width, lessThan(820));
+    expect(dialog.height, lessThan(560));
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.text('APPEARANCE'), findsNothing);
+    expect(find.byType(LicensePage), findsNothing);
+    expect(find.text('ABOUT'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('ABOUT'), findsNothing);
   });
 
   testWidgets('first run wizard sets name, library and REAPER', (tester) async {
@@ -475,6 +502,8 @@ void main() {
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Libraries'));
+    await tester.pumpAndSettle();
     expect(find.text('/music/Old'), findsOneWidget);
     expect(find.textContaining('alternate path'), findsNothing);
 
@@ -498,6 +527,8 @@ void main() {
     await tester.tap(find.text('Later'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Libraries'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Add a library'));
     await tester.tap(find.text('Add a library'));
@@ -705,6 +736,8 @@ void main() {
     );
     await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Libraries'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Known values'));
     await tester.pumpAndSettle();
     expect(find.text('Known values · Band'), findsOneWidget);
@@ -732,6 +765,8 @@ void main() {
   testWidgets('settings declare the members of a library', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Libraries'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Members'));
     await tester.pumpAndSettle();

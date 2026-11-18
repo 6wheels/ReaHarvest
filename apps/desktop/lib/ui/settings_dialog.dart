@@ -1,36 +1,68 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
-import '../state/library_catalog.dart';
-import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
-import 'known_values_editor.dart';
-import 'library_form.dart';
-import 'members_editor.dart';
-import 'path_row.dart';
-import 'reaper_settings.dart';
+import 'settings/about_page.dart';
+import 'settings/appearance_page.dart';
+import 'settings/libraries_page.dart';
+import 'settings/profile_page.dart';
+import 'settings/system_page.dart';
 
 /// Opens the settings as a popup over the blurred application (SPEC §5.2).
 Future<void> showSettings(BuildContext context) =>
     showGlassDialog<void>(context, (_) => const _SettingsPanel());
 
-class _SettingsPanel extends ConsumerWidget {
+/// One page of the settings, with its entry in the left menu.
+enum _SettingsPage {
+  appearance(Icons.palette_outlined),
+  profile(Icons.person_outline_rounded),
+  libraries(Icons.folder_copy_outlined),
+  system(Icons.tune_rounded),
+  about(Icons.info_outline_rounded);
+
+  const _SettingsPage(this.icon);
+
+  final IconData icon;
+
+  String label(AppLocalizations l10n) => switch (this) {
+    appearance => l10n.appearance,
+    profile => l10n.profile,
+    libraries => l10n.libraries,
+    system => l10n.pageSystem,
+    about => l10n.about,
+  };
+
+  Widget get body => switch (this) {
+    appearance => const AppearancePage(),
+    profile => const ProfilePage(),
+    libraries => const LibrariesPage(),
+    system => const SystemPage(),
+    about => const AboutPage(),
+  };
+}
+
+class _SettingsPanel extends StatefulWidget {
   const _SettingsPanel();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  State<_SettingsPanel> createState() => _SettingsPanelState();
+}
+
+class _SettingsPanelState extends State<_SettingsPanel> {
+  // Kept while the popup is open.
+  var _page = _SettingsPage.appearance;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
-    final settings = ref.watch(settingsProvider);
-    final notifier = ref.read(settingsProvider.notifier);
 
     return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
+      child: SizedBox(
+        width: 820,
+        height: 560,
         child: Material(
           color: c.surface,
           shape: RoundedRectangleBorder(
@@ -47,7 +79,6 @@ class _SettingsPanel extends ConsumerWidget {
               Space.l,
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -63,148 +94,94 @@ class _SettingsPanel extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: Space.m),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(right: Space.m),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _Section(l10n.appearance, first: true),
-                        FormRow(
-                          label: l10n.theme,
-                          child: SegmentedButton<ThemePreference>(
-                            showSelectedIcon: false,
-                            segments: [
-                              ButtonSegment(
-                                value: ThemePreference.system,
-                                label: Text(l10n.themeSystem),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 160,
+                        child: Column(
+                          children: [
+                            for (final page in _SettingsPage.values)
+                              _MenuEntry(
+                                icon: page.icon,
+                                label: page.label(l10n),
+                                selected: page == _page,
+                                onTap: () => setState(() => _page = page),
                               ),
-                              ButtonSegment(
-                                value: ThemePreference.light,
-                                label: Text(l10n.themeLight),
-                              ),
-                              ButtonSegment(
-                                value: ThemePreference.dark,
-                                label: Text(l10n.themeDark),
-                              ),
-                            ],
-                            selected: {settings.theme},
-                            onSelectionChanged: (s) => notifier.change(
-                              (a) => a.copyWith(theme: s.first),
-                            ),
-                          ),
+                          ],
                         ),
-                        FormRow(
-                          label: l10n.accentColor,
-                          child: SegmentedButton<AccentPreference>(
-                            showSelectedIcon: false,
-                            // Swatches only, named by their tooltip.
-                            segments: [
-                              for (final (value, label) in [
-                                (AccentPreference.neutral, l10n.accentNeutral),
-                                (AccentPreference.orange, l10n.accentOrange),
-                                (AccentPreference.yellow, l10n.accentYellow),
-                                (AccentPreference.teal, l10n.accentTeal),
-                                (AccentPreference.blue, l10n.accentBlue),
-                                (AccentPreference.violet, l10n.accentViolet),
-                              ])
-                                ButtonSegment(
-                                  value: value,
-                                  tooltip: label,
-                                  label: _Swatch(
-                                    accentOf(value)
-                                        .on(Theme.of(context).brightness),
-                                  ),
-                                ),
-                            ],
-                            selected: {settings.accent},
-                            onSelectionChanged: (s) => notifier.change(
-                              (a) => a.copyWith(accent: s.first),
-                            ),
-                          ),
+                      ),
+                      const SizedBox(width: Space.m),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          key: ValueKey(_page),
+                          padding: const EdgeInsets.only(right: Space.m),
+                          child: _page.body,
                         ),
-                        FormRow(
-                          label: l10n.textSize,
-                          child: Row(
-                            children: [
-                              Text('A', style: text.bodySmall),
-                              Expanded(
-                                child: Slider(
-                                  value: settings.textScale,
-                                  min: 0.85,
-                                  max: 1.3,
-                                  divisions: 9,
-                                  label:
-                                      '${(settings.textScale * 100).round()} %',
-                                  onChanged: (v) => notifier.change(
-                                    (a) => a.copyWith(textScale: v),
-                                  ),
-                                ),
-                              ),
-                              Text('A', style: text.titleLarge),
-                            ],
-                          ),
-                        ),
-                        FormRow(
-                          label: l10n.language,
-                          child: SegmentedButton<String>(
-                            showSelectedIcon: false,
-                            segments: [
-                              ButtonSegment(
-                                value: AppSettings.systemLanguage,
-                                label: Text(l10n.languageSystem),
-                              ),
-                              // Language names are shown in their own language.
-                              const ButtonSegment(
-                                value: 'en',
-                                label: Text('English'),
-                              ),
-                              const ButtonSegment(
-                                value: 'fr',
-                                label: Text('Français'),
-                              ),
-                            ],
-                            selected: {settings.language},
-                            onSelectionChanged: (s) => notifier.change(
-                              (a) => a.copyWith(language: s.first),
-                            ),
-                          ),
-                        ),
-                        _Section(l10n.profile),
-                        FormRow(
-                          label: l10n.yourName,
-                          child: const _NameField(),
-                        ),
-                        _Section(l10n.libraries),
-                        const _Libraries(),
-                        const _Section('REAPER'),
-                        const ReaperSettings(),
-                        _Section(l10n.logs),
-                        FormRow(
-                          label: l10n.logFolder,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  ref.watch(logFolderProvider),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: text.bodyMedium?.copyWith(
-                                    color: c.muted,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: Space.s),
-                              OutlinedButton(
-                                onPressed: () => ref.read(openFolderProvider)(
-                                  ref.read(logFolderProvider),
-                                ),
-                                child: Text(l10n.openFolder),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Entry of the left menu; the selected one is bold and has a bar, not only a
+/// different color.
+class _MenuEntry extends StatelessWidget {
+  const _MenuEntry({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.xs),
+      child: Material(
+        color: selected ? c.raised : Colors.transparent,
+        borderRadius: BorderRadius.circular(Radii.s),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Radii.s),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Space.s,
+              vertical: Space.s,
+            ),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: selected ? c.accent : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: selected ? c.accent : c.muted),
+                const SizedBox(width: Space.s),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.bodyMedium?.copyWith(
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                     ),
                   ),
                 ),
@@ -215,201 +192,4 @@ class _SettingsPanel extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _Section extends StatelessWidget {
-  const _Section(this.title, {this.first = false});
-
-  final String title;
-  final bool first;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(top: first ? 0 : Space.l, bottom: Space.m),
-    child: Text(
-      title.toUpperCase(),
-      style: Theme.of(context).textTheme.labelSmall
-          ?.copyWith(color: context.colors.muted, letterSpacing: 1.2),
-    ),
-  );
-}
-
-/// Display name of the local member, saved when editing ends.
-class _NameField extends ConsumerStatefulWidget {
-  const _NameField();
-
-  @override
-  ConsumerState<_NameField> createState() => _NameFieldState();
-}
-
-class _NameFieldState extends ConsumerState<_NameField> {
-  late final _controller = TextEditingController(
-    text: ref.read(settingsProvider).identity.displayName,
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    final name = _controller.text.trim();
-    final identity = ref.read(settingsProvider).identity;
-    if (name.isEmpty || name == identity.displayName) return;
-    ref
-        .read(settingsProvider.notifier)
-        .change((s) => s.copyWith(identity: identity.withDisplayName(name)));
-  }
-
-  @override
-  Widget build(BuildContext context) => Focus(
-    onFocusChange: (focused) {
-      if (!focused) _save();
-    },
-    child: TextField(
-      controller: _controller,
-      decoration: const InputDecoration(isDense: true),
-      onSubmitted: (_) => _save(),
-    ),
-  );
-}
-
-/// Configured libraries, with removal and addition.
-class _Libraries extends ConsumerWidget {
-  const _Libraries();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final c = context.colors;
-    final text = Theme.of(context).textTheme;
-    final libraries = ref.watch(settingsProvider.select((s) => s.libraries));
-    final indexed = ref.watch(indexedLibrariesProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (libraries.isEmpty)
-          Text(
-            l10n.noLibrary,
-            style: text.bodyMedium?.copyWith(color: c.muted),
-          ),
-        for (final library in libraries)
-          Padding(
-            padding: const EdgeInsets.only(bottom: Space.s),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(library.displayName, style: text.bodyLarge),
-                      Text(
-                        library.libraryRoot,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: text.bodySmall?.copyWith(color: c.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                // Known values of the intermediate levels (SPEC §3.1).
-                if (indexed[library.id]?.layout case final layout?
-                    when layout.levels.length > 1)
-                  OutlinedButton(
-                    onPressed: () => showKnownValues(context, library, layout),
-                    child: Text(l10n.knownValues),
-                  ),
-                OutlinedButton(
-                  onPressed: () => showMembers(context, library),
-                  child: Text(l10n.members),
-                ),
-                OutlinedButton(
-                  onPressed: () => _confirmRemoval(context, ref, library),
-                  child: Text(l10n.removeLibrary),
-                ),
-              ],
-            ),
-          ),
-        const SizedBox(height: Space.s),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.add_rounded),
-          label: Text(l10n.addLibrary),
-          onPressed: () => _add(context),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _confirmRemoval(
-    BuildContext context,
-    WidgetRef ref,
-    LibraryEntry library,
-  ) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showGlassDialog<bool>(
-      context,
-      (context) => AlertDialog(
-        title: Text(l10n.removeLibraryTitle(library.displayName)),
-        content: Text(l10n.removeLibraryHint),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.removeLibrary),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) {
-      await ref.read(libraryCatalogProvider).remove(library.id);
-    }
-  }
-
-  Future<void> _add(BuildContext context) =>
-      showGlassDialog<void>(context, (context) {
-        final l10n = AppLocalizations.of(context);
-        return AlertDialog(
-          title: Text(l10n.addLibrary),
-          content: SizedBox(
-            width: 560,
-            child: SingleChildScrollView(
-              child: LibraryForm(
-                submitLabel: l10n.addLibrary,
-                // The report of the scan is already open over this dialog:
-                // close this dialog, not the top route.
-                onAdded: () =>
-                    Navigator.of(context).removeRoute(ModalRoute.of(context)!),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l10n.cancel),
-            ),
-          ],
-        );
-      });
-}
-
-/// Small square of an accent color.
-class _Swatch extends StatelessWidget {
-  const _Swatch(this.color);
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 12,
-    height: 12,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(Radii.xs),
-      border: Border.all(color: context.colors.border),
-    ),
-  );
 }

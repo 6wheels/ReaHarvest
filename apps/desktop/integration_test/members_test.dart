@@ -38,6 +38,7 @@ void main() {
   /// Opens the members dialog of the only library from the settings.
   Future<void> openMembers(WidgetTester tester) async {
     await tapTooltip(tester, 'Settings');
+    await tapText(tester, 'Libraries');
     await tapText(tester, 'Members');
     expect(find.text('Members · Band'), findsOne);
   }
