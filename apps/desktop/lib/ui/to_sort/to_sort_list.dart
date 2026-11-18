@@ -26,7 +26,7 @@ _Key _keyOf(LibraryIssue issue) => (issue.library, issue.kind, issue.item.path);
 /// Issues on the media, record path or render target of a project, whose
 /// detail lists the references or the value (one per line).
 const _mediaKinds = {
-  ReportKind.mediaOutsidePool,
+  ReportKind.mediaOutsideVersion,
   ReportKind.missingMedia,
   ReportKind.externalMedia,
   ReportKind.recordPathNotMedia,

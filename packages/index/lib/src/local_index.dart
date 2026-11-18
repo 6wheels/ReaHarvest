@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 12;
+const _schemaVersion = 13;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -65,7 +65,14 @@ CREATE TABLE versions (
   media TEXT NOT NULL,
   record_path TEXT,
   render_file TEXT,
+  candidate INTEGER NOT NULL,
   PRIMARY KEY (library_id, title_path, file_name)
+);
+CREATE TABLE candidates (
+  library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+  root TEXT NOT NULL,
+  title TEXT,
+  PRIMARY KEY (library_id, root)
 );
 CREATE TABLE files (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
@@ -83,12 +90,15 @@ CREATE TABLE issues (
   detail TEXT,
   level TEXT,
   target TEXT,
-  PRIMARY KEY (library_id, kind, path)
+  candidate TEXT
 );
+CREATE INDEX issues_by_candidate ON issues (library_id, candidate);
+CREATE INDEX issues_by_path ON issues (library_id, path);
 ''';
 
 const _tables = [
   'issues',
+  'candidates',
   // Dropped in schema 11; kept here so that an older index drops it.
   'subprojects',
   'files',
@@ -162,22 +172,30 @@ final class LocalIndex {
           scan.journalPosition?.line,
         ],
       );
-      for (final t in ['nodes', 'titles', 'versions', 'issues']) {
+      for (final t in ['nodes', 'titles', 'versions', 'issues', 'candidates']) {
         _db.execute('DELETE FROM $t WHERE library_id = ?', [id]);
       }
       _insertNodes(id, scan.nodes);
       _insertTitles(id, scan.titles, scan.nodes);
-      _insertIssues(id, scan.issues, scan.corrupted, scan.orphanNodes);
+      _insertCandidates(id, scan.candidates, scan.titles);
+      _insertIssues(
+        id,
+        scan.issues,
+        scan.corrupted,
+        scan.orphanNodes,
+        candidates: scan.candidates,
+      );
       _updateFiles(id, scan.stamps);
     });
   }
 
   /// Stores the result of [scanTitle] for the title folder [titlePath] of
-  /// [library] (SPEC §8): its node, title and versions, and the files and
-  /// issues below its folder replace the stored ones; the
-  /// issues of the folder itself (its level) are left. Duplicated version
+  /// [library] (SPEC §8): its node, title, candidate and projects, and the
+  /// files and issues below its folder replace the stored ones; the issues
+  /// of the folder itself (its level) are left. Duplicated version
   /// identifiers, which span titles, are then found again from the indexed
-  /// versions. File hashes are kept for files whose stamp did not change.
+  /// projects; versions known by another title are left to the next full
+  /// scan. File hashes are kept for files whose stamp did not change.
   void updateTitle(Library library, String titlePath, TitleScan scan) {
     final id = library.id;
     final prefix = titlePath.isEmpty ? '' : '$titlePath/';
@@ -193,39 +211,45 @@ final class LocalIndex {
           titlePath,
         ]);
       }
-      _db.execute(
-        'DELETE FROM versions WHERE library_id = ? AND title_path = ?',
-        [id, titlePath],
-      );
+      for (final (table, column) in [
+        ('versions', 'title_path'),
+        ('candidates', 'root'),
+      ]) {
+        _db.execute('DELETE FROM $table WHERE library_id = ? AND $column = ?', [
+          id,
+          titlePath,
+        ]);
+      }
       _db.execute('DELETE FROM issues WHERE $below', [id, prefix]);
       final nodes = {titlePath: ?scan.node};
+      final titles = [?scan.title];
+      final candidates = [?scan.candidate];
       _insertNodes(id, nodes);
-      _insertTitles(id, [?scan.title], nodes);
-      _insertIssues(id, scan.issues, scan.corrupted, scan.orphanNodes);
+      _insertTitles(id, titles, nodes);
+      _insertCandidates(id, candidates, titles);
+      _insertIssues(
+        id,
+        scan.issues,
+        scan.corrupted,
+        scan.orphanNodes,
+        candidates: candidates,
+      );
       _updateFiles(id, scan.stamps, prefix: prefix);
       _db.execute('DELETE FROM issues WHERE library_id = ? AND kind = ?', [
         id,
         ReportKind.duplicateVersionId.name,
       ]);
-      _insertIssues(
-        id,
-        Report({
-          ReportKind.duplicateVersionId: [
-            for (final r in _db.select(
-              'SELECT title_path, file_name, version_id FROM versions '
-              'WHERE library_id = ?1 AND version_id IN (SELECT version_id '
-              'FROM versions WHERE library_id = ?1 AND version_id IS NOT NULL '
-              'GROUP BY version_id HAVING count(*) > 1)',
-              [id],
-            ))
-              ReportItem(
-                joinPath(r['title_path'] as String, r['file_name'] as String),
-                r['version_id'] as String,
-              ),
-          ],
-        }),
-        const [],
-        const [],
+      _insertAll(
+        'INSERT INTO issues (library_id, kind, path, detail, candidate) '
+        'SELECT library_id, ?2, '
+        "title_path || CASE title_path WHEN '' THEN '' ELSE '/' END "
+        '|| file_name, version_id, title_path FROM versions '
+        'WHERE library_id = ?1 AND version_id IN (SELECT version_id '
+        'FROM versions WHERE library_id = ?1 AND version_id IS NOT NULL '
+        'GROUP BY version_id HAVING count(*) > 1)',
+        [
+          [id, ReportKind.duplicateVersionId.name],
+        ],
       );
     });
   }
@@ -261,60 +285,118 @@ final class LocalIndex {
           ],
       ],
     );
+    _insertVersions(id, [
+      for (final t in titles)
+        for (final v in t.versions) (t.path, v),
+    ]);
+  }
+
+  /// Stores [candidates] with the projects of each one that are not a
+  /// version of its indexed title, among [titles] (SPEC §5.8 step 3).
+  void _insertCandidates(
+    LibraryId id,
+    List<ScanCandidate> candidates,
+    List<Title> titles,
+  ) {
+    _insertAll(
+      'INSERT INTO candidates (library_id, root, title) VALUES (?, ?, ?)',
+      [
+        for (final c in candidates) [id, c.root, c.title],
+      ],
+    );
+    final versions = {
+      for (final t in titles)
+        for (final v in t.versions) joinPath(t.path, v.fileName),
+    };
+    _insertVersions(id, candidate: true, [
+      for (final c in candidates)
+        for (final v in c.versions)
+          if (!versions.contains(joinPath(c.root, v.fileName))) (c.root, v),
+    ]);
+  }
+
+  /// Stores [versions], each with the folder it is relative to; projects of
+  /// a [candidate] only, not versions of a title.
+  void _insertVersions(
+    LibraryId id,
+    List<(String, Version)> versions, {
+    bool candidate = false,
+  }) {
     _insertAll(
       'INSERT INTO versions (library_id, title_path, file_name, folder, '
       'size, sizes, sample_rate, modified, version_id, owner, label, tempo, '
       'length, track_count, item_count, plugins, media, record_path, '
-      'render_file) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'render_file, candidate) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        for (final t in titles)
-          for (final v in t.versions)
-            [
-              id,
-              t.path,
-              v.fileName,
-              v.folder,
-              v.size,
-              jsonEncode({
-                for (final e in v.sizes.entries) e.key.name: e.value,
-              }),
-              v.sampleRate,
-              v.modified.microsecondsSinceEpoch,
-              v.metadata?.id,
-              v.metadata?.owner,
-              v.metadata?.label,
-              v.tempo,
-              v.length,
-              v.trackCount,
-              v.itemCount,
-              jsonEncode([for (final p in v.plugins) p.toJson()]),
-              jsonEncode(v.media),
-              v.recordPath,
-              v.renderFile,
-            ],
+        for (final (path, v) in versions)
+          [
+            id,
+            path,
+            v.fileName,
+            v.folder,
+            v.size,
+            jsonEncode({for (final e in v.sizes.entries) e.key.name: e.value}),
+            v.sampleRate,
+            v.modified.microsecondsSinceEpoch,
+            v.metadata?.id,
+            v.metadata?.owner,
+            v.metadata?.label,
+            v.tempo,
+            v.length,
+            v.trackCount,
+            v.itemCount,
+            jsonEncode([for (final p in v.plugins) p.toJson()]),
+            jsonEncode(v.media),
+            v.recordPath,
+            v.renderFile,
+            candidate ? 1 : 0,
+          ],
       ],
     );
   }
 
+  /// Stores [issues]: one row per issue of each of the [candidates], its
+  /// root as group key, then the others without key.
   void _insertIssues(
     LibraryId id,
     Report issues,
     List<String> corrupted,
-    List<String> orphanNodes,
-  ) => _insertAll(
-    'INSERT INTO issues (library_id, kind, path, detail, level, target) '
-    'VALUES (?, ?, ?, ?, ?, ?)',
-    [
-      for (final (kind, items) in issues.sections)
-        for (final i in items)
-          [id, kind.name, i.path, i.detail, i.level?.key, i.target],
-      for (final p in corrupted)
-        [id, ReportKind.corrupted.name, p, null, null, null],
-      for (final p in orphanNodes)
-        [id, ReportKind.orphanNode.name, p, null, null, null],
-    ],
-  );
+    List<String> orphanNodes, {
+    List<ScanCandidate> candidates = const [],
+  }) {
+    final grouped = {
+      for (final c in candidates)
+        for (final (kind, items) in c.issues.sections)
+          for (final i in items) (kind, i),
+    };
+    List<Object?> row(ReportKind kind, ReportItem i, String? candidate) => [
+      id,
+      kind.name,
+      i.path,
+      i.detail,
+      i.level?.key,
+      i.target,
+      candidate,
+    ];
+    _insertAll(
+      'INSERT INTO issues '
+      '(library_id, kind, path, detail, level, target, candidate) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        for (final c in candidates)
+          for (final (kind, items) in c.issues.sections)
+            for (final i in items) row(kind, i, c.root),
+        for (final (kind, items) in issues.sections)
+          for (final i in items)
+            if (!grouped.contains((kind, i))) row(kind, i, null),
+        for (final p in corrupted)
+          row(ReportKind.corrupted, ReportItem(p), null),
+        for (final p in orphanNodes)
+          row(ReportKind.orphanNode, ReportItem(p), null),
+      ],
+    );
+  }
 
   /// Replaces the stamps of the files of [id] whose path starts with
   /// [prefix] by [stamps].
@@ -387,7 +469,7 @@ final class LocalIndex {
     final versions = <(String, String), List<Version>>{};
     for (final r in _db.select(
       'SELECT * FROM versions $where AND (?2 IS NULL OR title_path = ?2) '
-      'ORDER BY file_name',
+      'AND candidate = 0 ORDER BY file_name',
       args,
     )) {
       final key = (r['library_id'] as String, r['title_path'] as String);
@@ -416,11 +498,8 @@ final class LocalIndex {
   ScanResult? scanResult(LibraryId id) => _snapshot(() => _scanResult(id));
 
   ScanResult? _scanResult(LibraryId id) {
-    final known = _db.select('SELECT json FROM libraries WHERE id = ?', [id]);
-    if (known.isEmpty) return null;
-    final library = Library.fromJson(
-      (jsonDecode(known.single['json'] as String) as Map).cast(),
-    );
+    final library = _library(id);
+    if (library == null) return null;
     final stored = issues(library: id);
     List<String> paths(ReportKind kind) => [
       for (final i in stored)
@@ -428,6 +507,7 @@ final class LocalIndex {
     ];
     final restored = titles(library: id);
     return ScanResult(
+      candidates: _candidates(id, layout: library.layout),
       titles: restored,
       nodes: _nodes(id, restored),
       issues: Report({
@@ -462,7 +542,71 @@ final class LocalIndex {
       titles: [title],
       nodes: _nodes(id, [title], path: titlePath),
       stamps: _stamps(id, prefix: prefix),
+      candidates: _candidates(
+        id,
+        root: titlePath,
+        layout: _library(id)?.layout,
+      ),
+      journalPosition: journalPosition(id),
     );
+  }
+
+  /// Stored library [id]; null if not indexed.
+  Library? _library(LibraryId id) {
+    final rows = _db.select('SELECT json FROM libraries WHERE id = ?', [id]);
+    if (rows.isEmpty) return null;
+    return Library.fromJson(
+      (jsonDecode(rows.single['json'] as String) as Map).cast(),
+    );
+  }
+
+  /// Stored candidates of [id] (only the one at [root] when set), with
+  /// their projects and issues; expected levels carry the labels of
+  /// [layout].
+  List<ScanCandidate> _candidates(
+    LibraryId id, {
+    String? root,
+    Layout? layout,
+  }) {
+    final versions = <String, List<Version>>{};
+    for (final r in _db.select(
+      'SELECT v.* FROM versions v JOIN candidates c '
+      'ON c.library_id = v.library_id AND c.root = v.title_path '
+      'WHERE v.library_id = ?1 AND (?2 IS NULL OR c.root = ?2) '
+      'ORDER BY v.file_name',
+      [id, root],
+    )) {
+      versions
+          .putIfAbsent(r['title_path'] as String, () => [])
+          .add(_version(r));
+    }
+    final issues = <String, Map<ReportKind, List<ReportItem>>>{};
+    for (final r in _db.select(
+      'SELECT * FROM issues WHERE library_id = ?1 AND candidate IS NOT NULL '
+      'AND (?2 IS NULL OR candidate = ?2) ORDER BY path',
+      [id, root],
+    )) {
+      issues
+          .putIfAbsent(r['candidate'] as String, () => {})
+          .putIfAbsent(ReportKind.values.byName(r['kind'] as String), () => [])
+          .add(_item(r, layout));
+    }
+    return [
+      for (final r in _db.select(
+        'SELECT * FROM candidates WHERE library_id = ?1 '
+        'AND (?2 IS NULL OR root = ?2) ORDER BY root',
+        [id, root],
+      ))
+        ScanCandidate(
+          root: r['root'] as String,
+          title: r['title'] as String?,
+          versions: versions[r['root']] ?? const [],
+          issues: Report({
+            for (final kind in ReportKind.values)
+              kind: ?issues[r['root']]?[kind],
+          }),
+        ),
+    ];
   }
 
   /// Stored node files of [id] (only the one at [path] when set), with the
@@ -525,8 +669,10 @@ final class LocalIndex {
           (jsonDecode(r['json'] as String) as Map).cast(),
         ).layout,
     };
+    // An issue of several candidates (an unknown folder above them) once.
     final rows = _db.select(
-      'SELECT * FROM issues WHERE (?1 IS NULL OR library_id = ?1) '
+      'SELECT DISTINCT library_id, kind, path, detail, level, target '
+      'FROM issues WHERE (?1 IS NULL OR library_id = ?1) '
       'AND (?2 IS NULL OR kind = ?2)',
       [library, kind?.name],
     );
@@ -535,18 +681,7 @@ final class LocalIndex {
         (
           library: LibraryId(r['library_id'] as String),
           kind: ReportKind.values.byName(r['kind'] as String),
-          item: switch (r['level'] as String?) {
-            null => ReportItem(r['path'] as String, r['detail'] as String?),
-            final key => ReportItem.misplaced(
-              r['path'] as String,
-              level:
-                  layouts[r['library_id']]?.levels
-                      .where((l) => l.key == key)
-                      .firstOrNull ??
-                  LayoutLevel(key),
-              target: r['target'] as String?,
-            ),
-          },
+          item: _item(r, layouts[r['library_id']]),
         ),
     ]..sort(
       (a, b) => switch ((
@@ -611,6 +746,20 @@ final class LocalIndex {
         hash: r['hash'] as String?,
       ),
   ];
+
+  /// Issue item of the row [r], its expected level with the label of
+  /// [layout].
+  static ReportItem _item(Row r, Layout? layout) =>
+      switch (r['level'] as String?) {
+        null => ReportItem(r['path'] as String, r['detail'] as String?),
+        final key => ReportItem.misplaced(
+          r['path'] as String,
+          level:
+              layout?.levels.where((l) => l.key == key).firstOrNull ??
+              LayoutLevel(key),
+          target: r['target'] as String?,
+        ),
+      };
 
   static Version _version(Row r) {
     final versionId = r['version_id'] as String?;

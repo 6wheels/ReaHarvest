@@ -16,7 +16,7 @@ const fixtures = '../../test/fixtures';
 /// (SPEC §4.3): left out of the layout tests, the fixtures not following
 /// these conventions.
 const mediaKinds = {
-  ReportKind.mediaOutsidePool,
+  ReportKind.mediaOutsideVersion,
   ReportKind.missingMedia,
   ReportKind.externalMedia,
   ReportKind.recordPathNotMedia,
@@ -220,8 +220,6 @@ void main() {
       put('band/album/song/Alice/mix/a.rpp', unknown);
       put('band/album/song/Assets/notes.rpp', unknown);
       put('band/album/song/.trash/old/old.rpp', unknown);
-      // Left to the title-oriented scan (#147): neither a version nor
-      // reported yet.
       put('band/album/song/loose.rpp', unknown);
       put('band/_Unassigned/other/v1/v1.rpp', unknown);
       put('band/_Unassigned/other/copy/copy.rpp', adopted);
@@ -255,6 +253,9 @@ void main() {
           for (final path in ['band/loose.rpp', 'root.rpp'])
             ReportItem.misplaced(path, level: lib.layout!.leaf),
         ],
+        ReportKind.projectInTitleFolder: [
+          const ReportItem('band/album/song/loose.rpp'),
+        ],
         ReportKind.duplicateVersionId: [
           for (final path in [
             'band/_Unassigned/other/copy/copy.rpp',
@@ -267,6 +268,40 @@ void main() {
         'band/_Unassigned/other/v1/v1.rpp',
         'band/album/song/v2/v2.RPP',
       ]);
+      // One candidate per title, every project in or below it included;
+      // projects above the title level grouped by folder.
+      expect(
+        {
+          for (final c in result.candidates)
+            c.root: [c.title, ...c.versions.map((v) => v.fileName)],
+        },
+        {
+          '': [null, 'root.rpp'],
+          'band': [null, 'loose.rpp'],
+          'band/_Unassigned/other': [
+            'band/_Unassigned/other',
+            'copy/copy.rpp',
+            'v1/v1.rpp',
+          ],
+          'band/album/song': [
+            'band/album/song',
+            'Alice/mix/a.rpp',
+            'loose.rpp',
+            'v1/v1.rpp',
+            'v2/old-takes/take.rpp',
+            'v2/v2.RPP',
+          ],
+        },
+      );
+      expect(
+        result.candidates.last.issues.items.keys,
+        unorderedEquals([
+          ReportKind.projectTooDeep,
+          ReportKind.projectInTitleFolder,
+          ReportKind.duplicateVersionId,
+          ...mediaKinds.where(result.candidates.last.issues.items.containsKey),
+        ]),
+      );
     });
 
     test('sizes a version by every file of its folder, by kind', () async {
@@ -543,7 +578,7 @@ void main() {
       const bad = 'band/album/song/bad/bad.rpp';
       const blank = 'band/album/song/blank/blank.rpp';
       final expected = {
-        ReportKind.mediaOutsidePool: [
+        ReportKind.mediaOutsideVersion: [
           const ReportItem(
             bad,
             '.\\audio-files\\b.wav\n..\\good\\Media\\a.wav',
@@ -575,8 +610,8 @@ void main() {
       expect(counting.reads, isEmpty);
       expect(second.issues.items[ReportKind.missingMedia], isNull);
       expect(
-        second.issues.items[ReportKind.mediaOutsidePool],
-        expected[ReportKind.mediaOutsidePool],
+        second.issues.items[ReportKind.mediaOutsideVersion],
+        expected[ReportKind.mediaOutsideVersion],
       );
     });
 
@@ -584,6 +619,263 @@ void main() {
       put('band/album/song/v1/v1.rpp', adopted);
       final result = await scanFolder(root.path, library(Layout.classic()));
       expect(result.titles.single.versions.single.isAdopted, isTrue);
+    });
+  });
+
+  group('title candidates', () {
+    const song = 'band/album/song';
+    const alice = Member(MemberId('alice'), 'Alice');
+
+    /// Issues of the candidate at [root] other than [mediaKinds].
+    Map<ReportKind, List<ReportItem>> issuesOf(ScanResult result, String root) {
+      final candidate = result.candidates.singleWhere((c) => c.root == root);
+      return {
+        for (final MapEntry(:key, :value) in candidate.issues.items.entries)
+          if (!mediaKinds.contains(key)) key: value,
+      };
+    }
+
+    test(
+      'gathers every project of a title folder, one issue per problem',
+      () async {
+        final lib = library(Layout.classic()).withMembers(const [alice]);
+        put('$song/v1/v1.rpp', unknown);
+        put('$song/Alice/v2/v2.rpp', unknown);
+        put('$song/Alice/mixing/m1.rpp', unknown);
+        put('$song/Alice/mixing/m2.rpp', unknown);
+        // Only the exact name of a status: a version.
+        put('$song/Mix/Mix.rpp', unknown);
+        put('$song/done/d.rpp', unknown);
+        put('$song/loose.rpp', unknown);
+        put('$song/v3/a.rpp', unknown);
+        put('$song/v3/b.rpp', unknown);
+        put('$song/v1/takes/t.rpp', unknown);
+        put('$song/Assets/kept.rpp', unknown);
+        put('$song/v1/Media/sub.rpp', unknown);
+
+        final result = await scan(storage, lib);
+
+        final candidate = result.candidates.single;
+        expect(candidate.root, song);
+        expect(candidate.title, song);
+        expect(candidate.versions.map((v) => v.fileName), [
+          'Alice/mixing/m1.rpp',
+          'Alice/mixing/m2.rpp',
+          'Alice/v2/v2.rpp',
+          'Mix/Mix.rpp',
+          'done/d.rpp',
+          'loose.rpp',
+          'v1/takes/t.rpp',
+          'v1/v1.rpp',
+          'v3/a.rpp',
+          'v3/b.rpp',
+        ]);
+        expect(issuesOf(result, song), {
+          ReportKind.projectTooDeep: [
+            ReportItem.misplaced(
+              '$song/v1/takes/t.rpp',
+              level: lib.layout!.leaf,
+              target: song,
+            ),
+          ],
+          ReportKind.projectInTitleFolder: [
+            const ReportItem('$song/loose.rpp'),
+          ],
+          ReportKind.severalProjectsInVersion: [
+            const ReportItem('$song/v3', 'a.rpp\nb.rpp'),
+          ],
+          ReportKind.memberFolder: [const ReportItem('$song/Alice', 'Alice')],
+          ReportKind.statusFolder: [
+            const ReportItem('$song/Alice/mixing', 'mixing'),
+            const ReportItem('$song/done', 'done'),
+          ],
+        });
+        // The issues of the library hold those of its candidates.
+        expect(layoutIssues(result), issuesOf(result, song));
+      },
+    );
+
+    test('reports media outside the version folder', () async {
+      final lib = library(Layout.classic());
+      String project(List<String> media) => [
+        '<REAPER_PROJECT 0.1 "7.84/win64" 0',
+        '  RECORD_PATH "Media" ""',
+        '  RENDER_FILE "Renders"',
+        '  <TRACK',
+        for (final m in media) ...[
+          '    <ITEM',
+          '      <SOURCE WAVE',
+          '        FILE "$m"',
+          '      >',
+          '    >',
+        ],
+        '  >',
+        '>',
+      ].join('\n');
+      put('$song/a.wav', 'a');
+      put('$song/v2/Media/b.wav', 'b');
+      put('$song/Alice/c.wav', 'c');
+      put('$song/v1/Media/d.wav', 'd');
+      put(
+        '$song/v1/v1.rpp',
+        project([
+          r'Media\d.wav',
+          r'..\a.wav',
+          r'..\v2\Media\b.wav',
+          r'..\Alice\c.wav',
+        ]),
+      );
+
+      final result = await scan(storage, lib);
+
+      expect(result.candidates.single.issues.items, {
+        ReportKind.mediaOutsideVersion: [
+          const ReportItem(
+            '$song/v1/v1.rpp',
+            '..\\a.wav\n..\\v2\\Media\\b.wav\n..\\Alice\\c.wav',
+          ),
+        ],
+      });
+    });
+
+    test('groups the projects below a title placed too high', () async {
+      final lib = library(Layout.classic()).withKnownValues(const [
+        KnownValue('Band', [KnownValue('Album')]),
+      ]);
+      put('Band/Song/v/v.rpp', unknown);
+      put('Band/Song/loose.rpp', unknown);
+      put('Band/Song/v/sub/deep.rpp', unknown);
+      put('Album/Other/v/v.rpp', unknown);
+      put('Band/Album/x.rpp', unknown);
+
+      final result = await scan(storage, lib);
+
+      expect(
+        {
+          for (final c in result.candidates)
+            c.root: [c.title, ...c.versions.map((v) => v.fileName)],
+        },
+        {
+          'Album/Other': [null, 'v/v.rpp'],
+          'Band/Album': [null, 'x.rpp'],
+          'Band/Song': ['Band/Song', 'loose.rpp', 'v/sub/deep.rpp', 'v/v.rpp'],
+        },
+      );
+      expect(
+        issuesOf(result, 'Band/Song').keys,
+        unorderedEquals([
+          ReportKind.titleTooHigh,
+          ReportKind.projectTooDeep,
+          ReportKind.projectInTitleFolder,
+        ]),
+      );
+      expect(issuesOf(result, 'Album/Other'), {
+        ReportKind.misplacedLevel: [
+          const ReportItem.misplaced(
+            'Album',
+            level: LayoutLevel('album'),
+            target: 'Band/Album',
+          ),
+        ],
+      });
+      expect(issuesOf(result, 'Band/Album'), {
+        ReportKind.projectTooShallow: [
+          ReportItem.misplaced('Band/Album/x.rpp', level: lib.layout!.leaf),
+        ],
+      });
+    });
+
+    test(
+      'matches a project moved by hand to the title knowing its id',
+      () async {
+        final lib = library(Layout.classic());
+        put('$song/v1/v1.rpp', adopted);
+        put('$song/v2/v2.rpp', unknown);
+        final first = await scan(storage, lib);
+        await setVersionStatus(storage, song, adoptedId, 'done');
+        // Moved outside the application: into another title, and above the
+        // title level.
+        put('band/album/other/v1/v1.rpp', adopted);
+        put('band/moved.rpp', adopted);
+        File(p.joinAll([root.path, ...'$song/v1/v1.rpp'.split('/')]))
+            .deleteSync();
+
+        final result = await scan(storage, lib, previous: first);
+
+        final other = result.candidates.singleWhere(
+          (c) => c.root == 'band/album/other',
+        );
+        expect(other.title, 'band/album/other');
+        expect(other.issues.items[ReportKind.knownVersionElsewhere], [
+          ReportItem.misplaced(
+            'band/album/other/v1/v1.rpp',
+            level: lib.layout!.leaf,
+            target: song,
+          ),
+        ]);
+        final loose = result.candidates.singleWhere((c) => c.root == 'band');
+        expect(loose.title, song);
+        expect(loose.issues.items[ReportKind.knownVersionElsewhere], [
+          ReportItem.misplaced(
+            'band/moved.rpp',
+            level: lib.layout!.leaf,
+            target: song,
+          ),
+        ]);
+        // Only the versions of titles are duplicates.
+        expect(result.issues.items[ReportKind.duplicateVersionId], isNull);
+        // A version still in its title is not known elsewhere.
+        expect(
+          issuesOf(result, song)[ReportKind.knownVersionElsewhere],
+          isNull,
+        );
+      },
+    );
+
+    test('keeps in place a version its own title knows too', () async {
+      final lib = library(Layout.classic());
+      const copy = 'band/album/copy';
+      put('$song/v1/v1.rpp', adopted);
+      put('$song/v2/v2.rpp', unknown);
+      put('$copy/v1/v1.rpp', adopted);
+      await scan(storage, lib);
+      await setVersionStatus(storage, song, adoptedId, 'done');
+      await setVersionStatus(storage, copy, adoptedId, 'done');
+      File(p.joinAll([root.path, ...'$song/v1/v1.rpp'.split('/')]))
+          .deleteSync();
+
+      final result = await scan(storage, lib);
+
+      expect(result.issues.items[ReportKind.knownVersionElsewhere], isNull);
+    });
+
+    test(
+      'lists the projects of a repository folder without node file',
+      () async {
+        final lib = library(Layout.classic());
+        put('$song/v1/v1.rpp', adopted);
+
+        final result = await scan(storage, lib, writeNodes: false);
+
+        expect(result.titles, isEmpty);
+        final candidate = result.candidates.single;
+        expect(candidate.root, song);
+        expect(candidate.title, isNull);
+        expect(candidate.versions.single.metadata?.id, adoptedId);
+      },
+    );
+
+    test('reads the projects of a candidate once', () async {
+      final lib = library(Layout.classic());
+      put('band/loose.rpp', adopted);
+      final counting = CountingStorage(storage);
+
+      final first = await scan(counting, lib);
+      counting.reads.clear();
+      final second = await scan(counting, lib, previous: first);
+
+      expect(counting.reads, isEmpty);
+      expect(second.candidates.single.versions.single.metadata?.id, adoptedId);
     });
   });
 
@@ -1951,6 +2243,14 @@ void main() {
           const ReportItem.misplaced('Stranger', level: LayoutLevel('artist')),
         ],
       });
+      expect(result.candidates.map((c) => c.root), [
+        'Band/First album/Song',
+        'Band/Loose2',
+        'Band/_Unassigned/Other',
+        'First album/Song2',
+        'Loose',
+        'Stranger/Album/Song',
+      ]);
       expect(exists('Stranger/$nodeFileName'), isFalse);
       expect(exists('Stranger/Album/Song/$nodeFileName'), isFalse);
 

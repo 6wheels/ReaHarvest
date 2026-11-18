@@ -73,8 +73,15 @@ Object? describe(Title? title) => title == null
         ],
       };
 
-/// Checks that [scan] holds what [full] found in the folder [dir], its
-/// duplicated version identifiers and level issues aside.
+/// Issue kinds spanning titles, left to the caller of [scanTitle].
+const _acrossTitles = {
+  ReportKind.duplicateVersionId,
+  ReportKind.knownVersionElsewhere,
+};
+
+/// Checks that [scan] holds what [full] found in the folder [dir], the
+/// issues spanning titles and those of its position aside; no issue nor
+/// candidate once it is no longer a title.
 void expectAsFullScan(TitleScan scan, ScanResult full, String dir) {
   expect(
     describe(scan.title),
@@ -86,16 +93,32 @@ void expectAsFullScan(TitleScan scan, ScanResult full, String dir) {
       if (_below(key, dir)) key: value,
   });
 
+  final candidate = scan.title == null
+      ? null
+      : full.candidates.where((c) => c.root == dir).firstOrNull;
+  expect(scan.candidate?.root, candidate?.root);
+  expect(scan.candidate?.title, candidate?.title);
+  expect(
+    scan.candidate?.versions.map((v) => v.fileName),
+    candidate?.versions.map((v) => v.fileName),
+  );
   expect(scan.issues.items, {
-    for (final (kind, items) in full.issues.sections)
-      if (kind != ReportKind.duplicateVersionId &&
+    for (final (kind, items) in (candidate?.issues ?? const Report()).sections)
+      if (!_acrossTitles.contains(kind) &&
           items.any((i) => _below(i.path, dir)))
         kind: [
           for (final i in items)
             if (_below(i.path, dir)) i,
         ],
   });
-  expect(scan.corrupted, full.corrupted.where((p) => _below(p, dir)));
+  expect(scan.candidate?.issues.items ?? const {}, scan.issues.items);
+  // The full scan reads the projects of a folder that is no longer a title.
+  expect(
+    scan.corrupted,
+    scan.title == null
+        ? everyElement(isIn(full.corrupted))
+        : full.corrupted.where((p) => _below(p, dir)),
+  );
   expect(scan.orphanNodes, full.orphanNodes.where((p) => _below(p, dir)));
 }
 
@@ -173,10 +196,11 @@ void main() {
         stored: first,
       );
 
-      // Only its folder listed; no reference leaving it any more; only the
-      // changed files and the corrupted project read again.
+      // Only its folder listed; no reference leaving it any more, only the
+      // migration folder looked for; only the changed files and the
+      // corrupted project read again.
       expect(storage.listed, ['$song/**']);
-      expect(storage.stats, isEmpty);
+      expect(storage.stats, ['.migration']);
       expect(
         storage.reads,
         unorderedEquals([
@@ -213,12 +237,13 @@ void main() {
       expect(
         storage.stats,
         unorderedEquals([
+          '.migration',
           'band/album/other/o1/Media/b.wav',
           'band/album/other/o1/Media/none.wav',
         ]),
       );
       // Media of another title or of another version: outside the version.
-      expect(result.issues.items[ReportKind.mediaOutsidePool], [
+      expect(result.issues.items[ReportKind.mediaOutsideVersion], [
         const ReportItem(
           '$song/v2/v2.rpp',
           '..\\..\\other\\o1\\Media\\b.wav\n..\\v1\\Media\\a.wav',
@@ -260,7 +285,15 @@ void main() {
 
       expect(result.title!.tags, loose.tags);
       expect(result.title!.versions.single.fileName, 'v/v.rpp');
-      expect(result.issues.items, isEmpty);
+      expect(result.issues.items, {
+        ReportKind.projectTooDeep: [
+          ReportItem.misplaced(
+            'band/loose/v/sub/deep.rpp',
+            level: lib.layout!.leaf,
+            target: 'band/loose',
+          ),
+        ],
+      });
       expectAsFullScan(result, first, 'band/loose');
     });
 
@@ -320,6 +353,8 @@ void main() {
 
         expect(result.title, isNull);
         expect(result.node, isNull);
+        expect(result.candidate, isNull);
+        expect(result.issues.isEmpty, isTrue);
         expect(result.corrupted, ['$song/.node.json']);
         expectAsFullScan(
           result,
