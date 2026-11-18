@@ -641,8 +641,10 @@ void main() {
         final lib = library(Layout.classic()).withMembers(const [alice]);
         put('$song/v1/v1.rpp', unknown);
         put('$song/Alice/v2/v2.rpp', unknown);
-        put('$song/Alice/mix/m1.rpp', unknown);
-        put('$song/Alice/mix/m2.rpp', unknown);
+        put('$song/Alice/mixing/m1.rpp', unknown);
+        put('$song/Alice/mixing/m2.rpp', unknown);
+        // Only the exact name of a status: a version.
+        put('$song/Mix/Mix.rpp', unknown);
         put('$song/done/d.rpp', unknown);
         put('$song/loose.rpp', unknown);
         put('$song/v3/a.rpp', unknown);
@@ -657,9 +659,10 @@ void main() {
         expect(candidate.root, song);
         expect(candidate.title, song);
         expect(candidate.versions.map((v) => v.fileName), [
-          'Alice/mix/m1.rpp',
-          'Alice/mix/m2.rpp',
+          'Alice/mixing/m1.rpp',
+          'Alice/mixing/m2.rpp',
           'Alice/v2/v2.rpp',
+          'Mix/Mix.rpp',
           'done/d.rpp',
           'loose.rpp',
           'v1/takes/t.rpp',
@@ -681,9 +684,9 @@ void main() {
           ReportKind.severalProjectsInVersion: [
             const ReportItem('$song/v3', 'a.rpp\nb.rpp'),
           ],
-          ReportKind.memberFolder: [ReportItem('$song/Alice', alice.id)],
+          ReportKind.memberFolder: [const ReportItem('$song/Alice', 'Alice')],
           ReportKind.statusFolder: [
-            const ReportItem('$song/Alice/mix', 'mixing'),
+            const ReportItem('$song/Alice/mixing', 'mixing'),
             const ReportItem('$song/done', 'done'),
           ],
         });
@@ -819,11 +822,8 @@ void main() {
             target: song,
           ),
         ]);
-        // Two copies of one version are duplicates.
-        expect(result.issues.items[ReportKind.duplicateVersionId], [
-          ReportItem('band/album/other/v1/v1.rpp', adoptedId),
-          ReportItem('band/moved.rpp', adoptedId),
-        ]);
+        // Only the versions of titles are duplicates.
+        expect(result.issues.items[ReportKind.duplicateVersionId], isNull);
         // A version still in its title is not known elsewhere.
         expect(
           issuesOf(result, song)[ReportKind.knownVersionElsewhere],
@@ -831,6 +831,23 @@ void main() {
         );
       },
     );
+
+    test('keeps in place a version its own title knows too', () async {
+      final lib = library(Layout.classic());
+      const copy = 'band/album/copy';
+      put('$song/v1/v1.rpp', adopted);
+      put('$song/v2/v2.rpp', unknown);
+      put('$copy/v1/v1.rpp', adopted);
+      await scan(storage, lib);
+      await setVersionStatus(storage, song, adoptedId, 'done');
+      await setVersionStatus(storage, copy, adoptedId, 'done');
+      File(p.joinAll([root.path, ...'$song/v1/v1.rpp'.split('/')]))
+          .deleteSync();
+
+      final result = await scan(storage, lib);
+
+      expect(result.issues.items[ReportKind.knownVersionElsewhere], isNull);
+    });
 
     test(
       'lists the projects of a repository folder without node file',

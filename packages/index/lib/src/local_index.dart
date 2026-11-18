@@ -92,6 +92,8 @@ CREATE TABLE issues (
   target TEXT,
   candidate TEXT
 );
+CREATE INDEX issues_by_candidate ON issues (library_id, candidate);
+CREATE INDEX issues_by_path ON issues (library_id, path);
 ''';
 
 const _tables = [

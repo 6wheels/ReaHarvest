@@ -11,7 +11,6 @@ import 'project_file.dart';
 import 'conventions.dart';
 import 'migration.dart';
 import 'mounted_folder_storage.dart';
-import 'fix_proposals.dart';
 import 'node_file.dart';
 import 'scaffold.dart';
 
@@ -718,7 +717,7 @@ final class _Scanner {
         base = joinPath(base, rest.removeAt(0));
         _issue(
           ReportKind.memberFolder,
-          ReportItem(base, member.id),
+          ReportItem(base, member.name),
           candidate: root,
         );
         grouped = true;
@@ -746,7 +745,8 @@ final class _Scanner {
           versionFolders
               .putIfAbsent(folder, () => [])
               .add(p.posix.basename(e.path));
-        default:
+        // Lifted into its title only: no fix for another candidate.
+        case _ when titles.any((t) => t.path == root):
           _issue(
             ReportKind.projectTooDeep,
             ReportItem.misplaced(e.path, level: layout.leaf, target: root),
@@ -770,9 +770,10 @@ final class _Scanner {
       .where((m) => m.name.toLowerCase() == folder.toLowerCase())
       .firstOrNull;
 
-  /// Status named by [folder] ([proposeStatus]), if any.
+  /// Default status named exactly [folder] (ignoring case), if any: a
+  /// shorter name (`Mix`) may be a version.
   static String? _status(String folder) =>
-      proposeStatus({for (final s in Title.defaultStatuses) s: s}, folder);
+      Title.defaultStatuses.where((s) => s == folder.toLowerCase()).firstOrNull;
 
   /// Whether the folder [dir] is or lies in a reserved folder.
   static bool _inReserved(String dir) =>
@@ -788,10 +789,12 @@ final class _Scanner {
     };
     for (final MapEntry(key: root, value: projects) in groups.entries) {
       final versions = <Version>[];
+      final own = <Version>[];
       for (final e in projects) {
         // A title is the candidate of its own folder.
         if (read[e.path] case final v?) {
           versions.add(v);
+          own.add(v);
           continue;
         }
         if (corrupted.contains(e.path)) continue;
@@ -804,22 +807,23 @@ final class _Scanner {
       }
       versions.sort((a, b) => a.fileName.compareTo(b.fileName));
       candidateVersions[root] = versions;
-      if (statOutside) await _statOutside(root, versions);
-      _checkMedia(root, versions);
+      // Only the versions of a title have media fixed in their folder.
+      if (statOutside) await _statOutside(root, own);
+      _checkMedia(root, own);
     }
   }
 
-  /// Reports the projects sharing a version identifier with another one
-  /// (manual duplication, SPEC §4.2), the identifier as detail.
+  /// Reports the versions of titles sharing a version identifier with
+  /// another one (manual duplication, SPEC §4.2), the identifier as detail:
+  /// each copy is made a new version from its title.
   void _findDuplicates() {
     final byId = <VersionId, List<(String, String)>>{};
-    for (final MapEntry(key: root, value: versions)
-        in candidateVersions.entries) {
-      for (final v in versions) {
+    for (final t in titles) {
+      for (final v in t.versions) {
         if (v.metadata?.id case final id?) {
           byId.putIfAbsent(id, () => []).add((
-            root,
-            joinPath(root, v.fileName),
+            t.path,
+            joinPath(t.path, v.fileName),
           ));
         }
       }
@@ -849,14 +853,16 @@ final class _Scanner {
         root: {for (final v in versions) ?v.metadata?.id},
     };
     final knownBy = <String, String>{};
+    final known = <String, Set<String>>{};
     for (final t in titles..sort((a, b) => a.path.compareTo(b.path))) {
       final node = nodes[t.path];
       if (node == null) continue;
-      for (final id in {
+      final ids = known[t.path] = {
         ...node.versionStatuses.keys,
         ...node.versionLabels.keys,
         ...node.versionOwners.keys,
-      }) {
+      };
+      for (final id in ids) {
         if (present[t.path]?.contains(id) ?? false) continue;
         knownBy.putIfAbsent(id, () => t.path);
       }
@@ -865,7 +871,12 @@ final class _Scanner {
         in candidateVersions.entries) {
       for (final v in versions) {
         final title = knownBy[v.metadata?.id];
-        if (title == null || title == root) continue;
+        // Known by its own title too (a title copied by hand): in place.
+        if (title == null ||
+            title == root ||
+            (known[root]?.contains(v.metadata?.id) ?? false)) {
+          continue;
+        }
         _issue(
           ReportKind.knownVersionElsewhere,
           ReportItem.misplaced(
