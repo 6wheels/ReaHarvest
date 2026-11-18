@@ -167,20 +167,6 @@ Rework after the first test (2026-11-14), before the remaining features:
 - [ ] #129 figures of a title and of its versions
 - [ ] #130 statistics page
 
-Plan of the rework (at most 3 agents at once):
-
-| Step | Tickets | Model | Starts when merged |
-|---|---|---|---|
-| 1 | #145 beside #146; #151, #152, #155, #158, #159 one after the other in the third lane | Opus (#145, reviewed by the largest model before merge); Sonnet for #146, #151; Haiku for #152, #155, #158, #159 | now (after #141) |
-| 2 | #147 beside #153 beside #157 + #135 | Opus for #147; Sonnet for the others | #145 (#147); #152 (#153) |
-| 3 | #148 beside #150 beside #12 | Opus for #148 (reviewed by the largest model before merge); Sonnet for #150, #12 | #147, #146 (#148); #151, #152 (#150); #145 (#12) |
-| 4 | #149 beside #156 beside #132 | Sonnet | #148, #150 (#149); #150, #12 (#156); #145 (#132) |
-| 5 | #154, #160 beside #129, then #130, beside #163 | Sonnet; Haiku for #163 | #132 (#154, #160); #145 (#129); #129 (#130); #157 (#163) |
-
-- #145 and #148 touch most of `packages/repository`: no other repository ticket runs beside them, except #146 beside #145 (small conflicts in `history.dart` and `adoption.dart`, the second to merge rebases).
-- #12: the tempo envelope format is validated (SPEC §5.3, `test/fixtures/tracks.rpp`); #158: the REAPER logo is supplied (`apps/desktop/assets/third_party/reaper/reaper.png`).
-- Shared files: `ReportKind` (#147, #148), both ARB files, `title_detail/*` (#145, #156, #12), `settings_dialog.dart` (#152, #157, #135, #158, #163), `library_page.dart` (#153, #154, #159).
-
 Remaining features:
 - [ ] #84 issues in the detail view, render target fix
 - [ ] #70 other files to Assets with reference check (uses #96)
@@ -191,16 +177,19 @@ Remaining features:
 - [ ] #88 Retry and Cancel only in the REAPER running dialog (a change is refused while REAPER runs)
 - [ ] #72 convert to a collab repository
 
-Plan of the remaining features (after the rework; at most 3 agents at once):
+Plan of the rest of M1 (2026-11-18, rework and remaining features; three lanes run side by side, at most 3 agents at once; a ticket starts when the one before it in its lane is merged, and when the tickets named in its last column are merged):
 
-| Step | Tickets | Model | Starts when merged |
+| Lane | Tickets, in order | Model | Also waits for |
 |---|---|---|---|
-| 9 | #84 beside #70 beside #23 | Sonnet | #148 (and #156 for #84) |
-| 10 | #60 beside #88 beside #106 | Sonnet for #60; Haiku for #88 and #106 | #156 (#60, #106); now (#88) |
-| 11 | #89 beside #72 | Sonnet | #149 |
-| 12 | Validation of M1 | maintainer | everything above |
+| A, critical (To sort, repository) | #152, #150, #149, #70, #23, #89, #72 | Haiku for #152; Sonnet for the others | #23: the maintainer's real Drive conflict (else A goes on to #89) |
+| B, title detail | #132, #129, #156, #84, #60, #106, #130 | Sonnet; Haiku for #106 | #150 (#156) |
+| C, library page and settings | #157 + #135, #163, #155, #158, #159, #153, #154, #160, #88 | Sonnet for #157, #135, #153, #154, #160; Haiku for the others | #152 (#153), #132 (#160) |
 
-Steps 9 to 11 only depend on the rework: with more agents they can overlap. Shared files: `ReportKind`, both ARB files, `scanner.dart` (#70, #23), the title detail files (#84, #60, #106).
+- Longest chain: #152, #150, then #149 (lane A) and #156 (lane B); every remaining feature but #88 waits for one of them.
+- Shared files are grouped by lane: `ReportKind` and `scanner.dart` (A), `title_detail/*` (B), `library_page.dart` and `settings_dialog.dart` (C). Left across lanes: both ARB files, and `settings_dialog.dart` between #152 and lane C; the second to merge rebases.
+- #158: the REAPER logo is supplied (`apps/desktop/assets/third_party/reaper/reaper.png`).
+- Until #149, the "To sort" page lists the issues by kind without any fix (its batch fix and guided move are unwired; `Choice`, `LevelField` and the generic texts are kept for #149).
+- Then: validation of M1, by the maintainer.
 - [ ] Validation (quality of the product, not the state of the migrated folder): full preparation on the sample copy with no product defect (every fix behaves as specified, nothing lost, no crash); issues without an automatic fix (missing or external media, conflict copies…) stay listed in To sort for a manual decision; inventory check passes; every fixed project opens in REAPER with no new missing media
 
 ## M2 — Join and sync
@@ -274,7 +263,3 @@ Former phase 2 (backend): #33, #34, #45. Former phase 3 (tools): #35, #36, #37.
 - #52: confirm that the built-in PDF preview is left out of the MVP (in the ticket; SPEC §5.9 asks for it).
 - #23: produce a real conflict on Google Drive for desktop to confirm its naming pattern (SPEC §3.0).
 - #31: the Microsoft Store study, at the start of M2. #25: the watching spike on the real Drive, at the start of M3. #110: the design proposal.
-
-## Next step
-Done: #90, #91 and both lots of #59 (the integration harness now sizes the native window to 1024x768, so the app stays visible during the tests, #119).
-Now: step 3 of the hardening plan. #92 and #93 are merged (PR #120, #122): #95 can start. #114 is merged (PR #124): #94 can start. #97 is merged (PR #125): step 3 is complete. #95 is merged (PR #128): #96 and #99 can start. #96 is merged (PR #137). #99 is merged (PR #138). #94 is merged (PR #136, reviewed, its ten findings fixed). #100 is merged (PR #139). #101 is merged (PR #140, reviewed, two findings fixed, two gaps left to #141). #102 is merged (PR #142, reviewed, four findings fixed, two gaps left to #141): #103, #105 and #141 can start. #103 is merged (PR #143, reviewed, four findings fixed, two follow-ups noted on #103). #105 is merged (PR #144, reviewed, no bug; two cleanup notes left as they are: `formats.dart` mixes pure and provider-aware helpers, `Choice` and `LevelField` stay in `to_sort/fix_dialog.dart`, as the ticket says). #141 is done: the hardening is complete. On 2026-11-14 the feedback after the first test reworked SPEC.md and the tickets (Decisions 2026-11-14). Next: the rework of M1 (#145 to #160, #163, #12, #132, #135, #129, #130, in the order of its plan), then the remaining features of M1 (steps 9 to 11), then the validation of M1. #145 is merged (PR #166): #12, #129 and #132 can start. #147 is merged (PR #167; title-oriented scan: `ScanResult.candidates`, one issue row per problem grouped by candidate, journals read by the title rescan). #146 is done (adoption, separation, backup, cleaning of backup paths and migration copies keep the date of a project, a restore gives it the date of the backup; the title rescan reads again a project rewritten with the same size and date): #148 can start. #148 is done (fixes per title candidate: `OrganizeTitle`, `AttachVersions`, `MoveProject`, proposed by `proposeFix`; one folder per version, media moved for the last project using them, copied otherwise; the former pool, merge, lift and duplicate trash removed): #149 can start once #150 is merged. #151 is done (one notification zone: `notify` replaces every snackbar, state icons green check / orange warning / red error with the new `TaskState.warning`, counter only above one task, clear button on the collapsed bar, error popup from `FlutterError.onError` and `PlatformDispatcher.onError`). Until #149, the "To sort" page lists the issues by kind without any fix (its batch fix and guided move are unwired; `Choice`, `LevelField` and the generic texts are kept for #149). #12 is done (version detail view: `RppProject.tempoChanges`, `VersionDetailView` parsed on demand in an isolate: sample rate, tempo and signature changes, length, REAPER version, tracks of depth 0 and 1 with FX and missing plugins marked, 20 tracks then "Show more", media presence and size): #156 can start once #150 is merged.
