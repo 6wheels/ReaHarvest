@@ -74,7 +74,7 @@ enum DisplayMode { cards, list, tree }
 /// Combinable title filters (SPEC §5.2). An empty set does not filter.
 final class TitleFilter {
   const TitleFilter({
-    this.tags = const {},
+    this.levels = const {},
     this.libraries = const {},
     this.modes = const {},
     this.statuses = const {},
@@ -83,8 +83,8 @@ final class TitleFilter {
     this.toAdopt = false,
   });
 
-  /// Accepted values, by tag key (e.g. `artist`).
-  final Map<String, Set<String>> tags;
+  /// Accepted values, by level key (e.g. `artist`).
+  final Map<String, Set<String>> levels;
   final Set<LibraryId> libraries;
   final Set<LibraryMode> modes;
 
@@ -101,7 +101,7 @@ final class TitleFilter {
   final bool toAdopt;
 
   bool get isEmpty =>
-      tags.values.every((v) => v.isEmpty) &&
+      levels.values.every((v) => v.isEmpty) &&
       libraries.isEmpty &&
       modes.isEmpty &&
       statuses.isEmpty &&
@@ -109,17 +109,17 @@ final class TitleFilter {
       !missingPlugins &&
       !toAdopt;
 
-  /// Copy accepting [values] for the tag [key] (empty: no tag filter).
-  TitleFilter withTag(String key, Set<String> values) => copyWith(
-    tags: {
-      for (final e in tags.entries)
+  /// Copy accepting [values] for the level [key] (empty: no level filter).
+  TitleFilter withLevel(String key, Set<String> values) => copyWith(
+    levels: {
+      for (final e in levels.entries)
         if (e.key != key) e.key: e.value,
       if (values.isNotEmpty) key: values,
     },
   );
 
   TitleFilter copyWith({
-    Map<String, Set<String>>? tags,
+    Map<String, Set<String>>? levels,
     Set<LibraryId>? libraries,
     Set<LibraryMode>? modes,
     Set<String>? statuses,
@@ -127,7 +127,7 @@ final class TitleFilter {
     bool? missingPlugins,
     bool? toAdopt,
   }) => TitleFilter(
-    tags: tags ?? this.tags,
+    levels: levels ?? this.levels,
     libraries: libraries ?? this.libraries,
     modes: modes ?? this.modes,
     statuses: statuses ?? this.statuses,
@@ -137,8 +137,8 @@ final class TitleFilter {
   );
 
   Map<String, Object?> toJson() => {
-    if (tags.isNotEmpty)
-      'tags': {for (final e in tags.entries) e.key: e.value.toList()},
+    if (levels.isNotEmpty)
+      'levels': {for (final e in levels.entries) e.key: e.value.toList()},
     if (libraries.isNotEmpty) 'libraries': libraries.toList(),
     if (modes.isNotEmpty) 'modes': [for (final m in modes) m.name],
     if (statuses.isNotEmpty) 'statuses': statuses.toList(),
@@ -151,8 +151,8 @@ final class TitleFilter {
     Set<String> strings(Object? list) => {...?(list as List?)?.cast<String>()};
     final modes = LibraryMode.values.asNameMap();
     return TitleFilter(
-      tags: {
-        for (final e in ((json['tags'] as Map?) ?? const {}).entries)
+      levels: {
+        for (final e in ((json['levels'] as Map?) ?? const {}).entries)
           e.key as String: strings(e.value),
       },
       libraries: {for (final id in strings(json['libraries'])) LibraryId(id)},

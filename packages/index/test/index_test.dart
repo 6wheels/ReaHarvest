@@ -77,7 +77,7 @@ void main() {
     id: NodeId.generate(),
     libraryId: lib,
     path: '$artist/$album/$name',
-    tags: {'artist': artist, 'album': album, 'title': name},
+    levels: {'artist': artist, 'album': album, 'title': name},
     versions: versions,
   );
 
@@ -167,8 +167,8 @@ void main() {
       final restored = index.scanResult(lib.id)!;
       final t = restored.titles.single;
       expect(t.id, song.id);
-      expect(t.tags, song.tags);
-      expect(t.tags.keys, ['artist', 'album', 'title']);
+      expect(t.levels, song.levels);
+      expect(t.levels.keys, ['artist', 'album', 'title']);
       expect(t.versions.map((v) => v.fileName), ['a.RPP', 'b.rpp']);
       final a = t.versions.first;
       expect(a.metadata!.id, song.versions.first.metadata!.id);
@@ -552,7 +552,7 @@ void main() {
             [
               t.id,
               t.path,
-              t.tags,
+              t.levels,
               t.status,
               t.versionStatuses,
               for (final v in t.versions)
@@ -805,7 +805,7 @@ void main() {
         id: song.id,
         libraryId: lib.id,
         path: song.path,
-        tags: song.tags,
+        levels: song.levels,
         versions: [version('v.rpp'), version('v.rpp')],
       );
 
@@ -842,7 +842,7 @@ void main() {
     final search = TitleSearch(titles, memberNames: {alice: 'Alice'});
 
     List<String> find(String query) =>
-        search.search(query).map((t) => t.tags['title']!).toList();
+        search.search(query).map((t) => t.levels['title']!).toList();
 
     test('blank query returns every title in order', () {
       expect(find('  '), ['Dancing on a line', 'Morning coffee', 'Late night']);

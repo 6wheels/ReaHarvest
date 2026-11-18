@@ -11,7 +11,7 @@ import '../labels.dart';
 import '../status_trail.dart';
 
 /// Title name with its first parent tag (e.g. the artist) on the same
-/// line, the other tags (e.g. the album) and the library below; stats of
+/// line, the other levels (e.g. the album) and the library below; stats of
 /// the selected [version] on the right; status trail across the width.
 class Header extends ConsumerWidget {
   const Header(this.title, this.version, {super.key});
@@ -25,12 +25,12 @@ class Header extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     final t = title;
-    final tags = t == null
+    final levels = t == null
         ? const <String>[]
-        : [for (final v in parentTags(t)) tagValueLabel(l10n, v)];
+        : [for (final v in parentLevels(t)) levelValueLabel(l10n, v)];
     final below = t == null
         ? ''
-        : [...tags.skip(1), ?libraryName(ref, t)].join(' · ');
+        : [...levels.skip(1), ?libraryName(ref, t)].join(' · ');
     final v = version;
     final toAdopt = t == null ? 0 : ref.watch(toAdoptCountsProvider)[t.id] ?? 0;
     return Padding(
@@ -78,10 +78,10 @@ class Header extends ConsumerWidget {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            if (tags.isNotEmpty)
+                            if (levels.isNotEmpty)
                               TextSpan(
                                 text:
-                                    '$labelSeparator${tags.first.toUpperCase()}',
+                                    '$labelSeparator${levels.first.toUpperCase()}',
                                 style: context.legend.copyWith(fontSize: 12),
                               ),
                           ],

@@ -878,7 +878,7 @@ final _libraryModel = Library(
 
 Title _title(
   String id, {
-  required Map<String, String> tags,
+  required Map<String, String> levels,
   String? status,
   int versions = 0,
   double? tempo,
@@ -886,8 +886,8 @@ Title _title(
 }) => Title(
   id: NodeId(id),
   libraryId: _library,
-  path: tags.values.join('/'),
-  tags: tags,
+  path: levels.values.join('/'),
+  levels: levels,
   // The title status is derived: [status] goes to the first version.
   versionStatuses: {
     if (status != null && versions > 0) '$id-0': status,
@@ -896,7 +896,7 @@ Title _title(
   versions: [
     for (var v = 0; v < versions; v++)
       Version(
-        fileName: '${tags.values.last} v${v + 1}.rpp',
+        fileName: '${levels.values.last} v${v + 1}.rpp',
         modified: DateTime(2026, 11, 12).subtract(Duration(days: v * 3)),
         size: 1,
         tempo: tempo,
@@ -911,7 +911,7 @@ Title _title(
 
 final _nominal = _title(
   'nominal',
-  tags: {'artist': 'Sample Artist', 'album': 'Album 1', 'title': 'Slow Tide'},
+  levels: {'artist': 'Sample Artist', 'album': 'Album 1', 'title': 'Slow Tide'},
   status: 'mixing',
   versions: 6,
   tempo: 92,
@@ -924,7 +924,11 @@ final _nominal = _title(
 
 final _done = _title(
   'done',
-  tags: {'artist': 'Other Artist', 'album': 'Album 2', 'title': 'First Light'},
+  levels: {
+    'artist': 'Other Artist',
+    'album': 'Album 2',
+    'title': 'First Light',
+  },
   status: 'done',
   versions: 3,
   tempo: 120,
@@ -932,7 +936,7 @@ final _done = _title(
 
 final _customStatus = _title(
   'custom',
-  tags: {
+  levels: {
     'artist': 'Sample Artist',
     'album': 'Album 1',
     'title': 'Glass Garden',
@@ -942,13 +946,13 @@ final _customStatus = _title(
   tempo: 76,
 );
 
-final _minimal = _title('minimal', tags: {'title': 'Untitled'});
+final _minimal = _title('minimal', levels: {'title': 'Untitled'});
 
-final _bare = _title('bare', tags: {'title': 'Sketch'}, versions: 1);
+final _bare = _title('bare', levels: {'title': 'Sketch'}, versions: 1);
 
 final _overflow = _title(
   'overflow',
-  tags: {
+  levels: {
     'artist': 'The Extraordinarily Long Named Collective of Sound',
     'album': 'An Album Title That Keeps Going Far Beyond Reason',
     'disc': 'Disc 2 — Bonus Material',
@@ -967,7 +971,7 @@ final _alerts = Title(
   id: const NodeId('alerts'),
   libraryId: _library,
   path: 'Other Artist/Album 2/Copper Sky',
-  tags: const {
+  levels: const {
     'artist': 'Other Artist',
     'album': 'Album 2',
     'title': 'Copper Sky',

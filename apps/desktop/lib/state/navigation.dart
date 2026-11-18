@@ -133,8 +133,8 @@ DateTime? lastModified(Title t) => t.versions.isEmpty
 
 /// Values a filter can take, from all the titles (SPEC §5.2).
 typedef FilterOptions = ({
-  /// Non-leaf layout levels and their values, by tag key.
-  List<({LayoutLevel level, List<String> values})> tags,
+  /// Non-leaf layout levels and their values, by level key.
+  List<({LayoutLevel level, List<String> values})> levels,
   List<LibraryEntry> libraries,
   List<LibraryMode> modes,
   List<String> statuses,
@@ -158,11 +158,11 @@ final filterOptionsProvider = Provider<FilterOptions>((ref) {
   final usedLibraries = {for (final t in titles) t.libraryId};
   final statuses = {for (final t in titles) ?t.status};
   return (
-    tags: [
+    levels: [
       for (final level in levels.values)
         (
           level: level,
-          values: ({for (final t in titles) ?t.tags[level.key]}.toList()
+          values: ({for (final t in titles) ?t.levels[level.key]}.toList()
             ..sort(_compareText)),
         ),
     ],
@@ -198,8 +198,8 @@ bool matchesFilter(
   required bool missingPlugins,
   required bool toAdopt,
 }) =>
-    filter.tags.entries.every(
-      (e) => e.value.isEmpty || e.value.contains(t.tags[e.key]),
+    filter.levels.entries.every(
+      (e) => e.value.isEmpty || e.value.contains(t.levels[e.key]),
     ) &&
     (filter.libraries.isEmpty || filter.libraries.contains(t.libraryId)) &&
     (filter.modes.isEmpty || filter.modes.contains(library?.mode)) &&

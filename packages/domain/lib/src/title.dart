@@ -7,7 +7,7 @@ final class Title {
     required this.id,
     required this.libraryId,
     required this.path,
-    required this.tags,
+    required this.levels,
     this.versions = const [],
     this.versionStatuses = const {},
   });
@@ -28,8 +28,8 @@ final class Title {
   /// Folder path relative to the library root, `/`-separated.
   final String path;
 
-  /// Tags derived from the path (e.g. `artist`, `album`, `title`).
-  final Map<String, String> tags;
+  /// Level values derived from the path (e.g. `artist`, `album`, `title`).
+  final Map<String, String> levels;
 
   final List<Version> versions;
 

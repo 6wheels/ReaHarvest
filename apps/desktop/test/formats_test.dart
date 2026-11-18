@@ -82,7 +82,7 @@ void main() {
       id: NodeId.generate(),
       libraryId: LibraryId.generate(),
       path: 'A/B/C',
-      tags: const {},
+      levels: const {},
       versions: [at('a/a.rpp'), at('a/a copy.rpp'), at('b/b.rpp')],
     );
     expect(versionFolderCount(title), 2);
@@ -102,7 +102,7 @@ void main() {
       id: NodeId.generate(),
       libraryId: LibraryId.generate(),
       path: 'Band/Album/Song',
-      tags: const {},
+      levels: const {},
       versions: [
         Version(
           fileName: 'Song/Song.rpp',

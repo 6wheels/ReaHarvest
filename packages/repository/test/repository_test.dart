@@ -234,7 +234,11 @@ void main() {
         'band/album/song',
       ]);
       final song = result.titles[1];
-      expect(song.tags, {'artist': 'band', 'album': 'album', 'title': 'song'});
+      expect(song.levels, {
+        'artist': 'band',
+        'album': 'album',
+        'title': 'song',
+      });
       expect(song.libraryId, lib.id);
       expect(song.versions.map((v) => v.fileName), ['v1/v1.rpp', 'v2/v2.RPP']);
       expect(song.versions.map((v) => v.folder), ['v1', 'v2']);
@@ -1082,7 +1086,7 @@ void main() {
         'band/other',
       ]);
       final demo = result.titles.first;
-      expect(demo.tags, {
+      expect(demo.levels, {
         'folder1': 'band',
         'folder2': '2024',
         'title': 'demo',
@@ -2056,7 +2060,7 @@ void main() {
 
       final result = await scan(storage, lib);
 
-      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.tags, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v/v.rpp');      expect(result.titles[1].tags['artist'], 'Band');
+      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.levels, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v/v.rpp');      expect(result.titles[1].levels['artist'], 'Band');
       expect(layoutIssues(result), {
         ReportKind.misplacedLevel: [
           const ReportItem.misplaced(

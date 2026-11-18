@@ -155,7 +155,7 @@ class Overview extends ConsumerWidget {
   }
 }
 
-/// Name, tags, figures, status and alerts.
+/// Name, levels, figures, status and alerts.
 class _Identity extends ConsumerWidget {
   const _Identity(this.title);
 
@@ -167,8 +167,9 @@ class _Identity extends ConsumerWidget {
     final c = context.colors;
     final text = Theme.of(context).textTheme;
     // Artist and album as on the cards.
-    final tags = [
-      for (final v in parentTags(title)) tagValueLabel(l10n, v).toUpperCase(),
+    final levels = [
+      for (final v in parentLevels(title))
+        levelValueLabel(l10n, v).toUpperCase(),
     ].join(labelSeparator);
     final library = libraryName(ref, title);
     final meta = [
@@ -203,11 +204,11 @@ class _Identity extends ConsumerWidget {
                   style: text.titleLarge,
                 ),
               ),
-              if (tags.isNotEmpty) ...[
+              if (levels.isNotEmpty) ...[
                 const SizedBox(width: Space.s),
                 Flexible(
                   child: Text(
-                    tags,
+                    levels,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: context.legend.copyWith(fontSize: 9.5),

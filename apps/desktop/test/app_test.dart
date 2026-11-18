@@ -678,7 +678,7 @@ void main() {
       id: NodeId.generate(),
       libraryId: demoLibrary.id,
       path: 'Band/$album/$name',
-      tags: {'artist': 'Band', 'album': album, 'title': name},
+      levels: {'artist': 'Band', 'album': album, 'title': name},
       // Two versions to adopt: the counter still counts one title.
       versions: [
         for (final file in ['$name.rpp', '$name 2.rpp'])
@@ -826,7 +826,7 @@ void main() {
     expect(find.widgetWithText(MenuItemButton, 'Other Artist'), findsNothing);
     expect(find.byType(TitleCard), findsNWidgets(6));
     expect(find.text('ARTIST // OTHER ARTIST'), findsOneWidget);
-    expect(settings.saved.last.navigation.filter.tags, {
+    expect(settings.saved.last.navigation.filter.levels, {
       'artist': {'Other Artist'},
     });
 
@@ -960,7 +960,7 @@ void main() {
                 id: t.id,
                 libraryId: other.id,
                 path: t.path,
-                tags: t.tags,
+                levels: t.levels,
                 versions: t.versions,
                 versionStatuses: t.versionStatuses,
               ),
@@ -1400,7 +1400,7 @@ void main() {
       id: const NodeId('t'),
       libraryId: demoLibrary.id,
       path: 'Band/First album/Opening',
-      tags: const {
+      levels: const {
         'artist': 'Band',
         'album': 'First album',
         'title': 'Opening',
@@ -1504,7 +1504,7 @@ void main() {
           id: NodeId.generate(),
           libraryId: demoLibrary.id,
           path: 'Band/Album/Song',
-          tags: const {'artist': 'Band', 'album': 'Album', 'title': 'Song'},
+          levels: const {'artist': 'Band', 'album': 'Album', 'title': 'Song'},
           versions: [version('Song.rpp'), version('Song copy.rpp')],
         ),
       ],
@@ -1661,7 +1661,7 @@ void main() {
     final single = demoTitles().first;
     expect(single.versions, hasLength(1));
     await pumpApp(tester, titles: [single]);
-    await tester.tap(find.text(single.tags['title']!));
+    await tester.tap(find.text(single.levels['title']!));
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(

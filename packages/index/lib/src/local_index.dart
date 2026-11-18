@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 13;
+const _schemaVersion = 14;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -39,7 +39,7 @@ CREATE TABLE titles (
   library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
   path TEXT NOT NULL,
   id TEXT NOT NULL,
-  tags TEXT NOT NULL,
+  levels TEXT NOT NULL,
   version_statuses TEXT NOT NULL,
   version_labels TEXT NOT NULL,
   version_owners TEXT NOT NULL,
@@ -267,7 +267,7 @@ final class LocalIndex {
     Map<String, NodeFile> nodes,
   ) {
     _insertAll(
-      'INSERT INTO titles (library_id, path, id, tags, '
+      'INSERT INTO titles (library_id, path, id, levels, '
       'version_statuses, version_labels, version_owners) '
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
@@ -276,7 +276,7 @@ final class LocalIndex {
             id,
             t.path,
             t.id,
-            jsonEncode(t.tags),
+            jsonEncode(t.levels),
             jsonEncode(t.versionStatuses),
             // Raw node entries: the next scan reuses them while the node
             // file is unchanged (SPEC §4.2).
@@ -485,7 +485,7 @@ final class LocalIndex {
           id: NodeId(r['id'] as String),
           libraryId: LibraryId(r['library_id'] as String),
           path: r['path'] as String,
-          tags: (jsonDecode(r['tags'] as String) as Map).cast(),
+          levels: (jsonDecode(r['levels'] as String) as Map).cast(),
           versions: versions[(r['library_id'], r['path'])] ?? const [],
           versionStatuses: _stringMap(r['version_statuses'] as String),
         ),

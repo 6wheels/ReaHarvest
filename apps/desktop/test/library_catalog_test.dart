@@ -42,7 +42,7 @@ void main() {
       'album',
       'title',
     ]);
-    expect(index.titles().single.tags['title'], 'Song');
+    expect(index.titles().single.levels['title'], 'Song');
     // Frozen as soon as a title exists (SPEC §3.1).
     expect(await catalog.hasProjects(band), isTrue);
     expect(container.read(indexRevisionProvider), greaterThan(revision));
@@ -62,13 +62,13 @@ void main() {
     );
 
     final options = container.read(filterOptionsProvider);
-    expect(options.tags, isEmpty);
+    expect(options.levels, isEmpty);
     final title = container.read(titlesProvider).single;
     // The root holds a project: one title, named after the library.
-    expect(title.tags, {'title': 'My songs'});
+    expect(title.levels, {'title': 'My songs'});
     expect(titleName(title), 'My songs');
-    expect(parentTags(title), isEmpty);
-    expect(parentTags(index.titles().single), isEmpty);
+    expect(parentLevels(title), isEmpty);
+    expect(parentLevels(index.titles().single), isEmpty);
   });
 
   test('attaches the library already described in the folder', () async {

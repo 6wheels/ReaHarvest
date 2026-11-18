@@ -47,7 +47,7 @@ Object? describe(Title? title) => title == null
     : {
         'id': title.id,
         'path': title.path,
-        'tags': title.tags,
+        'tags': title.levels,
         'status': title.status,
         'versionStatuses': title.versionStatuses,
         'versions': [
@@ -279,11 +279,11 @@ void main() {
         ..put('band/loose/v/sub/deep.rpp', project([]));
       final first = await scan(storage, lib);
       final loose = titleAt(first, 'band/loose');
-      expect(loose.tags['album'], Layout.unassigned);
+      expect(loose.levels['album'], Layout.unassigned);
 
       final result = await scanTitle(storage, lib, loose, stored: first);
 
-      expect(result.title!.tags, loose.tags);
+      expect(result.title!.levels, loose.levels);
       expect(result.title!.versions.single.fileName, 'v/v.rpp');
       expect(result.issues.items, {
         ReportKind.projectTooDeep: [
