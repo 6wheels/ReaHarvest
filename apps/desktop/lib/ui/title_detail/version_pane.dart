@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../state/tasks.dart';
 import '../../state/providers.dart';
 import '../../state/reaper.dart';
 import '../../state/report_paths.dart';
@@ -43,14 +44,12 @@ class VersionPane extends ConsumerWidget {
 
   Future<void> _backup(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    final tasks = ref.read(tasksProvider.notifier);
     try {
       await ref.read(versionActionsProvider).backup(title, version);
-      messenger.showSnackBar(SnackBar(content: Text(l10n.backupCreated)));
+      tasks.notify(l10n.backupCreated);
     } on Object catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(failureMessage(l10n, error))),
-      );
+      tasks.notify(failureMessage(l10n, error), level: NoticeLevel.error);
     }
   }
 

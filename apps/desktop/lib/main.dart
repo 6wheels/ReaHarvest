@@ -18,6 +18,7 @@ import 'logs.dart';
 import 'state/migration_actions.dart';
 import 'state/navigation.dart';
 import 'state/providers.dart';
+import 'ui/error_dialog.dart';
 import 'ui/settings_recovery.dart';
 
 const _demo = bool.fromEnvironment('REAHARVEST_DEMO');
@@ -64,6 +65,17 @@ Future<void> main() async {
   final logFolder = p.join(p.dirname(settingsPath), 'logs');
   startLogging(logFolder);
   Logger('app').info('Started; settings: $settingsPath, index: $indexPath');
+  // Unexpected errors are logged and shown in a popup (SPEC §5.2).
+  void unexpected(Object error, StackTrace? stack) {
+    Logger('app').severe('Unexpected error', error, stack);
+    showErrorDialog(error, stack);
+  }
+
+  FlutterError.onError = (d) => unexpected(d.exception, d.stack);
+  PlatformDispatcher.instance.onError = (error, stack) {
+    unexpected(error, stack);
+    return true;
+  };
   final settingsFile = SettingsFile(settingsPath);
   final settings = await loadSettingsOrRecover(settingsFile, show: runApp);
   // Written in background isolates only; read here, read-only (SPEC §7.1).

@@ -6,6 +6,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
@@ -26,7 +27,7 @@ class TrashView extends ConsumerWidget {
     required String action,
   }) async {
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    final tasks = ref.read(tasksProvider.notifier);
     final confirmed = await confirm(
       context,
       title: l10n.purgeTitle(files.length),
@@ -38,9 +39,9 @@ class TrashView extends ConsumerWidget {
       await ref.read(versionActionsProvider).purge(title, [
         for (final f in files) f.path,
       ]);
-      messenger.showSnackBar(SnackBar(content: Text(l10n.trashPurged)));
+      tasks.notify(l10n.trashPurged);
     } on Object catch (e) {
-      fail(messenger, l10n, e);
+      fail(tasks, l10n, e);
     }
   }
 

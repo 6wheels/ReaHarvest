@@ -4,6 +4,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../l10n/app_localizations.dart';
+import '../state/tasks.dart';
 import '../state/reaper_actions.dart';
 import '../state/reaper.dart';
 import '../theme/app_theme.dart';
@@ -656,14 +657,14 @@ class SectionLabel extends StatelessWidget {
 }
 
 /// Runs [change] of a project file, after a confirmation when REAPER is
-/// running (SPEC §5.7); failures are reported in a snackbar.
+/// running (SPEC §5.7); failures are reported in the notification zone.
 Future<bool> runProjectChange(
   BuildContext context,
   WidgetRef ref,
   Future<void> Function() change,
 ) async {
   final l10n = AppLocalizations.of(context);
-  final messenger = ScaffoldMessenger.of(context);
+  final tasks = ref.read(tasksProvider.notifier);
   if (await ref.read(reaperRunningProvider)()) {
     if (!context.mounted) return false;
     final confirmed = await showDialog<bool>(
@@ -689,15 +690,13 @@ Future<bool> runProjectChange(
     await change();
     return true;
   } on Object catch (error) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(failureMessage(l10n, error))),
-    );
+    tasks.notify(failureMessage(l10n, error), level: NoticeLevel.error);
     return false;
   }
 }
 
-/// Opens [version] of [title] in REAPER; problems are reported in a
-/// snackbar.
+/// Opens [version] of [title] in REAPER; problems are reported in the
+/// notification zone.
 Future<void> openVersionInReaper(
   BuildContext context,
   WidgetRef ref,
@@ -705,15 +704,13 @@ Future<void> openVersionInReaper(
   Version version,
 ) async {
   final l10n = AppLocalizations.of(context);
-  final messenger = ScaffoldMessenger.of(context);
+  final tasks = ref.read(tasksProvider.notifier);
   try {
     if (!await ref.read(reaperActionsProvider).openVersion(title, version)) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.reaperNotFound)));
+      tasks.notify(l10n.reaperNotFound, level: NoticeLevel.warning);
     }
   } on Object catch (error) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(failureMessage(l10n, error))),
-    );
+    tasks.notify(failureMessage(l10n, error), level: NoticeLevel.error);
   }
 }
 

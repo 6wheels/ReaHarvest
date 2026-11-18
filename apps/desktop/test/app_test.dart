@@ -1028,24 +1028,21 @@ void main() {
       matching: find.byTooltip('Open in REAPER'),
     );
 
-    Future<void> expectSnack(String text) async {
+    Future<void> expectNotice(String text) async {
       await tester.pumpAndSettle();
       expect(find.text(text), findsOneWidget);
-      await tester.pump(const Duration(seconds: 5));
-      await tester.pumpAndSettle();
     }
 
     await tester.tap(open);
     await tester.pumpAndSettle();
-    expect(find.byType(SnackBar), findsNothing);
     backupOpening = false;
     await tester.tap(open);
-    await expectSnack(
+    await expectNotice(
       'REAPER was not found. Set its location in the settings.',
     );
     backupOpening = StateError('boom');
     await tester.tap(open);
-    await expectSnack('The operation failed: Bad state: boom');
+    await expectNotice('The operation failed: Bad state: boom');
 
     final restore = find.descendant(
       of: backupRow.first,
@@ -1059,7 +1056,7 @@ void main() {
     await tester.tap(restore);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Restore'));
-    await expectSnack('Backup point restored');
+    await expectNotice('Backup point restored');
     expect(versions.restored, hasLength(1));
   });
 

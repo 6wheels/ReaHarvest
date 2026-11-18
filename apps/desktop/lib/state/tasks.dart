@@ -11,7 +11,11 @@ import '../l10n/app_localizations.dart';
 import 'library_turns.dart';
 
 /// [queued]: waiting for the turn of its library ([LibraryTurns]).
-enum TaskState { queued, running, done, failed, cancelled }
+/// [warning]: finished, its report holds warnings and no error.
+enum TaskState { queued, running, done, warning, failed, cancelled }
+
+/// Severity of an instant entry of the notification zone ([TasksNotifier.notify]).
+enum NoticeLevel { info, warning, error }
 
 /// Thrown by [TaskControl.checkCancelled] to stop a cancelled task; a task
 /// rethrows it with the [report] of what it did before stopping.
@@ -94,7 +98,7 @@ final class BackgroundTask {
 
   bool get isQueued => state == TaskState.queued;
 
-  /// Done, failed or cancelled.
+  /// Done, with warnings, failed or cancelled.
   bool get isFinished => !isRunning && !isQueued;
 
   BackgroundTask _with({
@@ -192,7 +196,11 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       _update(
         id,
         (t) => t._with(
-          state: report?.hasErrors ?? false ? TaskState.failed : TaskState.done,
+          state: switch (report) {
+            Report(hasErrors: true) => TaskState.failed,
+            Report(hasWarnings: true) => TaskState.warning,
+            _ => TaskState.done,
+          },
           progress: 1,
           report: report,
         ),
@@ -211,13 +219,17 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   }
 
   /// Writes the outcome of [task] and its report to the log (SPEC §8).
-  void _logEnd(BackgroundTask task) => _log.log(
-    task.state == TaskState.done ? Level.INFO : Level.WARNING,
-    [
-      '${task.label(_english)}: ${task.state.name}',
-      if (task.report case final report? when !report.isEmpty) '$report',
-    ].join('\n'),
-  );
+  void _logEnd(BackgroundTask task) {
+    // Warnings are in the report: the task itself is done.
+    final state = task.state == TaskState.warning ? TaskState.done : task.state;
+    _log.log(
+      state == TaskState.done ? Level.INFO : Level.WARNING,
+      [
+        '${task.label(_english)}: ${state.name}',
+        if (task.report case final report? when !report.isEmpty) '$report',
+      ].join('\n'),
+    );
+  }
 
   /// Asks the running task [id] to stop at its next step. A queued task
   /// leaves the queue and ends cancelled at once.
@@ -233,6 +245,24 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     }
     _update(id, (t) => t._with(cancelling: true));
     if (_cancels[id] case final c? when !c.isCompleted) c.complete();
+  }
+
+  /// Adds the finished entry [message] to the zone, without progress: the
+  /// outcome of an instant action.
+  void notify(String message, {NoticeLevel level = NoticeLevel.info}) {
+    final id = _next++;
+    final task = BackgroundTask(
+      id: id,
+      label: (_) => message,
+      state: switch (level) {
+        NoticeLevel.info => TaskState.done,
+        NoticeLevel.warning => TaskState.warning,
+        NoticeLevel.error => TaskState.failed,
+      },
+      progress: 1,
+    );
+    state = [...state, task];
+    _log.log(level == NoticeLevel.info ? Level.INFO : Level.WARNING, message);
   }
 
   /// Removes the finished tasks.

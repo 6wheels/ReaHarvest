@@ -451,7 +451,7 @@ void main() {
     final scanning = scans.scanAll();
     await waitFor(tester, () => !tasks().last.isRunning, reason: 'scan done');
     await scanning;
-    expect(tasks().last.state, TaskState.done);
+    expect(tasks().last.state, TaskState.warning);
     expect(tasks().last.progress, 1);
 
     // The report of the startup-like scan waits in the tasks zone (#63).

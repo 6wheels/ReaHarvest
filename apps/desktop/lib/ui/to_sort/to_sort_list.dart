@@ -5,6 +5,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../state/tasks.dart';
 import '../../state/migration_actions.dart';
 import '../../state/navigation.dart';
 import '../../state/providers.dart';
@@ -135,7 +136,7 @@ class _ToSortListState extends ConsumerState<ToSortList> {
   ) async {
     final path = issue.item.path;
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    final tasks = ref.read(tasksProvider.notifier);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -159,9 +160,7 @@ class _ToSortListState extends ConsumerState<ToSortList> {
           .read(migrationActionsProvider)
           .deleteOrphanNode(issue.library, path);
     } on Object catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(failureMessage(l10n, error))),
-      );
+      tasks.notify(failureMessage(l10n, error), level: NoticeLevel.error);
     }
   }
 }

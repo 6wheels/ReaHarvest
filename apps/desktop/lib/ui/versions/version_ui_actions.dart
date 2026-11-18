@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../formats.dart';
 import '../widgets.dart';
@@ -44,10 +45,10 @@ Future<bool?> confirm(
   );
 }
 
-void fail(ScaffoldMessengerState messenger, AppLocalizations l10n, Object e) =>
-    messenger.showSnackBar(SnackBar(content: Text(failureMessage(l10n, e))));
+void fail(TasksNotifier tasks, AppLocalizations l10n, Object e) =>
+    tasks.notify(failureMessage(l10n, e), level: NoticeLevel.error);
 
-/// Sets the [status] of [version] of [title]; failures in a snackbar.
+/// Sets the [status] of [version] of [title]; failures in the notification zone.
 Future<void> setVersionStatusFromUi(
   BuildContext context,
   WidgetRef ref,
@@ -56,11 +57,11 @@ Future<void> setVersionStatusFromUi(
   String? status,
 ) async {
   final l10n = AppLocalizations.of(context);
-  final messenger = ScaffoldMessenger.of(context);
+  final tasks = ref.read(tasksProvider.notifier);
   try {
     await ref.read(versionActionsProvider).setStatusOf(title, version, status);
   } on Object catch (e) {
-    fail(messenger, l10n, e);
+    fail(tasks, l10n, e);
   }
 }
 
@@ -73,7 +74,7 @@ Future<void> deleteVersionFromUi(
   Version version,
 ) async {
   final l10n = AppLocalizations.of(context);
-  final messenger = ScaffoldMessenger.of(context);
+  final tasks = ref.read(tasksProvider.notifier);
   final confirmed = await confirm(
     context,
     title: l10n.deleteVersionTitle(versionName(version)),
@@ -87,7 +88,7 @@ Future<void> deleteVersionFromUi(
     () => ref.read(versionActionsProvider).trashVersion(title, version),
   );
   if (done) {
-    messenger.showSnackBar(SnackBar(content: Text(l10n.versionDeleted)));
+    tasks.notify(l10n.versionDeleted);
   }
 }
 
@@ -100,7 +101,7 @@ Future<void> keepOnlyVersionFromUi(
   Version version,
 ) async {
   final l10n = AppLocalizations.of(context);
-  final messenger = ScaffoldMessenger.of(context);
+  final tasks = ref.read(tasksProvider.notifier);
   final confirmed = await confirm(
     context,
     title: l10n.keepOnlyVersionTitle(versionName(version)),
@@ -115,6 +116,6 @@ Future<void> keepOnlyVersionFromUi(
     () => ref.read(versionActionsProvider).keepOnly(title, version),
   );
   if (done) {
-    messenger.showSnackBar(SnackBar(content: Text(l10n.onlyVersionKept)));
+    tasks.notify(l10n.onlyVersionKept);
   }
 }
