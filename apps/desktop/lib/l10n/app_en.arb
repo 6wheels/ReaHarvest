@@ -399,5 +399,20 @@
     "placeholders": { "path": { "type": "String" } }
   },
   "settingsOpenFolder": "Open folder",
+  "projectUnreadable": "The project cannot be read",
+  "sampleRate": "Sample rate",
+  "tempo": "Tempo",
+  "timeSignature": "Signature",
+  "songLength": "Length",
+  "reaperVersion": "REAPER",
+  "tempoChanges": "Tempo and signature changes",
+  "tracks": "Tracks",
+  "unnamedTrack": "(unnamed)",
+  "showMoreTracks": "Show {count} more",
+  "@showMoreTracks": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "referencedMedia": "Referenced media",
+  "mediaAbsent": "absent",
   "quit": "Quit"
 }

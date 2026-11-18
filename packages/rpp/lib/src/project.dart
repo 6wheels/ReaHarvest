@@ -58,6 +58,33 @@ class RppTrack {
   final List<RppPlugin> plugins;
 }
 
+/// A change of tempo and/or time signature on the tempo envelope.
+class RppTempoChange {
+  const RppTempoChange({required this.position, this.tempo, this.signature});
+
+  /// Position in the project, in seconds.
+  final double position;
+
+  /// New tempo (BPM); null when the tempo does not change.
+  final double? tempo;
+
+  /// New time signature `(numerator, denominator)`; null when unchanged.
+  final (int, int)? signature;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RppTempoChange &&
+      other.position == position &&
+      other.tempo == tempo &&
+      other.signature == signature;
+
+  @override
+  int get hashCode => Object.hash(position, tempo, signature);
+
+  @override
+  String toString() => '$position s: $tempo BPM, $signature';
+}
+
 /// Read-only view of the project data ReaHarvest needs.
 class RppProject {
   RppProject(this.document);
@@ -86,6 +113,40 @@ class RppProject {
     final num = int.tryParse(_param('TEMPO', 1) ?? '');
     final den = int.tryParse(_param('TEMPO', 2) ?? '');
     return (num == null || den == null) ? null : (num, den);
+  }
+
+  /// Changes of tempo and time signature, from the tempo envelope
+  /// (`<TEMPOENVEX`, one `PT <seconds> <BPM> <shape> [<signature> …]` line
+  /// per point, signature = `numerator + 65536 × denominator`, `0` or absent
+  /// when unchanged). Only the points that differ from the state before them
+  /// (starting from the `TEMPO` line) are returned, in file order.
+  List<RppTempoChange> get tempoChanges {
+    var tempo = this.tempo;
+    var signature = timeSignature;
+    final changes = <RppTempoChange>[];
+    final envelope = _root.chunk('TEMPOENVEX');
+    for (final line in envelope?.lines ?? <RppLine>[]) {
+      if (line.name != 'PT') continue;
+      final position = double.tryParse(line.params.elementAtOrNull(0) ?? '');
+      final bpm = double.tryParse(line.params.elementAtOrNull(1) ?? '');
+      if (position == null || bpm == null) continue;
+      final packed = int.tryParse(line.params.elementAtOrNull(3) ?? '') ?? 0;
+      final newSignature = packed <= 0 ? null : (packed & 0xFFFF, packed >> 16);
+      final tempoChanged = bpm != tempo;
+      final signatureChanged =
+          newSignature != null && newSignature != signature;
+      if (!tempoChanged && !signatureChanged) continue;
+      changes.add(
+        RppTempoChange(
+          position: position,
+          tempo: tempoChanged ? bpm : null,
+          signature: signatureChanged ? newSignature : null,
+        ),
+      );
+      tempo = bpm;
+      if (signatureChanged) signature = newSignature;
+    }
+    return changes;
   }
 
   int? get sampleRate => int.tryParse(_param('SAMPLERATE') ?? '');

@@ -87,6 +87,15 @@ void main() {
       expect(p.sampleRate, 48000);
     });
 
+    test('reads the tempo and signature changes of the tempo envelope', () {
+      final p = RppProject.parse(fixture('tracks.rpp'));
+      expect(p.tempoChanges, const [
+        RppTempoChange(position: 8.90625, tempo: 140),
+        RppTempoChange(position: 14.90625, signature: (4, 4)),
+      ]);
+      expect(RppProject.parse(fixture('empty.rpp')).tempoChanges, isEmpty);
+    });
+
     test('reads the platform of a project saved on Linux', () {
       final p = RppProject.parse(fixture('linux.RPP'));
       expect(p.reaperVersion, '7.84/linux-x86_64');
