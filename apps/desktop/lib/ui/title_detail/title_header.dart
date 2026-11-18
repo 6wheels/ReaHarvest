@@ -125,6 +125,11 @@ class Header extends ConsumerWidget {
                   _Stat('BPM', v.tempo?.round().toString()),
                   _Stat(l10n.statTracks, v.trackCount?.toString()),
                   _Stat(l10n.statItems, v.itemCount?.toString()),
+                  _Stat(l10n.statFx, v.plugins.length.toString()),
+                  _Stat(
+                    l10n.statMissing,
+                    versionAlerts(ref, t, v).missing.length.toString(),
+                  ),
                 ],
               ],
             ],

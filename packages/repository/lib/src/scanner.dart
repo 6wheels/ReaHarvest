@@ -305,6 +305,13 @@ final class _Scanner {
   /// Folders whose trash or history holds a project.
   final traces = <String>{};
 
+  /// Number of projects in the trash of each title folder.
+  final trashed = <String, int>{};
+
+  /// Number of backup points (projects in a version's `.history/`) of each
+  /// title folder.
+  final backups = <String, int>{};
+
   Future<ScanResult> run() async {
     (await storage.list('', recursive: true)).forEach(_add);
     final ordered = dirs.toList()
@@ -511,8 +518,10 @@ final class _Scanner {
     switch (parents[i].toLowerCase()) {
       case trashFolderName when kept <= 1:
         traces.add(base);
+        trashed[base] = (trashed[base] ?? 0) + 1;
       case historyFolderName when kept == 0 && base.isNotEmpty:
         traces.add(parentOf(base));
+        backups[parentOf(base)] = (backups[parentOf(base)] ?? 0) + 1;
     }
   }
 
@@ -1111,6 +1120,13 @@ final class _Scanner {
             v,
       ],
       versionStatuses: node.versionStatuses,
+      trashSize:
+          (sizes[joinPath(dir, trashFolderName)]?.values ?? const <int>[]).fold(
+            0,
+            (a, b) => a + b,
+          ),
+      trashedVersions: trashed[dir] ?? 0,
+      backupCount: backups[dir] ?? 0,
     );
   }
 

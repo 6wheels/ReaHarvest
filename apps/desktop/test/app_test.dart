@@ -316,6 +316,9 @@ void main() {
             indexed ?? {demoLibrary.id: demoLibrary},
           ),
           issuesProvider.overrideWithValue(issues),
+          titleFiguresProvider.overrideWith(
+            (ref, title) => figuresOf(title, const []),
+          ),
           historyProvider.overrideWith(
             (ref, key) async => history[key.$2] ?? const [],
           ),
@@ -1728,6 +1731,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Move to the trash'), findsOne);
     expect(find.text('Keep only this version…'), findsNothing);
+  });
+
+  testWidgets('shows the figures of a title', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await openMidnightFerry(tester);
+    expect(find.text('FX'), findsOne);
+    expect(find.text('MISSING'), findsOne);
+    await tester.tap(find.text('FIGURES'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Total · '), findsOne);
+    expect(find.textContaining('Project · '), findsOne);
+    expect(find.textContaining('Trash · '), findsOne);
+    expect(find.textContaining('backup points'), findsOne);
+    expect(find.textContaining('versions in the trash'), findsOne);
+    expect(find.textContaining('not adopted'), findsOne);
+    expect(find.textContaining('assets'), findsOne);
   });
 
   testWidgets('shows the trash of a title', (tester) async {

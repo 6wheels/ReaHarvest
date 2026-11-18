@@ -88,10 +88,22 @@ final titlesProvider = Provider<List<Title>>((ref) {
           tags: t.tags,
           versions: t.versions,
           versionStatuses: t.versionStatuses,
+          trashSize: t.trashSize,
+          trashedVersions: t.trashedVersions,
+          backupCount: t.backupCount,
         )
       else
         t,
   ];
+});
+
+/// Figures of a title (SPEC §5.2), from the index.
+final titleFiguresProvider = Provider.family<TitleFigures, Title>((ref, title) {
+  ref.watch(indexRevisionProvider);
+  return figuresOf(
+    title,
+    ref.watch(localIndexProvider).files(title.libraryId, below: title.path),
+  );
 });
 
 /// Indexed libraries (mode and layout), by id.
