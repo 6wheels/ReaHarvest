@@ -16,6 +16,7 @@ import '../versions/version_ui_actions.dart';
 import '../widgets.dart';
 import 'adopt_form.dart';
 import 'history_view.dart';
+import 'version_detail_view.dart';
 
 /// Selected version: details, actions, missing plugins, duplicates and
 /// history.
@@ -293,6 +294,10 @@ class VersionPane extends ConsumerWidget {
               label: Text(l10n.separateDuplicate),
             ),
           ),
+        ],
+        if (entry != null) ...[
+          const SizedBox(height: Space.l),
+          VersionDetailView(versionPath(entry, title, version)),
         ],
         if (hasHistory) ...[
           const SizedBox(height: Space.l),

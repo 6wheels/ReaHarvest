@@ -316,5 +316,20 @@
   "settingsNewerTitle": "Les réglages viennent d'une version plus récente",
   "settingsNewerBody": "{path} a été écrit par une version plus récente de ReaHarvest. Mettez l'application à jour, ou ouvrez le dossier pour déplacer le fichier.",
   "settingsOpenFolder": "Ouvrir le dossier",
+  "projectUnreadable": "Le projet ne peut pas être lu",
+  "sampleRate": "Fréquence d'échantillonnage",
+  "tempo": "Tempo",
+  "timeSignature": "Signature",
+  "songLength": "Durée",
+  "reaperVersion": "REAPER",
+  "tempoChanges": "Changements de tempo et de signature",
+  "tracks": "Pistes",
+  "unnamedTrack": "(sans nom)",
+  "showMoreTracks": "Afficher {count} de plus",
+  "@showMoreTracks": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "referencedMedia": "Médias référencés",
+  "mediaAbsent": "absent",
   "quit": "Quitter"
 }
