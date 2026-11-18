@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest/state/version_actions.dart';
 import 'package:reaharvest/state/providers.dart';
+import 'package:reaharvest_library/reaharvest_library.dart';
 
 import 'library_env.dart';
 
@@ -31,6 +32,16 @@ void main() {
         .change((s) => s.copyWith(reaperExecutable: 'reaper.exe'));
     expect(await reaper.openVersion(title(), version('v1.rpp')), isTrue);
     expect(await reaper.openBackup(title(), saved), isTrue);
+    // The window option applies after each opening.
+    expect(shell.calls, isEmpty);
+    await container
+        .read(settingsProvider.notifier)
+        .change((s) => s.copyWith(onProjectOpen: ProjectOpenAction.minimize));
+    await reaper.openVersion(title(), version('v1.rpp'));
+    await reaper.openBackup(title(), saved);
+    expect(shell.calls, ['minimize', 'minimize']);
+    launched.removeRange(2, 4);
+
     expect(launched, [
       project.path,
       p.joinAll([

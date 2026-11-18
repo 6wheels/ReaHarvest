@@ -455,5 +455,17 @@
   "tagRemoveTitle": "Remove the tag “{tag}”?",
   "@tagRemoveTitle": {"placeholders": {"tag": {"type": "String"}}},
   "tagRemoveHint": "The tag is removed from this title for every member of the library.",
-  "tagRemoveAction": "Remove"
+  "tagRemoveAction": "Remove",
+  "windowAndTray": "Window and tray",
+  "showInTray": "Show in the system tray",
+  "onProjectOpen": "When a project opens in REAPER",
+  "onOpenNothing": "Do nothing",
+  "onOpenMinimize": "Minimize ReaHarvest",
+  "onOpenClose": "Close ReaHarvest",
+  "trayOpen": "Open ReaHarvest",
+  "quitTasksTitle": "Quit while tasks are running?",
+  "quitTasksBody": "These tasks are running or waiting:",
+  "keepRunning": "Keep running",
+  "cancelTasksAndQuit": "Cancel the tasks and quit",
+  "onOpenToTray": "Minimize to tray"
 }

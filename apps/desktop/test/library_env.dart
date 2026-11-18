@@ -8,6 +8,7 @@ import 'package:reaharvest/state/library_scans.dart';
 import 'package:reaharvest/state/migration_actions.dart';
 import 'package:reaharvest/state/reaper_actions.dart';
 import 'package:reaharvest/state/version_actions.dart';
+import 'package:reaharvest/state/window_behavior.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
@@ -20,6 +21,7 @@ late Directory root;
 late ProviderContainer container;
 late LocalIndex index;
 late List<String> launched;
+late FakeShell shell;
 
 LibraryCatalog get catalog => container.read(libraryCatalogProvider);
 LibraryScans get scans => container.read(libraryScansProvider);
@@ -38,6 +40,7 @@ String folder(String name) {
 void setUpLibraryEnv() {
   setUp(() async {
     launched = [];
+    shell = FakeShell();
     root = Directory.systemTemp.createTempSync('reaharvest_app_');
     final indexPath = p.join(root.path, 'index.sqlite');
     await createIndex(indexPath);
@@ -54,6 +57,7 @@ void setUpLibraryEnv() {
           p.join(root.path, 'resources'),
         ),
         detectedReaperProvider.overrideWith((ref) async => null),
+        windowShellProvider.overrideWithValue(shell),
         reaperLauncherProvider.overrideWithValue(
           (executable, file) async => launched.add(file),
         ),

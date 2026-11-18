@@ -249,6 +249,9 @@ enum ThemePreference { system, light, dark }
 /// Accent color of the interface (SPEC §7.1).
 enum AccentPreference { neutral, orange, yellow, teal, blue, violet }
 
+/// What the window does when a project opens in REAPER (SPEC §5.1).
+enum ProjectOpenAction { nothing, minimize, close }
+
 /// Application settings (SPEC §5.1). Null paths mean "use the default".
 final class AppSettings {
   AppSettings({
@@ -262,6 +265,8 @@ final class AppSettings {
     this.textScale = 1.0,
     this.language = systemLanguage,
     this.navigation = const NavigationSettings(),
+    this.showInTray = false,
+    this.onProjectOpen = ProjectOpenAction.nothing,
   }) : libraries = List.unmodifiable(libraries);
 
   /// [language] value meaning "follow the system language".
@@ -293,6 +298,13 @@ final class AppSettings {
 
   final NavigationSettings navigation;
 
+  /// Whether the application lives in the system tray: closing the window
+  /// then hides it.
+  final bool showInTray;
+
+  /// Window behavior when a project opens in REAPER.
+  final ProjectOpenAction onProjectOpen;
+
   /// Copy with the given values. Paths are kept when omitted and reset to
   /// the default when passed as null.
   AppSettings copyWith({
@@ -306,6 +318,8 @@ final class AppSettings {
     double? textScale,
     String? language,
     NavigationSettings? navigation,
+    bool? showInTray,
+    ProjectOpenAction? onProjectOpen,
   }) => AppSettings(
     identity: identity ?? this.identity,
     libraries: libraries ?? this.libraries,
@@ -317,6 +331,8 @@ final class AppSettings {
     textScale: textScale ?? this.textScale,
     language: language ?? this.language,
     navigation: navigation ?? this.navigation,
+    showInTray: showInTray ?? this.showInTray,
+    onProjectOpen: onProjectOpen ?? this.onProjectOpen,
   );
 
   static const _keep = Object();
@@ -377,6 +393,8 @@ final class AppSettings {
     'textScale': textScale,
     'language': language,
     'navigation': navigation.toJson(),
+    'showInTray': showInTray,
+    'onProjectOpen': onProjectOpen.name,
   };
 
   static AppSettings fromJson(Map<String, Object?> json) {
@@ -407,6 +425,10 @@ final class AppSettings {
       navigation: NavigationSettings.fromJson(
         (json['navigation'] as Map? ?? const {}).cast(),
       ),
+      showInTray: json['showInTray'] as bool? ?? false,
+      onProjectOpen:
+          ProjectOpenAction.values.asNameMap()[json['onProjectOpen']] ??
+          ProjectOpenAction.nothing,
     );
   }
 }

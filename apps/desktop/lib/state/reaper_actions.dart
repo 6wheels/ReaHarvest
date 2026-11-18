@@ -9,6 +9,7 @@ import 'library_catalog.dart';
 import 'reaper.dart';
 import 'report_paths.dart';
 import 'tasks.dart';
+import 'window_behavior.dart';
 
 /// Opening of the versions and backups in REAPER.
 class ReaperActions {
@@ -31,6 +32,7 @@ class ReaperActions {
       executable,
       p.joinAll([root, ...path.split('/')]),
     );
+    await ref.read(windowBehaviorProvider).projectOpened();
     return true;
   }
 
@@ -48,6 +50,7 @@ class ReaperActions {
       executable,
       versionPath(ref.libraryEntry(title.libraryId), title, version),
     );
+    await ref.read(windowBehaviorProvider).projectOpened();
     return true;
   }
 }
