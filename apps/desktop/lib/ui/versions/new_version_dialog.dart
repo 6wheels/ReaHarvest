@@ -5,6 +5,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../state/tasks.dart';
 import '../../state/library_catalog.dart';
 import '../../state/providers.dart';
 import '../../state/version_actions.dart';
@@ -70,7 +71,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
     final l10n = AppLocalizations.of(context);
     if (versionNameError(l10n, widget.title, _name.text) != null) return;
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    final tasks = ref.read(tasksProvider.notifier);
     setState(() => _busy = true);
     try {
       final name = await ref
@@ -84,7 +85,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
           );
       navigator.pop(name);
     } on Object catch (e) {
-      fail(messenger, l10n, e);
+      fail(tasks, l10n, e);
       if (mounted) setState(() => _busy = false);
     }
   }

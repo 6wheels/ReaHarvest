@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
@@ -37,11 +38,11 @@ Future<String?> showEditVersionDialog(
     return result;
   }
   final l10n = AppLocalizations.of(context);
-  final messenger = ScaffoldMessenger.of(context);
+  final tasks = ref.read(tasksProvider.notifier);
   try {
     return await edit();
   } on Object catch (e) {
-    fail(messenger, l10n, e);
+    fail(tasks, l10n, e);
     return null;
   }
 }

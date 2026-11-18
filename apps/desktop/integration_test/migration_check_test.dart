@@ -90,7 +90,7 @@ void main() {
     await fixSection(tester, lift);
     expect(find.text('Projects moved into their version folder · 1'), findsOne);
     expect(find.textContaining(lost), findsNothing);
-    expect(h.tasks.last.state, TaskState.done);
+    expect(h.tasks.last.state, TaskState.warning);
     await tapText(tester, 'Close');
 
     // Every file inventoried before the first change, the library
@@ -212,7 +212,7 @@ void main() {
     await fixSection(tester, lift);
     expect(find.text('Projects moved into their version folder · 1'), findsOne);
     expect(find.textContaining(lost), findsNothing);
-    expect(h.tasks.last.state, TaskState.done);
+    expect(h.tasks.last.state, TaskState.warning);
     await tapText(tester, 'Close');
     expect(migrations(), hasLength(2));
   });

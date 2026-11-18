@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/theme/app_theme.dart';
+import 'package:reaharvest/ui/error_dialog.dart';
 import 'package:reaharvest/ui/report_dialog.dart';
 import 'package:reaharvest/ui/tasks_zone.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
@@ -243,13 +245,14 @@ void main() {
     await settle(tester);
     expect(find.text('Reading the folders'), findsNothing);
     expect(find.text('Broken'), findsOneWidget);
-    expect(find.text('Failed'), findsOneWidget);
+    expect(find.byIcon(Icons.error), findsOneWidget);
     expect(find.text('boom'), findsOneWidget);
     expect(find.text('Cancelled'), findsNWidgets(2));
 
     await tasks().run((l10n) => 'Done', (_) async {});
     await settle(tester);
-    expect(find.text('Done'), findsNWidgets(2), reason: 'label and state');
+    expect(find.text('Done'), findsOneWidget, reason: 'label, no state text');
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
 
     await tester.tap(find.text('Clear finished'));
     await settle(tester);
@@ -258,9 +261,70 @@ void main() {
     // A finished task is shown when nothing runs, then the zone collapses.
     await tasks().run((l10n) => 'Last', (_) async {});
     await settle(tester);
-    await tester.tap(find.text('TASKS // 1'));
+    expect(find.text('TASKS'), findsOneWidget, reason: 'no counter for one');
+    await tester.tap(find.text('TASKS'));
     await settle(tester);
     expect(find.text('Last'), findsOneWidget);
+  });
+
+  testWidgets('warning, notices and the clear button of the bar', (
+    tester,
+  ) async {
+    await pumpZone(tester);
+    await tasks().run(
+      (l10n) => 'Fix',
+      (_) async => const Report({
+        ReportKind.titleTooHigh: [ReportItem('a')],
+      }),
+    );
+    expect(states(), [TaskState.warning]);
+    tasks().notify('Backup point created');
+    tasks().notify('Boom', level: NoticeLevel.error);
+    await settle(tester);
+
+    // Collapsed: the latest entry, with its state icon.
+    expect(find.text('Boom'), findsOneWidget);
+    expect(find.byIcon(Icons.error), findsOneWidget);
+    expect(find.text('TASKS // 3'), findsOneWidget);
+    await tester.tap(find.text('TASKS // 3'));
+    await settle(tester);
+    expect(find.text('Backup point created'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    expect(find.byIcon(Icons.warning), findsOneWidget);
+    await tester.tap(find.text('TASKS // 3'));
+    await settle(tester);
+
+    // The bar clears the finished entries without opening the zone.
+    await tester.tap(find.byIcon(Icons.clear_all));
+    await settle(tester);
+    expect(container.read(tasksProvider), isEmpty);
+  });
+
+  testWidgets('the error dialog shows the detail and copies it', (
+    tester,
+  ) async {
+    await pumpZone(tester);
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    showErrorDialog('boom', StackTrace.fromString('#0 here'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unexpected error'), findsOneWidget);
+    expect(find.textContaining('#0 here'), findsOneWidget);
+    expect(find.text('Open the logs'), findsOneWidget);
+
+    await tester.tap(find.text('Copy'));
+    expect(copied, 'boom\n\n#0 here');
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unexpected error'), findsNothing);
   });
 
   testWidgets('a queued task shows that it waits, cancellable', (tester) async {

@@ -121,7 +121,7 @@ void main() {
       ], level: 'title'),
     ]);
     expect(find.text('Projects moved into their version folder · 1'), findsOne);
-    expect(h.tasks.last.state, TaskState.done);
+    expect(h.tasks.last.state, TaskState.warning);
     await tapText(tester, 'Close');
     expect(find.text(title), findsNothing);
   });

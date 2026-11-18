@@ -59,7 +59,10 @@ class TasksZone extends ConsumerWidget {
         // The zone unfolds upwards.
         icon: Disclosure(expanded ? Disclosure.down : Disclosure.up),
         label: Text(
-          '${l10n.tasks.toUpperCase()}$labelSeparator${tasks.length}',
+          // The counter only tells something with several tasks.
+          tasks.length > 1
+              ? '${l10n.tasks.toUpperCase()}$labelSeparator${tasks.length}'
+              : l10n.tasks.toUpperCase(),
           style: context.legend.copyWith(color: c.text),
         ),
       );
@@ -101,6 +104,18 @@ class TasksZone extends ConsumerWidget {
                   children: [
                     Expanded(child: _TaskRow(headline)),
                     const SizedBox(width: Space.m),
+                    if (tasks.any((t) => t.isFinished))
+                      // No tooltip: the zone sits outside of the navigator, so
+                      // without overlay.
+                      IconButton(
+                        icon: Semantics(
+                          label: l10n.clearFinishedTasks,
+                          child: const Icon(Icons.clear_all),
+                        ),
+                        onPressed: ref
+                            .read(tasksProvider.notifier)
+                            .clearFinished,
+                      ),
                     toggle,
                   ],
                 ),
@@ -142,15 +157,16 @@ class _TaskRow extends ConsumerWidget {
         : task.isRunning
         ? task.step?.call(l10n)
         : null;
-    // Status light: off while waiting, breathing amber while running,
-    // green once done, blinking red on failure.
+    // Status: light off while waiting, breathing amber while running, then
+    // an icon: green check, orange warning, red error.
     final light = switch (task.state) {
       TaskState.queued || TaskState.cancelled => Led(c.muted, lit: false),
       TaskState.running => Led(c.ledAmber, mode: LedMode.pulse),
-      TaskState.done => Led(c.ledGreen),
-      TaskState.failed => Led(c.ledRed, mode: LedMode.blink),
+      TaskState.done => Icon(Icons.check_circle, size: 18, color: c.ledGreen),
+      TaskState.warning => Icon(Icons.warning, size: 18, color: c.ledAmber),
+      TaskState.failed => Icon(Icons.error, size: 18, color: error),
     };
-    final Widget trailing = switch (task.state) {
+    final Widget? trailing = switch (task.state) {
       TaskState.running when task.cancelling => Text(
         l10n.taskCancelling,
         style: muted,
@@ -159,11 +175,7 @@ class _TaskRow extends ConsumerWidget {
         onPressed: () => ref.read(tasksProvider.notifier).cancel(task.id),
         child: Text(l10n.cancel),
       ),
-      TaskState.done => Text(l10n.taskDone, style: muted),
-      TaskState.failed => Text(
-        l10n.taskFailed,
-        style: muted?.copyWith(color: error),
-      ),
+      TaskState.done || TaskState.warning || TaskState.failed => null,
       TaskState.cancelled => Text(l10n.taskCancelled, style: muted),
     };
     return ConstrainedBox(
@@ -224,9 +236,11 @@ class _TaskRow extends ConsumerWidget {
           SizedBox(
             width: _actionWidth,
             // A button fills its column, a state is centered in it.
-            child: trailing is ButtonStyleButton
-                ? trailing
-                : Center(child: trailing),
+            child: switch (trailing) {
+              null => null,
+              ButtonStyleButton() => trailing,
+              _ => Center(child: trailing),
+            },
           ),
           const SizedBox(width: Space.xs),
           SizedBox(

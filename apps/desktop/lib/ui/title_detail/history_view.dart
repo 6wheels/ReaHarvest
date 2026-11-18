@@ -5,6 +5,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../state/tasks.dart';
 import '../../state/reaper_actions.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
@@ -24,7 +25,7 @@ class History extends ConsumerWidget {
     String date,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    final tasks = ref.read(tasksProvider.notifier);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -49,24 +50,22 @@ class History extends ConsumerWidget {
       () => ref.read(versionActionsProvider).restore(title, version, backup),
     );
     if (done) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.backupRestored)));
+      tasks.notify(l10n.backupRestored);
     }
   }
 
   Future<void> _open(BuildContext context, WidgetRef ref, Backup backup) async {
     final l10n = AppLocalizations.of(context);
-    final messenger = ScaffoldMessenger.of(context);
+    final tasks = ref.read(tasksProvider.notifier);
     try {
       final opened = await ref
           .read(reaperActionsProvider)
           .openBackup(title, backup);
       if (!opened) {
-        messenger.showSnackBar(SnackBar(content: Text(l10n.reaperNotFound)));
+        tasks.notify(l10n.reaperNotFound, level: NoticeLevel.warning);
       }
     } on Object catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(failureMessage(l10n, error))),
-      );
+      tasks.notify(failureMessage(l10n, error), level: NoticeLevel.error);
     }
   }
 
