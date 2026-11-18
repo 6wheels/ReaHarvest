@@ -1743,6 +1743,7 @@ void main() {
     expect(find.textContaining('Total · '), findsOne);
     expect(find.textContaining('Project · '), findsOne);
     expect(find.textContaining('Trash · '), findsOne);
+    expect(find.textContaining('backup points'), findsOne);
     expect(find.textContaining('versions in the trash'), findsOne);
     expect(find.textContaining('not adopted'), findsOne);
     expect(find.textContaining('assets'), findsOne);

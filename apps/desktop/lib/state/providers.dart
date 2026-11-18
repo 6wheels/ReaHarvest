@@ -90,6 +90,7 @@ final titlesProvider = Provider<List<Title>>((ref) {
           versionStatuses: t.versionStatuses,
           trashSize: t.trashSize,
           trashedVersions: t.trashedVersions,
+          backupCount: t.backupCount,
         )
       else
         t,

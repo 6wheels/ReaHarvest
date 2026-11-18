@@ -76,6 +76,7 @@ void main() {
     List<String> tags = const [],
     int trashSize = 0,
     int trashedVersions = 0,
+    int backupCount = 0,
   }) => Title(
     id: NodeId.generate(),
     libraryId: lib,
@@ -85,6 +86,7 @@ void main() {
     versions: versions,
     trashSize: trashSize,
     trashedVersions: trashedVersions,
+    backupCount: backupCount,
   );
 
   Version version(String fileName, {String? label, MemberId? by}) => Version(
@@ -158,6 +160,7 @@ void main() {
         ],
         trashSize: 500,
         trashedVersions: 2,
+        backupCount: 3,
       );
       final nodeId = NodeId.generate();
       index.update(
@@ -195,7 +198,7 @@ void main() {
       final t = restored.titles.single;
       expect(t.id, song.id);
       expect(t.levels, song.levels);
-      expect((t.trashSize, t.trashedVersions), (500, 2));
+      expect((t.trashSize, t.trashedVersions, t.backupCount), (500, 2, 3));
       expect(t.levels.keys, ['artist', 'album', 'title']);
       expect(t.versions.map((v) => v.fileName), ['a.RPP', 'b.rpp']);
       final a = t.versions.first;

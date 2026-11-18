@@ -219,6 +219,10 @@
   "@figuresTrashedVersions": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "figuresBackups": "{count, plural, =1{1 backup point} other{{count} backup points}}",
+  "@figuresBackups": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "figuresAssetFiles": "{count, plural, =1{1 asset} other{{count} assets}}",
   "@figuresAssetFiles": {
     "placeholders": { "count": { "type": "int" } }

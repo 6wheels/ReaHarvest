@@ -13,6 +13,7 @@ final class Title {
     this.versionStatuses = const {},
     this.trashSize = 0,
     this.trashedVersions = 0,
+    this.backupCount = 0,
   });
 
   /// Default status list, from idea to done (SPEC §5.9). The list is
@@ -49,6 +50,9 @@ final class Title {
 
   /// Number of versions in the title's `.trash/`, from the scan.
   final int trashedVersions;
+
+  /// Number of backup points (`.history/`) of its versions, from the scan.
+  final int backupCount;
 
   /// Status of [version]; null when not set.
   String? statusOf(Version version) => versionStatuses[version.key];

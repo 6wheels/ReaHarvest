@@ -26,6 +26,7 @@ void main() {
     String path = 'a/b/song',
     int trashSize = 0,
     int trashedVersions = 0,
+    int backupCount = 0,
   }) => Title(
     id: NodeId.generate(),
     libraryId: LibraryId.generate(),
@@ -34,6 +35,7 @@ void main() {
     versions: versions,
     trashSize: trashSize,
     trashedVersions: trashedVersions,
+    backupCount: backupCount,
   );
 
   test('splits the size on disk by part, with the counts', () {
@@ -55,6 +57,7 @@ void main() {
         ],
         trashSize: 500,
         trashedVersions: 2,
+        backupCount: 4,
       ),
       [
         file('a/b/song/v1/v1.RPP', 10),
@@ -79,7 +82,10 @@ void main() {
     });
     expect(figures.total, 1885);
     expect((figures.versions, figures.adopted, figures.notAdopted), (2, 1, 1));
-    expect((figures.trashedVersions, figures.assets), (2, 2));
+    expect(
+      (figures.trashedVersions, figures.assets, figures.backups),
+      (2, 2, 4),
+    );
   });
 
   test('counts a folder holding several projects once', () {

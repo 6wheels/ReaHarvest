@@ -349,17 +349,23 @@ void main() {
       expect(again.size, project.length + 3185);
     });
 
-    test('sizes the trash of a title and counts its versions', () async {
-      final lib = library(Layout.classic());
-      put('band/album/song/v1/v1.rpp', blankProject);
-      put('band/album/song/.trash/old/old.rpp', 'p' * 50);
-      put('band/album/song/.trash/old/Media/a.wav', 'a' * 100);
-      put('band/album/song/.trash/note.txt', 'n' * 3);
+    test(
+      'sizes the trash of a title and counts its versions and backups',
+      () async {
+        final lib = library(Layout.classic());
+        put('band/album/song/v1/v1.rpp', blankProject);
+        put('band/album/song/.trash/old/old.rpp', 'p' * 50);
+        put('band/album/song/.trash/old/Media/a.wav', 'a' * 100);
+        put('band/album/song/.trash/note.txt', 'n' * 3);
+        put('band/album/song/v1/.history/b1.rpp', 'h');
+        put('band/album/song/v1/.history/b2.rpp', 'h');
 
-      final title = (await scan(storage, lib)).titles.single;
-      expect(title.trashSize, 153);
-      expect(title.trashedVersions, 1);
-    });
+        final title = (await scan(storage, lib)).titles.single;
+        expect(title.trashSize, 153);
+        expect(title.trashedVersions, 1);
+        expect(title.backupCount, 2);
+      },
+    );
 
     test('a reserved folder of a title is never a version', () async {
       final lib = library(Layout.classic());

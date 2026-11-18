@@ -33,6 +33,7 @@ final class TitleFigures {
     required this.versions,
     required this.notAdopted,
     required this.trashedVersions,
+    required this.backups,
     required this.assets,
   });
 
@@ -47,6 +48,9 @@ final class TitleFigures {
 
   /// Number of versions in the trash.
   final int trashedVersions;
+
+  /// Number of backup points of its versions.
+  final int backups;
 
   /// Number of files in `Assets/`.
   final int assets;
@@ -101,6 +105,7 @@ TitleFigures figuresOf(Title title, Iterable<IndexedFile> files) {
     versions: title.versions.length,
     notAdopted: title.versions.where((v) => v.metadata == null).length,
     trashedVersions: title.trashedVersions,
+    backups: title.backupCount,
     assets: assets,
   );
 }

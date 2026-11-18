@@ -88,6 +88,7 @@ class FiguresView extends ConsumerWidget {
           '${l10n.figuresVersions(figures.versions)} · '
               '${l10n.figuresAdopted(figures.adopted)} · '
               '${l10n.figuresNotAdopted(figures.notAdopted)}',
+          l10n.figuresBackups(figures.backups),
           l10n.figuresTrashedVersions(figures.trashedVersions),
           l10n.figuresAssetFiles(figures.assets),
         ])

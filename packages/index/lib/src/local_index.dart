@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 17;
+const _schemaVersion = 18;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -45,6 +45,7 @@ CREATE TABLE titles (
   version_statuses TEXT NOT NULL,
   trash_size INTEGER NOT NULL,
   trashed_versions INTEGER NOT NULL,
+  backup_count INTEGER NOT NULL,
   PRIMARY KEY (library_id, path)
 );
 CREATE TABLE versions (
@@ -270,8 +271,8 @@ final class LocalIndex {
   void _insertTitles(LibraryId id, List<Title> titles) {
     _insertAll(
       'INSERT INTO titles (library_id, path, id, levels, tags, '
-      'version_statuses, trash_size, trashed_versions) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'version_statuses, trash_size, trashed_versions, backup_count) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         for (final t in titles)
           [
@@ -283,6 +284,7 @@ final class LocalIndex {
             jsonEncode(t.versionStatuses),
             t.trashSize,
             t.trashedVersions,
+            t.backupCount,
           ],
       ],
     );
@@ -492,6 +494,7 @@ final class LocalIndex {
           versionStatuses: _stringMap(r['version_statuses'] as String),
           trashSize: r['trash_size'] as int,
           trashedVersions: r['trashed_versions'] as int,
+          backupCount: r['backup_count'] as int,
         ),
     ];
   }
