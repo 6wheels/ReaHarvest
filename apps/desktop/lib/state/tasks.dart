@@ -69,6 +69,8 @@ final class BackgroundTask {
     this.error,
     this.report,
     this.openReport = false,
+    this.foreground = false,
+    this.quiet = false,
     this.step,
   });
 
@@ -90,6 +92,12 @@ final class BackgroundTask {
 
   /// Whether the report is shown as soon as the task ends.
   final bool openReport;
+
+  /// Shown in a popup that blocks the interface until it ends (SPEC §5.2).
+  final bool foreground;
+
+  /// Leaves the list when it ends: its caller tells the outcome itself.
+  final bool quiet;
 
   /// Current sub-step of a running task, if it tells it.
   final String Function(AppLocalizations l10n)? step;
@@ -116,6 +124,8 @@ final class BackgroundTask {
     error: error ?? this.error,
     report: report ?? this.report,
     openReport: openReport,
+    foreground: foreground,
+    quiet: quiet,
     step: step,
   );
 
@@ -127,6 +137,8 @@ final class BackgroundTask {
         state: state,
         cancelling: cancelling,
         openReport: openReport,
+        foreground: foreground,
+        quiet: quiet,
         step: step,
       );
 }
@@ -155,11 +167,16 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   /// [openReport], the tasks zone opens it at the end (actions launched by
   /// the user, SPEC §5.2). A task writing in [library] is added at once,
   /// queued, and runs in the turn of its library ([LibraryTurns]);
-  /// cancelled while queued, it ends at once and [body] never runs.
+  /// cancelled while queued, it ends at once and [body] never runs. A
+  /// [foreground] task blocks the interface in a popup while it waits and
+  /// runs ([ForegroundTaskHost]); a [quiet] one leaves the list when it
+  /// ends.
   Future<T?> run<T>(
     String Function(AppLocalizations l10n) label,
     Future<T> Function(TaskControl task) body, {
     bool openReport = false,
+    bool foreground = false,
+    bool quiet = false,
     LibraryId? library,
   }) async {
     final id = _next++;
@@ -171,6 +188,8 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
         label: label,
         state: library == null ? TaskState.running : TaskState.queued,
         openReport: openReport,
+        foreground: foreground,
+        quiet: quiet,
       ),
     ];
     if (library == null) return _execute(id, body);
@@ -214,6 +233,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     } finally {
       _cancels.remove(id);
       _logEnd(_task(id));
+      if (_task(id).quiet) _remove(id);
     }
     return null;
   }
@@ -241,6 +261,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       _cancels.remove(id);
       left.complete();
       _logEnd(_task(id));
+      if (_task(id).quiet) _remove(id);
       return;
     }
     _update(id, (t) => t._with(cancelling: true));
@@ -267,6 +288,8 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
 
   /// Removes the finished tasks.
   void clearFinished() => state = [...state.where((t) => !t.isFinished)];
+
+  void _remove(int id) => state = [...state.where((t) => t.id != id)];
 
   BackgroundTask _task(int id) => state.firstWhere((t) => t.id == id);
 

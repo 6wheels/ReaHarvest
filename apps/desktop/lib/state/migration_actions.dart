@@ -59,6 +59,7 @@ class MigrationActions {
           label,
           (task) => _batch(entry, fixes, task),
           openReport: true,
+          foreground: true,
         );
       });
     }
@@ -69,6 +70,7 @@ class MigrationActions {
         return _batch(entry, fixes, task);
       },
       openReport: true,
+      foreground: true,
       library: entry.id,
     );
   }
@@ -175,6 +177,7 @@ class MigrationActions {
             }
           },
           openReport: true,
+          foreground: true,
           library: library,
         );
   }

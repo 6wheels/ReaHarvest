@@ -9,6 +9,7 @@ import 'theme/app_theme.dart';
 import 'ui/first_run_wizard.dart';
 import 'ui/interrupted_fix_dialog.dart';
 import 'ui/library_page.dart';
+import 'ui/progress_popup.dart';
 import 'ui/tasks_zone.dart';
 
 class ReaHarvestApp extends ConsumerWidget {
@@ -55,6 +56,7 @@ class ReaHarvestApp extends ConsumerWidget {
             Expanded(child: child!),
             const TasksZone(),
             const InterruptedFixPrompt(),
+            const ForegroundTaskHost(),
           ],
         ),
       ),

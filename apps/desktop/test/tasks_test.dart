@@ -9,8 +9,10 @@ import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/theme/app_theme.dart';
 import 'package:reaharvest/ui/error_dialog.dart';
+import 'package:reaharvest/ui/progress_popup.dart';
 import 'package:reaharvest/ui/report_dialog.dart';
 import 'package:reaharvest/ui/tasks_zone.dart';
+import 'package:reaharvest/ui/widgets.dart' show Meter;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 void main() {
@@ -354,6 +356,39 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  test(
+    'a quiet task leaves the list when it ends, failed or cancelled',
+    () async {
+      const band = LibraryId('band');
+      expect(await tasks().run((l10n) => 'A', (_) async => 1, quiet: true), 1);
+      expect(
+        await tasks().run<int>(
+          (l10n) => 'B',
+          (_) async => throw 'boom',
+          quiet: true,
+        ),
+        isNull,
+      );
+      final hold = Completer<void>();
+      final running = tasks().run(
+        (l10n) => 'C',
+        (_) => hold.future,
+        library: band,
+      );
+      final queued = tasks().run(
+        (l10n) => 'D',
+        (_) async {},
+        quiet: true,
+        library: band,
+      );
+      tasks().cancel(container.read(tasksProvider).last.id);
+      expect(await queued, isNull);
+      hold.complete();
+      await running;
+      expect(states(), [TaskState.done], reason: 'only the one not quiet');
+    },
+  );
+
   test('a report with errors fails its task', () async {
     const report = Report({
       ReportKind.corrupted: [ReportItem('x')],
@@ -467,4 +502,75 @@ void main() {
       ]);
     },
   );
+
+  testWidgets('a foreground task blocks the interface in a popup', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          navigatorKey: appNavigatorKey,
+          theme: buildTheme(Brightness.light),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: const Scaffold(body: ForegroundTaskHost()),
+        ),
+      ),
+    );
+    const band = LibraryId('band');
+    final step = Completer<void>();
+    final scan = tasks().run(
+      (l10n) => 'Scan',
+      (_) => step.future,
+      library: band,
+    );
+    expect(find.text('Fix'), findsNothing, reason: 'background: no popup');
+
+    // Waits for the scan, shown in its popup; Escape leaves it.
+    final queued = tasks().run(
+      (l10n) => 'Fix',
+      (_) async {},
+      foreground: true,
+      library: band,
+    );
+    await settle(tester);
+    expect(find.text('Fix'), findsOneWidget);
+    expect(find.text('Waiting'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(await queued, isNull);
+    expect(find.text('Fix'), findsNothing);
+
+    // Running: step and progress; a click on the barrier does nothing,
+    // Cancel asks to stop, the popup stays until the task ends.
+    step.complete();
+    await scan;
+    final hold = Completer<void>();
+    final running = tasks().run((l10n) => 'Fix', (task) async {
+      task.step((l10n) => 'Fix 1 of 2');
+      task.progress(0.5);
+      await hold.future;
+      task.checkCancelled();
+    }, foreground: true);
+    await settle(tester);
+    expect(find.text('Fix 1 of 2'), findsOneWidget);
+    expect(tester.widget<Meter>(find.byType(Meter)).value, 0.5);
+    await tester.tapAt(const Offset(2, 2));
+    await settle(tester);
+    expect(find.text('Fix'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    expect(find.text('Cancelling…'), findsOneWidget);
+    hold.complete();
+    await running;
+    await settle(tester);
+    expect(find.text('Fix'), findsNothing);
+    expect(states().last, TaskState.cancelled);
+
+    // Ended before its popup was built: the popup closes by itself.
+    await tasks().run((l10n) => 'Quick', (_) async {}, foreground: true);
+    await settle(tester);
+    expect(find.text('Quick'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
+  });
 }

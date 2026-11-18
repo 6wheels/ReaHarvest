@@ -7,6 +7,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
+import '../l10n/app_localizations.dart';
 import 'library_catalog.dart';
 import 'library_scans.dart';
 import 'library_turns.dart';
@@ -19,7 +20,7 @@ final _log = Logger('library.versions');
 /// Actions on the versions of a title: adopt, separate a duplicate, create,
 /// edit, status, trash, keep only one, purge, backup and restore (SPEC
 /// §4.2, §5.4, §5.9),
-/// each in the turn of its library ([_turn]). "Then rescans": the folder of
+/// each a foreground task in the turn of its library ([_turn]). "Then rescans": the folder of
 /// the title only ([LibraryScans.rescanTitle], SPEC §8).
 class VersionActions {
   VersionActions(this.ref);
@@ -34,7 +35,11 @@ class VersionActions {
     Version version,
     String label, {
     MemberId? owner,
-  }) => _turn(title, () => _adopt(title, version, label, owner: owner));
+  }) => _turn(
+    title,
+    (l10n) => l10n.taskAdopt,
+    () => _adopt(title, version, label, owner: owner),
+  );
 
   Future<void> _adopt(
     Title title,
@@ -66,8 +71,11 @@ class VersionActions {
   /// title with the same id, else [version] itself when the original is in
   /// another title), owned by the local member when the library declares
   /// it. Then rescans.
-  Future<void> separateDuplicate(Title title, Version version) =>
-      _turn(title, () => _separateDuplicate(title, version));
+  Future<void> separateDuplicate(Title title, Version version) => _turn(
+    title,
+    (l10n) => l10n.taskSeparateDuplicate,
+    () => _separateDuplicate(title, version),
+  );
 
   Future<void> _separateDuplicate(Title title, Version version) async {
     final entry = ref.libraryEntry(title.libraryId);
@@ -100,7 +108,7 @@ class VersionActions {
   /// Backs up [version] of [title] into its `.history/` (UI: « Créer un
   /// point de sauvegarde », SPEC §5.4); the version is unchanged.
   Future<void> backup(Title title, Version version) =>
-      _turn(title, () => _backup(title, version));
+      _turn(title, (l10n) => l10n.taskBackup, () => _backup(title, version));
 
   Future<void> _backup(Title title, Version version) async {
     final root = ref.libraryEntry(title.libraryId).libraryRoot;
@@ -117,8 +125,11 @@ class VersionActions {
 
   /// Restores [backup] into [version] of [title], after backing up its
   /// current state (SPEC §5.4). Then rescans.
-  Future<void> restore(Title title, Version version, Backup backup) =>
-      _turn(title, () => _restore(title, version, backup));
+  Future<void> restore(Title title, Version version, Backup backup) => _turn(
+    title,
+    (l10n) => l10n.taskRestore,
+    () => _restore(title, version, backup),
+  );
 
   Future<void> _restore(Title title, Version version, Backup backup) async {
     final entry = ref.libraryEntry(title.libraryId);
@@ -143,7 +154,7 @@ class VersionActions {
   /// from the project file [template], else blank (REAPER's default
   /// template for new projects when set). Then rescans. Returns its
   /// [Version.fileName].
-  Future<String> addVersion(
+  Future<String?> addVersion(
     Title title,
     String name,
     String label, {
@@ -151,6 +162,7 @@ class VersionActions {
     String? template,
   }) => _turn(
     title,
+    (l10n) => l10n.taskAddVersion,
     () => _addVersion(title, name, label, source: source, template: template),
   );
 
@@ -212,13 +224,14 @@ class VersionActions {
   /// the title's node file, and renames its folder and its `.RPP` to [name]
   /// (SPEC §5.4); the label is written when changed or on a rename. Then
   /// rescans. Returns its [Version.fileName].
-  Future<String> editVersion(
+  Future<String?> editVersion(
     Title title,
     Version version, {
     required String name,
     required String label,
   }) => _turn(
     title,
+    (l10n) => l10n.taskEditVersion,
     () => _editVersion(title, version, name: name, label: label),
   );
 
@@ -257,7 +270,11 @@ class VersionActions {
   /// Sets the [status] of [version] of [title] (null clears it), in the
   /// title's `.node.json` (SPEC §5.9). Then rescans.
   Future<void> setStatusOf(Title title, Version version, String? status) =>
-      _turn(title, () => _setStatusOf(title, version, status));
+      _turn(
+        title,
+        (l10n) => l10n.taskSetStatus,
+        () => _setStatusOf(title, version, status),
+      );
 
   Future<void> _setStatusOf(
     Title title,
@@ -278,12 +295,18 @@ class VersionActions {
   /// Adds the free [tag] to [title], in the title's `.node.json` (SPEC
   /// §5.9): applied to the tags read again from the file, so that no
   /// concurrent change is lost. Then rescans.
-  Future<void> addTag(Title title, String tag) =>
-      _turn(title, () => _editTags(title, tag, add: true));
+  Future<void> addTag(Title title, String tag) => _turn(
+    title,
+    (l10n) => l10n.taskEditTags,
+    () => _editTags(title, tag, add: true),
+  );
 
   /// Removes the free [tag] from [title] (ignoring case), like [addTag].
-  Future<void> removeTag(Title title, String tag) =>
-      _turn(title, () => _editTags(title, tag, add: false));
+  Future<void> removeTag(Title title, String tag) => _turn(
+    title,
+    (l10n) => l10n.taskEditTags,
+    () => _editTags(title, tag, add: false),
+  );
 
   Future<void> _editTags(Title title, String tag, {required bool add}) async {
     final entry = ref.libraryEntry(title.libraryId);
@@ -301,8 +324,11 @@ class VersionActions {
 
   /// Moves [version] of [title] to the trash: its whole folder (SPEC §5.4).
   /// Then rescans.
-  Future<void> trashVersion(Title title, Version version) =>
-      _turn(title, () => _trashVersion(title, version));
+  Future<void> trashVersion(Title title, Version version) => _turn(
+    title,
+    (l10n) => l10n.taskTrashVersion,
+    () => _trashVersion(title, version),
+  );
 
   Future<void> _trashVersion(Title title, Version version) async {
     final entry = ref.libraryEntry(title.libraryId);
@@ -318,8 +344,11 @@ class VersionActions {
 
   /// Moves every other version folder of [title] than the one of [version]
   /// to the trash (SPEC §5.4). Then rescans.
-  Future<void> keepOnly(Title title, Version version) =>
-      _turn(title, () => _keepOnly(title, version));
+  Future<void> keepOnly(Title title, Version version) => _turn(
+    title,
+    (l10n) => l10n.taskKeepOnly,
+    () => _keepOnly(title, version),
+  );
 
   Future<void> _keepOnly(Title title, Version version) async {
     final entry = ref.libraryEntry(title.libraryId);
@@ -344,7 +373,7 @@ class VersionActions {
   /// Permanently deletes the trash entries [paths] of [title], version
   /// folders and assets (SPEC §5.4).
   Future<void> purge(Title title, List<String> paths) =>
-      _turn(title, () => _purge(title, paths));
+      _turn(title, (l10n) => l10n.taskPurge, () => _purge(title, paths));
 
   Future<void> _purge(Title title, List<String> paths) async {
     final root = ref.libraryEntry(title.libraryId).libraryRoot;
@@ -354,11 +383,38 @@ class VersionActions {
     ref.invalidate(trashProvider(title.id));
   }
 
-  /// Runs [change] of [title] in the turn of its library ([LibraryTurns]):
-  /// never during a batch on the library, nor with another change of the
-  /// same node file. Version actions are not shown in the tasks zone.
-  Future<T> _turn<T>(Title title, Future<T> Function() change) =>
-      ref.read(libraryTurnsProvider).run(title.libraryId, change);
+  /// Runs [change] of [title] as a foreground task labelled [label], in the
+  /// turn of its library ([LibraryTurns]): the interface is blocked by its
+  /// popup, the change waits for the scan or the other action of the
+  /// library, never runs with another change of the same node file, and
+  /// leaves nothing in the tasks zone, its caller tells the outcome. Returns
+  /// null when cancelled while it waits; rethrows what [change] throws.
+  Future<T?> _turn<T>(
+    Title title,
+    String Function(AppLocalizations l10n) label,
+    Future<T> Function() change,
+  ) async {
+    Object? error;
+    StackTrace? stack;
+    final result = await ref
+        .read(tasksProvider.notifier)
+        .run<T>(
+          label,
+          (_) async {
+            try {
+              return await change();
+            } on Object catch (e, s) {
+              (error, stack) = (e, s);
+              rethrow;
+            }
+          },
+          foreground: true,
+          quiet: true,
+          library: title.libraryId,
+        );
+    if (error case final e?) Error.throwWithStackTrace(e, stack!);
+    return result;
+  }
 
   /// [version] of [title], with its library, for the logs.
   String _at(Title title, Version version) =>

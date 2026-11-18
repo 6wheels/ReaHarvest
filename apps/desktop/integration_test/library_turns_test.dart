@@ -11,8 +11,9 @@ import 'package:reaharvest_repository/reaharvest_repository.dart';
 import 'harness.dart';
 
 /// Tasks of one library run one at a time: a batch asked while the library
-/// is busy waits, queued and cancellable, in the tasks zone (SPEC §5.2,
-/// #101): `flutter test integration_test/library_turns_test.dart -d windows`.
+/// is busy waits, queued and cancellable, in its popup and the tasks zone
+/// (SPEC §5.2, #101, #150):
+/// `flutter test integration_test/library_turns_test.dart -d windows`.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -24,7 +25,7 @@ void main() {
 
   const wrongLevel = 'FOLDERS AT THE WRONG LEVEL · 1';
 
-  testWidgets('a batch waits for the turn of its library, cancellable', (
+  testWidgets('a batch waits for the turn of its library, in its popup, cancellable', (
     tester,
   ) async {
     h.copyCleanProject('Band/Artist/Album/Song/v1.rpp');
@@ -62,9 +63,20 @@ void main() {
       () => h.tasks.length > before && h.tasks.last.isQueued,
       reason: 'queued',
     );
-    expect(find.text('Fix 1 item  ·  Waiting'), findsOne);
-    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Fix 1 item  ·  Waiting'), findsOne, reason: 'zone');
+    final popup = find.byType(AlertDialog);
+    expect(
+      find.descendant(of: popup, matching: find.text('Fix 1 item')),
+      findsOne,
+    );
+    expect(
+      find.descendant(of: popup, matching: find.text('Waiting')),
+      findsOne,
+    );
+    await tester.tap(find.descendant(of: popup, matching: find.text('Cancel')));
     await tester.pumpAndSettle();
+    expect(popup, findsNothing);
     expect(h.tasks.last.state, TaskState.cancelled);
     expect(find.text('Cancelled'), findsOne);
     hold.complete();
@@ -82,6 +94,8 @@ void main() {
       () => h.tasks.length > queued && h.tasks.last.isQueued,
       reason: 'queued again',
     );
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(AlertDialog), findsOne, reason: 'waits in its popup');
     hold.complete();
     await tester.runAsync(() => holding);
     await waitFor(tester, () => h.tasks.last.isFinished, reason: 'batch done');
