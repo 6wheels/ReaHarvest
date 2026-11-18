@@ -15,7 +15,7 @@ typedef IndexedFile = ({String path, FileStamp stamp, String? hash});
 /// ([ReportKind.corrupted]) or orphan node ([ReportKind.orphanNode]) file.
 typedef LibraryIssue = ({LibraryId library, ReportKind kind, ReportItem item});
 
-const _schemaVersion = 16;
+const _schemaVersion = 17;
 
 /// Milliseconds a writing connection waits for another writer: a library
 /// write lasts a few seconds at most.
@@ -43,6 +43,8 @@ CREATE TABLE titles (
   levels TEXT NOT NULL,
   tags TEXT NOT NULL,
   version_statuses TEXT NOT NULL,
+  trash_size INTEGER NOT NULL,
+  trashed_versions INTEGER NOT NULL,
   PRIMARY KEY (library_id, path)
 );
 CREATE TABLE versions (
@@ -268,7 +270,8 @@ final class LocalIndex {
   void _insertTitles(LibraryId id, List<Title> titles) {
     _insertAll(
       'INSERT INTO titles (library_id, path, id, levels, tags, '
-      'version_statuses) VALUES (?, ?, ?, ?, ?, ?)',
+      'version_statuses, trash_size, trashed_versions) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         for (final t in titles)
           [
@@ -278,6 +281,8 @@ final class LocalIndex {
             jsonEncode(t.levels),
             jsonEncode(t.tags),
             jsonEncode(t.versionStatuses),
+            t.trashSize,
+            t.trashedVersions,
           ],
       ],
     );
@@ -485,6 +490,8 @@ final class LocalIndex {
           tags: (jsonDecode(r['tags'] as String) as List).cast(),
           versions: versions[(r['library_id'], r['path'])] ?? const [],
           versionStatuses: _stringMap(r['version_statuses'] as String),
+          trashSize: r['trash_size'] as int,
+          trashedVersions: r['trashed_versions'] as int,
         ),
     ];
   }
@@ -704,13 +711,18 @@ final class LocalIndex {
   }
 
   /// Files of [id] (only those without a hash, new or changed, if
-  /// [unhashedOnly]), sorted by path so that the files of a title are
-  /// processed together.
-  List<IndexedFile> files(LibraryId id, {bool unhashedOnly = false}) => [
+  /// [unhashedOnly]; only those below the folder [below] if set), sorted by
+  /// path so that the files of a title are processed together.
+  List<IndexedFile> files(
+    LibraryId id, {
+    bool unhashedOnly = false,
+    String? below,
+  }) => [
     for (final r in _db.select(
-      'SELECT path, size, modified, hash FROM files WHERE library_id = ? '
+      'SELECT path, size, modified, hash FROM files WHERE library_id = ?1 '
+      'AND (?2 IS NULL OR substr(path, 1, length(?2)) = ?2) '
       '${unhashedOnly ? 'AND hash IS NULL ' : ''}ORDER BY path',
-      [id],
+      [id, below == null ? null : (below.isEmpty ? '' : '$below/')],
     ))
       (
         path: r['path'] as String,

@@ -203,6 +203,26 @@
   "statLength": "Length",
   "statTracks": "Tracks",
   "statItems": "Items",
+  "statFx": "FX",
+  "statMissing": "Missing",
+  "figures": "Figures",
+  "figuresTotal": "Total",
+  "figuresAssets": "Assets",
+  "figuresTrash": "Trash",
+  "figuresVersions": "{count, plural, =1{1 version} other{{count} versions}}",
+  "@figuresVersions": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "figuresAdopted": "{count} adopted",
+  "figuresNotAdopted": "{count} not adopted",
+  "figuresTrashedVersions": "{count, plural, =1{1 version in the trash} other{{count} versions in the trash}}",
+  "@figuresTrashedVersions": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "figuresAssetFiles": "{count, plural, =1{1 asset} other{{count} assets}}",
+  "@figuresAssetFiles": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "moreActions": "More actions",
   "newVersion": "New version",
   "changeStatus": "Change status",

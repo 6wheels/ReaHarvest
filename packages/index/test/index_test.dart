@@ -74,6 +74,8 @@ void main() {
     String name, {
     List<Version> versions = const [],
     List<String> tags = const [],
+    int trashSize = 0,
+    int trashedVersions = 0,
   }) => Title(
     id: NodeId.generate(),
     libraryId: lib,
@@ -81,6 +83,8 @@ void main() {
     levels: {'artist': artist, 'album': album, 'title': name},
     tags: tags,
     versions: versions,
+    trashSize: trashSize,
+    trashedVersions: trashedVersions,
   );
 
   Version version(String fileName, {String? label, MemberId? by}) => Version(
@@ -122,6 +126,25 @@ void main() {
   tearDown(() => index.close());
 
   group('LocalIndex', () {
+    test('lists the files below a folder', () {
+      final lib = library();
+      index.update(
+        lib,
+        ScanResult(
+          stamps: {
+            'a/x.rpp': (size: 1, modified: t0),
+            'a/b/y.wav': (size: 2, modified: t0),
+            'ab/z.wav': (size: 3, modified: t0),
+          },
+        ),
+      );
+      expect(index.files(lib.id, below: 'a').map((f) => f.path), [
+        'a/b/y.wav',
+        'a/x.rpp',
+      ]);
+      expect(index.files(lib.id, below: '').length, 3);
+    });
+
     test('stores and restores libraries, titles, versions and issues', () {
       final lib = library();
       final song = title(
@@ -133,6 +156,8 @@ void main() {
           version('a.RPP', label: 'chorus B'),
           version('b.rpp'),
         ],
+        trashSize: 500,
+        trashedVersions: 2,
       );
       final nodeId = NodeId.generate();
       index.update(
@@ -170,6 +195,7 @@ void main() {
       final t = restored.titles.single;
       expect(t.id, song.id);
       expect(t.levels, song.levels);
+      expect((t.trashSize, t.trashedVersions), (500, 2));
       expect(t.levels.keys, ['artist', 'album', 'title']);
       expect(t.versions.map((v) => v.fileName), ['a.RPP', 'b.rpp']);
       final a = t.versions.first;

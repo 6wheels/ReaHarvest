@@ -11,6 +11,8 @@ final class Title {
     this.tags = const [],
     this.versions = const [],
     this.versionStatuses = const {},
+    this.trashSize = 0,
+    this.trashedVersions = 0,
   });
 
   /// Default status list, from idea to done (SPEC §5.9). The list is
@@ -41,6 +43,12 @@ final class Title {
   /// Status of each version, by [Version.key]. May hold keys of versions
   /// that no longer exist.
   final Map<String, String> versionStatuses;
+
+  /// Bytes used by the title's `.trash/`, from the scan (SPEC §5.2).
+  final int trashSize;
+
+  /// Number of versions in the title's `.trash/`, from the scan.
+  final int trashedVersions;
 
   /// Status of [version]; null when not set.
   String? statusOf(Version version) => versionStatuses[version.key];

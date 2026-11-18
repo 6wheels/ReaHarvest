@@ -11,6 +11,7 @@ import '../over_library.dart';
 import '../studio_title_bar.dart';
 import '../versions/new_version_dialog.dart';
 import '../versions/trash_view.dart';
+import 'figures_view.dart';
 import 'title_header.dart';
 import 'version_list_item.dart';
 import 'version_pane.dart';
@@ -35,8 +36,8 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
   /// File name of the selected version; the latest one when null.
   String? _selected;
 
-  /// Trash tab shown instead of the versions.
-  var _trash = false;
+  /// Tab shown instead of the versions.
+  var _tab = _DetailTab.versions;
 
   void _select(String fileName) => setState(() => _selected = fileName);
 
@@ -85,22 +86,25 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                 padding: const EdgeInsets.symmetric(horizontal: Space.s),
                 child: Row(
                   children: [
-                    _Tab(
-                      l10n.versions,
-                      selected: !_trash,
-                      onTap: () => setState(() => _trash = false),
-                    ),
-                    _Tab(
-                      l10n.trash,
-                      selected: _trash,
-                      onTap: () => setState(() => _trash = true),
-                    ),
+                    for (final (tab, label) in [
+                      (_DetailTab.versions, l10n.versions),
+                      (_DetailTab.trash, l10n.trash),
+                      (_DetailTab.figures, l10n.figures),
+                    ])
+                      _Tab(
+                        label,
+                        selected: _tab == tab,
+                        onTap: () => setState(() => _tab = tab),
+                      ),
                   ],
                 ),
               ),
             Divider(height: 1, color: c.border),
-            if (title != null && _trash) Expanded(child: TrashView(title)),
-            if (title != null && !_trash)
+            if (title != null && _tab == _DetailTab.trash)
+              Expanded(child: TrashView(title)),
+            if (title != null && _tab == _DetailTab.figures)
+              Expanded(child: FiguresView(title)),
+            if (title != null && _tab == _DetailTab.versions)
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -158,7 +162,9 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
   }
 }
 
-/// Tab of the title detail (versions, trash).
+enum _DetailTab { versions, trash, figures }
+
+/// Tab of the title detail (versions, trash, figures).
 class _Tab extends StatelessWidget {
   const _Tab(this.label, {required this.selected, required this.onTap});
 
