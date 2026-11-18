@@ -49,8 +49,8 @@ class VersionPane extends ConsumerWidget {
     try {
       await ref.read(versionActionsProvider).backup(title, version);
       tasks.notify(l10n.backupCreated);
-    } on Object catch (error) {
-      tasks.notify(failureMessage(l10n, error), level: NoticeLevel.error);
+    } on Object catch (e) {
+      fail(tasks, l10n, e);
     }
   }
 

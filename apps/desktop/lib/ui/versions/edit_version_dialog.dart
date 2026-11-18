@@ -30,7 +30,7 @@ Future<String?> showEditVersionDialog(
   if (name == version.folder && label == (version.metadata?.label ?? '')) {
     return null;
   }
-  Future<String> edit() => ref
+  Future<String?> edit() => ref
       .read(versionActionsProvider)
       .editVersion(title, version, name: name, label: label);
   if (name != version.folder) {

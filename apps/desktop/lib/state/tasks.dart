@@ -69,6 +69,9 @@ final class BackgroundTask {
     this.error,
     this.report,
     this.openReport = false,
+    this.foreground = false,
+    this.quiet = false,
+    this.cancellable = true,
     this.step,
   });
 
@@ -91,6 +94,16 @@ final class BackgroundTask {
   /// Whether the report is shown as soon as the task ends.
   final bool openReport;
 
+  /// Shown in a popup that blocks the interface until it ends (SPEC §5.2).
+  final bool foreground;
+
+  /// Leaves the list when it ends: its caller tells the outcome itself.
+  final bool quiet;
+
+  /// Stops at its steps when asked; otherwise, Cancel only takes it out of
+  /// the queue.
+  final bool cancellable;
+
   /// Current sub-step of a running task, if it tells it.
   final String Function(AppLocalizations l10n)? step;
 
@@ -100,6 +113,10 @@ final class BackgroundTask {
 
   /// Done, with warnings, failed or cancelled.
   bool get isFinished => !isRunning && !isQueued;
+
+  /// Whether Cancel applies: queued, or running, cancellable and not asked
+  /// to stop yet.
+  bool get canCancel => isQueued || (isRunning && cancellable && !cancelling);
 
   BackgroundTask _with({
     TaskState? state,
@@ -116,6 +133,9 @@ final class BackgroundTask {
     error: error ?? this.error,
     report: report ?? this.report,
     openReport: openReport,
+    foreground: foreground,
+    quiet: quiet,
+    cancellable: cancellable,
     step: step,
   );
 
@@ -127,6 +147,9 @@ final class BackgroundTask {
         state: state,
         cancelling: cancelling,
         openReport: openReport,
+        foreground: foreground,
+        quiet: quiet,
+        cancellable: cancellable,
         step: step,
       );
 }
@@ -150,16 +173,24 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   List<BackgroundTask> build() => const [];
 
   /// Runs [body] as a task labelled [label]. Returns its result, or null if
-  /// it failed or was cancelled (the outcome stays in the task). A [Report]
+  /// it failed or was cancelled (the outcome stays in the task); a [quiet]
+  /// one, whose caller tells the outcome, leaves the list when it ends and
+  /// rethrows the failure of [body], or throws [TaskCancelled]. A [Report]
   /// result is kept in the task, which fails if it holds errors; with
   /// [openReport], the tasks zone opens it at the end (actions launched by
   /// the user, SPEC §5.2). A task writing in [library] is added at once,
   /// queued, and runs in the turn of its library ([LibraryTurns]);
-  /// cancelled while queued, it ends at once and [body] never runs.
+  /// cancelled while queued, it ends at once and [body] never runs. A
+  /// [foreground] task blocks the interface in a popup while it waits and
+  /// runs ([ForegroundTaskHost]). A task not [cancellable] can only be
+  /// cancelled while queued.
   Future<T?> run<T>(
     String Function(AppLocalizations l10n) label,
     Future<T> Function(TaskControl task) body, {
     bool openReport = false,
+    bool foreground = false,
+    bool quiet = false,
+    bool cancellable = true,
     LibraryId? library,
   }) async {
     final id = _next++;
@@ -171,6 +202,9 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
         label: label,
         state: library == null ? TaskState.running : TaskState.queued,
         openReport: openReport,
+        foreground: foreground,
+        quiet: quiet,
+        cancellable: cancellable,
       ),
     ];
     if (library == null) return _execute(id, body);
@@ -181,7 +215,10 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       _update(id, (t) => t._with(state: TaskState.running));
       return _execute(id, body);
     });
-    return Future.any([turn, left.future.then<T?>((_) => null)]);
+    final cancelled = left.future.then<T?>(
+      (_) => quiet ? throw const TaskCancelled() : null,
+    );
+    return Future.any([turn, cancelled]);
   }
 
   /// Runs [body] as the running task [id], to its outcome.
@@ -190,6 +227,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     Future<T> Function(TaskControl task) body,
   ) async {
     _log.info('${_task(id).label(_english)}: started');
+    final quiet = _task(id).quiet;
     try {
       final result = await body(TaskControl._(this, id));
       final report = result is Report ? result : null;
@@ -208,12 +246,15 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       return result;
     } on TaskCancelled catch (e) {
       _update(id, (t) => t._with(state: TaskState.cancelled, report: e.report));
+      if (quiet) rethrow;
     } on Object catch (error, stack) {
       _update(id, (t) => t._with(state: TaskState.failed, error: '$error'));
       _log.severe(_task(id).label(_english), error, stack);
+      if (quiet) rethrow;
     } finally {
       _cancels.remove(id);
       _logEnd(_task(id));
+      if (quiet) _remove(id);
     }
     return null;
   }
@@ -231,8 +272,9 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     );
   }
 
-  /// Asks the running task [id] to stop at its next step. A queued task
-  /// leaves the queue and ends cancelled at once.
+  /// Asks the running task [id] to stop at its next step, if it is
+  /// [BackgroundTask.cancellable]. A queued task leaves the queue and ends
+  /// cancelled at once.
   void cancel(int id) {
     if (_queued[id] case final left?) {
       // Already left the queue: nothing more to stop.
@@ -241,8 +283,11 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       _cancels.remove(id);
       left.complete();
       _logEnd(_task(id));
+      if (_task(id).quiet) _remove(id);
       return;
     }
+    final task = state.where((t) => t.id == id).firstOrNull;
+    if (task == null || !task.canCancel) return;
     _update(id, (t) => t._with(cancelling: true));
     if (_cancels[id] case final c? when !c.isCompleted) c.complete();
   }
@@ -267,6 +312,8 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
 
   /// Removes the finished tasks.
   void clearFinished() => state = [...state.where((t) => !t.isFinished)];
+
+  void _remove(int id) => state = [...state.where((t) => t.id != id)];
 
   BackgroundTask _task(int id) => state.firstWhere((t) => t.id == id);
 

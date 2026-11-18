@@ -131,6 +131,64 @@ class TasksZone extends ConsumerWidget {
   }
 }
 
+/// Sub-step of [task] while it is not finished: its waiting while queued.
+/// Shared by the tasks zone and the popup ([ForegroundTaskHost]).
+String? taskStep(BackgroundTask task, AppLocalizations l10n) => task.isQueued
+    ? l10n.taskWaiting
+    : task.isRunning
+    ? task.step?.call(l10n)
+    : null;
+
+/// Cancel of [task] while it applies, or its stop state; null when done or
+/// failed.
+Widget? taskAction(BuildContext context, WidgetRef ref, BackgroundTask task) {
+  final l10n = AppLocalizations.of(context);
+  final muted = Theme.of(context).textTheme.bodySmall
+      ?.copyWith(color: context.colors.muted);
+  if (task.canCancel) {
+    return TextButton(
+      onPressed: () => ref.read(tasksProvider.notifier).cancel(task.id),
+      child: Text(l10n.cancel),
+    );
+  }
+  return switch (task.state) {
+    TaskState.running when task.cancelling => Text(
+      l10n.taskCancelling,
+      style: muted,
+    ),
+    TaskState.cancelled => Text(l10n.taskCancelled, style: muted),
+    _ => null,
+  };
+}
+
+/// Progress of a running [task] and its readout; empty while it waits.
+class TaskProgress extends StatelessWidget {
+  const TaskProgress(this.task, {super.key});
+
+  final BackgroundTask task;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = task.isQueued ? 0.0 : task.progress;
+    return Row(
+      children: [
+        Expanded(child: Meter(progress)),
+        const SizedBox(width: Space.s),
+        SizedBox(
+          width: 36,
+          child: Text(
+            progress == null
+                ? '---'
+                : '${(progress * 100).round()}%'.padLeft(4),
+            textAlign: TextAlign.end,
+            style: context.readout.copyWith(color: context.colors.text),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Width of the state and report columns of a task, with room for the
 /// longer labels of the supported languages.
 const _actionWidth = 104.0;
@@ -152,11 +210,7 @@ class _TaskRow extends ConsumerWidget {
     final muted = text.bodySmall?.copyWith(color: c.muted);
     final error = Theme.of(context).colorScheme.error;
     // A queued task shows that it waits in place of its step.
-    final step = task.isQueued
-        ? l10n.taskWaiting
-        : task.isRunning
-        ? task.step?.call(l10n)
-        : null;
+    final step = taskStep(task, l10n);
     // Status: light off while waiting, breathing amber while running, then
     // an icon: green check, orange warning, red error.
     final light = switch (task.state) {
@@ -166,18 +220,7 @@ class _TaskRow extends ConsumerWidget {
       TaskState.warning => Icon(Icons.warning, size: 18, color: c.ledAmber),
       TaskState.failed => Icon(Icons.error, size: 18, color: error),
     };
-    final Widget? trailing = switch (task.state) {
-      TaskState.running when task.cancelling => Text(
-        l10n.taskCancelling,
-        style: muted,
-      ),
-      TaskState.queued || TaskState.running => TextButton(
-        onPressed: () => ref.read(tasksProvider.notifier).cancel(task.id),
-        child: Text(l10n.cancel),
-      ),
-      TaskState.done || TaskState.warning || TaskState.failed => null,
-      TaskState.cancelled => Text(l10n.taskCancelled, style: muted),
-    };
+    final trailing = taskAction(context, ref, task);
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 34),
       child: Row(
@@ -217,18 +260,7 @@ class _TaskRow extends ConsumerWidget {
           ),
           if (task.isRunning) ...[
             const SizedBox(width: Space.m),
-            SizedBox(width: 120, child: Meter(task.progress)),
-            const SizedBox(width: Space.s),
-            SizedBox(
-              width: 36,
-              child: Text(
-                task.progress == null
-                    ? '---'
-                    : '${(task.progress! * 100).round()}%'.padLeft(4),
-                textAlign: TextAlign.end,
-                style: context.readout.copyWith(color: c.text),
-              ),
-            ),
+            SizedBox(width: 120 + Space.s + 36, child: TaskProgress(task)),
           ],
           const SizedBox(width: Space.m),
           // State and report in columns of one width, the report slot kept
