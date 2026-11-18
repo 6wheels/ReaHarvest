@@ -190,6 +190,31 @@ void main() {
       );
     });
 
+    test('forced, a title is moved and its versions organized', () {
+      final plan = planFix(
+        OrganizeTitle(
+          song,
+          'Band/Other/Song',
+          [version('$song/a.rpp', 'a')],
+          level: 'title',
+          force: true,
+        ),
+        facts(
+          files: {'Band/Album/x.wav'},
+          projects: {
+            '$song/a.rpp': project([r'..\x.wav', 'gone.wav']),
+          },
+        ),
+      );
+
+      expect(files(plan), [
+        'move $song -> Band/Other/Song',
+        'move Band/Other/Song/a.rpp -> Band/Other/Song/a/a.rpp',
+        'move Band/Album/x.wav -> Band/Other/Song/a/Media/x.wav',
+      ]);
+      expect(plan.blocked.items[ReportKind.missingMedia], hasLength(1));
+    });
+
     test('a project in a reserved folder never moves it', () {
       final plan = planFix(
         organize([version('$song/Media/a.rpp', 'a')]),

@@ -49,6 +49,7 @@ sealed class MigrationFix {
     this.target,
     this.versions, {
     required this.level,
+    this.force = false,
   });
 
   /// Library path of the candidate root, or of the project moved.
@@ -64,12 +65,19 @@ sealed class MigrationFix {
   /// creates.
   final String level;
 
+  /// Whether its versions with a missing or external media (e.g. one of
+  /// another computer, that REAPER will ask for when the project opens)
+  /// are organized too, rather than left as they are.
+  final bool force;
+
   /// Name of the fix in the migration journal.
   String get kind;
 
   @override
-  String toString() =>
-      ['$kind $path -> $target', for (final v in versions) '  $v'].join('\n');
+  String toString() => [
+    '$kind $path -> $target${force ? ', forced' : ''}',
+    for (final v in versions) '  $v',
+  ].join('\n');
 }
 
 /// Organizes the candidate [path] into version folders at [target]: a
@@ -82,6 +90,7 @@ final class OrganizeTitle extends MigrationFix {
     super.target,
     super.versions, {
     required super.level,
+    super.force,
     this.titleFolder = true,
   });
 
@@ -100,6 +109,7 @@ final class AttachVersions extends MigrationFix {
     super.target,
     super.versions, {
     required super.level,
+    super.force,
   });
 
   @override
@@ -109,8 +119,12 @@ final class AttachVersions extends MigrationFix {
 /// Moves one project to another title [target] (created if missing), where
 /// it becomes a version folder.
 final class MoveProject extends MigrationFix {
-  MoveProject(FixVersion version, String target, {required super.level})
-    : super(version.source, target, [version]);
+  MoveProject(
+    FixVersion version,
+    String target, {
+    required super.level,
+    super.force,
+  }) : super(version.source, target, [version]);
 
   @override
   String get kind => 'moveProject';

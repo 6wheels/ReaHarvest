@@ -457,6 +457,36 @@ void main() {
     expect(file('$song/b/Media/x.wav').existsSync(), isTrue);
   });
 
+  test(
+    'forced, a version with a missing or external media is organized',
+    () async {
+      title(song);
+      put('$song/a.rpp', rpp([r'audio\x.wav', 'gone.wav', r'C:\abs.wav']));
+      put('$song/audio/x.wav', 'x');
+      final date = DateTime(2022, 2, 3);
+      file('$song/a.rpp').setLastModifiedSync(date);
+      final m = await migration();
+
+      final report = await applyFixes(m, [
+        OrganizeTitle(
+          song,
+          song,
+          [version('$song/a.rpp')],
+          level: 'title',
+          force: true,
+        ),
+      ]);
+
+      // Still reported: REAPER asks for them when the project opens.
+      expect(report.items[ReportKind.missingMedia], hasLength(1));
+      expect(report.items[ReportKind.externalMedia], hasLength(1));
+      expect(media('$song/a/a.rpp'), r'Media\x.wav|gone.wav|C:\abs.wav');
+      expect(file('$song/a/Media/x.wav').existsSync(), isTrue);
+      expect(file('$song/a/a.rpp').lastModifiedSync(), date);
+      expect(await noLoss(m), isTrue);
+    },
+  );
+
   test('a subproject takes its proxy along, its references follow', () async {
     title(song);
     put('$song/a.rpp', rpp(['sub.rpp']));
@@ -709,6 +739,10 @@ void main() {
       level: 'title',
     );
     expect('$fix', 'moveProject a/b.rpp -> T\n  a/b.rpp -> b, b, m, demo');
+    expect(
+      '${AttachVersions('a', 'T', const [], level: 'title', force: true)}',
+      'attachVersions a -> T, forced',
+    );
     expect(
       '${const SetVersionEntries('T', VersionId('01J'), label: 'l', owner: MemberId('m'), status: 's')}',
       'version 01J in T: l, m, s',

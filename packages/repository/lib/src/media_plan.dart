@@ -233,7 +233,9 @@ MediaPlanCounts countPlan(MediaPlan plan) {
 ///   adopted when it has no id, and its label, owner and status set in the
 ///   node file of the title.
 /// - A version with a missing media, or an absolute one or outside the
-///   library, is left intact and reported; so is one whose media would take
+///   library, is reported and, unless the fix is forced
+///   ([MigrationFix.force]: organized anyway, those references left as
+///   written), left intact; so is one whose media would take
 ///   a name already taken in its `Media/`. The files of a version left
 ///   intact, those already in the `Media/` of a version and the projects of
 ///   the fix are never moved, only copied; nor is a folder holding a file
@@ -412,8 +414,6 @@ final class _Planner {
     }
     referenced.addAll(refs.keys);
     if (missing.isEmpty && external.isEmpty) return refs;
-    pinned.addAll(refs.keys);
-    intact.addAll(refs);
     if (missing.isNotEmpty) {
       report(ReportKind.missingMedia, ReportItem(v.source, missing.join('\n')));
     }
@@ -423,6 +423,10 @@ final class _Planner {
         ReportItem(v.source, external.join('\n')),
       );
     }
+    // Forced: organized anyway, the references not found left as written.
+    if (fix.force) return refs;
+    pinned.addAll(refs.keys);
+    intact.addAll(refs);
     return null;
   }
 
@@ -560,7 +564,9 @@ final class _Planner {
     }
     final references = <String, String>{};
     for (final ref in project.references) {
-      final file = resolveReference(parentOf(source), ref)!;
+      final file = resolveReference(parentOf(source), ref);
+      // Not found (a forced fix): left as written.
+      if (file == null || !files.containsKey(file.toLowerCase())) continue;
       final now = placed[file.toLowerCase()] ?? locate(file);
       final rewritten = relativeReference(versionDir, now, like: ref);
       if (rewritten != ref) references[ref] = rewritten;
