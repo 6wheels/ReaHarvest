@@ -17,8 +17,11 @@ import 'demo_titles.dart';
 import 'logs.dart';
 import 'state/migration_actions.dart';
 import 'state/navigation.dart';
+import 'state/desktop_window_shell.dart';
 import 'state/providers.dart';
+import 'state/window_behavior.dart';
 import 'ui/error_dialog.dart';
+import 'ui/quit_dialog.dart';
 import 'ui/settings_recovery.dart';
 
 const _demo = bool.fromEnvironment('REAHARVEST_DEMO');
@@ -81,8 +84,14 @@ Future<void> main() async {
   // Written in background isolates only; read here, read-only (SPEC §7.1).
   await createIndex(indexPath);
 
-  final container = ProviderContainer(
+  late final ProviderContainer container;
+  final shell = DesktopWindowShell(
+    () => container.read(windowBehaviorProvider),
+  );
+  container = ProviderContainer(
     overrides: [
+      windowShellProvider.overrideWithValue(shell),
+      quitConfirmerProvider.overrideWithValue(confirmQuit),
       logFolderProvider.overrideWithValue(logFolder),
       settingsFileProvider.overrideWithValue(settingsFile),
       initialSettingsProvider.overrideWithValue(settings),
@@ -99,6 +108,8 @@ Future<void> main() async {
       ],
     ],
   );
+  await shell.start();
+  container.read(windowBehaviorProvider).start();
   runApp(
     UncontrolledProviderScope(
       container: container,

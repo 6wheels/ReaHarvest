@@ -285,6 +285,8 @@ void main() {
             accent: AccentPreference.violet,
             textScale: 1.2,
             language: 'fr',
+            showInTray: true,
+            onProjectOpen: ProjectOpenAction.close,
             navigation: const NavigationSettings(
               displayMode: DisplayMode.tree,
               query: 'tide',
@@ -333,6 +335,19 @@ void main() {
       expect(
         (read.theme, read.accent, read.textScale, read.language),
         (ThemePreference.dark, AccentPreference.violet, 1.2, 'fr'),
+      );
+      expect(
+        (read.showInTray, read.onProjectOpen),
+        (true, ProjectOpenAction.close),
+      );
+      final fresh = AppSettings.fromJson({
+        ...settings.toJson(),
+        'showInTray': null,
+        'onProjectOpen': 'unknown',
+      });
+      expect(
+        (fresh.showInTray, fresh.onProjectOpen),
+        (false, ProjectOpenAction.nothing),
       );
       final nav = read.navigation;
       expect((nav.displayMode, nav.query), (DisplayMode.tree, 'tide'));

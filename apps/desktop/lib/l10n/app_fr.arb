@@ -354,5 +354,16 @@
   "tagRemove": "Retirer le tag {tag}",
   "tagRemoveTitle": "Retirer le tag « {tag} » ?",
   "tagRemoveHint": "Le tag est retiré de ce titre pour tous les membres de la bibliothèque.",
-  "tagRemoveAction": "Retirer"
+  "tagRemoveAction": "Retirer",
+  "windowAndTray": "Fenêtre et zone de notification",
+  "showInTray": "Afficher dans la zone de notification",
+  "onProjectOpen": "À l’ouverture d’un projet dans REAPER",
+  "onOpenNothing": "Ne rien faire",
+  "onOpenMinimize": "Réduire ReaHarvest",
+  "onOpenClose": "Fermer ReaHarvest",
+  "trayOpen": "Ouvrir ReaHarvest",
+  "quitTasksTitle": "Quitter pendant que des tâches s’exécutent ?",
+  "quitTasksBody": "Ces tâches sont en cours ou en attente :",
+  "keepRunning": "Continuer",
+  "cancelTasksAndQuit": "Annuler les tâches et quitter"
 }
