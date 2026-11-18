@@ -650,7 +650,7 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
 
 ## 9. Scope and delivery order
 
-Progress, the order of the tickets and the dated decisions are kept in `PROGRESS.md` only; this section gives the scope.
+Progress and the order of the tickets are kept in `PROGRESS.md` and `progress/`, the dated decisions in `DECISIONS.md`; this section gives the scope.
 
 | Phase | Content |
 |---|---|

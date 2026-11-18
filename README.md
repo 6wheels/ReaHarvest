@@ -32,7 +32,8 @@ onto a structured shared cloud folder, delivered in four milestones:
 - **M2 — Join and sync**: join a library, checkout, publish, release.
 - **M3 — Shared statuses and activity**
 
-Progress is tracked in [PROGRESS.md](PROGRESS.md) and in
+Progress is tracked in [PROGRESS.md](PROGRESS.md) (one file per milestone in
+[progress/](progress/)) and in
 [GitHub issues](https://github.com/6wheels/ReaHarvest/issues).
 
 ## Platforms
