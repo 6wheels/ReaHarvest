@@ -1,0 +1,45 @@
+name: Feature
+description: A change of behavior, scoped and testable.
+labels: [type:feature, needs-refinement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Dependencies are not written here: use the native "blocked by" relations of the issue.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why this change, and the SPEC.md sections it relies on.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What the user sees and does once it is done.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: One checkbox per verifiable criterion.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this issue does not cover. Write "None" if nothing.
+    validations:
+      required: true
+  - type: textarea
+    id: showcase
+    attributes:
+      label: Showcase UI components
+      description: Components of `apps/desktop/lib/main_showcase.dart` added or changed. Write "None" if the issue has no UI.
+    validations:
+      required: true

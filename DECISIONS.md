@@ -23,7 +23,7 @@ Dated decisions and the open points left to the maintainer. Agents do not need t
 - Priority to the core: one role per class or module, business rules in the packages and testable without the interface (SPEC §7.2). The core hardening tickets (#90 to #105) come before the remaining M1 features.
 - Design direction (DAW, mixing console) and typeface wait: recorded in #110 (M2).
 - Milestones: only M0 to M3 and the Backlog remain; the tickets of phases 2 and 3 are in the Backlog, their milestones are closed.
-- Progress is written in this file only; SPEC.md refers to it (since 2026-11-18: `PROGRESS.md`, one file per milestone in `progress/`, and the dated decisions in `DECISIONS.md`).
+- Progress is written in this file only; SPEC.md refers to it (since 2026-11-18: `PROGRESS.md`, one file per milestone in `progress/`, and the dated decisions in `DECISIONS.md`; since 2026-11-19: scope, state, order and dependencies in the GitHub issues, `PROGRESS.md` and `progress/` only give the lanes and advised models).
 - M1 validation checks the quality of the product, not a folder left without any issue.
 - Assets: a link opening the `Assets/` folder is enough until M3 (#106); the assets view comes in M3, right after the statuses and before the activity (#52, #28).
 - Distribution: the members are not technical, so M2 delivers a Windows installer with auto-update (#31); the zip shared by hand is dropped (#75 closed), a portable zip stays attached to each release. #31 starts with a study of the Microsoft Store as another route. Code signing (SignPath Foundation) is out of M2: Backlog, #113; the M2 installer is unsigned, with a guide for the SmartScreen warning.

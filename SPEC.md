@@ -650,7 +650,7 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
 
 ## 9. Scope and delivery order
 
-Progress and the order of the tickets are kept in `PROGRESS.md` and `progress/`, the dated decisions in `DECISIONS.md`; this section gives the scope.
+Scope, state, order and dependencies of the tickets live in the GitHub issues; `PROGRESS.md` and `progress/` hold the lanes and advised models only, `DECISIONS.md` the dated decisions. This section gives the scope.
 
 | Phase | Content |
 |---|---|
