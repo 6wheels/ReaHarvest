@@ -80,7 +80,7 @@ Rules:
 
 **Cloud providers.** The MVP relies on a **folder mounted or synchronized by the provider's client**: the application only sees a file system path. The following are therefore covered, with no specific code: Google Drive for desktop, Dropbox, OneDrive, iCloud Drive, Nextcloud, Syncthing, network share (NAS/SMB), rclone mount (Linux). Common constraints to handle:
 - on-demand files (not present locally): never read or hash them needlessly, rely on size and mtime;
-- provider-specific conflict copies (e.g. `file (1).RPP`, `conflicted copy`): detected and reported as anomalies, never silently adopted **[TO VALIDATE: naming patterns per provider]**.
+- copies of a project or of a version folder, made by a cloud client after a conflict or by hand (e.g. `file (1).RPP`, `file (conflicted copy …).RPP`, `file.sync-conflict-….RPP`, `<version> (1)/`): detected with these generic patterns, whatever the provider, and reported as anomalies, never silently adopted (#23).
 
 Providers accessible through an API only (without a mounted folder) are **outside the MVP**. Repository access goes through a `RepositoryStorage` port whose MVP implementation is `MountedFolderStorage`, to allow other adapters later.
 
@@ -414,7 +414,7 @@ Flow (wizard "Organize a collaboration folder", §5.1):
    - media referenced through an absolute path, missing media, `RECORD_PATH` other than `Media` (e.g. `audio-files`), `RENDER_FILE` forms (§5.3);
    - other files to move into `Assets/`, or blocked because a project references them;
    - versions not adopted, duplicated `versionId` (§4.2);
-   - cloud provider conflict copies (e.g. `x (1).rpp`), reported only.
+   - copies of projects and of version folders (cloud conflict or hand copy, e.g. `x (1).rpp`, §3.0), reported only.
    - files outside any title (e.g. an orphan `.node.json`, a document beside the titles).
 4. **Fixes in the interface**, proposed per title, each with a preview (dry run) and a report (§5.2):
    - **organize the title**: each project becomes a version folder named after its version (its label, pre-filled from the file name; `name (2)` when taken) with its own `Media/` and `Renders/`; the project keeps its file name, and a project alone in a subfolder of the title moves with that folder (decided 2026-11-18, #148); its media are moved into its `Media/` when no other project uses them (the last one of the title to use it), copied otherwise (audio, video, MIDI, subprojects `<SOURCE RPP_PROJECT` with their `.rpp-PROX`); references rewritten, `RECORD_PATH` set to `Media` (targeted patch, §7.3); a media named by a plugin state (§4.3) is left where it is and reported. The preview lists the operations planned (folders created, moves, copies, rewrites, blocked projects);
@@ -684,7 +684,7 @@ Present from the start: local `memberId` and version `owner`, `libraryId`, `.lib
 4. ~~`reaper.ini` preference keys~~ (validated: peaks only, backups without check, §5.1).
 5. Plugin caches: VST and JS validated on Windows; CLAP, AU, LV2, macOS and Linux remaining (§5.3, #40). Linux can be validated under WSL2 + WSLg (available on the dev machine) with the Linux REAPER build and a Linux Dart SDK installed inside WSL: the `dart` reached through Windows interop runs as Windows.
 6. Opening in the existing instance on macOS (§5.7).
-7. Naming patterns of conflict copies per cloud provider (§3.0).
+7. ~~Naming patterns of conflict copies per cloud provider~~ (decided 2026-11-20: generic patterns, whatever the provider, §3.0).
 8. ~~License and SignPath~~ (GPL-3.0, SignPath retained, §8).
 9. ~~`RENDER_FILE` form, command-line render with REAPER open~~ (validated, §5.3).
 10. ~~Choice of the hash algorithm by benchmark~~ (validated: XXH3-64, pure Dart, §7.1).
