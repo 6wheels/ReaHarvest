@@ -12,7 +12,7 @@ Goal: make the issue self-sufficient for an agent, with **nothing invented**. Ev
 ## Steps
 
 1. **Read everything** (read only):
-   - `gh issue view $ARGUMENTS --comments --json number,title,state,body,comments,labels,milestone`. Later text wins over older text: comments, then "Implementation details", then "Rework".
+   - `gh issue view $ARGUMENTS --json number,title,state,body,comments,labels,milestone` (`--comments` cannot be combined with `--json`; the comments come with the `comments` field). Later text wins over older text: comments, then "Implementation details", then "Rework".
    - Current blockers: `gh api repos/{owner}/{repo}/issues/$ARGUMENTS/dependencies/blocked_by --jq '.[] | "#\(.number) \(.state) \(.title)"'`.
    - `.github/ISSUE_TEMPLATE/feature.yml` (target sections).
    - The SPEC.md sections the issue names, and any other section its behavior touches.
