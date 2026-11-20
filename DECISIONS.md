@@ -6,7 +6,6 @@ Dated decisions and the open points left to the maintainer. Agents do not need t
 - #161: the synchronization preference is confirmed (2026-11-14); its implementation details are to write before an agent starts.
 - #24: confirm the proposed rule for a timestamp far ahead of the local clock (in the ticket; SPEC §10 point 14).
 - #52: confirm that the built-in PDF preview is left out of the MVP (in the ticket; SPEC §5.9 asks for it).
-- #23: produce a real conflict on Google Drive for desktop to confirm its naming pattern (SPEC §3.0).
 - #31: the Microsoft Store study, at the start of M2. #25: the watching spike on the real Drive, at the start of M3. #110: the design proposal.
 
 ## Decisions (2026-11-09)
@@ -59,3 +58,8 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 - Title status derived from the versions, no longer stored (§5.9). Tags shared in `.node.json` (#132).
 - Long and sensitive actions in the foreground, library locked; only the scan in the background; one notification zone (§5.2; #150, #151).
 - Statistics (#129, #130), tags (#132), version detail view (#12) and tray (#135) move to M1. #109 and #111 are closed as obsolete.
+
+## Decisions (2026-11-20)
+- The "Organize a collaboration folder" wizard creates a `collab` library at once (name, repository and workspace folders, members with the local member required, layout and known values), then a full scan and "To sort". "Finish the organization" sets `ready` in `.library.json`; only a ready library can be joined; the fixes in place are reserved to its creator (SPEC §5.1, §5.8; #89). No conversion: #72 is dropped, every mode change goes to the Backlog.
+- Statuses, version labels and owners stay in the `.node.json` files in every mode; in `collab` mode their changes are also activity events of the collab store, never its source (SPEC §5.9). Their propagation to the other members before notifications is to refine (SPEC §10 point 15).
+- Copies of projects and version folders are detected with generic patterns, whatever the provider, under one generic report kind (#23).
