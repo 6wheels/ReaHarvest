@@ -66,5 +66,5 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 
 ## Decisions (2026-11-21)
 - No forcing: no action overwrites a version of the repository changed by someone else. A conflict on one same version offers to keep the repository version or to publish as a new version. Another member's version is not publishable: "Save as my own version" is a shortcut to its duplication (label asked, owner = current member). A version never published can be published by the local member whatever its owner; in a library with members, a version without owner is refused until it gets one (SPEC §5.5; #19, #26).
-- Release only frees space in the workspace, for a version or a whole title, and only when everything is in the repository; the repository is unchanged, nothing goes to the trash, no confirmation lets unpublished files be lost (SPEC §5.5; #20).
+- Release only frees space in the workspace, for a version or a whole title, and only when everything is in the repository; the repository is unchanged, nothing goes to the trash, no confirmation lets unpublished files be lost. UI name EN "Remove local copy" / FR « Retirer la copie locale » (`release` in the code), always after a confirmation saying that the repository copy stays intact (SPEC §5.5; #20, #21).
 - Node file merge: `tags` merged tag by tag, each tag once (SPEC §5.5; #18).

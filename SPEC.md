@@ -51,7 +51,7 @@ Public release considered in the long run: no hard dependency on Google Drive, o
 | Media | `Media/` folder of a version, its record path. Never shared with another version. |
 | Checkout (UI: « Récupérer ») | Copy repository → workspace, version by version. |
 | Publish (UI: « Publier ») | Copy workspace → repository of a version folder. |
-| Release (UI: « Libérer ») | Removal of the local copy of a version or of a title, once all of it is in the repository, to free space in the workspace. Not a deletion: the repository is unchanged. |
+| Release (UI: EN "Remove local copy", FR « Retirer la copie locale ») | Removal of the local copy of a version or of a title, once all of it is in the repository, to free space in the workspace. Not a deletion: the repository is unchanged. |
 | Asset | Auxiliary file of a title, outside the REAPER project (score, tab, image, PDF, text…). |
 | Collab store | Storage of shared data in `collab` mode (statuses, tasks, notes, lyrics, asset metadata, activity). Two implementations: journal and PocketBase. |
 
@@ -358,6 +358,7 @@ A version folder has a **single writer**, its owner. Publishing copies the versi
 - Frees space in the workspace, and only there: removes the local copy of a version folder, or of a whole title (every checked-out version, its `.node.json` and `Assets/`). The repository is unchanged. It is not a deletion of the version (§5.4: Delete).
 - Only when everything is in the repository: every file identical to its base and to the repository. Otherwise it is refused, the files listed (to publish first); no confirmation lets the user go on. Excluded files (§3.2: peaks, REAPER backups) are removed with the folder.
 - The title's `.node.json` and `Assets/` are released with its last checked-out version.
+- Always after a confirmation that says what happens: the local copy is removed from this computer, the copy in the repository stays intact and can be checked out again.
 
 **Synchronization preference** of the checked-out versions (§5.1): when to check for updates and to publish one's own versions: manual (default), when REAPER closes, while REAPER is open, periodically; automatic publish; check on the startup of ReaHarvest; publish only when ReaHarvest closes (the closing waits for the end of the publish). Details in its ticket (M2).
 
