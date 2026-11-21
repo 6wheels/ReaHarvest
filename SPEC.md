@@ -51,7 +51,7 @@ Public release considered in the long run: no hard dependency on Google Drive, o
 | Media | `Media/` folder of a version, its record path. Never shared with another version. |
 | Checkout (UI: « Récupérer ») | Copy repository → workspace, version by version. |
 | Publish (UI: « Publier ») | Copy workspace → repository of a version folder. |
-| Release (UI: « Libérer ») | Deletion of the local copy of a version. |
+| Release (UI: « Libérer ») | Removal of the local copy of a version or of a title, once all of it is in the repository, to free space in the workspace. Not a deletion: the repository is unchanged. |
 | Asset | Auxiliary file of a title, outside the REAPER project (score, tab, image, PDF, text…). |
 | Collab store | Storage of shared data in `collab` mode (statuses, tasks, notes, lyrics, asset metadata, activity). Two implementations: journal and PocketBase. |
 
@@ -66,8 +66,8 @@ The user configures **one or more libraries**. Each has its own mode, layout and
 | Mode | Folders | Features | Use case |
 |---|---|---|---|
 | **`local`** | Workspace only | Organization (layout), navigation, versions, statuses, assets (files only), detail view, creation, opening in REAPER. No synchronization, no collaboration | Personal projects on a single machine |
-| **`cloud`** (local + cloud) | Workspace + cloud repository | `local` + Checkout / Publish / Release, conflict detection (useful between several machines of the same user), cloud copy. Single user: no ownership check; forcing only to resolve a conflict (§5.5) | Personal projects copied to the cloud and accessible from several machines |
-| **`collab`** (collaboration) | Workspace + shared cloud repository | `cloud` + members, version ownership and forcing, collab store (statuses, tasks, notes, lyrics, shared asset metadata, activity) | Group projects |
+| **`cloud`** (local + cloud) | Workspace + cloud repository | `local` + Checkout / Publish / Release, conflict detection (useful between several machines of the same user), cloud copy. Single user: no ownership check; no forcing (§5.5) | Personal projects copied to the cloud and accessible from several machines |
+| **`collab`** (collaboration) | Workspace + shared cloud repository | `cloud` + members, version ownership, collab store (statuses, tasks, notes, lyrics, shared asset metadata, activity) | Group projects |
 
 Rules:
 - Work always happens **in the local workspace**; the repository is never a place to work in. Single exception: organizing a collaboration folder (§5.8) is done in place, on the repository, by the member who created the library, since it is the source of truth and this avoids downloading the whole library; the other members join once it is ready.
@@ -176,7 +176,7 @@ This data does **not** depend on the collab store: the application must work (na
 Identity stored **in the `.RPP`**, through a dedicated `EXTSTATE` section named `ReaHarvest` (kept by REAPER on every save):
 - `versionId` (ULID), written once, on adoption. It travels with the file: renames outside the application, backups (§5.4), trash, publication (§5.5). A version is adopted when its file holds one.
 
-Label and owner are stored **outside the `.RPP`**, in the title's `.node.json`, keyed by `versionId` (`versionLabels`, `versionOwners`, next to `versionStatuses`, §5.9). Like the statuses, they would be overwritten by REAPER on the next save of an open project (§5.7), and changing them must not rewrite a project nor change its date. In `collab` mode the collab store takes them over together with the statuses (milestone M3); until then they stay in `.node.json` in every mode. Entries of versions that no longer exist are kept.
+Label and owner are stored **outside the `.RPP`**, in the title's `.node.json`, keyed by `versionId` (`versionLabels`, `versionOwners`, next to `versionStatuses`, §5.9). Like the statuses, they would be overwritten by REAPER on the next save of an open project (§5.7), and changing them must not rewrite a project nor change its date. They stay in `.node.json` in every mode; in `collab` mode their changes are also activity events of the collab store, never its source (§5.9). Entries of versions that no longer exist are kept.
 - `label` (free text, e.g. "chorus B"), required. A version without entry shows its folder name. The label and the folder name are independent: the folder name is pre-filled from the label at creation, and only changes through a rename (§5.4).
 - `owner` (memberId), stored only when the library declares members (§6.5): the member chosen at adoption, at creation or in a migration fix. A library without declared members stores no owner, and a version is never required to have one.
 
@@ -332,12 +332,12 @@ Actions performed from the title detail (§5.2).
 - **Back up a version** (UI: « Créer un point de sauvegarde »): copies the `.RPP` of the version into its own `.history/` (flat), named `<version name> <yyyy-MM-dd HHmmss>.<ext>` (` (n)` suffix on a name clash), keeping its date (§4.2). The version itself is unchanged. Backups follow their version (rename, trash, publish) and are linked to it by their folder and by the `versionId` of the copy.
 - **Paths of backups**: the copy has its relative paths rebased so that it opens in REAPER from `.history/` (`FILE "Media\x.wav"` → `"..\Media\x.wav"`, `RECORD_PATH "Media"` → `"..\Media"`, empty record path → `".."`, relative `RENDER_FILE` → `..\…`); absolute paths are left as is. Restoring rebases them back to the version folder.
   Validated (REAPER 7.85, Windows): a project in `.history/` with `..\` paths opens without missing media, records into the `Media/` of the folder above and renders into its `Renders/`. But REAPER resolves a relative media path against the record path first and does not normalize it: on each save, an existing media reference grows by one `..\Media\` (`..\Media\kick.wav` → `..\Media\..\Media\kick.wav`), still valid. Hence the application normalizes the paths of a backup before opening it in REAPER (UI: « Ouvrir dans REAPER »), and on restore. Projects in the version folder are not affected (`Media\Media\x` does not exist, so REAPER falls back to the project folder).
-- **History**: browsing, opening in REAPER and restoring the backups of a version (manual backups, and versions overwritten by a forced publish, §5.5). Restoring first backs up the current state of the version, then replaces its content.
+- **History**: browsing, opening in REAPER and restoring the backups of a version (manual backups). Restoring first backs up the current state of the version, then replaces its content.
 
 ### 5.5 Synchronization
 Synchronization works **version by version**: nobody checks out every version nor every title. The `.node.json` and `Assets/` of a title follow the title (checked out with its first version, published with any of them).
 
-A version folder has a **single writer**, its owner. Publishing copies the version folder; there is no media collision and no project rewrite during the synchronization. A conflict is only possible on one same version (the same member on two machines, or a forced publish).
+A version folder has a **single writer**, its owner. Publishing copies the version folder; there is no media collision and no project rewrite during the synchronization. A conflict is only possible on one same version (the same member on two machines). No action overwrites a version of the repository changed by someone else: there is no forcing.
 
 **Checkout**
 - Unit: one version folder (its `.RPP`, `Media/`, `Renders/`, `.history/`), plus the `.node.json` and `Assets/` of its title.
@@ -349,14 +349,15 @@ A version folder has a **single writer**, its owner. Publishing copies the versi
 1. Check of the media: a version whose media are not all in its own `Media/` (§4.3) is not published; the report points to its fix in "To sort". Media referenced through an absolute path (other machine) are left as is, with a warning stating that a manual action in REAPER is needed for the project to be shared.
 2. Copy of the changed files of the version folder, media before the project.
 3. For the `.RPP`:
-   - **conflict** if the remote hash differs from the base hash: refusal, conflict display, user choice (keep remote, publish as a new version, or force);
-   - **version of another member**: refused, with an offer to save it as a new version of one's own (copy of the version folder). Exception: a version never published (absent from the repository) can be published by the member who created it, whatever its owner (e.g. a version prepared for another member);
-   - **forcing**: overwrites the remote version with the local one, after explicit confirmation and a warning when a conflict was detected. In `collab` mode it bypasses the ownership check or the conflict; in `cloud` mode, the conflict only. The overwritten remote `.RPP` is first backed up into the version's `.history/`; in `collab` mode, an activity event is sent to the owner.
+   - **conflict** if the remote hash differs from the base hash: refusal, conflict display, user choice (keep the repository version, or publish as a new version);
+   - **version of another member**: refused, with "Save as my own version" (UI: « Enregistrer comme ma propre version »), a shortcut to the duplication of the version (§5.4): label asked, owner = current member. Exception: a version never published (absent from the repository, so only in the workspace of the member who made it) can be published by the local member, whatever its owner (e.g. a version prepared for another member). In a library with members, a version without owner is refused, with an offer to take it (owner = current member) before publishing;
 4. Renames, moves to `.trash/` and purges of the owner's versions are applied to the repository.
 5. Update of the base hashes; in `collab` mode, emission of an activity event ("X published Y", UI: « X a publié Y »).
 
 **Release**
-- Deletes the local copy of a version folder. Refused if local modifications are not published, unless explicitly confirmed. The title's `.node.json` and `Assets/` are released with its last checked-out version.
+- Frees space in the workspace, and only there: removes the local copy of a version folder, or of a whole title (every checked-out version, its `.node.json` and `Assets/`). The repository is unchanged. It is not a deletion of the version (§5.4: Delete).
+- Only when everything is in the repository: every file identical to its base and to the repository. Otherwise it is refused, the files listed (to publish first); no confirmation lets the user go on. Excluded files (§3.2: peaks, REAPER backups) are removed with the folder.
+- The title's `.node.json` and `Assets/` are released with its last checked-out version.
 
 **Synchronization preference** of the checked-out versions (§5.1): when to check for updates and to publish one's own versions: manual (default), when REAPER closes, while REAPER is open, periodically; automatic publish; check on the startup of ReaHarvest; publish only when ReaHarvest closes (the closing waits for the end of the publish). Details in its ticket (M2).
 
@@ -364,9 +365,9 @@ A version folder has a **single writer**, its owner. Publishing copies the versi
 
 **Cancellation, failure, interruption**: a checkout or a publish that did not reach its end is simply started again and copies only what is missing or incomplete (size and hash checked; each file is written atomically). A version counts as checked out only once complete, and is shown as incomplete meanwhile. A publish copies the media before the project, so that the repository never holds a project without its media, and updates the base hashes file by file.
 
-**Node files**: a `.node.json` (statuses, version labels and owners, tags, §4.2, §5.9) is never in conflict. Checkout and publish merge it key by key against its last common content, kept in the sync state (§7.1): an entry changed on one side takes that side; changed on both sides, the local value wins and the report says so. `nodeId` and `level` are never merged.
+**Node files**: a `.node.json` (statuses, version labels and owners, tags, §4.2, §5.9) is never in conflict. Checkout and publish merge it key by key against its last common content, kept in the sync state (§7.1): an entry changed on one side takes that side; changed on both sides, the local value wins and the report says so. `tags` are merged tag by tag: a tag added on one side is kept, a tag removed on one side is removed, each tag appears once. `nodeId` and `level` are never merged.
 
-**Other members' versions locally**: readable, openable, importable (later phase), but not publishable without forcing.
+**Other members' versions locally**: readable, openable, importable (later phase), but not publishable ("Save as my own version", above).
 
 ### 5.6 Project creation
 - Input of a value for each layout level (with autocompletion on existing values; folders created if needed), choice of the template and of the version label.
@@ -451,7 +452,7 @@ Statuses and asset files are available in **all modes**; the other features requ
   - metadata (description, author, optional associated version) is in the collab store (`asset` entity);
   - built-in preview for images and PDF, opening with the system application otherwise;
   - in `local` and `cloud` modes, `Assets/` is available without collaborative metadata.
-- **Activity feed** (history of changes, per title and global): publications, forced publishes, changes of statuses, version labels and owners, new tasks. Available with any store (journal or PocketBase).
+- **Activity feed** (history of changes, per title and global): publications, changes of statuses, version labels and owners, new tasks. Available with any store (journal or PocketBase).
 - **Notifications** (phase 2): real-time, in the application and as OS system notifications, with the PocketBase store only.
 
 ---
@@ -660,14 +661,14 @@ Scope, state, order and dependencies of the tickets live in the GitHub issues; `
 
 | Phase | Content |
 |---|---|
-| **1 — MVP** | Libraries and modes (`local`, `cloud`, `collab`), mode change, configuration, layouts (provided templates + custom), folder conventions, scan and index, navigation, detail view, version management, Checkout / Publish / Release (conflicts, forcing), creation from template, opening in REAPER, adoption wizard. Full `collab` mode: members, ownership and forcing, `CollabStore` port + `JournalStore`, statuses, tasks, notes, lyrics, shared assets, activity |
+| **1 — MVP** | Libraries and modes (`local`, `cloud`, `collab`), mode change, configuration, layouts (provided templates + custom), folder conventions, scan and index, navigation, detail view, version management, Checkout / Publish / Release (conflicts), creation from template, opening in REAPER, adoption wizard. Full `collab` mode: members, ownership, `CollabStore` port + `JournalStore`, statuses, tasks, notes, lyrics, shared assets, activity |
 | **2 — Backend** | `PocketBaseStore`, one-click switch, authentication, real-time notifications; prerequisite for mobile applications |
 | **3 — Tools** | Renders: built-in player, on-demand render, render publication (repository and export folders); track import between versions; companion Lua scripts (for example audio render of tracks whose plugins are missing) |
 
 **Re-oriented MVP** (decided 2026-11-09). The primary goal is to move the band onto a structured shared Drive folder, Windows only (macOS best effort). Milestones, delivered and tested in this order, each usable on its own:
 1. **M0 — Foundations**: portable mode (§5.1), background tasks zone and structured reports (§5.2), logging and coverage gate (§8).
 2. **M1 — Migration**: in-place organization of the band folder (§5.8): "Organize a collaboration folder" wizard (§5.1), inventory, typed issues in "To sort", fixes in the interface, members (§6.5), end of the organization, read-only list of the repository titles. Every mode change is in the Backlog. Before the last features, the core is hardened along the responsibilities of §7.2, then reworked after the first test of the application (2026-11-14): one folder per version (§3.2), title-oriented scan and "To sort" (§5.8), dates of the projects kept (§4.2), the interface changes of §5.1 to §5.3, tags (§5.9) and statistics.
-3. **M2 — Join and synchronize**: first-run wizard with "Join my band's library" (§5.1), member identity per library, durable sync state (§7.1), repository view, Checkout / Publish / Release with conflicts, ownership and forcing (§5.5), versions in `collab` mode, Windows installer with auto-update published by CI (§8), design direction of the interface (§7.1).
+3. **M2 — Join and synchronize**: first-run wizard with "Join my band's library" (§5.1), member identity per library, durable sync state (§7.1), repository view, Checkout / Publish / Release with conflicts and ownership (§5.5), versions in `collab` mode, Windows installer with auto-update published by CI (§8), design direction of the interface (§7.1).
 4. **M3 — Shared statuses and activity**: `JournalStore` (§6.3), then, in this order: activity events of the statuses, version labels and owners (`activity`), assets view with their shared metadata (`asset`), activity feed (`activity`), tasks, notes and lyrics (`task`, `note`, `lyrics`) (§5.9).
 
 Everything else waits in the **Backlog**, the only milestone besides M0 to M3: phases 2 and 3 of the table above, creation from template, mode change wizards, code signing of the releases, macOS and Linux packages and validation, CLAP / AU / LV2 caches, library removal, configurable statuses, custom layout editor, checkout option (exclude `Renders/`).
