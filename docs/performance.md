@@ -5,12 +5,21 @@ targets of SPEC §8 concrete, and the benchmarks below check them.
 
 ## Reference conditions
 
-- **Library**: a synthetic library of **1,000 titles** with one `.RPP` each,
-  built by the benchmark tool from the fixtures in `test/fixtures/`. Its media
-  are sparse files totalling 100 GB, so the library weighs almost nothing on
-  disk. The generator is seeded, so every run builds the same library.
-- **Build**: release (`flutter build windows`); debug and profile timings do
-  not count.
+- **Library**: a synthetic library of **1,000 titles** with one `.RPP` each
+  (classic layout: 20 artists × 5 albums × 10 titles), built by the benchmark
+  tool from the fixtures in `test/fixtures/`. Every referenced media exists
+  with its real name, 1 KB each: the scan only checks that media exist, it
+  never reads them. The generator is seeded, so every run builds the same
+  library. The 100 GB of media of SPEC §8 matter for the copies of the
+  synchronization, measured in M2.
+- **Build**:
+  - B1 and B7: release build (`flutter build windows`);
+  - B2 and B3: the scan compiled ahead of time (`dart compile exe`), the same
+    machine code as in release;
+  - B4 to B6: profile mode (`flutter drive --profile`), since integration
+    tests do not run in release.
+
+  Debug timings never count.
 - **Machine**: the maintainer's Windows PC is the reference. The CI Windows
   runner gets twice each budget (×2), because its timings vary from one run
   to the next.
