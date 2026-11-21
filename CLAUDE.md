@@ -61,7 +61,7 @@ Test fixtures: real `.rpp` files in `test/fixtures/`.
 
 ## Performance
 
-Targets in SPEC §8.
+Targets in SPEC §8; measurable budgets and benchmarks in `docs/performance.md`.
 - Never block the UI isolate: scan, parsing, hashing, copies and index writes run in isolates.
 - Cloud folders may contain on-demand files: never read or hash them unless size/mtime changed.
 - Check the weight of a dependency before adding it (footprint, SPEC §8).

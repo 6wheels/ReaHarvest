@@ -631,7 +631,7 @@ Goal: notifications, notes, tasks, lyrics, statuses; no REAPER project managemen
 
 ## 8. Non-functional requirements
 
-- **Performance**:
+- **Performance** (measurable budgets and benchmarks: `docs/performance.md`):
   - startup to a usable main view in less than one second, served from the index;
   - no blocking operation in the interface;
   - long tasks in the background with progress and cancellation;
