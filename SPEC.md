@@ -240,7 +240,7 @@ Versions form a **flat list** (no tree, no parent version).
     - Folder without `.library.json`, not in `collab` mode, or whose organization is not finished: clear message (the folder is not set up yet, ask the person who manages it); nothing is written.
   - **Organize a collaboration folder** (UI: « Organiser un dossier de collaboration »): creates a `collab` library on the band's folder and organizes it in place (§5.8).
   - **Create a new library**.
-- **Portable mode**: a `settings.json` and/or an `index.sqlite` placed next to the executable are used first, instead of the user application data folder. Used by the demo mode and local tests, and to run two members on one machine (two copies of the application folder).
+- **Portable mode**: a `settings.json`, an `index.sqlite` and a `sync.sqlite` placed next to the executable are each used first, instead of the user application data folder. Used by the demo mode and local tests, and to run two members on one machine (two copies of the application folder).
 - Local member identity (`memberId`, display name), created on first run: it is the current member in `local` and `cloud` libraries (a version owner is stored only when the library declares members, §4.2); in a `collab` library, the installation acts as the declared member picked when joining. Each installation also has a client identifier (`clientId`, ULID), which names its folder in `.collab/` (§6.3). Later (outside the MVP): one identity shared by all the machines of a user, linked through a confirmed email.
 - Unreadable settings: when `settings.json` cannot be read, the application starts on a recovery screen naming the file, and offers to start with new settings (the file is first kept aside; libraries are to add again, their folders are untouched), to open its folder or to quit. A file written by a newer version is never overwritten: message, then open its folder or quit.
 - Path of the REAPER executable and of the REAPER resource folder (defaults per OS). Executable detection: first the location reported by the OS (Windows: default value of `HKLM\SOFTWARE\REAPER` = install folder, validated; macOS: Spotlight `mdfind "kMDItemCFBundleIdentifier == 'com.cockos.reaper'"`; Linux: `which reaper`), then the usual install locations (Windows: `%ProgramFiles%\REAPER (x64)`, `%ProgramFiles%\REAPER`; macOS: `/Applications/REAPER.app`, `/Applications/REAPER64.app`, `~/Applications/REAPER.app`; Linux: `~/opt/REAPER/reaper`, `/opt/REAPER/reaper`). Resource folder: `%APPDATA%\REAPER`, `~/Library/Application Support/REAPER`, `~/.config/REAPER`. macOS and Linux values **[TO VALIDATE]**.
@@ -341,7 +341,7 @@ A version folder has a **single writer**, its owner. Publishing copies the versi
 
 **Checkout**
 - Unit: one version folder (its `.RPP`, `Media/`, `Renders/`, `.history/`), plus the `.node.json` and `Assets/` of its title.
-- **Recover as my version** (UI: « Récupérer comme ma version »): from a version not checked out, the application copies it once from the repository into a new version of the current member, in the workspace (new `versionId`, owner = current member). Neither the source version nor the title needs to be checked out.
+- **Make my own version** (UI: « En faire ma propre version »): from a version not checked out, the application copies it once from the repository into a new version of the current member, in the workspace (new `versionId`, owner = current member). Neither the source version nor the title needs to be checked out.
 - Option (outside the MVP): exclude `Renders/`. User preference per library, persisted client-side.
 - Local storage of the hash (cf. §7.1) of each checked-out file, used as the comparison base. A checked-out `.RPP` keeps its remote date (§4.2).
 
@@ -350,7 +350,7 @@ A version folder has a **single writer**, its owner. Publishing copies the versi
 2. Copy of the changed files of the version folder, media before the project.
 3. For the `.RPP`:
    - **conflict** if the remote hash differs from the base hash: refusal, conflict display, user choice (keep the repository version, or publish as a new version);
-   - **version of another member**: refused, with "Save as my own version" (UI: « Enregistrer comme ma propre version »), a shortcut to the duplication of the version (§5.4): label asked, owner = current member. Exception: a version never published (absent from the repository, so only in the workspace of the member who made it) can be published by the local member, whatever its owner (e.g. a version prepared for another member). In a library with members, a version without owner is refused, with an offer to take it (owner = current member) before publishing;
+   - **version of another member**: refused, with "Make my own version" (UI: « En faire ma propre version »), a shortcut to the duplication of the version (§5.4): label asked, owner = current member. Exception: a version never published (absent from the repository, so only in the workspace of the member who made it) can be published by the local member, whatever its owner (e.g. a version prepared for another member). In a library with members, a version without owner is refused, with an offer to take it (owner = current member) before publishing;
 4. Renames, moves to `.trash/` and purges of the owner's versions are applied to the repository.
 5. Update of the base hashes; in `collab` mode, emission of an activity event ("X published Y", UI: « X a publié Y »).
 
@@ -368,7 +368,7 @@ A version folder has a **single writer**, its owner. Publishing copies the versi
 
 **Node files**: a `.node.json` (statuses, version labels and owners, tags, §4.2, §5.9) is never in conflict. Checkout and publish merge it key by key against its last common content, kept in the sync state (§7.1): an entry changed on one side takes that side; changed on both sides, the local value wins and the report says so. `tags` are merged tag by tag: a tag added on one side is kept, a tag removed on one side is removed, each tag appears once. `nodeId` and `level` are never merged.
 
-**Other members' versions locally**: readable, openable, importable (later phase), but not publishable ("Save as my own version", above).
+**Other members' versions locally**: readable, openable, importable (later phase), but not publishable ("Make my own version", above).
 
 ### 5.6 Project creation
 - Input of a value for each layout level (with autocompletion on existing values; folders created if needed), choice of the template and of the version label.
