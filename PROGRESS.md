@@ -1,6 +1,6 @@
 # ReaHarvest — Planning
 
-Lanes and advised models of the open issues, per milestone. Scope, state, order and dependencies live in GitHub (`gh`).
+Waves and advised models of the open issues, per milestone. Scope, state, order and dependencies live in GitHub (`gh`).
 
 - [M1 — Migration](progress/M1.md)
 - [M2 — Join and sync](progress/M2.md)
