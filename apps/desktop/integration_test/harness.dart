@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -18,6 +20,9 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
+
+// ignore: implementation_imports
+import 'package:test_api/src/backend/invoker.dart';
 
 import 'window.dart';
 
@@ -93,7 +98,8 @@ class Harness {
   /// Starts the application like `main()`: settings loaded from their file
   /// (created on first run), index opened, then the app pumped.
   Future<void> start(WidgetTester tester) async {
-    await _fitWindow(tester);
+    await fitWindow(tester);
+    addTearDown(() => screenshotOnFailure(tester));
     // Lights stay still (a failed task blinks for ever otherwise), so that
     // the tests can wait for the animations to end.
     tester.platformDispatcher.accessibilityFeaturesTestValue =
@@ -134,12 +140,39 @@ class Harness {
     await tester.pumpAndSettle();
   }
 
+  /// Saves the app as a PNG in `build/integration_failures/` when the test
+  /// failed, so that a CI failure can be understood without the machine.
+  /// The tree is still mounted: it is unmounted by the next test.
+  static Future<void> screenshotOnFailure(WidgetTester tester) async {
+    final live = Invoker.current!.liveTest;
+    if (live.state.result.isPassing) return;
+    final folder = Directory(
+      p.join(_appFolder(), 'build', 'integration_failures'),
+    )..createSync(recursive: true);
+    final name = live.test.name.replaceAll(RegExp(r'[^\w.-]+'), '_');
+    try {
+      final boundary =
+          find.byType(RepaintBoundary).evaluate().first.renderObject!
+              as RenderRepaintBoundary;
+      final bytes = await tester.runAsync(() async {
+        final image = await boundary.toImage();
+        return image.toByteData(format: ui.ImageByteFormat.png);
+      });
+      File(p.join(folder.path, '$name.png'))
+          .writeAsBytesSync(bytes!.buffer.asUint8List());
+    } catch (error) {
+      // The screenshot is a help: never hide the failure of the test.
+      File(p.join(folder.path, '$name.txt'))
+          .writeAsStringSync('Screenshot not saved: $error');
+    }
+  }
+
   /// Same layout on every machine, [windowSize] logical pixels (the window
   /// of a CI runner is small): the native window is resized, so that the
   /// app stays visible in it. When it cannot reach that size (small
   /// screen), the test view is overridden instead, and the window shows a
   /// blank surface.
-  static Future<void> _fitWindow(WidgetTester tester) async {
+  static Future<void> fitWindow(WidgetTester tester) async {
     final view = tester.view;
     final target = windowSize * view.devicePixelRatio;
     bool fits() =>
@@ -239,6 +272,17 @@ void writeReaperIni(String resources, {required bool recommended}) =>
           ? '[REAPER]\naltpeaks=1\naltpeakspath=C:\\Peaks\n'
           : '[REAPER]\naltpeaks=0\naltpeakspath=\n',
     );
+
+/// The app folder (`apps/desktop`), found from the working directory
+/// upwards: the app of a device run may start in its build folder.
+String _appFolder() {
+  for (var dir = Directory.current.absolute; ; dir = dir.parent) {
+    if (Directory(p.join(dir.path, 'integration_test')).existsSync()) {
+      return dir.path;
+    }
+    if (dir.parent.path == dir.path) return Directory.current.path;
+  }
+}
 
 /// Fixture [name], found from the working directory upwards.
 String fixture(String name) {
