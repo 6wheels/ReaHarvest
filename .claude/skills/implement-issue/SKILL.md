@@ -57,6 +57,7 @@ Present the plan:
   - With `Rel #<n>`, the file stays unchanged.
 - Conventional Commits: `<type>(<scope>): <description>`, in English, imperative mood. The body references the issue (`Closes #<n>` when every criterion is met, `Rel #<n>` otherwise). No AI attribution and no session link.
 - Show the message, then commit. Push or open a pull request only when the user asks.
+- A pull request, when asked: its title is the Conventional Commits title of the change, and it carries the `type:*` label of its issue (`gh pr create --label type:<kind>`): the release notes group the pull requests by this label.
 
 ## Stop conditions
 
