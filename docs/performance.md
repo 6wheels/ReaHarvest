@@ -14,7 +14,7 @@ targets of SPEC §8 concrete, and the benchmarks below check them.
   synchronization, measured in M2.
 - **Build**:
   - B1 and B7: release build (`flutter build windows`);
-  - B2 and B3: the scan compiled ahead of time (`dart compile exe`), the same
+  - B2 and B3: the scan compiled ahead of time (`dart build cli`), the same
     machine code as in release;
   - B4 to B6: profile mode (`flutter drive --profile`), since integration
     tests do not run in release.
@@ -55,7 +55,29 @@ Rules attached to the budgets:
 - The benchmarks do not run on every pull request. They run in a CI workflow
   started by hand or weekly on the Windows runner, which keeps each result as
   an artifact.
-- They are added by #189, which also gives the command.
+- The command, on Windows with Flutter installed, from the repository root:
+
+  ```
+  dart tool/perf/bench.dart [--ci]
+  ```
+
+  It builds the reference library (`dart run tool/perf/make_library.dart
+  <folder>`, seeded), runs a warm-up then 5 counted runs of each measure, and
+  prints a table measure / result / budget, also written to
+  `tmp/perf/results.txt`. It exits with 1 when a measure is over its budget.
+  `--ci` compares with the CI column.
+- B1 and B7 run the release build with `--dart-define=REAHARVEST_PERF=true`:
+  the application then writes timestamped marks to `perf-marks.txt` in its
+  data folder and quits itself one second after its first frame.
+- B2 and B3 run `packages/index/bin/bench_scan.dart`, built ahead of time with
+  `dart build cli` (the SQLite library is a build hook, which
+  `dart compile exe` does not run), and check that the rescan reads no file
+  content.
+- B4 to B6 run `apps/desktop/integration_test/perf/perf_test.dart` with
+  `flutter drive --profile`.
+- The workflow `.github/workflows/perf.yml` runs `bench.dart --ci` on the
+  Windows runner, by hand or every Monday, and keeps the table as the artifact
+  `perf-results`.
 
 ## Changing a budget
 

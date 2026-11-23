@@ -15,3 +15,16 @@ workspace:
 
 dev_dependencies:
   lints: ^6.0.0
+  # Benchmark tools (tool/perf).
+  path: ^1.9.1
+  reaharvest_domain:
+    path: packages/domain
+  reaharvest_index:
+    path: packages/index
+  reaharvest_library:
+    path: packages/library
+  reaharvest_repository:
+    path: packages/repository
+  reaharvest_rpp:
+    path: packages/rpp
+  test: ^1.31.1

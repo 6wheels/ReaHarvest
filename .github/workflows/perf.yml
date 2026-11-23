@@ -1,0 +1,37 @@
+name: Performance
+
+# Benchmarks of the budgets of docs/performance.md (#189). Never on a pull
+# request: started by hand, or every Monday.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'
+
+env:
+  FLUTTER_VERSION: 3.47.9
+
+jobs:
+  bench:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter gen-l10n
+        working-directory: apps/desktop
+      - name: Benchmarks against the CI budgets
+        run: dart tool/perf/bench.dart --ci
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: perf-results
+          path: tmp/perf/results.txt
+          if-no-files-found: ignore
