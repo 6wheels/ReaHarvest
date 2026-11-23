@@ -101,3 +101,12 @@ SPEC.md and the tickets are updated with every point; each changed ticket has a 
 - New tickets: #197 (keep only these versions for every member), #198 (rebuild an unreadable sync state, split from #83), #199 (benchmark of the synchronization copies on 100 GB).
 - Advised models raised to Opus: #149, #181, #191, #194, #198; reviewed by the largest model before merge: #70, #84, #197.
 - Dependencies fixed: #74 is blocked by #18 (not the other way round); #184 after #121, #185 after #184, #150 after #186, #180 after #181 and #182; #110 after every interface ticket of M2.
+
+## Decisions (2026-11-23, review of the Backlog)
+SPEC.md and the tickets are updated with every point; each changed ticket has a comment "Review of the Backlog (2026-11-23)". The dependencies and advised models of M1 to M3 were checked against their plans: no gap.
+- New title (#200, M2): no issue of M1 to M3 let a member start a song in the application. The minimal creation (level values, label, blank or template, known values) goes into M2, wave 3; #83 moves to wave 8. Patching the project values at creation (title, author, render metadata) stays in #14, a comfort feature after M3 (SPEC §5.6).
+- Removing a library unregisters it: no file deleted anywhere, the confirmation gives the paths and leaves the cleanup to the user; in `cloud` and `collab` modes a checkbox frees the workspace like "Remove local copy" (SPEC §5.1; #46).
+- Until #47, every library uses the provided status list (SPEC §5.9).
+- #78 is folded into #160 and closed. #35 is split: player (#35), on-demand render (#201), render publication (#202).
+- Backlog tickets realigned with the decisions since 2026-11-14: #53 (node files untouched by a mode change), #133 (no bulk checkout nor title status, foreground, nothing unpublished lost), #43 (`local` only, plus the free tree → layout conversion), #22, #34, #45, #58, #113, #134, #32 (macOS only).
+- Backlog plan in waves with advised models: `progress/Backlog.md`. The tickets stay `needs-refinement` and get their implementation details when scheduled.
