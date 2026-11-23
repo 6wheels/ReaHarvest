@@ -84,3 +84,6 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 - Remote collab changes found by polling the journal files every 15 s; file watching moves to the Backlog (#25). No special rule for clocks far ahead: timestamps in absolute UTC (SPEC §10 points 3 and 14).
 - "Check for updates" also merges the node files of the checked-out titles and `.library.json` when they changed in the repository (SPEC §10 point 15; #161).
 - Activity feed: plain words for non-technical members, consecutive similar events grouped into one line (#29).
+- Asset files: a tab always shown in the title detail, read only for a repository title not checked out; built-in preview for images and `.txt` only, any other file (PDF, Guitar Pro…) opened with the system application (SPEC §5.9; #52). Their description, author and version are shared in `collab` mode (#28).
+- Rename a title: essential (a title often starts with a temporary name); its folder only, identity by `nodeId`, followed by the other workspaces, the last rename published wins (SPEC §5.4, §5.5; #194).
+- UI labels of checkout: EN "Get" / FR « Récupérer », EN "Get all" / FR « Tout récupérer » (SPEC §2).
