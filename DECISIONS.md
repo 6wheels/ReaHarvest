@@ -3,10 +3,8 @@
 Dated decisions and the open points left to the maintainer. Agents do not need this file: `SPEC.md` and the tickets already hold what they need.
 
 ## Open points for the maintainer
-- #161: the synchronization preference is confirmed (2026-11-14); its implementation details are to write before an agent starts.
-- #24: confirm the proposed rule for a timestamp far ahead of the local clock (in the ticket; SPEC §10 point 14).
-- #52: confirm that the built-in PDF preview is left out of the MVP (in the ticket; SPEC §5.9 asks for it).
-- #31: the Microsoft Store study, at the start of M2. #25: the watching spike on the real Drive, at the start of M3. #110: the design proposal.
+- #110: the design proposal (icons and light theme), step 1 of the issue.
+- B8 (copies of the synchronization, `docs/performance.md`): confirm the proposed budget (checkout and publish at least 80 % of a plain copy, 60 % on the CI) before #199 is merged.
 
 ## Decisions (2026-11-09)
 - Preparation (migration) works **in place** on the Drive folder (first a copy holding a sample, then the real one), through `RepositoryStorage`; the same code will later organize local folders.
@@ -87,3 +85,19 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 - Asset files: a tab always shown in the title detail, read only for a repository title not checked out; built-in preview for images and `.txt` only, any other file (PDF, Guitar Pro…) opened with the system application (SPEC §5.9; #52). Their description, author and version are shared in `collab` mode (#28).
 - Rename a title: essential (a title often starts with a temporary name); its folder only, identity by `nodeId`, followed by the other workspaces, the last rename published wins (SPEC §5.4, §5.5; #194).
 - UI labels of checkout: EN "Get" / FR « Récupérer », EN "Get all" / FR « Tout récupérer » (SPEC §2).
+
+## Decisions (2026-11-23, review of every open ticket of M1 to M3)
+SPEC.md and the tickets are updated with every point; each changed ticket has a comment "Review of every open ticket (2026-11-23)".
+- Move of a title ("Move…", #156): in `cloud` and `collab` libraries it is published and followed like a rename, found by its `nodeId` (SPEC §5.2, §5.4, §5.5; #194).
+- Asset files have several writers: merged file by file against their base, never overwritten; a deletion on one side goes to the `.trash/` of the other unless changed there; a file changed on both sides keeps both (SPEC §5.5; #18, #19, #52).
+- `Unsorted/` is never synchronized: it stays in the repository, handled by the creator while preparing (SPEC §5.5; #180).
+- "Keep only these versions" (UI « Garder uniquement ces versions »): a selection of one or more versions; every other version goes to the trash. In `cloud` and `collab` libraries it applies to every member, any member can run it, on the workspace and the repository in one action, versions not checked out included; the other workspaces follow it, unpublished changes go to the local trash; a version in the repository trash is never published again (SPEC §3.0, §5.4, §5.5; #156, #197, #19, #38). Moving one version to the trash or renaming it stays reserved to its owner in `collab` mode (#26).
+- Automatic synchronization (#161) runs in the background like the scan; checkout and publish started by the user, and the publish on quit, run in the foreground (SPEC §5.2, §5.5).
+- "Get all" (« Tout récupérer ») checks out every version of one title (SPEC §2, §5.5; #18, #74); no checkout of several titles at once.
+- While a collaboration folder is prepared, every action that is not work applies to the repository; the read-only state of the repository titles applies once the library is ready (SPEC §3.0; #181, #191).
+- FR label of the asset files: « Fichiers joints » (SPEC §2; #52, #106).
+- New activity kind `titleRenamed` (SPEC §5.9; #29).
+- Collab entities: `member`, `titleMeta` and `versionMeta` are dropped; members live in `.library.json` (SPEC §6.2; #24).
+- New tickets: #197 (keep only these versions for every member), #198 (rebuild an unreadable sync state, split from #83), #199 (benchmark of the synchronization copies on 100 GB).
+- Advised models raised to Opus: #149, #181, #191, #194, #198; reviewed by the largest model before merge: #70, #84, #197.
+- Dependencies fixed: #74 is blocked by #18 (not the other way round); #184 after #121, #185 after #184, #150 after #186, #180 after #181 and #182; #110 after every interface ticket of M2.
