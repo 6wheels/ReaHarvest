@@ -4,7 +4,6 @@ Dated decisions and the open points left to the maintainer. Agents do not need t
 
 ## Open points for the maintainer
 - #110: the design proposal (icons and light theme), step 1 of the issue.
-- B8 (copies of the synchronization, `docs/performance.md`): confirm the proposed budget (checkout and publish at least 80 % of a plain copy, 60 % on the CI) before #199 is merged.
 
 ## Decisions (2026-11-09)
 - Preparation (migration) works **in place** on the Drive folder (first a copy holding a sample, then the real one), through `RepositoryStorage`; the same code will later organize local folders.
@@ -98,6 +97,7 @@ SPEC.md and the tickets are updated with every point; each changed ticket has a 
 - FR label of the asset files: « Fichiers joints » (SPEC §2; #52, #106).
 - New activity kind `titleRenamed` (SPEC §5.9; #29).
 - Collab entities: `member`, `titleMeta` and `versionMeta` are dropped; members live in `.library.json` (SPEC §6.2; #24).
+- Budget B8, copies of the synchronization: checkout and publish at least 80 % of the throughput of a plain copy of the same files (60 % on the CI), measured on 100 GB of media; written in `docs/performance.md` by #199.
 - New tickets: #197 (keep only these versions for every member), #198 (rebuild an unreadable sync state, split from #83), #199 (benchmark of the synchronization copies on 100 GB).
 - Advised models raised to Opus: #149, #181, #191, #194, #198; reviewed by the largest model before merge: #70, #84, #197.
 - Dependencies fixed: #74 is blocked by #18 (not the other way round); #184 after #121, #185 after #184, #150 after #186, #180 after #181 and #182; #110 after every interface ticket of M2.
