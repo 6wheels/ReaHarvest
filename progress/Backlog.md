@@ -6,7 +6,7 @@ Waves after M3, in order; within a wave, the order of the list.
 
 | Wave | Issues | Advised model |
 |---|---|---|
-| A — Daily comfort | #46, #47, #58, #14, #48 | Sonnet |
+| A — Daily comfort | #47, #58, #14, #48 | Sonnet |
 | B — Figures and bulk actions | #131, #133 | Sonnet |
 | C — Personal libraries | #43, #22, #53 | Opus; #43 reviewed by the largest model before merge |
 | D — Distribution | #113, #112, #193 | The maintainer for the SignPath application and the Store account; then Haiku for the signing step of #113, Sonnet for #112 and the MSIX build of #193 |
