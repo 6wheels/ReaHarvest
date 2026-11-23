@@ -69,3 +69,10 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 - Release only frees space in the workspace, for a version or a whole title, and only when everything is in the repository; the repository is unchanged, nothing goes to the trash, no confirmation lets unpublished files be lost. UI name EN "Remove local copy" / FR « Retirer la copie locale » (`release` in the code), always after a confirmation saying that the repository copy stays intact (SPEC §5.5; #20, #21).
 - Node file merge: `tags` merged tag by tag, each tag once (SPEC §5.5; #18).
 - One action makes a new version of the current member from another version, in the repository or local: EN "Make my own version" / FR « En faire ma propre version », label asked (formerly "Recover as my version" and "Save as my own version"; SPEC §5.5; #18, #26, #74).
+
+## Decisions (2026-11-23)
+- Preparing, then normal work: while a collaboration folder is being prepared, everything is done on the repository, `.library.json` included; once the library is ready, every change is made in the workspace, `.library.json` included, and reaches the repository only by publishing (SPEC §3.0, §6.5).
+- `.library.json` is merged at each checkout and publish: members by `memberId`, known values value by value, the other fields from the repository (SPEC §5.5; #18, #19).
+- Publish and Remove local copy apply to one version or to a whole title (#21).
+- Two versions created with the same folder name: no choice offered; the second publish renames its copy automatically and notifies its author (SPEC §5.5; #38).
+- A version renamed or deleted by its owner is followed by the other workspaces once a scan of the repository tells them; the same title created on both sides is merged into one title with several versions (SPEC §5.5; #38).

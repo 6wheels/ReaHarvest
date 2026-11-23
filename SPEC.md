@@ -71,6 +71,7 @@ The user configures **one or more libraries**. Each has its own mode, layout and
 
 Rules:
 - Work always happens **in the local workspace**; the repository is never a place to work in. Single exception: organizing a collaboration folder (§5.8) is done in place, on the repository, by the member who created the library, since it is the source of truth and this avoids downloading the whole library; the other members join once it is ready.
+- **Preparing, then normal work.** While a collaboration folder is being prepared (`ready` false, §5.8, §6.5), every action works on the repository, `.library.json` included; the actions that are work (create a version, backup point, restore, open in REAPER) are not offered. Once the library is ready, and always in `cloud` mode, every change is made in the workspace, `.library.json` included (known values, members…), and reaches the repository only by publishing (§5.5). A title present only in the repository is read only.
 - **Mode change** possible at any time, through a wizard (outside the MVP, §9):
   - `local` → `cloud`: choice of the repository, initial publish;
   - `cloud` → `collab`: group creation, member invitation, adoption of versions (owner assignment);
@@ -362,11 +363,13 @@ A version folder has a **single writer**, its owner. Publishing copies the versi
 
 **Synchronization preference** of the checked-out versions (§5.1): when to check for updates and to publish one's own versions: manual (default), when REAPER closes, while REAPER is open, periodically; automatic publish; check on the startup of ReaHarvest; publish only when ReaHarvest closes (the closing waits for the end of the publish). Details in its ticket (M2).
 
-**No conflict from the owner's actions**: a version deleted (or purged) by its owner is released from the other workspaces at their next synchronization; a local copy holding unpublished changes goes into the local `.trash/` of the title instead, with a notification. Two versions created with the same folder name in one title: the second publish renames its folder and `.RPP` to a free name (`name (2)`) and notifies its author, who may rename it (§5.4).
+**No conflict from the owner's actions**: the other workspaces follow them once a scan of the repository tells them. A version renamed by its owner (a title often starts with a temporary name) is renamed in the other workspaces too, found by its `versionId`. A version deleted (or purged) by its owner is released from the other workspaces; a local copy holding unpublished changes goes into the local `.trash/` of the title instead, with a notification. Two versions created with the same folder name in one title: the second publish renames its folder and `.RPP` to a free name (`name (2)`) and notifies its author, who may rename it (§5.4). One title created on both sides (same path): merged into one title holding the versions of both, with the repository's `nodeId`.
 
 **Cancellation, failure, interruption**: a checkout or a publish that did not reach its end is simply started again and copies only what is missing or incomplete (size and hash checked; each file is written atomically). A version counts as checked out only once complete, and is shown as incomplete meanwhile. A publish copies the media before the project, so that the repository never holds a project without its media, and updates the base hashes file by file.
 
 **Node files**: a `.node.json` (statuses, version labels and owners, tags, §4.2, §5.9) is never in conflict. Checkout and publish merge it key by key against its last common content, kept in the sync state (§7.1): an entry changed on one side takes that side; changed on both sides, the local value wins and the report says so. `tags` are merged tag by tag: a tag added on one side is kept, a tag removed on one side is removed, each tag appears once. `nodeId` and `level` are never merged.
+
+**Library file**: once the library is ready, the workspace holds a copy of `.library.json` (§6.5), merged at each checkout and publish like the node files, against its last common content: members by `memberId` and known values value by value (added or removed on one side, that side wins; a member renamed on both sides, the local name wins and the report says so); the other fields (layout, statuses, mode, `collab` block) take the repository's, since they change only while preparing.
 
 **Other members' versions locally**: readable, openable, importable (later phase), but not publishable ("Make my own version", above).
 
@@ -546,7 +549,7 @@ CollabStore
   ]
 }
 ```
-Members are declared by the person who prepares the library, before the others install the application, so that versions get their owner during the migration. A member joins by picking their entry (§5.1); a client folder in `.collab/<memberId>/` marks a joined member.
+Members are declared by the person who prepares the library, before the others install the application, so that versions get their owner during the migration. A member joins by picking their entry (§5.1); a client folder in `.collab/<memberId>/` marks a joined member. Once the library is ready, and always in `cloud` mode, changes to `.library.json` are made in its copy in the workspace and published (§3.0, §5.5).
 Switch procedure (single action in the settings):
 1. `exportAll()` from the current adapter.
 2. `importAll()` into the target adapter, then verification by count per entity.
