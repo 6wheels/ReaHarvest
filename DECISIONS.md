@@ -76,3 +76,4 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 - Publish and Remove local copy apply to one version or to a whole title (#21).
 - Two versions created with the same folder name: no choice offered; the second publish renames its copy automatically and notifies its author (SPEC §5.5; #38).
 - A version renamed or deleted by its owner is followed by the other workspaces once a scan of the repository tells them; the same title created on both sides is merged into one title with several versions (SPEC §5.5; #38).
+- What is left in "To sort" of the repository once the library is ready: its creator reopens the organization (`ready` back to false), the library read only for the other members meanwhile, then finishes it again. The workspace copy of `.library.json` is made as soon as normal work starts (SPEC §3.0; #191).
