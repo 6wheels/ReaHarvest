@@ -71,7 +71,7 @@ The user configures **one or more libraries**. Each has its own mode, layout and
 
 Rules:
 - Work always happens **in the local workspace**; the repository is never a place to work in. Single exception: organizing a collaboration folder (§5.8) is done in place, on the repository, by the member who created the library, since it is the source of truth and this avoids downloading the whole library; the other members join once it is ready.
-- **Preparing, then normal work.** While a collaboration folder is being prepared (`ready` false, §5.8, §6.5), every action works on the repository, `.library.json` included; the actions that are work (create a version, backup point, restore, open in REAPER) are not offered. Once the library is ready, and always in `cloud` mode, every change is made in the workspace, `.library.json` included (known values, members…), and reaches the repository only by publishing (§5.5). A title present only in the repository is read only. The creator can reopen the organization (UI: « Rouvrir l'organisation »; `ready` back to false) to fix what is left in "To sort" of the repository; meanwhile the library is read only for the other members, until the organization is finished again.
+- **Preparing, then normal work.** While a collaboration folder is being prepared (`ready` false, §5.8, §6.5), every action works on the repository, `.library.json` included; the actions that are work (create a version, backup point, restore, open in REAPER) are not offered. Once the library is ready, and always in `cloud` mode, every change is made in the workspace, `.library.json` included (known values, members…), and reaches the repository only by publishing (§5.5). A title present only in the repository is read only. Exception: the journals of the collab store (§6.3) are appended directly in the repository, each installation in its own folder of `.collab/`, so that the members see the activity without a checkout; the synchronization never touches `.collab/`. The creator can reopen the organization (UI: « Rouvrir l'organisation »; `ready` back to false) to fix what is left in "To sort" of the repository; meanwhile the library is read only for the other members, until the organization is finished again.
 - **Mode change** possible at any time, through a wizard (outside the MVP, §9):
   - `local` → `cloud`: choice of the repository, initial publish;
   - `cloud` → `collab`: group creation, member invitation, adoption of versions (owner assignment);
@@ -446,7 +446,7 @@ Statuses and asset files are available in **all modes**; the other features requ
 - **Status** per version; the status of a title is not stored: it is the highest status of its versions, in the order of the library's list (none when no version has one). Available in **all modes** (key feature):
   - the list of statuses is free, defined per library in `.library.json` (`statuses`, §6.5), started from 2 or 3 provided templates (e.g. `idea`, `writing`, `recording`, `mixing`, `done`). Like layout levels (§3.1), template values are language-independent keys translated by the application; custom values carry their own translations (`labels`);
   - stored in the title's `.node.json` in every mode (`versionStatuses`: map `versionId` → status; in free tree, keyed by the path relative to the title folder), synchronized with the title in `cloud` and `collab` modes (§5.5). Never stored in the `.RPP` (REAPER would overwrite it on the next save of an open project, §5.7);
-  - `collab` mode: every change of a status, a version label or an owner is also written as an `activity` event in the collab store, which gives its history and the activity feed to every member, without a checkout. The store is never the source of these values. How the other members get the changes before real-time notifications: open point (§10).
+  - `collab` mode: every change of a status, a version label or an owner is also written as an `activity` event in the collab store, which gives its history and the activity feed to every member, without a checkout. The store is never the source of these values. The other members get the values with the node files, merged at each checkout, publish and check for updates (§5.5).
 - **Tags** per title, in **all modes**: one or more free words or phrases attached to a title, to qualify it (e.g. `live`, `standard tuning`, `rehearsal`; anything). A tag is never a layout level. Stored in the title's `.node.json` (`tags`, a list), hence shared by the members with the title (§5.5). Used by search and filters (§5.2); a setting (Appearance, §5.1) shows them on the cards, in the list and in the tree.
 - **Tasks** per title: text, assignee, optional due date, state.
 - **Notes** per title or per version, written by the members in ReaHarvest. Distinct from the REAPER project notes (`<NOTES` chunk, visible in REAPER's project settings, §5.6).
@@ -504,7 +504,9 @@ CollabStore
 - Each installation (`clientId`) writes **only** in its own folder: no Drive synchronization conflict possible, even when a member uses two computers.
 - One line = one operation: `{ v, opId, groupId, author, client, hlc, entity, uid, op: "upsert"|"delete", fields }`.
 - Reading: merge of all journals, then local projection into SQLite (incremental replay by file offset).
-- Detection of remote changes: file watching, with **fallback to periodic polling of mtimes** (file events on a virtual Drive volume are not reliable) **[TO VALIDATE]**.
+- Detection of remote changes: periodic polling of the sizes and dates of the journal files (every 15 s while the library is open; only the changed files are read, from their offset). File watching, as an optimization, is studied after the MVP (Backlog).
+- An operation that cannot be appended (repository unreachable) is kept in a local pending file, shown at once, and appended at the next successful poll, in order.
+- `hlc` physical time in UTC milliseconds since the epoch: absolute, whatever the time zone.
 - Known limitation: propagation latency depending on the Drive client.
 
 ### 6.4 PocketBase adapter (`PocketBaseStore`, phase 2)
@@ -685,7 +687,7 @@ Present from the start: local `memberId` and version `owner`, `libraryId`, `.lib
 
 1. ~~Format of project and render metadata lines, `EXTSTATE`~~ (validated, §4.2, §5.6).
 2. Detection of an open project: neither `REAPER.ini` nor file lock; MVP through process detection, companion script later (§5.7).
-3. Reliability of file watching on the streaming Drive volume (§6.3).
+3. ~~Reliability of file watching on the streaming Drive volume~~ (decided 2026-11-23: polling only in the MVP, watching studied later, §6.3).
 4. ~~`reaper.ini` preference keys~~ (validated: peaks only, backups without check, §5.1).
 5. Plugin caches: VST and JS validated on Windows; CLAP, AU, LV2, macOS and Linux remaining (§5.3, #40). Linux can be validated under WSL2 + WSLg (available on the dev machine) with the Linux REAPER build and a Linux Dart SDK installed inside WSL: the `dart` reached through Windows interop runs as Windows.
 6. Opening in the existing instance on macOS (§5.7).
@@ -696,8 +698,8 @@ Present from the start: local `memberId` and version `owner`, `libraryId`, `.lib
 11. Relative paths with `\` read by REAPER macOS (§4.3).
 12. ~~Project that is not valid UTF-8~~ (validated: REAPER 7.85 keeps its bytes when saving it; read as Windows-1252 and written back as read, §7.3).
 13. ~~Purge in `cloud` and `collab` modes~~ (no longer relevant: no shared media; a purge empties the trash and is published by the owner of the version, §5.4).
-14. Collab timestamp far ahead of the local clock (wrong clock on a computer): behavior to decide, so that it does not win every later write (§6.2).
-15. Propagation to the other members, before real-time notifications: the `.node.json` files (statuses, version labels, owners), `.collab/` and `.library.json` of the repository must be read again regularly (scan, update, push), so that every member sees the changes (§5.9). To refine.
+14. ~~Collab timestamp far ahead of the local clock~~ (decided 2026-11-23: no special rule; computers are synchronized by NTP and timestamps are absolute UTC, §6.3).
+15. ~~Propagation to the other members, before real-time notifications~~ (decided 2026-11-23: "Check for updates" merges the `.node.json` of the checked-out titles and `.library.json` whenever they changed in the repository, even when no version changed, §5.5; the activity feed gives the changes live, §5.9).
 
 ## 11. Out of scope
 

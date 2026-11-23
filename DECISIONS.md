@@ -80,3 +80,7 @@ SPEC.md is updated with every point; the impacted tickets start with a "Rework (
 - The Microsoft Store study moves to the Backlog; M2 delivers the installer route (#31).
 - Release: the version of `pubspec.yaml` is the only source (tag, About page, update feed); a portable zip holds a `portable` marker; the update feed is signed and published with each release; the members get a short EN/FR summary written by an agent for non-technical readers, GitHub keeps the technical changelog (SPEC §5.1, §8; #31).
 - Icons: Lucide replaces the Material icons (#110).
+- Collab journals: appended directly in the repository, each installation in its own `.collab/` folder; the only direct write of normal work; the synchronization never touches `.collab/` (SPEC §3.0, §6.3; #24).
+- Remote collab changes found by polling the journal files every 15 s; file watching moves to the Backlog (#25). No special rule for clocks far ahead: timestamps in absolute UTC (SPEC §10 points 3 and 14).
+- "Check for updates" also merges the node files of the checked-out titles and `.library.json` when they changed in the repository (SPEC §10 point 15; #161).
+- Activity feed: plain words for non-technical members, consecutive similar events grouped into one line (#29).
