@@ -54,6 +54,16 @@ void main() {
     ]);
   });
 
+  test('times the steps of a phase in one line', () {
+    final steps = StepTimes('Startup')
+      ..mark('window')
+      ..mark('index');
+    expect(
+      steps.line,
+      matches(RegExp(r'^Startup steps \(ms\): window \d+, index \d+$')),
+    );
+  });
+
   test('logs records and uncaught errors into the folder', () {
     final flutterHandler = FlutterError.onError;
     final platformHandler = PlatformDispatcher.instance.onError;

@@ -48,6 +48,25 @@ final class LogFiles {
   }
 }
 
+/// Times the steps of a phase (startup, quit), in milliseconds since it was
+/// created, for one log line (docs/performance.md, B1 and B7).
+final class StepTimes {
+  StepTimes(this.phase);
+
+  /// Name of the phase, at the start of the line.
+  final String phase;
+
+  final _clock = Stopwatch()..start();
+  final _steps = <String>[];
+
+  /// Notes that [step] is done now.
+  void mark(String step) => _steps.add('$step ${_clock.elapsedMilliseconds}');
+
+  /// The steps, in the order they were marked:
+  /// `<phase> steps (ms): <step> <ms>, …`.
+  String get line => '$phase steps (ms): ${_steps.join(', ')}';
+}
+
 /// Sends every log record, and the uncaught errors, to daily files in
 /// [folder], created if needed.
 void startLogging(String folder) {
