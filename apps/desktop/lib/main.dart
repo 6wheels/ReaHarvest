@@ -33,21 +33,26 @@ const _dataDir = String.fromEnvironment('REAHARVEST_DATA_DIR');
 /// Entry point: the only place where concrete adapters are created and
 /// injected (SPEC §7.2).
 Future<void> main() async {
+  // Each step of startup, timed from here, logged once the window is shown.
+  final startup = StepTimes('Startup');
   WidgetsFlutterBinding.ensureInitialized();
+  startup.mark('binding');
 
-  if (!kIsWeb &&
+  final desktop =
+      !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.windows ||
           defaultTargetPlatform == TargetPlatform.linux ||
-          defaultTargetPlatform == TargetPlatform.macOS)) {
+          defaultTargetPlatform == TargetPlatform.macOS);
+  if (desktop) {
     await windowManager.ensureInitialized();
+    startup.mark('window init');
     const options = WindowOptions(
       minimumSize: Size(900, 600),
       titleBarStyle: TitleBarStyle.hidden,
     );
-    await windowManager.waitUntilReadyToShow(options, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
+    // Not shown here: the runner shows the window with its first frame.
+    await windowManager.waitUntilReadyToShow(options);
+    startup.mark('window options');
   }
 
   LicenseRegistry.addLicense(() async* {
@@ -68,10 +73,15 @@ Future<void> main() async {
   // Logs next to the settings (portable mode included, SPEC §8).
   final logFolder = p.join(p.dirname(settingsPath), 'logs');
   startLogging(logFolder);
+  startup.mark('logging');
   Logger('app').info('Started; settings: $settingsPath, index: $indexPath');
   // Unexpected errors are logged and shown in a popup (SPEC §5.2).
+  var running = false;
   void unexpected(Object error, StackTrace? stack) {
     Logger('app').severe('Unexpected error', error, stack);
+    // Before runApp, no first frame comes to show the window: shown here,
+    // so that it can be closed.
+    if (!running && desktop) unawaited(windowManager.show());
     showErrorDialog(error, stack);
   }
 
@@ -82,12 +92,15 @@ Future<void> main() async {
   };
   final settingsFile = SettingsFile(settingsPath);
   final settings = await loadSettingsOrRecover(settingsFile, show: runApp);
+  startup.mark('settings');
   // Written in background isolates only; read here, read-only (SPEC §7.1).
   await createIndex(indexPath);
+  startup.mark('index');
 
   late final ProviderContainer container;
   final shell = DesktopWindowShell(
     () => container.read(windowBehaviorProvider),
+    startup,
   );
   container = ProviderContainer(
     overrides: [
@@ -111,11 +124,23 @@ Future<void> main() async {
   );
   await shell.start();
   container.read(windowBehaviorProvider).start();
+  startup.mark('shell');
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const ReaHarvestApp(),
     ),
+  );
+  running = true;
+  startup.mark('runApp');
+  final firstFrame = Completer<void>();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    startup.mark('first frame');
+    firstFrame.complete();
+  });
+  unawaited(
+    Future.wait([firstFrame.future, shell.shown])
+        .then((_) => Logger('app').info(startup.line)),
   );
   if (perfMode) startPerfMarks(container, appData); // coverage:ignore-line
   // Indexed titles are shown at once; the scan then refreshes them, then
