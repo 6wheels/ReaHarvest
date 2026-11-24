@@ -13,6 +13,8 @@
 //                in `coverage/` (e.g. gathered from several CI jobs).
 //
 // - A package is measured on its own files with its own tests only.
+// - The `golden` tests are not run here: they are compared on Windows only
+//   (CI job `golden`, #179).
 // - `app` merges the widget tests and the integration tests (run on
 //   Windows, or on macOS with `--device=macos`), generated localizations
 //   excluded.
@@ -145,7 +147,7 @@ Future<String> _runWidget() async {
   final lcov = '$_out${Platform.pathSeparator}app-widget.lcov';
   await _run(
     'flutter',
-    ['test', '--coverage', '--coverage-path=$lcov'],
+    ['test', '--exclude-tags=golden', '--coverage', '--coverage-path=$lcov'],
     'apps/desktop',
     lcov,
   );

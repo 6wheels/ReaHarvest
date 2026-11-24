@@ -74,6 +74,41 @@ jobs:
           path: coverage/app-widget.lcov
           if-no-files-found: error
 
+  golden:
+    # Golden images are rendered by the system font stack: compared on Windows
+    # only, where they are generated (#179). Every other widget test runs on
+    # Linux. Skipped while the repository is private (paid minutes); runs on demand.
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter gen-l10n
+        working-directory: apps/desktop
+      - name: Compare the golden tests
+        working-directory: apps/desktop
+        run: |
+          # `flutter test --tags golden` fails when no test carries the tag.
+          if (Get-ChildItem test/goldens -Recurse -Filter *_test.dart -ErrorAction SilentlyContinue) {
+            flutter test --tags golden test/goldens
+            exit $LASTEXITCODE
+          }
+          Write-Host 'No golden test yet.'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: golden-failures
+          path: apps/desktop/test/**/failures/
+          if-no-files-found: warn
+
   integration:
     # Skipped while the repository is private (paid minutes); runs on demand.
     if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}

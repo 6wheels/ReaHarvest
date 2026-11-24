@@ -53,3 +53,6 @@ app.*.map.json
 # Portable mode data written by the demo run configuration
 /settings.json
 /index.sqlite*
+
+# Golden test comparator output (failure images)
+failures/
