@@ -32,6 +32,7 @@ class Header extends ConsumerWidget {
     final below = t == null
         ? ''
         : [...levels.skip(1), ?libraryName(ref, t)].join(' · ');
+    final leaf = levels.isEmpty ? '' : levels.first.toUpperCase();
     final v = version;
     final toAdopt = t == null ? 0 : ref.watch(toAdoptCountsProvider)[t.id] ?? 0;
     return Padding(
@@ -81,8 +82,7 @@ class Header extends ConsumerWidget {
                             ),
                             if (levels.isNotEmpty)
                               TextSpan(
-                                text:
-                                    '$labelSeparator${levels.first.toUpperCase()}',
+                                text: '$labelSeparator$leaf',
                                 style: context.legend.copyWith(fontSize: 12),
                               ),
                           ],

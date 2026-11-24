@@ -50,6 +50,8 @@ Test fixtures: real `.rpp` files in `test/fixtures/`.
 - The acceptance criteria of the issue are met, nothing beyond its scope. Deferred or discovered work is written as a comment on the issue.
 - `flutter analyze` clean; `dart tool/coverage.dart <suite>` passing for every suite the issue names (gate 95–100 %, each excluded line justified by `// coverage:ignore-…`).
 - Every new text in both ARB files.
+- `dart format .` before committing (the CI checks it).
+- Pull request title in Conventional Commits: it becomes the merge commit title.
 - The integration test of the feature written when the issue asks for it, and its line ticked in the integration tests issue of the milestone.
 - `SPEC.md` changed only when the issue revealed a gap in it; the pull request says so.
 

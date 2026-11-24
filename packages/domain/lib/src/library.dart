@@ -75,8 +75,8 @@ final class Layout {
 
   LayoutLevel get leaf => levels.last;
 
-  /// Level values of a title located at [folders] (relative to the library root),
-  /// or null if the path does not match the layout depth.
+  /// Level values of a title located at [folders] (relative to the library
+  /// root), or null if the path does not match the layout depth.
   Map<String, String>? levelsOf(List<String> folders) {
     if (folders.length != levels.length) return null;
     return {for (var i = 0; i < levels.length; i++) levels[i].key: folders[i]};

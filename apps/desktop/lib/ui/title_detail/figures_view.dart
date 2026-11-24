@@ -37,6 +37,12 @@ class FiguresView extends ConsumerWidget {
       for (final part in FigurePart.values)
         if (figures.sizes[part]! > 0) part,
     ];
+    String legendText(FigurePart part) {
+      final size = figures.sizes[part]!;
+      final percent = total == 0 ? '' : ' · ${(100 * size / total).round()} %';
+      return '${_label(l10n, part)} · ${formatSize(size)}$percent';
+    }
+
     return ListView(
       padding: const EdgeInsets.all(Space.xl),
       children: [
@@ -74,11 +80,7 @@ class FiguresView extends ConsumerWidget {
                 children: [
                   Container(width: 12, height: 12, color: colors[part]),
                   const SizedBox(width: Space.s),
-                  Text(
-                    '${_label(l10n, part)} · ${formatSize(figures.sizes[part]!)}'
-                    '${total == 0 ? '' : ' · ${(100 * figures.sizes[part]! / total).round()} %'}',
-                    style: text.bodySmall,
-                  ),
+                  Text(legendText(part), style: text.bodySmall),
                 ],
               ),
           ],

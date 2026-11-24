@@ -11,6 +11,9 @@ import 'layout_labels.dart';
 Future<void> showReport(BuildContext context, String title, Report report) =>
     showGlassDialog(context, (context) => _ReportDialog(title, report));
 
+String _expectedLevelText(AppLocalizations l10n, LayoutLevel level) =>
+    '\n${l10n.reportExpectedLevel(layoutLevelLabel(l10n, level))}';
+
 String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
     switch (kind) {
       ReportKind.scanFailed => l10n.reportScanFailed,
@@ -130,8 +133,7 @@ class _ReportDialog extends StatelessWidget {
                                       TextSpan(text: '\n$detail', style: muted),
                                     if (item.level case final level?)
                                       TextSpan(
-                                        text:
-                                            '\n${l10n.reportExpectedLevel(layoutLevelLabel(l10n, level))}',
+                                        text: _expectedLevelText(l10n, level),
                                         style: muted,
                                       ),
                                     if (item.target case final target?)

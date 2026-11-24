@@ -410,7 +410,8 @@ final class LocalIndex {
   }) {
     final existing = _stamps(id, prefix: prefix);
     final upsert = _db.prepare(
-      'INSERT INTO files (library_id, path, size, modified) VALUES (?, ?, ?, ?) '
+      'INSERT INTO files (library_id, path, size, modified) '
+      'VALUES (?, ?, ?, ?) '
       'ON CONFLICT (library_id, path) DO UPDATE SET size = excluded.size, '
       'modified = excluded.modified, hash = NULL',
     );

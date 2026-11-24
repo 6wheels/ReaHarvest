@@ -16,13 +16,15 @@ typedef InventoryEntry = ({int size, DateTime modified, String hash});
 /// library before the first change, with its size, modification date and
 /// XXH3 hash, appended line by line to `<folder>/inventory.jsonl`:
 /// ```
-/// {"path":"Band/Song/a.wav","size":1234,"modified":1731300000000000,"hash":"0123456789abcdef"}
+/// {"path":"B/a.wav","size":1234,"modified":1731300000000000,"hash":"0123ab"}
 /// {"complete":true,"files":1}
 /// ```
-/// `modified` is in microseconds since the epoch; the last line of a path
-/// wins, `{"path":…,"removed":true}` drops it (gone before the inventory
-/// was complete). Raw copies of the files rewritten are kept in
-/// `<folder>/originals/`, under their inventory path ([originalPath]).
+/// The values of the examples are shortened: `hash` is the XXH3 hash as 16
+/// hexadecimal digits. `modified` is in microseconds since the epoch; the
+/// last line of a path wins, `{"path":…,"removed":true}` drops it (gone
+/// before the inventory was complete). Raw copies of the files rewritten
+/// are kept in `<folder>/originals/`, under their inventory path
+/// ([originalPath]).
 final class Inventory {
   /// A new inventory in the migration [folder]; nothing is written before
   /// [take]. The entries of [reuse] (by current path) are taken without

@@ -14,7 +14,8 @@ import 'library_turns.dart';
 /// [warning]: finished, its report holds warnings and no error.
 enum TaskState { queued, running, done, warning, failed, cancelled }
 
-/// Severity of an instant entry of the notification zone ([TasksNotifier.notify]).
+/// Severity of an instant entry of the notification zone
+/// ([TasksNotifier.notify]).
 enum NoticeLevel { info, warning, error }
 
 /// Thrown by [TaskControl.checkCancelled] to stop a cancelled task; a task

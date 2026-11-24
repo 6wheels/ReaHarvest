@@ -140,7 +140,8 @@ organizeTitle Artist/Album/Song -> Artist/Album/Song
           'Artist/Album/Song/v.rpp',
           _project.replaceFirst(
             '>\n',
-            '  <EXTSTATE\n    <REAHARVEST\n      VERSIONID $id\n    >\n  >\n>\n',
+            '  <EXTSTATE\n    <REAHARVEST\n      VERSIONID $id\n'
+                '    >\n  >\n>\n',
           ),
         )
         ..put(
@@ -210,7 +211,8 @@ organizeTitle Artist/Album/Song -> Artist/Album/Song
           'Artist/Album/Copy/v/v.rpp',
           _project.replaceFirst(
             '>\n',
-            '  <EXTSTATE\n    <REAHARVEST\n      VERSIONID $id\n    >\n  >\n>\n',
+            '  <EXTSTATE\n    <REAHARVEST\n      VERSIONID $id\n'
+                '    >\n  >\n>\n',
           ),
         );
 

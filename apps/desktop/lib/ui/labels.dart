@@ -23,7 +23,8 @@ String modeLabel(AppLocalizations l10n, LibraryMode mode) => switch (mode) {
   LibraryMode.collab => l10n.modeCollab,
 };
 
-/// Name shown for a title: its leaf level value (last one), else its folder name.
+/// Name shown for a title: its leaf level value (last one), else its folder
+/// name.
 String titleName(Title t) =>
     t.levels.values.lastOrNull ?? t.path.split('/').last;
 

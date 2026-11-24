@@ -359,7 +359,8 @@ void main() {
         'tasks Fix 3 items: Checking that no file is lost',
         'library.migration $name: inventory checked, no file lost',
         'tasks Fix 3 items: Updating the library',
-        'library.migration Known values of $name added: Artist/New, Artist/Live',
+        'library.migration Known values of $name added: '
+            'Artist/New, Artist/Live',
         startsWith('library.scans Scanned $name: '),
         startsWith('tasks Fix 3 items: done'),
       ]),
