@@ -22,6 +22,8 @@ import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
+import 'harness.dart';
+
 /// Runs the real app on a throwaway library, with its own settings and
 /// index, and manages versions through the UI (#51):
 /// `flutter test integration_test -d windows` in `apps/desktop`.
@@ -141,6 +143,8 @@ void main() {
   }
 
   testWidgets('manages the versions of a title', (tester) async {
+    addTearDown(() => Harness.screenshotOnFailure(tester));
+    await Harness.fitWindow(tester);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -339,6 +343,8 @@ void main() {
   testWidgets('tags a title, shared through its node file (#132)', (
     tester,
   ) async {
+    addTearDown(() => Harness.screenshotOnFailure(tester));
+    await Harness.fitWindow(tester);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -398,6 +404,8 @@ void main() {
   testWidgets('reports misplaced levels of a misorganized folder', (
     tester,
   ) async {
+    addTearDown(() => Harness.screenshotOnFailure(tester));
+    await Harness.fitWindow(tester);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -444,6 +452,8 @@ void main() {
   testWidgets('runs portable data, tasks, reports and logs (M0)', (
     tester,
   ) async {
+    addTearDown(() => Harness.screenshotOnFailure(tester));
+    await Harness.fitWindow(tester);
     // Logs: the file sink of the app, in the temp folder (#64).
     final logs = Directory(p.join(root.path, 'logs'))..createSync();
     final logFiles = LogFiles(logs.path);

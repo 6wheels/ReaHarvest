@@ -15,6 +15,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 
+import 'harness.dart';
+
 /// Runs the real app on a throwaway library holding a project saved in
 /// Windows-1252 (#91): it is adopted, backed up and normalized through the
 /// UI and keeps its encoding:
@@ -127,6 +129,8 @@ void main() {
   testWidgets('keeps a Windows-1252 project in its encoding (#91)', (
     tester,
   ) async {
+    addTearDown(() => Harness.screenshotOnFailure(tester));
+    await Harness.fitWindow(tester);
     final original = file('old/old.rpp').readAsBytesSync();
     expect(isUtf8(original), isFalse);
     await tester.pumpWidget(

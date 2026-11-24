@@ -6,13 +6,16 @@
 //     `app` (widget + integration tests), or one part of the app: `widget`
 //     or `integration`; all packages and `app` by default.
 //   --batch=i/n  integration: runs only batch i of n (CI matrix, #126).
+//   --device=id  integration: device of the run, `windows` (default) or
+//                `macos`; skipped on any other host.
 //   --no-gate    writes the reports without checking the threshold.
 //   --gate-only  runs nothing, checks the threshold on the reports already
 //                in `coverage/` (e.g. gathered from several CI jobs).
 //
 // - A package is measured on its own files with its own tests only.
-// - `app` merges the widget tests and the Windows integration tests (the
-//   latter run on Windows only), generated localizations excluded.
+// - `app` merges the widget tests and the integration tests (run on
+//   Windows, or on macOS with `--device=macos`), generated localizations
+//   excluded.
 // - Uncovered lines that cannot be tested carry a justified
 //   `// coverage:ignore-line|start|end|file` comment, honored by both runners.
 
@@ -45,12 +48,17 @@ Future<void> main(List<String> args) async {
   var run = true;
   var batch = 1;
   var batches = 1;
+  var device = 'windows';
   for (final option in options) {
     final match = RegExp(r'^--batch=(\d+)/(\d+)$').firstMatch(option);
+    final deviceMatch = RegExp(r'^--device=(windows|macos)$')
+        .firstMatch(option);
     if (option == '--no-gate') {
       gate = false;
     } else if (option == '--gate-only') {
       run = false;
+    } else if (deviceMatch != null) {
+      device = deviceMatch[1]!;
     } else if (match != null) {
       batch = int.parse(match[1]!);
       batches = int.parse(match[2]!);
@@ -76,10 +84,10 @@ Future<void> main(List<String> args) async {
         : switch (suite) {
             'app' => [
               await _runWidget(),
-              ...await _runIntegration(batch, batches),
+              ...await _runIntegration(batch, batches, device),
             ],
             'widget' => [await _runWidget()],
-            'integration' => await _runIntegration(batch, batches),
+            'integration' => await _runIntegration(batch, batches, device),
             _ => [await _runPackage(suite)],
           };
     if (!gate) continue;
@@ -145,14 +153,19 @@ Future<String> _runWidget() async {
 }
 
 /// Runs batch [batch] of [batches] of the integration test files of the app,
-/// on Windows only. Returns its lcov path, none when skipped.
+/// on [device] (`windows` or `macos`), when the host is that system. Returns
+/// its lcov path, none when skipped.
 ///
 /// The files of a batch run from one generated entry point: one build and
 /// one app launch per batch (a second app launch in the same `flutter test`
 /// does not connect, "Unable to start the app on the device").
-Future<List<String>> _runIntegration(int batch, int batches) async {
-  if (!Platform.isWindows) {
-    stdout.writeln('Integration tests skipped (Windows only).');
+Future<List<String>> _runIntegration(
+  int batch,
+  int batches,
+  String device,
+) async {
+  if (device != Platform.operatingSystem) {
+    stdout.writeln('Integration tests skipped (device $device only).');
     return [];
   }
   final all =
@@ -187,14 +200,7 @@ Future<List<String>> _runIntegration(int batch, int batches) async {
       '$_out${Platform.pathSeparator}app-integration-$batch-of-$batches.lcov';
   await _run(
     'flutter',
-    [
-      'test',
-      _batchEntry,
-      '-d',
-      'windows',
-      '--coverage',
-      '--coverage-path=$lcov',
-    ],
+    ['test', _batchEntry, '-d', device, '--coverage', '--coverage-path=$lcov'],
     'apps/desktop',
     lcov,
   );
