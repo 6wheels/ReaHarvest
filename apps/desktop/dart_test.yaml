@@ -1,0 +1,4 @@
+tags:
+  # Image comparison tests: generated on Windows and compared on a Windows CI
+  # job only (#179). `tool/coverage.dart` leaves them out of the Linux run.
+  golden: {}
