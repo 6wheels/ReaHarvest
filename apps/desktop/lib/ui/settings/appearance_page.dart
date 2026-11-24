@@ -77,6 +77,7 @@ class AppearancePage extends ConsumerWidget {
           child: Row(
             children: [
               Text('A', style: text.bodySmall),
+              const SizedBox(width: Space.m),
               Expanded(
                 child: Slider(
                   value: settings.textScale,
@@ -88,6 +89,7 @@ class AppearancePage extends ConsumerWidget {
                       notifier.change((a) => a.copyWith(textScale: v)),
                 ),
               ),
+              const SizedBox(width: Space.m),
               Text('A', style: text.titleLarge),
             ],
           ),

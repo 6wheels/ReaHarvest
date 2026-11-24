@@ -8,9 +8,8 @@ import 'package:reaharvest_repository/reaharvest_repository.dart'
 import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
+import 'kit/kit.dart';
 import 'layout_labels.dart';
-import 'widgets.dart';
 
 /// Width of the dialog.
 const _width = 480.0;
@@ -197,7 +196,7 @@ class _AddValueState extends State<_AddValue> {
           // Smaller than the field, so that it keeps its height.
           : IconAction(
               tooltip: widget.label,
-              icon: const Icon(Icons.check_rounded),
+              icon: const Icon(Icons.keyboard_return_rounded),
               onPressed: _valid ? _add : null,
             ),
     ),

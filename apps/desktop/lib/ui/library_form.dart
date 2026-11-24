@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../state/pickers.dart';
 import '../theme/app_theme.dart';
+import 'kit/kit.dart';
 import 'known_values_editor.dart';
 import 'layout_labels.dart';
 import 'path_row.dart';
@@ -339,56 +340,47 @@ class _LayoutChoice extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.s),
-      child: Material(
-        color: selected ? c.accent.withValues(alpha: Alpha.faint) : c.raised,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.s),
-          side: BorderSide(
-            color: selected
-                ? c.accent.withValues(alpha: Alpha.strong)
-                : c.border,
+      child: PressableSurface(
+        selected: selected,
+        color: c.raised,
+        side: BorderSide(color: c.border),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.m,
+            vertical: Space.md,
           ),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Radii.s),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Space.m,
-              vertical: Space.md,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(name, style: text.bodyLarge),
-                          if (recommended) ...[
-                            const SizedBox(width: Space.s),
-                            Text(
-                              l10n.recommended,
-                              style: text.labelSmall?.copyWith(color: c.accent),
-                            ),
-                          ],
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(name, style: text.bodyLarge),
+                        if (recommended) ...[
+                          const SizedBox(width: Space.s),
+                          Text(
+                            l10n.recommended,
+                            style: text.labelSmall?.copyWith(color: c.accent),
+                          ),
                         ],
-                      ),
-                      Text(
-                        detail,
-                        style: text.bodySmall?.copyWith(color: c.muted),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    Text(
+                      detail,
+                      style: text.bodySmall?.copyWith(color: c.muted),
+                    ),
+                  ],
                 ),
-                AnimatedOpacity(
-                  opacity: selected ? 1 : 0,
-                  duration: Motion.fast,
-                  child: Icon(Icons.check_rounded, color: c.accent),
-                ),
-              ],
-            ),
+              ),
+              AnimatedOpacity(
+                opacity: selected ? 1 : 0,
+                duration: Motion.fast,
+                child: const ChoiceLight(checked: true),
+              ),
+            ],
           ),
         ),
       ),

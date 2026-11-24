@@ -4,7 +4,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
-import 'widgets.dart';
+import 'kit/kit.dart';
 
 /// Height of the title bar.
 const studioTitleBarHeight = 40.0;

@@ -3,17 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../state/tasks.dart';
 import '../../state/providers.dart';
 import '../../state/reaper.dart';
 import '../../state/report_paths.dart';
+import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
+import '../kit/kit.dart';
 import '../labels.dart';
+import '../project_actions.dart';
 import '../versions/edit_version_dialog.dart';
 import '../versions/version_ui_actions.dart';
-import '../widgets.dart';
 import 'adopt_form.dart';
 import 'history_view.dart';
 import 'version_detail_view.dart';
@@ -198,7 +199,7 @@ class VersionPane extends ConsumerWidget {
                     for (final s in {...Title.defaultStatuses, ?status})
                       MenuItemButton(
                         trailingIcon: s == status
-                            ? const Icon(Icons.check_rounded, size: IconSize.l)
+                            ? const ChoiceLight(checked: true)
                             : null,
                         onPressed: () => setVersionStatusFromUi(
                           context,

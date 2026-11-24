@@ -6,9 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/state/providers.dart';
+import 'package:reaharvest/ui/kit/kit.dart' show Dropdown;
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/ui/title_card.dart';
-import 'package:reaharvest/ui/widgets.dart' show Dropdown;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import 'harness.dart';

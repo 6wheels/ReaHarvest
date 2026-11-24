@@ -18,7 +18,7 @@ import 'state/reaper.dart';
 import 'state/tasks.dart';
 import 'theme/app_theme.dart';
 import 'ui/aurora.dart';
-import 'ui/filter_bar.dart' as filter show Pill;
+import 'ui/kit/kit.dart';
 import 'ui/known_values_editor.dart';
 import 'ui/library_page.dart' show LibrarySearchField;
 import 'ui/overview.dart';
@@ -27,9 +27,14 @@ import 'ui/status_trail.dart';
 import 'ui/studio_title_bar.dart';
 import 'ui/tasks_zone.dart';
 import 'ui/title_card.dart';
-import 'ui/to_sort/fix_dialog.dart' show Choice, LevelField;
+import 'ui/to_sort/fix_dialog.dart' show Choice;
 import 'ui/to_sort/to_sort_item.dart';
-import 'ui/widgets.dart';
+
+/// Heights of the controls bar and of the accent presets bar, width of the
+/// sliders of the controls.
+const _controlsHeight = 56.0;
+const _presetsHeight = 40.0;
+const _sliderWidth = 180.0;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -131,6 +136,9 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   Locale _locale = const Locale('en');
   double _progress = 0.65;
   bool _loading = true;
+  bool _switch = true;
+  double _slider = 0.5;
+  int _segment = 1;
 
   /// Accent picked in the settings bar.
   AccentPreference _accent = AccentPreference.neutral;
@@ -146,9 +154,11 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   bool _filterActive = true;
   final _selectedItems = {0};
   String _choice = 'b';
+  String _row = 'a';
   String? _owner;
   final _levelController = TextEditingController(text: 'Sample');
   final _emptyLevelController = TextEditingController();
+  final _compactController = TextEditingController();
   final _searchFocus = FocusNode();
   List<KnownValue> _knownValues = const [
     KnownValue('Sample Artist', [KnownValue('Album 1'), KnownValue('Album 2')]),
@@ -159,6 +169,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   void dispose() {
     _levelController.dispose();
     _emptyLevelController.dispose();
+    _compactController.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
@@ -202,36 +213,51 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   );
 
   /// The title bar of the application above the showcase controls.
-  PreferredSizeWidget _windowBar(BuildContext context) {
-    final controls = _appBar(context);
-    return PreferredSize(
-      preferredSize: Size.fromHeight(
-        studioTitleBarHeight + controls.preferredSize.height,
-      ),
-      child: Column(
-        children: [
-          const StudioTitleBar(location: 'UI showcase'),
-          // An app bar needs a bounded height outside the scaffold slot.
-          SizedBox(height: controls.preferredSize.height, child: controls),
-        ],
-      ),
-    );
-  }
+  PreferredSizeWidget _windowBar(BuildContext context) => PreferredSize(
+    preferredSize: const Size.fromHeight(
+      studioTitleBarHeight + _controlsHeight + _presetsHeight,
+    ),
+    child: Column(
+      children: [
+        const StudioTitleBar(location: 'UI showcase'),
+        Expanded(
+          child: ColoredBox(
+            color: context.colors.surface,
+            child: Column(
+              children: [
+                SizedBox(height: _controlsHeight, child: _controls(context)),
+                SizedBox(height: _presetsHeight, child: _presets(context)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
-  PreferredSizeWidget _appBar(BuildContext context) {
-    Widget preset(String label, AccentPreference value) => TextButton(
-      onPressed: () => setState(() => _accent = value),
-      child: Text(label),
-    );
-    return AppBar(
-      title: const Text('ReaHarvest — UI showcase'),
-      actions: [
+  /// Title and controls of the showcase: loading, progress, size, language,
+  /// theme.
+  Widget _controls(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: Space.m),
+    child: Row(
+      spacing: Space.s,
+      children: [
+        Expanded(
+          child: Text(
+            'ReaHarvest — UI showcase',
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
         Text('LOADING', style: context.legend),
-        Switch(value: _loading, onChanged: (v) => setState(() => _loading = v)),
-        const SizedBox(width: Space.m),
+        LightSwitch(
+          value: _loading,
+          onChanged: (v) => setState(() => _loading = v),
+        ),
+        const SizedBox(width: Space.s),
         Text('PROGRESS ${(_progress * 100).round()}%', style: context.readout),
         SizedBox(
-          width: 180,
+          width: _sliderWidth,
           child: Slider(
             value: _progress,
             onChanged: (v) => setState(() => _progress = v),
@@ -239,7 +265,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         ),
         Text('SIZE ${(_scale * 100).round()}%', style: context.readout),
         SizedBox(
-          width: 180,
+          width: _sliderWidth,
           child: Slider(
             min: 0.75,
             max: 1.5,
@@ -265,40 +291,40 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                 : ThemeMode.dark;
           }),
         ),
-        const SizedBox(width: Space.m),
       ],
-      // Accent settings: one preset per accent.
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(40),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Space.m),
-          child: Row(
-            children: [
-              Text('ACCENT', style: context.legend),
-              const SizedBox(width: Space.s),
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: context.colors.accent,
-                  borderRadius: BorderRadius.circular(Radii.xs),
-                ),
-              ),
-              const SizedBox(width: Space.s),
-              preset('Neutral', AccentPreference.neutral),
-              preset('Orange', AccentPreference.orange),
-              preset('Yellow', AccentPreference.yellow),
-              preset('Teal', AccentPreference.teal),
-              preset('Blue', AccentPreference.blue),
-              preset('Violet', AccentPreference.violet),
-              const SizedBox(width: Space.m),
-              Text(
-                'ACCENT ${_accent.name.toUpperCase()}',
-                style: context.readout,
-              ),
-            ],
+    ),
+  );
+
+  /// Accent settings: one preset per accent.
+  Widget _presets(BuildContext context) {
+    Widget preset(String label, AccentPreference value) => TextButton(
+      onPressed: () => setState(() => _accent = value),
+      child: Text(label),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.m),
+      child: Row(
+        children: [
+          Text('ACCENT', style: context.legend),
+          const SizedBox(width: Space.s),
+          Container(
+            width: IconSize.s,
+            height: IconSize.s,
+            decoration: BoxDecoration(
+              color: context.colors.accent,
+              borderRadius: BorderRadius.circular(Radii.xs),
+            ),
           ),
-        ),
+          const SizedBox(width: Space.s),
+          preset('Neutral', AccentPreference.neutral),
+          preset('Orange', AccentPreference.orange),
+          preset('Yellow', AccentPreference.yellow),
+          preset('Teal', AccentPreference.teal),
+          preset('Blue', AccentPreference.blue),
+          preset('Violet', AccentPreference.violet),
+          const SizedBox(width: Space.m),
+          Text('ACCENT ${_accent.name.toUpperCase()}', style: context.readout),
+        ],
       ),
     );
   }
@@ -549,7 +575,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
       ),
       _Section('Tags, legends & menus', '', [
         _Specimen(
-          'Pill (status / alert tag)',
+          'Pill — status / alert tag, removable tag',
           child: Wrap(
             spacing: Space.s,
             runSpacing: Space.s,
@@ -566,6 +592,12 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                   color: c.accent,
                 ),
               ),
+              Pill(
+                'First album',
+                uppercase: false,
+                deleteTooltip: 'Remove "First album"',
+                onDeleted: () {},
+              ),
             ],
           ),
         ),
@@ -575,16 +607,174 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             spacing: Space.s,
             runSpacing: Space.s,
             children: [
-              filter.Pill(
-                label: 'Status',
+              Pill(
+                'Status',
                 icon: Icons.flag_outlined,
                 menuOpen: false,
                 active: _filterActive,
                 count: _filterActive ? 2 : null,
                 onPressed: () => setState(() => _filterActive = !_filterActive),
               ),
-              filter.Pill(label: 'To sort', count: 14, onPressed: () {}),
-              filter.Pill(label: 'Artist', onPressed: () {}),
+              Pill('To sort', count: 14, onPressed: () {}),
+              Pill('Artist', onPressed: () {}),
+            ],
+          ),
+        ),
+        _Specimen(
+          'LightSwitch — on, off, disabled',
+          child: Row(
+            spacing: Space.m,
+            children: [
+              LightSwitch(
+                value: _switch,
+                onChanged: (v) => setState(() => _switch = v),
+              ),
+              const LightSwitch(value: false, onChanged: null),
+              const LightSwitch(value: true, onChanged: null),
+            ],
+          ),
+        ),
+        _Specimen(
+          'Slider and SegmentedButton (theme) — and Tooltip: hover',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Slider(
+                value: _slider,
+                onChanged: (v) => setState(() => _slider = v),
+              ),
+              const Slider(value: 0.3, onChanged: null),
+              SegmentedButton<int>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: 0, label: Text('System')),
+                  ButtonSegment(value: 1, label: Text('Light')),
+                  ButtonSegment(value: 2, label: Text('Dark')),
+                  ButtonSegment(value: 3, label: Text('Off'), enabled: false),
+                ],
+                selected: {_segment},
+                onSelectionChanged: (s) => setState(() => _segment = s.first),
+              ),
+              const SizedBox(height: Space.s),
+              const Tooltip(
+                message: 'The theme of the tooltips',
+                child: Text('Hover this text'),
+              ),
+            ],
+          ),
+        ),
+        _Specimen(
+          'DisclosureTile — report sections (error blinks)',
+          child: Column(
+            children: [
+              for (final (level, led, open) in [
+                ('Error', Led(c.ledRed, mode: LedMode.blink), true),
+                ('Warning', Led(c.ledAmber), true),
+                ('Skipped', Led(c.muted, lit: false), false),
+                ('Done', Led(c.ledGreen), false),
+              ])
+                DisclosureTile(
+                  initiallyExpanded: open,
+                  leading: SizedBox(
+                    width: IconSize.l,
+                    child: Center(child: led),
+                  ),
+                  title: Text('$level section · 2'),
+                  children: const [Text('First item'), Text('Second item')],
+                ),
+            ],
+          ),
+        ),
+        const _Specimen(
+          'Surface.panel — plain, raised (panel / menu)',
+          child: Column(
+            spacing: Space.m,
+            children: [
+              Surface.panel(
+                child: Padding(
+                  padding: EdgeInsets.all(Space.s),
+                  child: Text('Plain panel'),
+                ),
+              ),
+              Surface.panel(
+                elevation: Elevation.menu,
+                child: Padding(
+                  padding: EdgeInsets.all(Space.s),
+                  child: Text('Raised panel'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _Specimen(
+          'ChoiceRow and CheckRow — choice among several, on / off, disabled',
+          child: Column(
+            children: [
+              CheckRow(
+                value: _switch,
+                label: 'Show in the tray',
+                onChanged: (v) => setState(() => _switch = v),
+              ),
+              ChoiceRow(
+                selected: _row == 'a',
+                label: 'Blank project',
+                hint: 'An empty project',
+                onTap: () => setState(() => _row = 'a'),
+              ),
+              ChoiceRow(
+                selected: _row == 'b',
+                label: 'From a template',
+                hint: 'A project template',
+                trailing: SizedBox(
+                  width: 120,
+                  child: Dropdown(
+                    enabled: _row == 'b',
+                    value: _choice,
+                    options: const {'a': 'Artist', 'b': 'Album'},
+                    onChanged: (v) => setState(() => _choice = v),
+                  ),
+                ),
+                onTap: () => setState(() => _row = 'b'),
+              ),
+              const ChoiceRow(
+                selected: false,
+                label: 'Duplicate',
+                hint: 'Not available',
+                onTap: null,
+              ),
+            ],
+          ),
+        ),
+        _Specimen(
+          'PressableSurface — idle, selected, disabled (hover, press: try)',
+          child: Column(
+            spacing: Space.s,
+            children: [
+              for (final (label, onTap, selected) in [
+                ('IDLE', () {}, false),
+                ('SELECTED', () {}, true),
+                ('DISABLED', null, false),
+              ])
+                PressableSurface(
+                  onTap: onTap,
+                  selected: selected,
+                  color: c.surface,
+                  side: BorderSide(color: c.border),
+                  child: Padding(
+                    padding: const EdgeInsets.all(Space.s),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: Space.xxs,
+                          height: Space.m,
+                          color: selected ? c.accent : c.muted,
+                        ),
+                        const SizedBox(width: Space.s),
+                        Text(label, style: context.legend),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -673,6 +863,17 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                   onChanged: (v) => setState(() => _choice = v),
                 ),
               ),
+              SizedBox(
+                width: 160,
+                child: LevelField(
+                  label: 'Artist',
+                  controller: _levelController,
+                  options: () => const ['Sample Artist', 'Other Artist'],
+                  error: null,
+                  dense: true,
+                  onChanged: () {},
+                ),
+              ),
               FilledButton(onPressed: () {}, child: const Text('Adopt')),
               OutlinedButton(onPressed: () {}, child: const Text('Choose…')),
               TextButton(onPressed: () {}, child: const Text('Cancel')),
@@ -741,7 +942,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ),
         _Specimen(
-          'LevelField — autocomplete / error',
+          'LevelField — autocomplete / compact (tag) / error',
           width: 480,
           child: Column(
             spacing: Space.m,
@@ -752,6 +953,17 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                 options: () => const ['Sample Artist', 'Other Artist'],
                 error: null,
                 onChanged: () {},
+              ),
+              SizedBox(
+                width: 160,
+                child: LevelField(
+                  label: 'Add a tag',
+                  controller: _compactController,
+                  options: () => const ['live', 'mix'],
+                  error: null,
+                  compact: true,
+                  onChanged: () {},
+                ),
               ),
               LevelField(
                 label: 'Album',

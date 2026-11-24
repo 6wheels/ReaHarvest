@@ -6,6 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
+import '../kit/kit.dart';
 import '../labels.dart';
 import '../over_library.dart';
 import '../studio_title_bar.dart';
@@ -181,7 +182,8 @@ class _Tab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return InkWell(
+    return PressableSurface(
+      radius: 0,
       onTap: onTap,
       child: AnimatedContainer(
         duration: Motion.fast,

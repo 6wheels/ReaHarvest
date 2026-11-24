@@ -5,15 +5,15 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../state/tasks.dart';
 import '../../state/migration_actions.dart';
 import '../../state/navigation.dart';
 import '../../state/providers.dart';
+import '../../state/tasks.dart';
 import '../../theme/app_theme.dart';
-import '../glass_dialog.dart';
+import '../kit/kit.dart';
 import '../layout_labels.dart';
+import '../project_actions.dart';
 import '../report_dialog.dart';
-import '../widgets.dart';
 import 'to_sort_item.dart';
 
 /// Issues on the media, record path or render target of a project, whose

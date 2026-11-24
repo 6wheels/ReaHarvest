@@ -9,10 +9,10 @@ import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/theme/app_theme.dart';
 import 'package:reaharvest/ui/error_dialog.dart';
+import 'package:reaharvest/ui/kit/kit.dart' show Led, LedMode, Meter;
 import 'package:reaharvest/ui/progress_popup.dart';
 import 'package:reaharvest/ui/report_dialog.dart';
 import 'package:reaharvest/ui/tasks_zone.dart';
-import 'package:reaharvest/ui/widgets.dart' show Meter;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 void main() {
@@ -23,6 +23,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
   }
+
+  /// The lit status light of [color], steady unless said otherwise (a failed
+  /// task blinks).
+  Finder light(Color color, {LedMode mode = LedMode.steady}) =>
+      find.byWidgetPredicate(
+        (w) => w is Led && w.lit && w.color == color && w.mode == mode,
+      );
 
   late ProviderContainer container;
   TasksNotifier tasks() => container.read(tasksProvider.notifier);
@@ -247,14 +254,14 @@ void main() {
     await settle(tester);
     expect(find.text('Reading the folders'), findsNothing);
     expect(find.text('Broken'), findsOneWidget);
-    expect(find.byIcon(Icons.error), findsOneWidget);
+    expect(light(AppColors.light.ledRed, mode: LedMode.blink), findsOneWidget);
     expect(find.text('boom'), findsOneWidget);
     expect(find.text('Cancelled'), findsNWidgets(2));
 
     await tasks().run((l10n) => 'Done', (_) async {});
     await settle(tester);
     expect(find.text('Done'), findsOneWidget, reason: 'label, no state text');
-    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    expect(light(AppColors.light.ledGreen), findsOneWidget);
 
     await tester.tap(find.text('Clear finished'));
     await settle(tester);
@@ -284,15 +291,15 @@ void main() {
     tasks().notify('Boom', level: NoticeLevel.error);
     await settle(tester);
 
-    // Collapsed: the latest entry, with its state icon.
+    // Collapsed: the latest entry, with its state light.
     expect(find.text('Boom'), findsOneWidget);
-    expect(find.byIcon(Icons.error), findsOneWidget);
+    expect(light(AppColors.light.ledRed, mode: LedMode.blink), findsOneWidget);
     expect(find.text('TASKS // 3'), findsOneWidget);
     await tester.tap(find.text('TASKS // 3'));
     await settle(tester);
     expect(find.text('Backup point created'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle), findsOneWidget);
-    expect(find.byIcon(Icons.warning), findsOneWidget);
+    expect(light(AppColors.light.ledGreen), findsOneWidget);
+    expect(light(AppColors.light.ledAmber), findsOneWidget);
     await tester.tap(find.text('TASKS // 3'));
     await settle(tester);
 

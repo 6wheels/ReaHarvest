@@ -3,7 +3,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
+import 'kit/kit.dart';
 import 'layout_labels.dart';
 
 /// Width of the dialog.
@@ -67,8 +67,7 @@ class _ReportDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
-    final theme = Theme.of(context);
-    final muted = theme.textTheme.bodySmall?.copyWith(color: c.muted);
+    final muted = context.type.caption.copyWith(color: c.muted);
     return AlertDialog(
       title: Text(title),
       content: SizedBox(
@@ -80,35 +79,27 @@ class _ReportDialog extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     for (final (kind, items) in report.sections)
-                      ExpansionTile(
+                      DisclosureTile(
                         initiallyExpanded:
                             kind.level == ReportLevel.error ||
                             kind.level == ReportLevel.warning,
-                        tilePadding: EdgeInsets.zero,
-                        childrenPadding: const EdgeInsets.only(
-                          left: Space.l + Space.s,
-                          bottom: Space.s,
+                        // The level as a light: blinking for an error, dark
+                        // when skipped, steady otherwise; the sections are in
+                        // the order of the levels.
+                        leading: SizedBox(
+                          width: IconSize.l,
+                          child: Center(
+                            child: switch (kind.level) {
+                              ReportLevel.error => Led(
+                                c.ledRed,
+                                mode: LedMode.blink,
+                              ),
+                              ReportLevel.warning => Led(c.ledAmber),
+                              ReportLevel.skipped => Led(c.muted, lit: false),
+                              ReportLevel.done => Led(c.ledGreen),
+                            },
+                          ),
                         ),
-                        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                        shape: const Border(),
-                        leading: switch (kind.level) {
-                          ReportLevel.error => Icon(
-                            Icons.error_outline_rounded,
-                            color: theme.colorScheme.error,
-                          ),
-                          ReportLevel.warning => Icon(
-                            Icons.warning_amber_rounded,
-                            color: context.colors.ledAmber,
-                          ),
-                          ReportLevel.skipped => Icon(
-                            Icons.remove_circle_outline_rounded,
-                            color: c.muted,
-                          ),
-                          ReportLevel.done => Icon(
-                            Icons.check_circle_outline_rounded,
-                            color: c.accent,
-                          ),
-                        },
                         title: Text(
                           '${reportKindLabel(l10n, kind)} · ${items.length}',
                         ),
@@ -127,7 +118,7 @@ class _ReportDialog extends StatelessWidget {
                               child: SelectableText.rich(
                                 TextSpan(
                                   text: item.path,
-                                  style: theme.textTheme.bodySmall,
+                                  style: context.type.caption,
                                   children: [
                                     if (item.detail case final detail?)
                                       TextSpan(text: '\n$detail', style: muted),

@@ -5,11 +5,11 @@ import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
+import 'kit/kit.dart';
 import 'labels.dart';
 import 'overview.dart';
 import 'status_trail.dart';
 import 'title_actions.dart';
-import 'widgets.dart';
 
 /// Height of the bar of the actions of a card.
 const _barHeight = 28.0;

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/theme/app_theme.dart';
-import 'package:reaharvest/ui/glass_dialog.dart';
+import 'package:reaharvest/ui/kit/kit.dart';
 
 void main() {
   testWidgets('a dialog opened by the helper shows over a blurred backdrop', (

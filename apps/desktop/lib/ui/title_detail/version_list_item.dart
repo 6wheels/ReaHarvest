@@ -6,8 +6,8 @@ import '../../l10n/app_localizations.dart';
 import '../../state/navigation.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
+import '../kit/kit.dart';
 import '../labels.dart';
-import '../widgets.dart';
 
 /// Version of the title detail list, like a rack strip: a light lit when
 /// the version is adopted (off when not), its label and readouts, its
@@ -76,89 +76,85 @@ class _VersionItemState extends ConsumerState<VersionItem> {
                   : c.border,
             ),
           ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(Radii.s),
-              onTap: widget.onTap,
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Lit edge of the selected strip only.
-                    AnimatedContainer(
-                      duration: Motion.fast,
-                      width: Sizes.bar,
-                      margin: const EdgeInsets.symmetric(vertical: Space.sm),
-                      color: selected ? c.accent : Colors.transparent,
+          child: PressableSurface(
+            onTap: widget.onTap,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Lit edge of the selected strip only.
+                  AnimatedContainer(
+                    duration: Motion.fast,
+                    width: Sizes.bar,
+                    margin: const EdgeInsets.symmetric(vertical: Space.sm),
+                    color: selected ? c.accent : Colors.transparent,
+                  ),
+                  const SizedBox(width: Space.md),
+                  if (m != null || alerts.notAdopted) ...[
+                    Center(
+                      child: m == null
+                          ? Tooltip(
+                              message: l10n.notAdopted,
+                              child: Led(c.accent, lit: false),
+                            )
+                          : Led(c.accent),
                     ),
                     const SizedBox(width: Space.md),
-                    if (m != null || alerts.notAdopted) ...[
-                      Center(
-                        child: m == null
-                            ? Tooltip(
-                                message: l10n.notAdopted,
-                                child: Led(c.accent, lit: false),
-                              )
-                            : Led(c.accent),
-                      ),
-                      const SizedBox(width: Space.md),
-                    ],
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: Space.md),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.type.item.copyWith(
-                                color: generic ? c.muted : null,
-                              ),
+                  ],
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: Space.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.type.item.copyWith(
+                              color: generic ? c.muted : null,
                             ),
-                            const SizedBox(height: Space.xxs),
-                            Text.rich(
-                              TextSpan(
-                                text: details,
-                                children: [
-                                  if (generic)
-                                    TextSpan(
-                                      text: ' · ${version.fileName}',
-                                      style: AppText.italic,
-                                    ),
-                                ],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.type.readoutSmall,
+                          ),
+                          const SizedBox(height: Space.xxs),
+                          Text.rich(
+                            TextSpan(
+                              text: details,
+                              children: [
+                                if (generic)
+                                  TextSpan(
+                                    text: ' · ${version.fileName}',
+                                    style: AppText.italic,
+                                  ),
+                              ],
                             ),
-                          ],
-                        ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.type.readoutSmall,
+                          ),
+                        ],
                       ),
                     ),
-                    if (status != null) ...[
-                      const SizedBox(width: Space.s),
-                      Center(
-                        child: Pill(statusLabel(l10n, status), color: c.accent),
-                      ),
-                    ],
-                    if (alerts.missing.isNotEmpty ||
-                        alerts.duplicates.isNotEmpty) ...[
-                      const SizedBox(width: Space.s),
-                      Center(
-                        child: Icon(
-                          Icons.warning_amber_rounded,
-                          size: IconSize.l,
-                          color: context.colors.ledAmber,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(width: Space.m),
+                  ),
+                  if (status != null) ...[
+                    const SizedBox(width: Space.s),
+                    Center(
+                      child: Pill(statusLabel(l10n, status), color: c.accent),
+                    ),
                   ],
-                ),
+                  if (alerts.missing.isNotEmpty ||
+                      alerts.duplicates.isNotEmpty) ...[
+                    const SizedBox(width: Space.s),
+                    Center(
+                      child: Icon(
+                        Icons.warning_amber_rounded,
+                        size: IconSize.l,
+                        color: context.colors.ledAmber,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: Space.m),
+                ],
               ),
             ),
           ),

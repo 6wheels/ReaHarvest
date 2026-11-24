@@ -9,14 +9,17 @@ import '../../state/providers.dart';
 import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
-import '../to_sort/fix_dialog.dart';
+import '../kit/kit.dart';
 import '../versions/version_ui_actions.dart';
 
-/// Width of the field adding a tag.
-const _fieldWidth = 200.0;
+/// Width of the field adding a tag, side of the button showing it.
+const _fieldWidth = 160.0;
+const _addSide = 18.0;
 
-/// Free tags of a title (SPEC §5.9): one chip each, removable, and a field
-/// to add one, with autocompletion over the tags of the library.
+/// Free tags of a title (SPEC §5.9): one chip each, removable, and a small
+/// "+" showing a field to add one, with autocompletion over the tags of the
+/// library. Enter adds a tag and keeps the focus in the field; Escape or a
+/// click outside hides it.
 class TitleTags extends ConsumerStatefulWidget {
   const TitleTags(this.title, {super.key});
 
@@ -28,6 +31,14 @@ class TitleTags extends ConsumerStatefulWidget {
 
 class _TitleTagsState extends ConsumerState<TitleTags> {
   final _controller = TextEditingController();
+
+  /// Whether the field adding a tag is shown.
+  var _adding = false;
+
+  void _hideField() => setState(() {
+    _adding = false;
+    _controller.clear();
+  });
 
   @override
   void dispose() {
@@ -90,29 +101,63 @@ class _TitleTagsState extends ConsumerState<TitleTags> {
                 for (final tag in tags)
                   Padding(
                     padding: const EdgeInsets.only(right: Space.s),
-                    child: InputChip(
-                      visualDensity: VisualDensity.compact,
-                      label: Text(tag),
-                      deleteButtonTooltipMessage: l10n.tagRemove(tag),
-                      onDeleted: () => _remove(tag),
+                    child: Center(
+                      child: Pill(
+                        tag,
+                        uppercase: false,
+                        deleteTooltip: l10n.tagRemove(tag),
+                        onDeleted: () => _remove(tag),
+                      ),
                     ),
                   ),
+                // Right after the tags: a discreet "+", then its field.
+                Center(
+                  child: _adding
+                      ? TextFieldTapRegion(
+                          onTapOutside: (_) => _hideField(),
+                          child: Focus(
+                            // Leaving the field (Tab, a click in another
+                            // field) discards the entry.
+                            canRequestFocus: false,
+                            skipTraversal: true,
+                            onFocusChange: (focused) {
+                              if (!focused) _hideField();
+                            },
+                            child: SizedBox(
+                              width: _fieldWidth,
+                              child: LevelField(
+                                label: l10n.tagAddHint,
+                                controller: _controller,
+                                options: () => [
+                                  for (final t in known)
+                                    if (!tags.any(
+                                      (x) => x.toLowerCase() == t.toLowerCase(),
+                                    ))
+                                      t,
+                                ],
+                                error: null,
+                                compact: true,
+                                autofocus: true,
+                                onChanged: () {},
+                                onSubmit: _add,
+                                onCancel: _hideField,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Tooltip(
+                          message: l10n.tagAddHint,
+                          child: PressableSurface(
+                            onTap: () => setState(() => _adding = true),
+                            radius: Radii.xs,
+                            child: const SizedBox.square(
+                              dimension: _addSide,
+                              child: Icon(Icons.add_rounded, size: IconSize.s),
+                            ),
+                          ),
+                        ),
+                ),
               ],
-            ),
-          ),
-          SizedBox(
-            width: _fieldWidth,
-            child: LevelField(
-              label: l10n.tagAddHint,
-              controller: _controller,
-              options: () => [
-                for (final t in known)
-                  if (!tags.any((x) => x.toLowerCase() == t.toLowerCase())) t,
-              ],
-              error: null,
-              dense: true,
-              onChanged: () {},
-              onSubmit: _add,
             ),
           ),
         ],

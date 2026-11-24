@@ -10,7 +10,7 @@ import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
-import '../widgets.dart';
+import '../kit/kit.dart';
 import 'version_ui_actions.dart';
 
 /// Entries in the trash of a title (version folders and assets), with

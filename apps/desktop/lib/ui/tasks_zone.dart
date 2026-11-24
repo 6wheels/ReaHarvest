@@ -5,8 +5,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart' show Report;
 import '../l10n/app_localizations.dart';
 import '../state/tasks.dart';
 import '../theme/app_theme.dart';
+import 'kit/kit.dart';
 import 'report_dialog.dart';
-import 'widgets.dart';
 
 /// Layout of a task: height of the list and of a row, widths of the light,
 /// of the percentage and of the meter.
@@ -74,7 +74,7 @@ class TasksZone extends ConsumerWidget {
           style: context.legend.copyWith(color: c.text),
         ),
       );
-      content = Material(
+      content = Surface(
         color: c.surface,
         shape: Border(top: BorderSide(color: c.border)),
         child: Padding(
@@ -216,25 +216,16 @@ class _TaskRow extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final text = Theme.of(context).textTheme;
     final muted = text.bodySmall?.copyWith(color: c.muted);
-    final error = Theme.of(context).colorScheme.error;
     // A queued task shows that it waits in place of its step.
     final step = taskStep(task, l10n);
-    // Status: light off while waiting, breathing amber while running, then
-    // an icon: green check, orange warning, red error.
+    // Status light: dark while waiting or cancelled, breathing while
+    // running, blinking when failed, steady with its color otherwise.
     final light = switch (task.state) {
       TaskState.queued || TaskState.cancelled => Led(c.muted, lit: false),
       TaskState.running => Led(c.ledAmber, mode: LedMode.pulse),
-      TaskState.done => Icon(
-        Icons.check_circle,
-        size: IconSize.l,
-        color: c.ledGreen,
-      ),
-      TaskState.warning => Icon(
-        Icons.warning,
-        size: IconSize.l,
-        color: c.ledAmber,
-      ),
-      TaskState.failed => Icon(Icons.error, size: IconSize.l, color: error),
+      TaskState.done => Led(c.ledGreen),
+      TaskState.warning => Led(c.ledAmber),
+      TaskState.failed => Led(c.ledRed, mode: LedMode.blink),
     };
     final trailing = taskAction(context, ref, task);
     return ConstrainedBox(

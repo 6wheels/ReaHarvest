@@ -9,10 +9,11 @@ import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
-import 'labels.dart';
 import 'formats.dart';
+import 'kit/kit.dart';
+import 'labels.dart';
+import 'project_actions.dart';
 import 'title_detail/title_detail_page.dart';
-import 'widgets.dart';
 
 /// Height of the overview dock.
 const overviewHeight = 196.0;
@@ -147,7 +148,7 @@ class Overview extends ConsumerWidget {
               borderRadius: radius,
               border: Border.all(color: c.border),
             ),
-            child: Material(type: MaterialType.transparency, child: body),
+            child: Surface(child: body),
           ),
         ),
       ),
@@ -278,8 +279,9 @@ class _Alert extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    borderRadius: BorderRadius.circular(Radii.xs),
+  Widget build(BuildContext context) => PressableSurface(
+    radius: Radii.xs,
+    dimDisabled: false,
     onTap: onTap,
     child: Padding(
       padding: const EdgeInsets.symmetric(vertical: Space.xxs),

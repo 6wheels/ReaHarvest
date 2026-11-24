@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
+import 'kit/kit.dart';
 import 'settings/about_page.dart';
 import 'settings/appearance_page.dart';
 import 'settings/libraries_page.dart';
@@ -70,7 +70,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       child: SizedBox(
         width: _width,
         height: _height,
-        child: Material(
+        child: Surface(
           color: c.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Radii.m),
@@ -119,7 +119,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: Space.m),
+                      const SizedBox(width: Space.l),
                       Expanded(
                         child: SingleChildScrollView(
                           key: ValueKey(_page),
@@ -160,44 +160,36 @@ class _MenuEntry extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.xs),
-      child: Material(
-        color: selected ? c.raised : Colors.transparent,
-        borderRadius: BorderRadius.circular(Radii.s),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Radii.s),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Space.s,
-              vertical: Space.s,
-            ),
-            decoration: BoxDecoration(
-              border: Border(
-                left: BorderSide(
-                  color: selected ? c.accent : Colors.transparent,
-                  width: Sizes.menuBar,
-                ),
+      // No frame, no fill: the lit bar and the text tell the selection.
+      child: PressableSurface(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(Space.s),
+          child: Row(
+            children: [
+              // Lit bar of the selected section.
+              Container(
+                width: Space.xxs,
+                height: Space.m,
+                color: selected ? c.accent : c.muted,
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: IconSize.l,
-                  color: selected ? c.accent : c.muted,
-                ),
-                const SizedBox(width: Space.s),
-                Expanded(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.bodyMedium?.copyWith(
-                      fontWeight: selected ? Weights.bold : Weights.regular,
-                    ),
+              const SizedBox(width: Space.s),
+              Icon(
+                icon,
+                size: IconSize.l,
+                color: selected ? c.accent : c.muted,
+              ),
+              const SizedBox(width: Space.s),
+              Expanded(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.bodyMedium?.copyWith(
+                    fontWeight: selected ? Weights.bold : Weights.regular,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

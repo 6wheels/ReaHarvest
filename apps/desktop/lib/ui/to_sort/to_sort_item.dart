@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart' hide Title;
 
 import '../../theme/app_theme.dart';
-import '../widgets.dart';
+import '../kit/kit.dart';
 
 /// Entry of the "To sort" list, like a rack strip: a square light to select
 /// it (when it can be), its name and place, detail readouts and its action
@@ -60,43 +60,40 @@ class _ItemState extends State<Item> {
                   : c.border,
             ),
           ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(Radii.s),
-              onTap: selected == null
-                  ? null
-                  : () => widget.onSelected?.call(!selected),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Lit edge of the selected strip.
-                    AnimatedContainer(
-                      duration: Motion.fast,
-                      width: Sizes.bar,
-                      margin: const EdgeInsets.symmetric(vertical: Space.sm),
-                      color: lit ? c.accent : Colors.transparent,
-                    ),
-                    if (selected != null)
-                      Padding(
-                        padding: const EdgeInsets.only(left: Space.md),
-                        child: Center(
-                          child: Semantics(
-                            checked: selected,
-                            label: widget.title,
-                            child: ChoiceLight(checked: selected),
-                          ),
+          child: PressableSurface(
+            dimDisabled: false,
+            onTap: selected == null
+                ? null
+                : () => widget.onSelected?.call(!selected),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Lit edge of the selected strip.
+                  AnimatedContainer(
+                    duration: Motion.fast,
+                    width: Sizes.bar,
+                    margin: const EdgeInsets.symmetric(vertical: Space.sm),
+                    color: lit ? c.accent : Colors.transparent,
+                  ),
+                  if (selected != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: Space.md),
+                      child: Center(
+                        child: Semantics(
+                          checked: selected,
+                          label: widget.title,
+                          child: ChoiceLight(checked: selected),
                         ),
                       ),
-                    Expanded(child: _content(context)),
-                    if (widget.action case final action?)
-                      Padding(
-                        padding: const EdgeInsets.only(right: Space.s),
-                        child: Center(child: action),
-                      ),
-                  ],
-                ),
+                    ),
+                  Expanded(child: _content(context)),
+                  if (widget.action case final action?)
+                    Padding(
+                      padding: const EdgeInsets.only(right: Space.s),
+                      child: Center(child: action),
+                    ),
+                ],
               ),
             ),
           ),

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/theme/app_theme.dart';
-import 'package:reaharvest/ui/to_sort/fix_dialog.dart';
+import 'package:reaharvest/ui/kit/kit.dart';
+import 'package:reaharvest/ui/to_sort/fix_dialog.dart' show Choice;
 
 /// The fields of the "To sort" fixes, kept for the page of #149.
 void main() {

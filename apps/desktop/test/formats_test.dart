@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart' hide Title;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/ui/formats.dart';
-import 'package:reaharvest/ui/widgets.dart';
-import 'package:reaharvest_repository/reaharvest_repository.dart';
+import 'package:reaharvest/ui/project_actions.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 void main() {
   test('formatSize picks the unit and the precision', () {

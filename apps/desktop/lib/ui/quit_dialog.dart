@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../state/tasks.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
+import 'kit/kit.dart';
 import 'tasks_zone.dart' show appNavigatorKey;
 
 /// Lists the [tasks] that run or wait and asks whether to cancel them and

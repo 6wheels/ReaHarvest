@@ -6,8 +6,8 @@ import '../../l10n/app_localizations.dart';
 import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../formats.dart';
-import '../glass_dialog.dart';
-import '../widgets.dart';
+import '../kit/kit.dart';
+import '../project_actions.dart';
 
 /// Asks to confirm [action]; [danger] marks an action that moves or deletes
 /// several things at once.
