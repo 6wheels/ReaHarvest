@@ -6,6 +6,9 @@ import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
 import 'layout_labels.dart';
 
+/// Width of the dialog.
+const _width = 600.0;
+
 /// Shows [report] of the action [title] (SPEC §5.2): one section per kind of
 /// outcome, problems first and expanded, each item with its path.
 Future<void> showReport(BuildContext context, String title, Report report) =>
@@ -54,9 +57,6 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.fixUndone => l10n.reportFixUndone,
     };
 
-/// Warning color, between the accent and the error.
-const _warning = Color(0xFFE0A33B);
-
 class _ReportDialog extends StatelessWidget {
   const _ReportDialog(this.title, this.report);
 
@@ -72,7 +72,7 @@ class _ReportDialog extends StatelessWidget {
     return AlertDialog(
       title: Text(title),
       content: SizedBox(
-        width: 600,
+        width: _width,
         child: report.isEmpty
             ? Text(l10n.reportEmpty, style: muted)
             : SingleChildScrollView(
@@ -96,9 +96,9 @@ class _ReportDialog extends StatelessWidget {
                             Icons.error_outline_rounded,
                             color: theme.colorScheme.error,
                           ),
-                          ReportLevel.warning => const Icon(
+                          ReportLevel.warning => Icon(
                             Icons.warning_amber_rounded,
-                            color: _warning,
+                            color: context.colors.ledAmber,
                           ),
                           ReportLevel.skipped => Icon(
                             Icons.remove_circle_outline_rounded,

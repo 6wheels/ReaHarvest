@@ -94,7 +94,7 @@ class VersionPane extends ConsumerWidget {
             ],
           ],
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: Space.xxs),
         Text(
           versionDetails(
             ref,
@@ -123,7 +123,7 @@ class VersionPane extends ConsumerWidget {
                 const SizedBox(width: Space.xs),
                 IconButton(
                   tooltip: l10n.showInExplorer,
-                  iconSize: 16,
+                  iconSize: IconSize.m,
                   visualDensity: VisualDensity.compact,
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.all(Space.xs),
@@ -145,7 +145,7 @@ class VersionPane extends ConsumerWidget {
               if (alerts.missing.isNotEmpty)
                 Pill(
                   l10n.missingPluginCount(alerts.missing.length),
-                  color: warningColor,
+                  color: context.colors.ledAmber,
                 ),
             ],
           ),
@@ -168,13 +168,13 @@ class VersionPane extends ConsumerWidget {
             ),
             // Not wired yet: renders are played from phase 3 (SPEC §5).
             OutlinedButton.icon(
-              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              icon: const Icon(Icons.play_arrow_rounded, size: IconSize.l),
               onPressed: null,
               label: Text(l10n.playRender),
             ),
             if (hasHistory)
               OutlinedButton.icon(
-                icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                icon: const Icon(Icons.bookmark_add_outlined, size: IconSize.l),
                 onPressed: () => _backup(context, ref),
                 label: Text(l10n.createBackup),
               ),
@@ -198,7 +198,7 @@ class VersionPane extends ConsumerWidget {
                     for (final s in {...Title.defaultStatuses, ?status})
                       MenuItemButton(
                         trailingIcon: s == status
-                            ? const Icon(Icons.check_rounded, size: 18)
+                            ? const Icon(Icons.check_rounded, size: IconSize.l)
                             : null,
                         onPressed: () => setVersionStatusFromUi(
                           context,
@@ -253,13 +253,13 @@ class VersionPane extends ConsumerWidget {
           const SizedBox(height: Space.xs),
           for (final plugin in alerts.missing)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(vertical: Space.xxs),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.extension_off_outlined,
-                    size: 16,
-                    color: warningColor,
+                    size: IconSize.m,
+                    color: context.colors.ledAmber,
                   ),
                   const SizedBox(width: Space.s),
                   Expanded(child: Text(plugin.name, style: text.bodyMedium)),
@@ -278,12 +278,12 @@ class VersionPane extends ConsumerWidget {
                       : '${titleName(t)}/${v.fileName}',
               ].join(', '),
             ),
-            style: text.bodyMedium?.copyWith(color: warningColor),
+            style: text.bodyMedium?.copyWith(color: context.colors.ledAmber),
           ),
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
-              icon: const Icon(Icons.call_split_rounded, size: 18),
+              icon: const Icon(Icons.call_split_rounded, size: IconSize.l),
               onPressed: () => runProjectChange(
                 context,
                 ref,

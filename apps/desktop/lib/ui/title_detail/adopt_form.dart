@@ -8,6 +8,12 @@ import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../widgets.dart';
 
+/// Widest the row of the owner grows.
+const _rowWidth = 420.0;
+
+/// Width of the drop-down of the owner.
+const _ownerWidth = 160.0;
+
 /// Adoption of a version without metadata: its id written into the project,
 /// its label and owner (chosen among the declared members; none when the
 /// library declares none) into the title's node file (SPEC §4.2).
@@ -85,7 +91,7 @@ class _AdoptState extends ConsumerState<Adopt> {
         ),
         const SizedBox(height: Space.s),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: _rowWidth),
           child: Row(
             children: [
               Expanded(
@@ -102,7 +108,7 @@ class _AdoptState extends ConsumerState<Adopt> {
               if (members.isNotEmpty) ...[
                 const SizedBox(width: Space.s),
                 SizedBox(
-                  width: 160,
+                  width: _ownerWidth,
                   child: Dropdown<MemberId>(
                     value: owner,
                     label: l10n.filterOwner,

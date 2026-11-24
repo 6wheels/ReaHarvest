@@ -63,7 +63,7 @@ class AppearancePage extends ConsumerWidget {
                   value: value,
                   tooltip: label,
                   label: _Swatch(
-                    accentOf(value).on(Theme.of(context).brightness),
+                    Accents.of(value, Theme.of(context).brightness),
                   ),
                 ),
             ],
@@ -115,6 +115,9 @@ class AppearancePage extends ConsumerWidget {
   }
 }
 
+/// Side of the square of an accent color.
+const _swatch = 12.0;
+
 /// Small square of an accent color.
 class _Swatch extends StatelessWidget {
   const _Swatch(this.color);
@@ -123,8 +126,8 @@ class _Swatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 12,
-    height: 12,
+    width: _swatch,
+    height: _swatch,
     decoration: BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(Radii.xs),

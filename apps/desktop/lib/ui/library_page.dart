@@ -21,6 +21,14 @@ import 'title_card.dart';
 import 'studio_title_bar.dart';
 import 'title_views.dart';
 
+/// Widest the search field of the title bar grows.
+const _searchWidth = 480.0;
+
+/// Offset of the overview bar when hidden, in its own size, and of a card at
+/// its entrance, in its size.
+const _hidden = Offset(0, 1.2);
+const _riseFrom = Offset(0, 0.04);
+
 /// Main window: the library (SPEC §5.2). Search bar at the top, filters
 /// below, then the titles as cards, list or tree, and the overview docked
 /// at the bottom.
@@ -131,7 +139,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       children: [
                         StudioTitleBar(
                           center: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 480),
+                            constraints: const BoxConstraints(
+                              maxWidth: _searchWidth,
+                            ),
                             child: LibrarySearchField(focusNode: _searchFocus),
                           ),
                           trailing: const _SettingsButton(),
@@ -183,7 +193,7 @@ class _OverviewHostState extends State<_OverviewHost> {
     return IgnorePointer(
       ignoring: !open,
       child: AnimatedSlide(
-        offset: Offset(0, open ? 0 : 1.2),
+        offset: open ? Offset.zero : _hidden,
         duration: Motion.medium,
         curve: Motion.curve,
         onEnd: () {
@@ -280,20 +290,16 @@ class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
           cursorColor: c.accent,
           decoration: InputDecoration(
             hintText: l10n.searchHint,
-            hintStyle: TextStyle(color: c.muted, fontSize: 13),
-            prefixIcon: const Icon(Icons.search_rounded, size: 16),
-            prefixIconConstraints: const BoxConstraints(minWidth: 32),
+            hintStyle: context.type.body.copyWith(color: c.muted),
+            prefixIcon: const Icon(Icons.search_rounded, size: IconSize.m),
             // The shortcut while empty, then a discreet button clearing it.
             suffixIcon: empty
                 ? Padding(
                     padding: const EdgeInsets.only(right: Space.s),
-                    child: Text(
-                      shortcut,
-                      style: context.legend.copyWith(fontSize: 9.5),
-                    ),
+                    child: Text(shortcut, style: context.type.legendSmall),
                   )
                 : Padding(
-                    padding: const EdgeInsets.only(right: 2),
+                    padding: const EdgeInsets.only(right: Space.xxs),
                     child: IconButton(
                       tooltip: l10n.clearSearch,
                       onPressed: _clear,
@@ -301,10 +307,10 @@ class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
                       // Smaller than the theme size, so that the field
                       // keeps its height.
                       style: IconButton.styleFrom(
-                        fixedSize: const Size.square(22),
+                        fixedSize: const Size.square(Sizes.mini),
                         minimumSize: Size.zero,
                         padding: EdgeInsets.zero,
-                        iconSize: 14,
+                        iconSize: IconSize.s,
                       ).merge(Theme.of(context).iconButtonTheme.style),
                       icon: const Icon(Icons.close_rounded),
                     ),
@@ -328,7 +334,7 @@ class _SettingsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: AppLocalizations.of(context).settings,
-    iconSize: 16,
+    iconSize: IconSize.m,
     onPressed: () => showSettings(context),
     icon: const Icon(Icons.settings_outlined),
   );
@@ -356,7 +362,11 @@ class _Message extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: c.muted.withValues(alpha: 0.6)),
+            Icon(
+              icon,
+              size: IconSize.hero,
+              color: c.muted.withValues(alpha: Alpha.strong),
+            ),
             const SizedBox(height: Space.m),
             Text(title, style: text.titleMedium, textAlign: TextAlign.center),
             if (hint case final hint?) ...[
@@ -510,7 +520,7 @@ class _Appear extends StatefulWidget {
 class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 420),
+    duration: Motion.cascade,
   );
   late final _t = CurvedAnimation(parent: _controller, curve: Motion.curve);
   var _rise = true;
@@ -533,8 +543,10 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
       _controller.forward();
       return;
     }
-    final delay = widget.index < 24 ? widget.index * 30 : 0;
-    Future.delayed(Duration(milliseconds: delay), () {
+    final delay = widget.index < 24
+        ? Motion.stagger * widget.index
+        : Duration.zero;
+    Future.delayed(delay, () {
       if (mounted) _controller.forward();
     });
   }
@@ -550,10 +562,7 @@ class _AppearState extends State<_Appear> with SingleTickerProviderStateMixin {
     opacity: _t,
     child: _rise
         ? SlideTransition(
-            position: Tween(
-              begin: const Offset(0, 0.04),
-              end: Offset.zero,
-            ).animate(_t),
+            position: Tween(begin: _riseFrom, end: Offset.zero).animate(_t),
             child: widget.child,
           )
         : widget.child,

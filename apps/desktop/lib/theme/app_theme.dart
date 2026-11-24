@@ -4,10 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:reaharvest_library/reaharvest_library.dart'
     show AccentPreference;
 
-/// Spacing scale (logical pixels).
+/// Spacing scale (logical pixels), by increasing value: [xxs] 2, [xs] 4,
+/// [sm] 6, [s] 8, [md] 10, [ml] 12, [m] 16, [l] 24, [xl] 32.
 abstract final class Space {
+  static const xxs = 2.0;
   static const xs = 4.0;
+  static const sm = 6.0;
   static const s = 8.0;
+  static const md = 10.0;
+  static const ml = 12.0;
   static const m = 16.0;
   static const l = 24.0;
   static const xl = 32.0;
@@ -25,7 +30,130 @@ abstract final class Motion {
   static const fast = Duration(milliseconds: 150);
   static const medium = Duration(milliseconds: 280);
   static const slow = Duration(milliseconds: 600);
+
+  /// Entrance of the cards of a list, one after the other.
+  static const cascade = Duration(milliseconds: 420);
+
+  /// Delay between two cards of the cascade.
+  static const stagger = Duration(milliseconds: 30);
+
+  /// Delay before a tooltip of the title bar shows.
+  static const tooltip = Duration(milliseconds: 1500);
   static const curve = Curves.easeOutCubic;
+}
+
+/// Sizes of the controls and of the popups (logical pixels).
+abstract final class Sizes {
+  /// Hairline: dividers.
+  static const hairline = 1.0;
+
+  /// Bar marking a selected row, and the wider one of a menu entry.
+  static const bar = 2.0;
+  static const menuBar = 3.0;
+
+  /// Height of a filter pill and of its segmented bar, of a segment.
+  static const control = 26.0;
+  static const segment = 20.0;
+
+  /// Height of a field or a button, of a small button, of a heading row.
+  static const field = 32.0;
+  static const mini = 22.0;
+  static const row = 30.0;
+
+  /// Cover of a title in its header.
+  static const avatar = 72.0;
+
+  /// Width of a window button.
+  static const windowButton = 44.0;
+}
+
+/// Blur of the glows and of the shadows, and the offset of a drop shadow.
+abstract final class Blur {
+  static const s = 6.0;
+  static const m = 12.0;
+  static const l = 24.0;
+  static const dropOffset = Offset(0, 6);
+}
+
+/// Elevation of a menu and of a dialog.
+abstract final class Elevation {
+  static const menu = 6.0;
+  static const dialog = 24.0;
+}
+
+/// Line heights: tight for a name over an image, normal for a label, loose
+/// for a paragraph.
+abstract final class Leading {
+  static const tight = 1.2;
+  static const normal = 1.3;
+  static const loose = 1.4;
+}
+
+/// Letter spacing of the capitals: the legend and the wider heading.
+abstract final class Tracking {
+  static const legend = 1.1;
+  static const wide = 1.2;
+}
+
+/// Alpha levels: every translucent tint, border or shade of the interface
+/// takes one of them.
+abstract final class Alpha {
+  /// Fill of a selected row or chip.
+  static const faint = 0.08;
+
+  /// Fill of a lit control, glow.
+  static const tint = 0.14;
+
+  /// Light hairline, light shade.
+  static const soft = 0.25;
+
+  /// Border of a selected item, dimmed text.
+  static const medium = 0.45;
+
+  /// Dimmed icon, strong border.
+  static const strong = 0.65;
+
+  /// Nearly opaque shade.
+  static const dense = 0.85;
+}
+
+/// Icon sizes (logical pixels).
+abstract final class IconSize {
+  static const xs = 12.0;
+  static const s = 14.0;
+  static const m = 16.0;
+  static const l = 18.0;
+  static const xl = 20.0;
+
+  /// Illustration of an empty list.
+  static const hero = 48.0;
+
+  /// Side of a square icon action.
+  static const action = 28.0;
+
+  /// Status lights.
+  static const ledS = 6.0;
+  static const ledM = 8.0;
+  static const ledL = 10.0;
+}
+
+/// Font weights.
+abstract final class Weights {
+  static const regular = FontWeight.w400;
+  static const medium = FontWeight.w500;
+  static const semibold = FontWeight.w600;
+  static const bold = FontWeight.w700;
+}
+
+/// Fixed tones, for what is drawn over an image (the aurora of a title).
+abstract final class Tone {
+  static const black = Color(0xFF000000);
+  static const white = Color(0xFFFFFFFF);
+
+  /// Shade at the bottom of the aurora, behind the name of a title, on the
+  /// dark and on the light theme.
+  static const auroraShadeDark = Color(0xB0000000);
+  static const auroraShadeLight = Color(0x99FFFFFF);
 }
 
 /// Type faces: Inter for running text and names, JetBrains Mono for the
@@ -145,84 +273,180 @@ final class AppColors extends ThemeExtension<AppColors> {
 extension AppColorsX on BuildContext {
   AppColors get colors => Theme.of(this).extension<AppColors>()!;
 
-  /// Console legend: small mono capitals, widely spaced. Callers upper-case
-  /// the text themselves.
-  TextStyle get legend => TextStyle(
-    fontFamily: Fonts.mono,
-    fontSize: 10.5,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 1.1,
-    height: 1.3,
-    color: colors.muted,
-  );
+  /// Text styles of the interface.
+  AppText get type => Theme.of(this).extension<AppText>()!;
+
+  /// Console legend: small mono capitals, widely spaced.
+  TextStyle get legend => type.legend;
 
   /// Readout: mono figures (tempo, counts, dates, durations).
-  TextStyle get readout => TextStyle(
-    fontFamily: Fonts.mono,
-    fontSize: 11.5,
-    fontWeight: FontWeight.w500,
-    height: 1.3,
-    color: colors.muted,
-    fontFeatures: const [FontFeature.tabularFigures()],
-  );
+  TextStyle get readout => type.readout;
 }
 
-/// Accent color of the interface: a hue and a saturation, as light as the
-/// teal accent on each theme. A neutral one (no saturation) is near white
-/// on the dark theme and near black on the light one, like the keys of a
-/// console. The colors are soft and warm, like the LEDs of a mixing desk.
+/// Text styles of the application: a scale of six sizes for running text,
+/// and the mono styles of the console.
 @immutable
-final class Accent {
-  const Accent(this.hue, this.saturation);
+final class AppText extends ThemeExtension<AppText> {
+  const AppText({
+    required this.micro,
+    required this.small,
+    required this.caption,
+    required this.body,
+    required this.item,
+    required this.title,
+    required this.legend,
+    required this.legendSmall,
+    required this.readout,
+    required this.readoutSmall,
+  });
 
-  /// Default accent.
-  static const neutral = Accent(230, 0);
-  static const orange = Accent(26, 0.6);
-  static const yellow = Accent(44, 0.62);
-
-  /// [buildTheme] uses the exact design tokens for it.
-  static const teal = Accent(163, 0.63);
-  static const blue = Accent(199, 0.63);
-  static const violet = Accent(266, 0.45);
-
-  final double hue;
-  final double saturation;
-
-  Color on(Brightness brightness) {
-    final chroma = (saturation / 0.65).clamp(0.0, 1.0);
-    final lightness = brightness == Brightness.dark
-        ? 0.94 - 0.25 * chroma
-        : 0.12 + 0.17 * chroma;
-    return HSLColor.fromAHSL(1, hue, saturation, lightness).toColor();
+  /// Styles over the colors [c].
+  factory AppText.of(AppColors c) {
+    TextStyle text(double size, [FontWeight? weight]) => TextStyle(
+      fontFamily: Fonts.text,
+      fontSize: size,
+      fontWeight: weight,
+      color: c.text,
+    );
+    TextStyle legend(double size) => TextStyle(
+      fontFamily: Fonts.mono,
+      fontSize: size,
+      fontWeight: Weights.bold,
+      letterSpacing: Tracking.legend,
+      height: Leading.normal,
+      color: c.muted,
+    );
+    TextStyle readout(double size) => TextStyle(
+      fontFamily: Fonts.mono,
+      fontSize: size,
+      fontWeight: Weights.medium,
+      height: Leading.normal,
+      color: c.muted,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return AppText(
+      micro: text(9.5),
+      small: text(11),
+      caption: text(12),
+      body: text(13),
+      item: text(13.5, Weights.semibold),
+      title: text(20, Weights.medium),
+      legend: legend(10.5),
+      legendSmall: legend(9.5),
+      readout: readout(11.5),
+      readoutSmall: readout(11),
+    );
   }
 
-  @override
-  bool operator ==(Object other) =>
-      other is Accent && other.hue == hue && other.saturation == saturation;
+  /// Weight or slant only, for a span inheriting the rest.
+  static const semibold = TextStyle(fontWeight: Weights.semibold);
+  static const italic = TextStyle(fontStyle: FontStyle.italic);
+
+  /// Color only, for a span inheriting the rest.
+  static TextStyle color(Color color) => TextStyle(color: color);
+
+  final TextStyle micro;
+  final TextStyle small;
+  final TextStyle caption;
+  final TextStyle body;
+
+  /// Name of a row of a list.
+  final TextStyle item;
+  final TextStyle title;
+
+  /// Console legend: small mono capitals, widely spaced. Callers upper-case
+  /// the text themselves.
+  final TextStyle legend;
+  final TextStyle legendSmall;
+
+  /// Mono figures (tempo, counts, dates, durations).
+  final TextStyle readout;
+  final TextStyle readoutSmall;
 
   @override
-  int get hashCode => Object.hash(hue, saturation);
+  AppText copyWith({
+    TextStyle? micro,
+    TextStyle? small,
+    TextStyle? caption,
+    TextStyle? body,
+    TextStyle? item,
+    TextStyle? title,
+    TextStyle? legend,
+    TextStyle? legendSmall,
+    TextStyle? readout,
+    TextStyle? readoutSmall,
+  }) => AppText(
+    micro: micro ?? this.micro,
+    small: small ?? this.small,
+    caption: caption ?? this.caption,
+    body: body ?? this.body,
+    item: item ?? this.item,
+    title: title ?? this.title,
+    legend: legend ?? this.legend,
+    legendSmall: legendSmall ?? this.legendSmall,
+    readout: readout ?? this.readout,
+    readoutSmall: readoutSmall ?? this.readoutSmall,
+  );
+
+  @override
+  AppText lerp(AppText? other, double t) {
+    if (other == null) return this;
+    TextStyle mix(TextStyle a, TextStyle b) => TextStyle.lerp(a, b, t)!;
+    return AppText(
+      micro: mix(micro, other.micro),
+      small: mix(small, other.small),
+      caption: mix(caption, other.caption),
+      body: mix(body, other.body),
+      item: mix(item, other.item),
+      title: mix(title, other.title),
+      legend: mix(legend, other.legend),
+      legendSmall: mix(legendSmall, other.legendSmall),
+      readout: mix(readout, other.readout),
+      readoutSmall: mix(readoutSmall, other.readoutSmall),
+    );
+  }
 }
 
-/// Accent of the [preference].
-Accent accentOf(AccentPreference preference) => switch (preference) {
-  AccentPreference.neutral => Accent.neutral,
-  AccentPreference.orange => Accent.orange,
-  AccentPreference.yellow => Accent.yellow,
-  AccentPreference.teal => Accent.teal,
-  AccentPreference.blue => Accent.blue,
-  AccentPreference.violet => Accent.violet,
-};
+/// Accent colors: one value tuned for each theme. The neutral accent is
+/// near white on the dark theme and near black on the light one, like the
+/// keys of a console. The others are soft and warm, like the LEDs of a
+/// mixing desk.
+abstract final class Accents {
+  static const _dark = {
+    AccentPreference.neutral: Color(0xFFF0F0F0),
+    AccentPreference.orange: Color(0xFFE1AF88),
+    AccentPreference.yellow: Color(0xFFE2C984),
+    AccentPreference.teal: Color(0xFF7FE0C5),
+    AccentPreference.blue: Color(0xFF81C4E2),
+    AccentPreference.violet: Color(0xFFC0A9DE),
+  };
+  static const _light = {
+    AccentPreference.neutral: Color(0xFF1F1F1F),
+    AccentPreference.orange: Color(0xFF71411C),
+    AccentPreference.yellow: Color(0xFF755D1B),
+    AccentPreference.teal: Color(0xFF177E65),
+    AccentPreference.blue: Color(0xFF1B5976),
+    AccentPreference.violet: Color(0xFF392158),
+  };
+
+  /// Accent [preference] on the [brightness] theme.
+  static Color of(AccentPreference preference, Brightness brightness) =>
+      (brightness == Brightness.dark ? _dark : _light)[preference]!;
+}
+
+/// Width of the snack bars.
+const _snackbarWidth = 520.0;
 
 /// Material theme built on the design tokens. Material is only the
 /// foundation: no splash, flat surfaces, hairlines, nearly square corners.
 /// The accent is [accent] (default: neutral).
-ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
+ThemeData buildTheme(
+  Brightness brightness, {
+  AccentPreference accent = AccentPreference.neutral,
+}) {
   final dark = brightness == Brightness.dark;
   final tokens = dark ? AppColors.dark : AppColors.light;
-  final c = accent == Accent.teal
-      ? tokens
-      : tokens.copyWith(accent: accent.on(brightness));
+  final c = tokens.copyWith(accent: Accents.of(accent, brightness));
   // Labels on a solid accent: a deep shade of the accent on dark.
   final onAccent = dark
       ? Color.lerp(c.accent, Colors.black, 0.88)!
@@ -262,7 +486,7 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
     hoverColor: c.text.withValues(alpha: 0.05),
     focusColor: c.accent.withValues(alpha: 0.14),
     highlightColor: Colors.transparent,
-    extensions: [c],
+    extensions: [c, AppText.of(c)],
   );
   final text = base.textTheme.apply(bodyColor: c.text, displayColor: c.text);
   final square = RoundedRectangleBorder(
@@ -270,17 +494,17 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
   );
   final hairline = BorderSide(color: c.border);
   final headlineSmall = text.headlineSmall?.copyWith(
-    fontWeight: FontWeight.w600,
+    fontWeight: Weights.semibold,
     letterSpacing: -0.4,
   );
   final titleLarge = text.titleLarge?.copyWith(
-    fontWeight: FontWeight.w600,
+    fontWeight: Weights.semibold,
     letterSpacing: -0.3,
   );
   final buttonText = const TextStyle(
     fontFamily: Fonts.text,
     fontSize: 13,
-    fontWeight: FontWeight.w600,
+    fontWeight: Weights.semibold,
     letterSpacing: 0.1,
   );
   bool lit(Set<WidgetState> states) =>
@@ -322,25 +546,25 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
   return base.copyWith(
     textTheme: text.copyWith(
       headlineMedium: text.headlineMedium?.copyWith(
-        fontWeight: FontWeight.w700,
+        fontWeight: Weights.bold,
         letterSpacing: -0.6,
       ),
       headlineSmall: headlineSmall,
       titleLarge: titleLarge,
       titleMedium: text.titleMedium?.copyWith(
-        fontWeight: FontWeight.w600,
+        fontWeight: Weights.semibold,
         letterSpacing: -0.2,
       ),
       // Also the text of the fields: as large as the button labels.
       bodyLarge: text.bodyLarge?.copyWith(
         fontSize: 13,
-        height: 1.3,
+        height: Leading.normal,
         letterSpacing: 0,
       ),
-      labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w500),
+      labelLarge: text.labelLarge?.copyWith(fontWeight: Weights.medium),
       labelSmall: text.labelSmall?.copyWith(
         fontFamily: Fonts.mono,
-        fontWeight: FontWeight.w700,
+        fontWeight: Weights.bold,
         letterSpacing: 1.0,
       ),
     ),
@@ -371,7 +595,7 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
       contentTextStyle: TextStyle(color: c.text, fontSize: 13),
       actionTextColor: c.accent,
       elevation: 0,
-      width: 520,
+      width: _snackbarWidth,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Radii.s),
         side: hairline,
@@ -383,14 +607,14 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
     filledButtonTheme: FilledButtonThemeData(
       style: mainKey.style(
         buttonText,
-        minimumSize: const Size(64, 32),
+        minimumSize: const Size(64, Sizes.field),
         padding: const EdgeInsets.symmetric(horizontal: Space.m),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: otherKey.style(
         buttonText,
-        minimumSize: const Size(64, 32),
+        minimumSize: const Size(64, Sizes.field),
         padding: const EdgeInsets.symmetric(horizontal: Space.m),
       ),
     ),
@@ -410,8 +634,8 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
         shape: WidgetStatePropertyAll(square),
         minimumSize: const WidgetStatePropertyAll(Size.zero),
         padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-        fixedSize: const WidgetStatePropertyAll(Size.square(28)),
-        iconSize: const WidgetStatePropertyAll(16),
+        fixedSize: const WidgetStatePropertyAll(Size.square(IconSize.action)),
+        iconSize: const WidgetStatePropertyAll(IconSize.m),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         // A desktop tool: the plain pointer, no hand.
         mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.basic),
@@ -421,7 +645,7 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
       style: MenuStyle(
         backgroundColor: WidgetStatePropertyAll(c.surface),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-        elevation: const WidgetStatePropertyAll(6),
+        elevation: const WidgetStatePropertyAll(Elevation.menu),
         shape: menuShape,
         padding: const WidgetStatePropertyAll(EdgeInsets.all(Space.xs)),
       ),
@@ -442,7 +666,7 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
           TextStyle(
             fontFamily: Fonts.text,
             fontSize: 13,
-            fontWeight: FontWeight.w500,
+            fontWeight: Weights.medium,
           ),
         ),
         foregroundColor: WidgetStateProperty.resolveWith(
@@ -455,7 +679,7 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
               ? c.accent
               : c.muted,
         ),
-        iconSize: const WidgetStatePropertyAll(16),
+        iconSize: const WidgetStatePropertyAll(IconSize.m),
         backgroundColor: WidgetStateProperty.resolveWith(
           (states) =>
               states.contains(WidgetState.hovered) ||
@@ -488,8 +712,14 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
       floatingLabelStyle: TextStyle(color: c.muted, fontSize: 12),
       helperStyle: TextStyle(color: c.muted, fontSize: 11.5),
       errorStyle: TextStyle(color: c.ledRed, fontSize: 11.5),
-      prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 0),
-      suffixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 0),
+      prefixIconConstraints: const BoxConstraints(
+        minWidth: Sizes.field,
+        minHeight: 0,
+      ),
+      suffixIconConstraints: const BoxConstraints(
+        minWidth: Sizes.field,
+        minHeight: 0,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(Radii.s),
         borderSide: hairline,
@@ -508,7 +738,7 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
         borderRadius: BorderRadius.circular(Radii.xs),
       ),
     ),
-    iconTheme: IconThemeData(color: c.muted, size: 18),
+    iconTheme: IconThemeData(color: c.muted, size: IconSize.l),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
         color: c.raised,
@@ -519,8 +749,8 @@ ThemeData buildTheme(Brightness brightness, {Accent accent = Accent.neutral}) {
       textStyle: TextStyle(
         fontFamily: Fonts.text,
         fontSize: 11.5,
-        fontWeight: FontWeight.w500,
-        height: 1.3,
+        fontWeight: Weights.medium,
+        height: Leading.normal,
         color: c.text,
       ),
       waitDuration: const Duration(milliseconds: 450),

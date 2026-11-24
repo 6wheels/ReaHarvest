@@ -10,6 +10,9 @@ import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
 import 'widgets.dart';
 
+/// Width of the dialog.
+const _width = 420.0;
+
 /// Edits the declared members of the library [entry] (SPEC §6.5).
 Future<void> showMembers(BuildContext context, LibraryEntry entry) =>
     showGlassDialog(context, (_) => _MembersDialog(entry));
@@ -90,7 +93,7 @@ class _MembersDialogState extends ConsumerState<_MembersDialog> {
     return AlertDialog(
       title: Text('${l10n.members} · ${widget.entry.displayName}'),
       content: SizedBox(
-        width: 420,
+        width: _width,
         child: members == null
             ? const BusyLight()
             : SingleChildScrollView(

@@ -9,6 +9,10 @@ import '../../theme/app_theme.dart';
 import '../formats.dart';
 import '../widgets.dart';
 
+/// Side of the color square of a figure, height of the bar of the shares.
+const _swatch = 12.0;
+const _barHeight = 14.0;
+
 /// Figures of a title (SPEC §5.2): size on disk, total and per part, as a
 /// stacked bar with its legend, then the versions, the trash and the
 /// assets. Taken from the index, never from the files.
@@ -56,7 +60,7 @@ class FiguresView extends ConsumerWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(Radii.xs),
           child: SizedBox(
-            height: 14,
+            height: _barHeight,
             child: Row(
               children: [
                 if (parts.isEmpty) Expanded(child: ColoredBox(color: c.border)),
@@ -78,7 +82,11 @@ class FiguresView extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(width: 12, height: 12, color: colors[part]),
+                  Container(
+                    width: _swatch,
+                    height: _swatch,
+                    color: colors[part],
+                  ),
                   const SizedBox(width: Space.s),
                   Text(legendText(part), style: text.bodySmall),
                 ],

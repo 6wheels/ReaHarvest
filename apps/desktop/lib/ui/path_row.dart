@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 
+/// Width of the column of the labels.
+const _labelWidth = 140.0;
+
 /// A labelled form row: fixed-width label, then the field.
 class FormRow extends StatelessWidget {
   const FormRow({
@@ -25,7 +28,7 @@ class FormRow extends StatelessWidget {
           : CrossAxisAlignment.center,
       children: [
         SizedBox(
-          width: 140,
+          width: _labelWidth,
           child: Padding(
             padding: EdgeInsets.only(top: alignTop ? Space.s : 0),
             child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
@@ -84,7 +87,9 @@ class PathRow extends StatelessWidget {
             IconButton(
               tooltip: l10n.resetToDefault,
               // As high as the "Choose…" button next to it.
-              style: IconButton.styleFrom(fixedSize: const Size.square(32)),
+              style: IconButton.styleFrom(
+                fixedSize: const Size.square(Sizes.field),
+              ),
               icon: const Icon(Icons.restart_alt_rounded),
               onPressed: reset,
             ),

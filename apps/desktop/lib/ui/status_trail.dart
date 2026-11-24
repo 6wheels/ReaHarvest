@@ -6,6 +6,10 @@ import '../theme/app_theme.dart';
 import 'labels.dart';
 import 'widgets.dart';
 
+/// Thickness of the bars of the trail, large and small.
+const _barLarge = 6.0;
+const _barSmall = 4.0;
+
 /// Progress of a title through the statuses (SPEC §5.9), as a row of
 /// lights: one segment per status, passed ones green, the current one
 /// amber and glowing, the next ones off.
@@ -48,27 +52,29 @@ class _StatusTrailState extends State<StatusTrail> {
     if (status != null && current < 0) {
       return Align(
         alignment: Alignment.centerLeft,
-        child: Pill(statusLabel(l10n, status), color: warningColor),
+        child: Pill(statusLabel(l10n, status), color: context.colors.ledAmber),
       );
     }
 
     final done = current == steps.length - 1;
     final next = widget.onDark
-        ? Colors.white.withValues(alpha: 0.22)
+        ? Tone.white.withValues(alpha: Alpha.soft)
         : c.border;
-    final nextLabel = widget.onDark ? Colors.white70 : c.muted;
+    final nextLabel = widget.onDark
+        ? Tone.white.withValues(alpha: Alpha.strong)
+        : c.muted;
     Color colorOf(int i) => i < current || done
         ? c.ledGreen
         : i == current
         ? c.ledAmber
         : next;
     Color labelColorOf(int i) => i <= current || done ? colorOf(i) : nextLabel;
-    final thickness = widget.large ? 6.0 : 4.0;
-    final gap = widget.large ? 4.0 : 2.0;
-    final base = context.legend.copyWith(fontSize: widget.large ? 10.5 : 9);
+    final thickness = widget.large ? _barLarge : _barSmall;
+    final gap = widget.large ? Space.xs : Space.xxs;
+    final base = widget.large ? context.legend : context.type.legendSmall;
     TextStyle styleOf(int i) => base.copyWith(
       color: labelColorOf(i),
-      fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
+      fontWeight: i == current ? Weights.bold : Weights.medium,
     );
     String labelOf(String step) => statusLabel(l10n, step).toUpperCase();
 
@@ -98,12 +104,12 @@ class _StatusTrailState extends State<StatusTrail> {
                     height: thickness,
                     decoration: BoxDecoration(
                       color: colorOf(i),
-                      borderRadius: BorderRadius.circular(1),
+                      borderRadius: BorderRadius.circular(Radii.xs),
                       boxShadow: [
                         if (i == current && !done)
                           BoxShadow(
-                            color: colorOf(i).withValues(alpha: 0.6),
-                            blurRadius: 6,
+                            color: colorOf(i).withValues(alpha: Alpha.strong),
+                            blurRadius: Blur.s,
                           ),
                       ],
                     ),
@@ -112,7 +118,7 @@ class _StatusTrailState extends State<StatusTrail> {
               ],
             ],
           ),
-          SizedBox(height: widget.large ? 6 : 3),
+          SizedBox(height: widget.large ? Space.sm : Space.xxs),
           LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;

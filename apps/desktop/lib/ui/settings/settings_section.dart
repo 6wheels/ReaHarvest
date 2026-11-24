@@ -15,7 +15,7 @@ class SettingsSection extends StatelessWidget {
     child: Text(
       title.toUpperCase(),
       style: Theme.of(context).textTheme.labelSmall
-          ?.copyWith(color: context.colors.muted, letterSpacing: 1.2),
+          ?.copyWith(color: context.colors.muted, letterSpacing: Tracking.wide),
     ),
   );
 }

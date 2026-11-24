@@ -12,6 +12,9 @@ import '../../theme/app_theme.dart';
 import '../to_sort/fix_dialog.dart';
 import '../versions/version_ui_actions.dart';
 
+/// Width of the field adding a tag.
+const _fieldWidth = 200.0;
+
 /// Free tags of a title (SPEC §5.9): one chip each, removable, and a field
 /// to add one, with autocompletion over the tags of the library.
 class TitleTags extends ConsumerStatefulWidget {
@@ -75,7 +78,7 @@ class _TitleTagsState extends ConsumerState<TitleTags> {
     ]);
     // One line, scrolling sideways: the header stays low.
     return SizedBox(
-      height: 32,
+      height: Sizes.field,
       child: Row(
         children: [
           Text(l10n.tagsLabel.toUpperCase(), style: context.legend),
@@ -98,7 +101,7 @@ class _TitleTagsState extends ConsumerState<TitleTags> {
             ),
           ),
           SizedBox(
-            width: 200,
+            width: _fieldWidth,
             child: LevelField(
               label: l10n.tagAddHint,
               controller: _controller,

@@ -93,9 +93,11 @@ class PeaksWarning extends ConsumerWidget {
           : Container(
               padding: const EdgeInsets.all(Space.m),
               decoration: BoxDecoration(
-                color: c.accent.withValues(alpha: 0.08),
+                color: c.accent.withValues(alpha: Alpha.faint),
                 borderRadius: BorderRadius.circular(Radii.s),
-                border: Border.all(color: c.accent.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: c.accent.withValues(alpha: Alpha.soft),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

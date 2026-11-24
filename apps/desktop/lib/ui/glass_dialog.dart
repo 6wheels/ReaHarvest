@@ -5,6 +5,13 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 
+/// Geometry of the popup transition: blur of the pane behind, scale and
+/// slide the popup starts from, curve of its closing.
+const _blur = 16.0;
+const _scaleFrom = 0.96;
+const _slideFrom = Offset(0, 0.02);
+const _closeCurve = Curves.easeInCubic;
+
 /// Opens [builder] as a popup over the blurred application: the glass pane
 /// of the settings, with its opening and closing animation (SPEC §5.2).
 Future<T?> showGlassDialog<T>(
@@ -31,7 +38,7 @@ RawDialogRoute<T> glassDialogRoute<T>(
     final t = CurvedAnimation(
       parent: animation,
       curve: Motion.curve,
-      reverseCurve: Curves.easeInCubic,
+      reverseCurve: _closeCurve,
     );
     return Stack(
       children: [
@@ -41,11 +48,13 @@ RawDialogRoute<T> glassDialogRoute<T>(
               animation: t,
               builder: (context, _) => BackdropFilter(
                 filter: ImageFilter.blur(
-                  sigmaX: 16 * t.value,
-                  sigmaY: 16 * t.value,
+                  sigmaX: _blur * t.value,
+                  sigmaY: _blur * t.value,
                 ),
                 child: ColoredBox(
-                  color: context.colors.scrim.withValues(alpha: 0.45 * t.value),
+                  color: context.colors.scrim.withValues(
+                    alpha: Alpha.medium * t.value,
+                  ),
                 ),
               ),
             ),
@@ -54,12 +63,9 @@ RawDialogRoute<T> glassDialogRoute<T>(
         FadeTransition(
           opacity: t,
           child: ScaleTransition(
-            scale: Tween(begin: 0.96, end: 1.0).animate(t),
+            scale: Tween(begin: _scaleFrom, end: 1.0).animate(t),
             child: SlideTransition(
-              position: Tween(
-                begin: const Offset(0, 0.02),
-                end: Offset.zero,
-              ).animate(t),
+              position: Tween(begin: _slideFrom, end: Offset.zero).animate(t),
               child: child,
             ),
           ),

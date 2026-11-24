@@ -44,9 +44,9 @@ class Header extends ConsumerWidget {
             children: [
               if (t != null) ...[
                 Container(
-                  width: 72,
-                  height: 72,
-                  padding: const EdgeInsets.all(3),
+                  width: Sizes.avatar,
+                  height: Sizes.avatar,
+                  padding: const EdgeInsets.all(Space.xxs),
                   decoration: BoxDecoration(
                     color: c.surface,
                     borderRadius: BorderRadius.circular(Radii.s),
@@ -77,13 +77,15 @@ class Header extends ConsumerWidget {
                             TextSpan(
                               text: titleName(t),
                               style: text.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: Weights.bold,
                               ),
                             ),
                             if (levels.isNotEmpty)
                               TextSpan(
                                 text: '$labelSeparator$leaf',
-                                style: context.legend.copyWith(fontSize: 12),
+                                style: context.legend.copyWith(
+                                  fontSize: context.type.caption.fontSize,
+                                ),
                               ),
                           ],
                         ),
@@ -103,7 +105,7 @@ class Header extends ConsumerWidget {
                           children: [
                             Icon(
                               Icons.help_outline_rounded,
-                              size: 16,
+                              size: IconSize.m,
                               color: c.muted,
                             ),
                             const SizedBox(width: Space.xs),
@@ -161,8 +163,8 @@ class _Stat extends StatelessWidget {
           Text(
             value ?? '—',
             style: context.readout.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w500,
+              fontSize: context.type.title.fontSize,
+              fontWeight: Weights.medium,
               color: context.colors.text,
             ),
           ),

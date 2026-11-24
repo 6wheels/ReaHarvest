@@ -185,4 +185,4 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
 }
 
 /// Space between two actions.
-const _gap = SizedBox(width: 4);
+const _gap = SizedBox(width: Space.xs);

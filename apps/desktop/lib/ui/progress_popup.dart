@@ -8,6 +8,9 @@ import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
 import 'tasks_zone.dart';
 
+/// Width of the popup.
+const _width = 360.0;
+
 /// Shows the foreground tasks ([BackgroundTask.foreground]) one after the
 /// other, each in a popup over the glass pane that blocks the interface
 /// until the task ends (SPEC §5.2). Takes no room.
@@ -79,7 +82,7 @@ class _ProgressPopup extends ConsumerWidget {
           child: AlertDialog(
             title: Text(task.label(l10n)),
             content: SizedBox(
-              width: 360,
+              width: _width,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

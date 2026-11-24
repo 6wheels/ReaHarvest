@@ -16,6 +16,9 @@ import 'title_header.dart';
 import 'version_list_item.dart';
 import 'version_pane.dart';
 
+/// Width of the column of the versions.
+const _paneWidth = 300.0;
+
 /// Opens the detail page of title [id] over the library.
 Future<void> openTitleDetail(BuildContext context, NodeId id) =>
     Navigator.of(context).push(overLibraryRoute((_) => TitleDetailPage(id)));
@@ -99,7 +102,7 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                   ],
                 ),
               ),
-            Divider(height: 1, color: c.border),
+            Divider(height: Sizes.hairline, color: c.border),
             if (title != null && _tab == _DetailTab.trash)
               Expanded(child: TrashView(title)),
             if (title != null && _tab == _DetailTab.figures)
@@ -110,7 +113,7 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: 300,
+                      width: _paneWidth,
                       child: ListView(
                         padding: const EdgeInsets.all(Space.m),
                         children: [
@@ -118,7 +121,10 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                             Padding(
                               padding: const EdgeInsets.only(bottom: Space.s),
                               child: OutlinedButton.icon(
-                                icon: const Icon(Icons.add_rounded, size: 18),
+                                icon: const Icon(
+                                  Icons.add_rounded,
+                                  size: IconSize.l,
+                                ),
                                 onPressed: () => _newVersion(title, selected),
                                 label: Text(l10n.newVersion),
                               ),
@@ -133,7 +139,7 @@ class _TitleDetailPageState extends ConsumerState<TitleDetailPage> {
                         ],
                       ),
                     ),
-                    VerticalDivider(width: 1, color: c.border),
+                    VerticalDivider(width: Sizes.hairline, color: c.border),
                     Expanded(
                       child: AnimatedSwitcher(
                         duration: Motion.fast,
@@ -186,7 +192,7 @@ class _Tab extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              width: 2,
+              width: Sizes.bar,
               color: selected ? c.accent : Colors.transparent,
             ),
           ),

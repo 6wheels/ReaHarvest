@@ -12,6 +12,9 @@ import 'glass_dialog.dart';
 import 'layout_labels.dart';
 import 'widgets.dart';
 
+/// Width of the dialog.
+const _width = 480.0;
+
 /// Editor of the known values of the intermediate levels of [layout] (SPEC
 /// §3.1), as a tree: values can be removed, unless [used], and added at
 /// each level.
@@ -71,7 +74,7 @@ class KnownValuesEditor extends StatelessWidget {
             children: [
               Icon(
                 last ? Icons.label_outline_rounded : Icons.folder_outlined,
-                size: 16,
+                size: IconSize.m,
                 color: c.muted,
               ),
               const SizedBox(width: Space.s),
@@ -83,7 +86,7 @@ class KnownValuesEditor extends StatelessWidget {
               IconButton(
                 tooltip: l10n.removeValue(v.value),
                 visualDensity: VisualDensity.compact,
-                iconSize: 16,
+                iconSize: IconSize.m,
                 icon: const Icon(Icons.close_rounded),
                 onPressed: used.contains([...parent, v.value].join('/'))
                     ? null
@@ -186,8 +189,8 @@ class _AddValueState extends State<_AddValue> {
       errorText: _controller.text.trim().isEmpty || _valid
           ? null
           : AppLocalizations.of(context).invalidLevelName,
-      prefixIcon: const Icon(Icons.add_rounded, size: 16),
-      prefixIconConstraints: const BoxConstraints(minWidth: 28),
+      prefixIcon: const Icon(Icons.add_rounded, size: IconSize.m),
+      prefixIconConstraints: const BoxConstraints(minWidth: IconSize.action),
       border: InputBorder.none,
       suffixIcon: !_valid
           ? null
@@ -248,7 +251,7 @@ class _KnownValuesDialogState extends ConsumerState<_KnownValuesDialog> {
     return AlertDialog(
       title: Text('${l10n.knownValues} · ${widget.entry.displayName}'),
       content: SizedBox(
-        width: 480,
+        width: _width,
         child: values == null
             ? const BusyLight()
             : SingleChildScrollView(

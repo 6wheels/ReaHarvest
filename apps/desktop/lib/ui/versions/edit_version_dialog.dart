@@ -11,6 +11,9 @@ import '../glass_dialog.dart';
 import '../widgets.dart';
 import 'version_ui_actions.dart';
 
+/// Width of the dialog.
+const _width = 440.0;
+
 /// Asks for a new name (of its folder and its `.RPP`) and label of
 /// [version] of [title] and applies them. A rename waits for the REAPER
 /// warning (SPEC §5.7); a label, stored outside the project, does not (SPEC
@@ -95,7 +98,7 @@ class _EditVersionDialogState extends State<_EditVersionDialog> {
     return AlertDialog(
       title: Text(l10n.editVersionTitle),
       content: SizedBox(
-        width: 440,
+        width: _width,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

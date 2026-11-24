@@ -24,13 +24,12 @@ class ReaHarvestApp extends ConsumerWidget {
         (s) => (s.theme, s.accent, s.language, s.textScale),
       ),
     );
-    final accent = accentOf(accentPreference);
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light, accent: accent),
-      darkTheme: buildTheme(Brightness.dark, accent: accent),
+      theme: buildTheme(Brightness.light, accent: accentPreference),
+      darkTheme: buildTheme(Brightness.dark, accent: accentPreference),
       themeMode: switch (theme) {
         ThemePreference.system => ThemeMode.system,
         ThemePreference.light => ThemeMode.light,

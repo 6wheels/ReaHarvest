@@ -9,6 +9,13 @@ import 'settings/libraries_page.dart';
 import 'settings/profile_page.dart';
 import 'settings/system_page.dart';
 
+/// Size of the settings dialog.
+const _width = 820.0;
+const _height = 560.0;
+
+/// Width of the menu of the pages.
+const _menuWidth = 160.0;
+
 /// Opens the settings as a popup over the blurred application (SPEC §5.2).
 Future<void> showSettings(BuildContext context) =>
     showGlassDialog<void>(context, (_) => const _SettingsPanel());
@@ -61,16 +68,16 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
     return Center(
       child: SizedBox(
-        width: 820,
-        height: 560,
+        width: _width,
+        height: _height,
         child: Material(
           color: c.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Radii.m),
             side: BorderSide(color: c.border),
           ),
-          elevation: 24,
-          shadowColor: Colors.black54,
+          elevation: Elevation.dialog,
+          shadowColor: Tone.black.withValues(alpha: Alpha.medium),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               Space.l,
@@ -99,7 +106,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(
-                        width: 160,
+                        width: _menuWidth,
                         child: Column(
                           children: [
                             for (final page in _SettingsPage.values)
@@ -168,20 +175,24 @@ class _MenuEntry extends StatelessWidget {
               border: Border(
                 left: BorderSide(
                   color: selected ? c.accent : Colors.transparent,
-                  width: 3,
+                  width: Sizes.menuBar,
                 ),
               ),
             ),
             child: Row(
               children: [
-                Icon(icon, size: 18, color: selected ? c.accent : c.muted),
+                Icon(
+                  icon,
+                  size: IconSize.l,
+                  color: selected ? c.accent : c.muted,
+                ),
                 const SizedBox(width: Space.s),
                 Expanded(
                   child: Text(
                     label,
                     overflow: TextOverflow.ellipsis,
                     style: text.bodyMedium?.copyWith(
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                      fontWeight: selected ? Weights.bold : Weights.regular,
                     ),
                   ),
                 ),

@@ -11,6 +11,9 @@ import 'status_trail.dart';
 import 'title_actions.dart';
 import 'widgets.dart';
 
+/// Height of the bar of the actions of a card.
+const _barHeight = 28.0;
+
 /// Square title card, like a rack module (SPEC §5.2).
 class TitleCard extends StatefulWidget {
   const TitleCard(
@@ -66,7 +69,7 @@ class _TitleCardState extends State<TitleCard> {
     final frame = widget.selected
         ? c.accent
         : _hovered
-        ? c.muted.withValues(alpha: 0.6)
+        ? c.muted.withValues(alpha: Alpha.strong)
         : c.border;
 
     return MouseRegion(
@@ -89,8 +92,8 @@ class _TitleCardState extends State<TitleCard> {
             boxShadow: [
               if (widget.selected)
                 BoxShadow(
-                  color: c.accent.withValues(alpha: 0.18),
-                  blurRadius: 12,
+                  color: c.accent.withValues(alpha: Alpha.tint),
+                  blurRadius: Blur.m,
                 ),
             ],
           ),
@@ -98,30 +101,30 @@ class _TitleCardState extends State<TitleCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                height: 28,
+                height: _barHeight,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.md),
                   child: Row(
                     children: [
-                      Led(c.accent, lit: widget.selected, size: 6),
+                      Led(c.accent, lit: widget.selected, size: IconSize.ledS),
                       const SizedBox(width: Space.s),
                       Expanded(
                         child: Text(
                           levels,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: context.legend.copyWith(fontSize: 9.5),
+                          style: context.type.legendSmall,
                         ),
                       ),
                       const SizedBox(width: Space.s),
-                      Text(date, style: context.readout.copyWith(fontSize: 10)),
+                      Text(date, style: context.type.readoutSmall),
                     ],
                   ),
                 ),
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(Radii.xs),
                     child: Stack(
@@ -138,7 +141,7 @@ class _TitleCardState extends State<TitleCard> {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(Space.s + 2),
+                          padding: const EdgeInsets.all(Space.md),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -157,8 +160,8 @@ class _TitleCardState extends State<TitleCard> {
                                 overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(
-                                      color: light ? c.text : Colors.white,
-                                      height: 1.2,
+                                      color: light ? c.text : Tone.white,
+                                      height: Leading.tight,
                                     ),
                               ),
                             ],
@@ -170,7 +173,12 @@ class _TitleCardState extends State<TitleCard> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, Space.s, 10, 10),
+                padding: const EdgeInsets.fromLTRB(
+                  Space.md,
+                  Space.s,
+                  Space.md,
+                  Space.md,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -188,8 +196,7 @@ class _TitleCardState extends State<TitleCard> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.end,
-                            style: context.legend.copyWith(
-                              fontSize: 9.5,
+                            style: context.type.legendSmall.copyWith(
                               color: c.ledAmber,
                             ),
                           ),
@@ -222,13 +229,13 @@ class _Readout extends StatelessWidget {
     child: Text.rich(
       TextSpan(
         text: '$unit ',
-        style: context.legend.copyWith(fontSize: 9.5),
+        style: context.type.legendSmall,
         children: [
           TextSpan(
             text: value,
             style: context.readout.copyWith(
               color: context.colors.text,
-              fontWeight: FontWeight.w700,
+              fontWeight: Weights.bold,
             ),
           ),
         ],

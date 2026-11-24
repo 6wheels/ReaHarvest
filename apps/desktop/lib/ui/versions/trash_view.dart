@@ -78,7 +78,7 @@ class TrashView extends ConsumerWidget {
           children: [
             Expanded(child: SectionLabel('${l10n.trash} · $trashSize')),
             OutlinedButton.icon(
-              icon: const Icon(Icons.delete_forever_outlined, size: 18),
+              icon: const Icon(Icons.delete_forever_outlined, size: IconSize.l),
               onPressed: () =>
                   _purge(context, ref, files, action: l10n.emptyTrash),
               label: Text(l10n.emptyTrash),
@@ -95,7 +95,7 @@ class TrashView extends ConsumerWidget {
                     : isProjectFile(e.path)
                     ? Icons.music_note_outlined
                     : Icons.insert_drive_file_outlined,
-                size: 16,
+                size: IconSize.m,
               ),
               const SizedBox(width: Space.s),
               Expanded(
@@ -113,7 +113,7 @@ class TrashView extends ConsumerWidget {
                 tooltip: l10n.deleteForever,
                 onPressed: () =>
                     _purge(context, ref, [e], action: l10n.deleteForever),
-                icon: const Icon(Icons.close_rounded, size: 18),
+                icon: const Icon(Icons.close_rounded, size: IconSize.l),
               ),
             ],
           ),

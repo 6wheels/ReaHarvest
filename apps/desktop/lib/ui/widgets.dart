@@ -10,9 +10,6 @@ import '../state/reaper.dart';
 import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
 
-/// Color of warnings (missing plugins, duplicates).
-const warningColor = Color(0xFFE5A04D);
-
 /// Small console tag (status, alerts): mono capitals in a lit frame.
 class Pill extends StatelessWidget {
   const Pill(this.label, {super.key, required this.color});
@@ -22,20 +19,42 @@ class Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    padding: const EdgeInsets.symmetric(
+      horizontal: Space.sm,
+      vertical: Space.xxs,
+    ),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
+      color: color.withValues(alpha: Alpha.tint),
       borderRadius: BorderRadius.circular(Radii.xs),
-      border: Border.all(color: color.withValues(alpha: 0.45)),
+      border: Border.all(color: color.withValues(alpha: Alpha.medium)),
     ),
     child: Text(
       label.toUpperCase(),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: context.legend.copyWith(color: color, fontSize: 9.5),
+      style: context.type.legendSmall.copyWith(color: color),
     ),
   );
 }
+
+/// Periods of the animations of the kit: breathing and blinking of a [Led],
+/// sweep of a [Meter] of unknown progress.
+const _pulsePeriod = Duration(milliseconds: 1100);
+const _blinkPeriod = Duration(milliseconds: 1600);
+const _sweepPeriod = Duration(milliseconds: 1400);
+
+/// Curve of the breathing of a [Led], steepness of the edges of its blink,
+/// spread of its glow around the dot.
+const _pulseCurve = Curves.easeInOut;
+const _blinkEdge = 12;
+const _glowSpread = 0.6;
+
+/// Opacity of the glow of a lit [Led]; of a lit LED of a [Meter]; of the
+/// core and the body of an unlit one.
+const _ledGlow = 0.6;
+const _meterGlow = 0.5;
+const _unlitCore = 0.14;
+const _unlitBody = 0.10;
 
 /// How a [Led] shines.
 enum LedMode {
@@ -57,7 +76,7 @@ class Led extends StatefulWidget {
     this.color, {
     super.key,
     this.lit = true,
-    this.size = 7,
+    this.size = IconSize.ledM,
     this.mode = LedMode.steady,
   });
 
@@ -99,11 +118,11 @@ class _LedState extends State<Led> with SingleTickerProviderStateMixin {
           ..value = 1;
       case LedMode.pulse:
         _controller
-          ..duration = const Duration(milliseconds: 1100)
+          ..duration = _pulsePeriod
           ..repeat(reverse: true);
       case LedMode.blink:
         _controller
-          ..duration = const Duration(milliseconds: 1600)
+          ..duration = _blinkPeriod
           ..repeat();
     }
   }
@@ -127,12 +146,12 @@ class _LedState extends State<Led> with SingleTickerProviderStateMixin {
             ? 0.0
             : switch (_mode) {
                 LedMode.steady => 1.0,
-                LedMode.pulse => Curves.easeInOut.transform(t),
+                LedMode.pulse => _pulseCurve.transform(t),
                 // On for the first half of the cycle, with soft edges.
                 LedMode.blink =>
                   t < 0.5
-                      ? (t * 12).clamp(0.0, 1.0)
-                      : (1 - (t - 0.5) * 12).clamp(0.0, 1.0),
+                      ? (t * _blinkEdge).clamp(0.0, 1.0)
+                      : (1 - (t - 0.5) * _blinkEdge).clamp(0.0, 1.0),
               };
         return Container(
           width: size,
@@ -143,8 +162,8 @@ class _LedState extends State<Led> with SingleTickerProviderStateMixin {
             boxShadow: [
               if (level > 0)
                 BoxShadow(
-                  color: widget.color.withValues(alpha: 0.6 * level),
-                  blurRadius: size * (0.6 + level),
+                  color: widget.color.withValues(alpha: _ledGlow * level),
+                  blurRadius: size * (_glowSpread + level),
                 ),
             ],
           ),
@@ -172,7 +191,7 @@ class Meter extends StatefulWidget {
 class _MeterState extends State<Meter> with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
+    duration: _sweepPeriod,
   );
 
   @override
@@ -235,15 +254,31 @@ class _MeterPainter extends CustomPainter {
   /// Space between two LEDs.
   static const _gap = 3.0;
 
-  /// Width of the window lit while the progress is unknown.
+  /// Width of the window lit while the progress is unknown, and the level of
+  /// its two end LEDs.
   static const _window = 5;
+  static const _edgeLevel = 0.45;
+
+  /// Position on the scale where the LEDs turn amber, then red.
+  static const _amberFrom = 0.7;
+  static const _redFrom = 0.9;
+
+  /// Corner radius of a LED, blur of its glow.
+  static const _corner = 1.0;
+  static const _glowBlur = 2.0;
+
+  /// Lens of a lit LED: share of white in its core, then the opacity of the
+  /// core and of the body of the LED, from off to fully lit.
+  static const _lens = 0.35;
+  static const _coreFloor = 0.4;
+  static const _bodyFloor = 0.35;
 
   /// Color of the LED at [i] of [n] on the scale.
   Color _colorAt(int i, int n) {
     final position = i / (n - 1);
-    return position < 0.7
+    return position < _amberFrom
         ? c.ledGreen
-        : position < 0.9
+        : position < _redFrom
         ? c.ledAmber
         : c.ledRed;
   }
@@ -254,7 +289,7 @@ class _MeterPainter extends CustomPainter {
     final head = ((sweep?.value ?? 0) * (n + _window)).floor();
     final offset = head - i;
     if (offset < 0 || offset >= _window) return 0;
-    return offset == 0 || offset == _window - 1 ? 0.45 : 1;
+    return offset == 0 || offset == _window - 1 ? _edgeLevel : 1;
   }
 
   @override
@@ -283,25 +318,31 @@ class _MeterPainter extends CustomPainter {
       final level = _levelAt(i, n);
       final x = (start + i * (led + gap) - tx) / sx;
       final rect = Rect.fromLTWH(x, top, led / sx, height);
-      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(1));
+      final rrect = RRect.fromRectAndRadius(
+        rect,
+        const Radius.circular(_corner),
+      );
       if (level > 0) {
         canvas.drawRRect(
           rrect,
           Paint()
-            ..color = color.withValues(alpha: 0.5 * level)
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2 * level),
+            ..color = color.withValues(alpha: _meterGlow * level)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, _glowBlur * level),
         );
       }
       // Brighter core, like the lens of a lit LED.
       final colors = level == 0
-          ? [color.withValues(alpha: 0.14), color.withValues(alpha: 0.10)]
+          ? [
+              color.withValues(alpha: _unlitCore),
+              color.withValues(alpha: _unlitBody),
+            ]
           : [
               Color.lerp(
                 color,
-                Colors.white,
-                0.35 * level,
-              )!.withValues(alpha: 0.4 + 0.6 * level),
-              color.withValues(alpha: 0.35 + 0.65 * level),
+                Tone.white,
+                _lens * level,
+              )!.withValues(alpha: _coreFloor + (1 - _coreFloor) * level),
+              color.withValues(alpha: _bodyFloor + (1 - _bodyFloor) * level),
             ];
       canvas.drawRRect(
         rrect,
@@ -326,7 +367,11 @@ class BusyLight extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Led(context.colors.ledAmber, size: 10, mode: LedMode.pulse),
+    child: Led(
+      context.colors.ledAmber,
+      size: IconSize.ledL,
+      mode: LedMode.pulse,
+    ),
   );
 }
 
@@ -338,13 +383,19 @@ class MenuLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
-    child: Text(
-      label.toUpperCase(),
-      style: context.legend.copyWith(fontSize: 9.5),
-    ),
+    padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, Space.xs),
+    child: Text(label.toUpperCase(), style: context.type.legendSmall),
   );
 }
+
+/// Glow of a [ChoiceLight] and its opacity (partial fill, partial glow, lit
+/// glow), size of the bar of its partial state.
+const _lightGlow = 6.0;
+const _partialFill = 0.25;
+const _partialGlow = 0.3;
+const _litGlow = 0.5;
+const _dashWidth = 6.0;
+const _dashHeight = 2.0;
 
 /// Square light of a checkable entry, lit when [checked]; half lit with a
 /// bar when null (some of a group selected).
@@ -360,12 +411,12 @@ class ChoiceLight extends StatelessWidget {
     final on = checked ?? true;
     return AnimatedContainer(
       duration: Motion.fast,
-      width: 10,
-      height: 10,
+      width: IconSize.ledL,
+      height: IconSize.ledL,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: partial
-            ? c.accent.withValues(alpha: 0.25)
+            ? c.accent.withValues(alpha: _partialFill)
             : on
             ? c.accent
             : Colors.transparent,
@@ -374,12 +425,16 @@ class ChoiceLight extends StatelessWidget {
         boxShadow: [
           if (on)
             BoxShadow(
-              color: c.accent.withValues(alpha: partial ? 0.3 : 0.5),
-              blurRadius: 6,
+              color: c.accent.withValues(
+                alpha: partial ? _partialGlow : _litGlow,
+              ),
+              blurRadius: _lightGlow,
             ),
         ],
       ),
-      child: partial ? Container(width: 6, height: 2, color: c.accent) : null,
+      child: partial
+          ? Container(width: _dashWidth, height: _dashHeight, color: c.accent)
+          : null,
     );
   }
 }
@@ -423,7 +478,8 @@ class BusyLabel extends StatelessWidget {
     alignment: Alignment.center,
     children: [
       Opacity(opacity: busy ? 0 : 1, child: Text(label)),
-      if (busy) Led(context.colors.ledAmber, size: 8, mode: LedMode.pulse),
+      if (busy)
+        Led(context.colors.ledAmber, size: IconSize.ledM, mode: LedMode.pulse),
     ],
   );
 }
@@ -480,7 +536,7 @@ class _DropdownState<T> extends State<Dropdown<T>> {
         ? value
         : options.keys.firstOrNull;
     return MenuAnchor(
-      alignmentOffset: const Offset(0, 2),
+      alignmentOffset: const Offset(0, Space.xxs),
       onOpen: () => focusMenuEntry(_entry),
       menuChildren: [
         for (final MapEntry(:key, value: text) in options.entries)
@@ -506,7 +562,7 @@ class _DropdownState<T> extends State<Dropdown<T>> {
                 color: controller.isOpen ? c.accent : c.muted,
               ),
               suffixIconConstraints: const BoxConstraints(
-                minWidth: 28,
+                minWidth: IconSize.action,
                 minHeight: 0,
               ),
             ),
@@ -526,7 +582,7 @@ class _DropdownState<T> extends State<Dropdown<T>> {
 /// REAPER logo, the icon of the actions opening a project in REAPER
 /// (used with the permission of Cockos, see `assets/third_party/reaper`).
 class ReaperIcon extends StatelessWidget {
-  const ReaperIcon({super.key, this.size = 16});
+  const ReaperIcon({super.key, this.size = IconSize.m});
 
   final double size;
 
@@ -553,7 +609,7 @@ class IconAction extends StatelessWidget {
   });
 
   /// Size of the action, square (the icon button size of the theme).
-  static const size = 28.0;
+  static const size = IconSize.action;
 
   final Widget icon;
   final String tooltip;
@@ -572,7 +628,7 @@ class IconAction extends StatelessWidget {
       style: onAurora
           ? glowButtonStyle(
               context,
-              ink: dark ? Colors.white : context.colors.text,
+              ink: dark ? Tone.white : context.colors.text,
             ).merge(theme)
           : theme,
     );
@@ -580,13 +636,13 @@ class IconAction extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: dark
-            ? Colors.black.withValues(alpha: 0.45)
-            : Colors.white.withValues(alpha: 0.7),
+            ? Tone.black.withValues(alpha: Alpha.medium)
+            : Tone.white.withValues(alpha: Alpha.strong),
         borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(
           color: dark
-              ? Colors.white.withValues(alpha: 0.22)
-              : Colors.black.withValues(alpha: 0.12),
+              ? Tone.white.withValues(alpha: Alpha.soft)
+              : Tone.black.withValues(alpha: Alpha.tint),
         ),
       ),
       child: button,
@@ -620,7 +676,12 @@ class OpenDetailAction extends StatelessWidget {
 /// its new direction: [right] then [down] for a fold, [down] then [up] for
 /// a menu.
 class Disclosure extends StatelessWidget {
-  const Disclosure(this.turns, {super.key, this.size = 22, this.color});
+  const Disclosure(
+    this.turns, {
+    super.key,
+    this.size = IconSize.xl,
+    this.color,
+  });
 
   static const right = 0.0;
   static const down = 0.25;

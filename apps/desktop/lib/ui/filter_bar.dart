@@ -14,6 +14,9 @@ import 'to_sort/to_sort_page.dart';
 import 'widgets.dart'
     show ChoiceLight, Disclosure, MenuLegend, actionLabel, focusMenuEntry;
 
+/// Width of a segment of the display mode bar.
+const _segmentWidth = 28.0;
+
 /// Filter chips, saved views, "To sort" / "To adopt" and display mode, below
 /// the search bar (SPEC §5.2). Chips offering a single value are hidden.
 class FilterBar extends ConsumerWidget {
@@ -102,7 +105,7 @@ class FilterBar extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: Space.m,
-        vertical: Space.s - 2,
+        vertical: Space.sm,
       ),
       decoration: BoxDecoration(
         color: c.surface,
@@ -113,8 +116,8 @@ class FilterBar extends ConsumerWidget {
         children: [
           Expanded(
             child: Wrap(
-              spacing: Space.xs + 2,
-              runSpacing: Space.xs + 2,
+              spacing: Space.sm,
+              runSpacing: Space.sm,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: chips,
             ),
@@ -176,26 +179,26 @@ class Pill extends StatelessWidget {
     final c = context.colors;
     final color = active ? c.accent : c.muted;
     return Material(
-      color: active ? c.accent.withValues(alpha: 0.10) : c.raised,
+      color: active ? c.accent.withValues(alpha: Alpha.faint) : c.raised,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Radii.s),
         side: BorderSide(
-          color: active ? c.accent.withValues(alpha: 0.55) : c.border,
+          color: active ? c.accent.withValues(alpha: Alpha.medium) : c.border,
         ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(Radii.s),
         onTap: onPressed,
         child: SizedBox(
-          height: 26,
+          height: Sizes.control,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: Space.md),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 14, color: color),
-                  const SizedBox(width: 6),
+                  Icon(icon, size: IconSize.s, color: color),
+                  const SizedBox(width: Space.sm),
                 ],
                 Text.rich(
                   TextSpan(
@@ -204,7 +207,7 @@ class Pill extends StatelessWidget {
                       if (count != null)
                         TextSpan(
                           text: '$labelSeparator$count',
-                          style: TextStyle(color: c.accent),
+                          style: AppText.color(c.accent),
                         ),
                     ],
                   ),
@@ -213,10 +216,10 @@ class Pill extends StatelessWidget {
                   ),
                 ),
                 if (menuOpen case final open?) ...[
-                  const SizedBox(width: 2),
+                  const SizedBox(width: Space.xxs),
                   Disclosure(
                     open ? Disclosure.up : Disclosure.down,
-                    size: 20,
+                    size: IconSize.xl,
                     color: color,
                   ),
                 ],
@@ -247,8 +250,8 @@ class _DisplaySwitch extends StatelessWidget {
       (DisplayMode.tree, Icons.account_tree_outlined, l10n.displayTree),
     ];
     return Container(
-      height: 26,
-      padding: const EdgeInsets.all(2),
+      height: Sizes.control,
+      padding: const EdgeInsets.all(Space.xxs),
       decoration: BoxDecoration(
         color: c.raised,
         borderRadius: BorderRadius.circular(Radii.s),
@@ -256,25 +259,25 @@ class _DisplaySwitch extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        spacing: 2,
+        spacing: Space.xxs,
         children: [
           for (final (mode, icon, tooltip) in modes)
             Tooltip(
               message: tooltip,
               child: Material(
                 color: mode == selected
-                    ? c.accent.withValues(alpha: 0.16)
+                    ? c.accent.withValues(alpha: Alpha.tint)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(Radii.xs),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(Radii.xs),
                   onTap: () => onChanged(mode),
                   child: SizedBox(
-                    width: 28,
-                    height: 20,
+                    width: _segmentWidth,
+                    height: Sizes.segment,
                     child: Icon(
                       icon,
-                      size: 14,
+                      size: IconSize.s,
                       color: mode == selected ? c.accent : c.muted,
                     ),
                   ),
@@ -407,7 +410,7 @@ class _SavedViewsChipState extends ConsumerState<_SavedViewsChip> {
             onPressed: () => notifier.applyView(v),
             trailingIcon: IconButton(
               tooltip: l10n.deleteView,
-              iconSize: 14,
+              iconSize: IconSize.s,
               visualDensity: VisualDensity.compact,
               onPressed: () => notifier.deleteView(v.name),
               icon: const Icon(Icons.close_rounded),
@@ -416,7 +419,7 @@ class _SavedViewsChipState extends ConsumerState<_SavedViewsChip> {
           ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: Space.xs),
-          child: Divider(height: 1),
+          child: Divider(height: Sizes.hairline),
         ),
         MenuItemButton(
           // The first entry when no view is saved yet.

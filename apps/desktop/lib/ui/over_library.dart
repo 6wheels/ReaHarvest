@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/tasks.dart';
 import '../theme/app_theme.dart';
 
+/// Slide of a page over the library at its entrance, in its own size.
+const _slideFrom = Offset(0.02, 0);
+
 /// Route of a page shown over the library (title detail, "To sort").
 PageRouteBuilder<void> overLibraryRoute(WidgetBuilder builder) =>
     PageRouteBuilder<void>(
@@ -17,10 +20,7 @@ PageRouteBuilder<void> overLibraryRoute(WidgetBuilder builder) =>
         return FadeTransition(
           opacity: t,
           child: SlideTransition(
-            position: Tween(
-              begin: const Offset(0.02, 0),
-              end: Offset.zero,
-            ).animate(t),
+            position: Tween(begin: _slideFrom, end: Offset.zero).animate(t),
             child: child,
           ),
         );

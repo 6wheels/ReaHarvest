@@ -11,6 +11,7 @@ import 'package:reaharvest_reaper/reaharvest_reaper.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'l10n/app_localizations.dart';
+import 'showcase_tokens.dart';
 import 'state/navigation.dart';
 import 'state/providers.dart';
 import 'state/reaper.dart';
@@ -132,7 +133,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   bool _loading = true;
 
   /// Accent picked in the settings bar.
-  Accent _accent = Accent.neutral;
+  AccentPreference _accent = AccentPreference.neutral;
 
   /// Interface size (text scale of the settings, 75 to 150 %).
   double _scale = 1;
@@ -218,8 +219,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   }
 
   PreferredSizeWidget _appBar(BuildContext context) {
-    final accent = _accent;
-    Widget preset(String label, Accent value) => TextButton(
+    Widget preset(String label, AccentPreference value) => TextButton(
       onPressed: () => setState(() => _accent = value),
       child: Text(label),
     );
@@ -267,7 +267,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         ),
         const SizedBox(width: Space.m),
       ],
-      // Accent settings: presets, hue and saturation (0: neutral grey).
+      // Accent settings: one preset per accent.
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(40),
         child: Padding(
@@ -285,34 +285,16 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                 ),
               ),
               const SizedBox(width: Space.s),
-              preset('Neutral', Accent.neutral),
-              preset('Orange', Accent.orange),
-              preset('Yellow', Accent.yellow),
-              preset('Teal', Accent.teal),
-              preset('Blue', Accent.blue),
-              preset('Violet', Accent.violet),
+              preset('Neutral', AccentPreference.neutral),
+              preset('Orange', AccentPreference.orange),
+              preset('Yellow', AccentPreference.yellow),
+              preset('Teal', AccentPreference.teal),
+              preset('Blue', AccentPreference.blue),
+              preset('Violet', AccentPreference.violet),
               const SizedBox(width: Space.m),
-              Text('HUE ${accent.hue.round()}°', style: context.readout),
-              SizedBox(
-                width: 200,
-                child: Slider(
-                  max: 360,
-                  value: accent.hue,
-                  onChanged: (v) =>
-                      setState(() => _accent = Accent(v, accent.saturation)),
-                ),
-              ),
               Text(
-                'SAT ${(accent.saturation * 100).round()}%',
+                'ACCENT ${_accent.name.toUpperCase()}',
                 style: context.readout,
-              ),
-              SizedBox(
-                width: 200,
-                child: Slider(
-                  value: accent.saturation,
-                  onChanged: (v) =>
-                      setState(() => _accent = Accent(accent.hue, v)),
-                ),
               ),
             ],
           ),
@@ -550,6 +532,21 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ),
       ]),
+      _Section(
+        'Tokens',
+        'Style scales and the accents of both themes side by side. '
+            'Pick an accent in the bar: the matrix always shows all six.',
+        [
+          const _Specimen('Type scale', child: TypeScaleSpecimen()),
+          const _Specimen('Alpha levels', child: AlphaSpecimen()),
+          const _Specimen('Icon sizes', child: IconSizeSpecimen()),
+          const _Specimen(
+            'Accents — name, hex, luminance, contrast',
+            width: 960,
+            child: AccentMatrix(),
+          ),
+        ],
+      ),
       _Section('Tags, legends & menus', '', [
         _Specimen(
           'Pill (status / alert tag)',
@@ -558,7 +555,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             runSpacing: Space.s,
             children: [
               Pill('Mixing', color: c.accent),
-              const Pill('Missing plugins', color: warningColor),
+              Pill('Missing plugins', color: c.ledAmber),
               Pill('Not adopted', color: c.muted),
               Pill('Corrupted', color: c.ledRed),
               Pill('Done', color: c.ledGreen),

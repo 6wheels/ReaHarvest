@@ -58,7 +58,7 @@ class StudioTitleBar extends StatelessWidget {
           child: Text.rich(
             TextSpan(
               text: 'REAHARVEST',
-              style: TextStyle(color: c.text),
+              style: AppText.color(c.text),
               children: [
                 if (location case final location?)
                   TextSpan(text: '$labelSeparator${location.toUpperCase()}'),
@@ -95,7 +95,7 @@ class StudioTitleBar extends StatelessWidget {
                       child: IconButton(
                         tooltip: l10n.back,
                         padding: EdgeInsets.zero,
-                        iconSize: 16,
+                        iconSize: IconSize.m,
                         onPressed: onBack,
                         icon: const Icon(Icons.arrow_back_rounded),
                       ),
@@ -129,9 +129,9 @@ class StudioTitleBar extends StatelessWidget {
                 if (_isDesktop && !_isMacOS) ...[
                   VerticalDivider(
                     color: c.border,
-                    width: 1,
-                    indent: 10,
-                    endIndent: 10,
+                    width: Sizes.hairline,
+                    indent: Space.md,
+                    endIndent: Space.md,
                   ),
                   // Console buttons on Windows, the system look elsewhere.
                   if (_isWindows)
@@ -263,13 +263,13 @@ class _CaptionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
-    waitDuration: const Duration(milliseconds: 1500),
+    waitDuration: Motion.tooltip,
     child: IconButton(
       onPressed: onPressed,
       icon: Icon(icon),
       style: (danger ? closeKeyStyle(context) : glowButtonStyle(context)).merge(
         IconButton.styleFrom(
-          fixedSize: const Size(44, studioTitleBarHeight),
+          fixedSize: const Size(Sizes.windowButton, studioTitleBarHeight),
           iconSize: iconSize,
         ).merge(Theme.of(context).iconButtonTheme.style),
       ),

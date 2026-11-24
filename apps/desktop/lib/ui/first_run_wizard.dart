@@ -8,6 +8,12 @@ import 'library_form.dart';
 import 'reaper_settings.dart';
 import 'studio_title_bar.dart';
 
+/// Widest a step of the wizard grows.
+const _maxWidth = 620.0;
+
+/// Slide of a step at its entrance, in its own size.
+const _slideFrom = Offset(0.03, 0);
+
 /// Whether the first-run wizard is shown: on start without any library,
 /// until it is finished or postponed.
 class WizardActive extends Notifier<bool> {
@@ -112,7 +118,7 @@ class _FirstRunWizardState extends ConsumerState<FirstRunWizard> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(Space.xl),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 620),
+                  constraints: const BoxConstraints(maxWidth: _maxWidth),
                   child: AnimatedSwitcher(
                     duration: Motion.medium,
                     switchInCurve: Motion.curve,
@@ -120,7 +126,7 @@ class _FirstRunWizardState extends ConsumerState<FirstRunWizard> {
                       opacity: animation,
                       child: SlideTransition(
                         position: Tween(
-                          begin: const Offset(0.03, 0),
+                          begin: _slideFrom,
                           end: Offset.zero,
                         ).animate(animation),
                         child: child,
@@ -135,7 +141,7 @@ class _FirstRunWizardState extends ConsumerState<FirstRunWizard> {
                           l10n.stepOf(_step + 1, _steps).toUpperCase(),
                           style: text.labelSmall?.copyWith(
                             color: c.muted,
-                            letterSpacing: 1.2,
+                            letterSpacing: Tracking.wide,
                           ),
                         ),
                         const SizedBox(height: Space.s),
