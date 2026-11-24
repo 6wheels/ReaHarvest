@@ -49,7 +49,8 @@ For each report of a subagent:
 When a subagent reports its work committed:
 - Check the commit: `git log origin/main..<branch>`, one commit per issue, message without AI attribution, `git diff origin/main -- progress/` touching only this issue's line.
 - `review-against-issue` has run in the subagent (`implement-issue` step 5): relay its findings with a verdict on each.
-- **Code review, for every issue**, by a fresh read-only subagent that runs `code-review high` on the branch against `origin/main`, on a model one step above the model that implemented: `haiku` → `sonnet`, `sonnet` → `opus`, `opus` → `opus`. When the line of the issue in `progress/M<n>.md` says "reviewed by the largest model before merge", the reviewer is `opus`. The implementing subagent never reviews its own code.
+- **Code review, for every issue**, by a fresh read-only subagent that runs `code-review high <branch>` from the worktree of the issue, with the branch of the issue as explicit target, on a model one step above the model that implemented: `haiku` → `sonnet`, `sonnet` → `opus`, `opus` → `opus`. When the line of the issue in `progress/M<n>.md` says "reviewed by the largest model before merge", the reviewer is `opus`. The implementing subagent never reviews its own code.
+- Before reporting, the reviewer checks that the reviewed diff is the one of `git diff origin/main...<branch>`: an empty or different diff is reported, never reviewed.
 - `code-review` never runs above `high` (no `xhigh`, `max` or `ultra`).
 - Relay the review findings with a verdict on each. Resume the implementing subagent with the findings the user wants fixed, inside the scope; the others are reported, or written as a comment on the issue when the user asks.
 - The pull request comes after the review.
