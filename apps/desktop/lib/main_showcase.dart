@@ -1,5 +1,6 @@
 // UI showcase: every real component of the app on static data, with the
-// real theme. No I/O: run with `flutter run -d windows -t lib/main_showcase.dart`.
+// real theme. No I/O: run with
+// `flutter run -d windows -t lib/main_showcase.dart`.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Title;
 import 'package:flutter_localizations/flutter_localizations.dart';

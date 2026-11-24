@@ -12,16 +12,18 @@ typedef _Op = ({int line, int? fix, Map<String, dynamic> json});
 /// ```
 /// {"op":"fixStart","fix":1,"kind":"normalizeMedia","path":"Band/Song"}
 /// {"op":"move","from":"Band/Song/audio/a.wav","to":"Band/Song/Media/a.wav"}
-/// {"op":"rewrite","path":"Band/Song/Song.rpp","modified":1731300000000000,"copy":".migration/<stamp>/originals/Band/Song/Song.rpp"}
+/// {"op":"rewrite","path":"S.rpp","modified":1731300000000000,"copy":"o/S.rpp"}
 /// {"op":"create","path":"Band/Song/Media/b.wav"}
 /// {"op":"fixEnd","fix":1,"ok":true}
 /// {"op":"undoStart","fix":2}
 /// {"op":"undoEnd","fix":2}
 /// ```
-/// `fix` numbers the fixes of the journal from 1; `rewrite` is an existing
-/// file about to be overwritten, `modified` its date before (microseconds
-/// since the epoch), `copy` the raw copy of its content before; `create` a
-/// file about to be written where none was. An undo of a fix (#94) is
+/// The example paths are shortened. `fix` numbers the fixes of the journal
+/// from 1; `rewrite` is an existing file about to be overwritten, `modified`
+/// its date before (microseconds since the epoch), `copy` the raw copy of its
+/// content before, in `<folder>/originals/` under its inventory path (in
+/// `<folder>/fixes/<fix>/` if not inventoried); `create` a file about to be
+/// written where none was. An undo of a fix (#94) is
 /// between `undoStart` and `undoEnd`; the operations of a fix followed by
 /// its `undoEnd` are ignored by [locate], [origin] and [rewrittenAfter].
 final class MigrationJournal {

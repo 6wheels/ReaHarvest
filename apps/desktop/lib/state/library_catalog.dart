@@ -129,11 +129,14 @@ class LibraryCatalog {
       await writeLibrary(MountedFolderStorage(folder), library);
     }
     await ref.read(settingsProvider.notifier).change((_) => updated);
+    final knownText = knownValues.isEmpty
+        ? ''
+        : ', ${knownValues.paths.length} known values';
     _log.info(
       '${found == null ? 'Created' : 'Attached'} library '
       '${entry.displayName} at $folder'
       '${changed && found != null ? ', layout replaced' : ''}'
-      '${knownValues.isEmpty ? '' : ', ${knownValues.paths.length} known values'}',
+      '$knownText',
     );
     await ref.read(libraryScansProvider).scanTask(entry);
   }

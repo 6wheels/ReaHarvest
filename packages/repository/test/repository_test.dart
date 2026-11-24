@@ -2138,7 +2138,20 @@ void main() {
 
       final result = await scan(storage, lib);
 
-      // Titles placed too high stay visible, tagged as at their target.      expect(result.titles.map((t) => t.path), [        'Band/First album/Song',        'Band/Loose2',        'Band/_Unassigned/Other',        'Loose',      ]);      expect(result.titles.last.levels, {        'artist': Layout.unassigned,        'album': Layout.unassigned,        'title': 'Loose',      });      expect(result.titles.last.versions.single.fileName, 'v/v.rpp');      expect(result.titles[1].levels['artist'], 'Band');
+      // Titles placed too high stay visible, tagged as at their target.
+      expect(result.titles.map((t) => t.path), [
+        'Band/First album/Song',
+        'Band/Loose2',
+        'Band/_Unassigned/Other',
+        'Loose',
+      ]);
+      expect(result.titles.last.levels, {
+        'artist': Layout.unassigned,
+        'album': Layout.unassigned,
+        'title': 'Loose',
+      });
+      expect(result.titles.last.versions.single.fileName, 'v/v.rpp');
+      expect(result.titles[1].levels['artist'], 'Band');
       expect(layoutIssues(result), {
         ReportKind.misplacedLevel: [
           const ReportItem.misplaced(

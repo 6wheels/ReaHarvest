@@ -20,8 +20,8 @@ final _log = Logger('library.versions');
 /// Actions on the versions of a title: adopt, separate a duplicate, create,
 /// edit, status, trash, keep only one, purge, backup and restore (SPEC
 /// §4.2, §5.4, §5.9),
-/// each a foreground task in the turn of its library ([_turn]). "Then rescans": the folder of
-/// the title only ([LibraryScans.rescanTitle], SPEC §8).
+/// each a foreground task in the turn of its library ([_turn]). "Then rescans":
+/// the folder of the title only ([LibraryScans.rescanTitle], SPEC §8).
 class VersionActions {
   VersionActions(this.ref);
 

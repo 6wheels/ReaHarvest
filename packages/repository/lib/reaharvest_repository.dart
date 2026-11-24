@@ -1,4 +1,5 @@
-/// Repository and workspace scanning, layout conventions, adoption, RepositoryStorage adapters.
+/// Repository and workspace scanning, layout conventions, adoption,
+/// RepositoryStorage adapters.
 library;
 
 export 'src/adoption.dart';

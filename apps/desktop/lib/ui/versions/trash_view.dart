@@ -70,16 +70,13 @@ class TrashView extends ConsumerWidget {
       ].join('/');
     }
 
+    final trashSize = formatSize(files.fold(0, (s, e) => s + e.size));
     return ListView(
       padding: const EdgeInsets.all(Space.xl),
       children: [
         Row(
           children: [
-            Expanded(
-              child: SectionLabel(
-                '${l10n.trash} · ${formatSize(files.fold(0, (s, e) => s + e.size))}',
-              ),
-            ),
+            Expanded(child: SectionLabel('${l10n.trash} · $trashSize')),
             OutlinedButton.icon(
               icon: const Icon(Icons.delete_forever_outlined, size: 18),
               onPressed: () =>

@@ -867,12 +867,22 @@ void main() {
       '${AttachVersions('a', 'T', const [], level: 'title', force: true)}',
       'attachVersions a -> T, forced',
     );
-    expect(
-      '${const SetVersionEntries('T', VersionId('01J'), label: 'l', owner: MemberId('m'), status: 's')}',
-      'version 01J in T: l, m, s',
+    const entries = SetVersionEntries(
+      'T',
+      VersionId('01J'),
+      label: 'l',
+      owner: MemberId('m'),
+      status: 's',
+    );
+    expect('$entries', 'version 01J in T: l, m, s');
+    const rewrite = RewriteProject(
+      'a.rpp',
+      {'x': 'y'},
+      recordPath: ['Media', ''],
+      versionId: VersionId('01J'),
     );
     expect(
-      '${const RewriteProject('a.rpp', {'x': 'y'}, recordPath: ['Media', ''], versionId: VersionId('01J'))}',
+      '$rewrite',
       'rewrite a.rpp, x -> y, RECORD_PATH Media , VERSIONID 01J',
     );
     expect('${const CopyFile('a', 'b')}', 'copy a -> b');

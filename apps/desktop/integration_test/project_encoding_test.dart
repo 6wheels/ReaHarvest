@@ -59,7 +59,8 @@ void main() {
       File(fixture('windows-1252.rpp')).readAsBytesSync(),
     );
     const item =
-        '<ITEM\r\n  <SOURCE WAVE\r\n    FILE "audio-files\\Café.wav"\r\n  >\r\n>\r\n';
+        '<ITEM\r\n  <SOURCE WAVE\r\n    FILE "audio-files\\Café.wav"\r\n'
+        '  >\r\n>\r\n';
     File(p.join(song, 'old', 'old.rpp'))
       ..createSync(recursive: true)
       ..writeAsBytesSync(

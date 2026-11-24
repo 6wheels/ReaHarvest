@@ -42,7 +42,8 @@ final class ScanResult {
   /// and the folders whose node file has another level. Misplaced items
   /// name their expected level and, when known, their target. Titles
   /// below an unknown intermediate folder are not indexed, except titles
-  /// placed too high, indexed where they are with the level values of their target.
+  /// placed too high, indexed where they are with the level values of their
+  /// target.
   final Report issues;
 
   /// Title candidates of a layout library (SPEC §5.8 step 3), sorted by
@@ -796,8 +797,9 @@ final class _Scanner {
       dir.isNotEmpty && dir.split('/').any(isReservedFolder);
 
   /// Reads the projects of every candidate (the versions of its title
-  /// reused, their file names relative to the same folder), then checks their media; with [statOutside], the references
-  /// leaving a candidate are checked with one `stat` each.
+  /// reused, their file names relative to the same folder), then checks their
+  /// media; with [statOutside], the references leaving a candidate are checked
+  /// with one `stat` each.
   Future<void> _readCandidates({bool statOutside = false}) async {
     final read = {
       for (final t in titles)

@@ -22,7 +22,8 @@ Future<void> adoptVersion(
 /// Makes the *Save As* copy [fileName] of the title [titleDir] a new version
 /// (SPEC §4.2): a new id in the file, [label] (the label of the original, as
 /// shown, its file name fallback included) and [owner], if any, set for it.
-/// The file keeps its date. Returns the new id. Throws [StateError] if the project is not adopted.
+/// The file keeps its date. Returns the new id. Throws [StateError] if the
+/// project is not adopted.
 Future<VersionId> separateDuplicateVersion(
   RepositoryStorage storage,
   String titleDir,

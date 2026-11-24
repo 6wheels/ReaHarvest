@@ -231,10 +231,11 @@ MediaPlanCounts countPlan(MediaPlan plan) {
 
 /// Plans [fix] (SPEC §5.8 step 4, #148) from its [facts]:
 ///
-/// - [OrganizeTitle] of a title folder moves it to its target first, if
-///   free and none of its files is used from outside it; the projects of a candidate placed above the title level move
-///   one by one into the target, created. [AttachVersions] needs an
-///   existing title. A target without node file gets one.
+/// - [OrganizeTitle] of a title folder moves it to its target first, if free
+///   and none of its files is used from outside it; the projects of a candidate
+///   placed above the title level move one by one into the target, created.
+///   [AttachVersions] needs an existing title. A target without node file gets
+///   one.
 /// - Each version gets the folder named [FixVersion.folder] in the target
 ///   title, or a free `name (n)` variant: a project alone in a folder of
 ///   the title (no other project in or below it, none of its files used

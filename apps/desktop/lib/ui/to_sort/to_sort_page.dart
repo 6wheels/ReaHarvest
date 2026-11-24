@@ -12,8 +12,8 @@ Future<void> openToSort(BuildContext context) =>
     Navigator.of(context).push(overLibraryRoute((_) => const ToSortPage()));
 
 /// Issues of the libraries grouped by kind, with a counter per kind
-/// (SPEC §5.2, §5.8 step 3), and a guided move for misplaced projects. Back with the back button, Escape or
-/// the mouse back button.
+/// (SPEC §5.2, §5.8 step 3), and a guided move for misplaced projects. Back
+/// with the back button, Escape or the mouse back button.
 class ToSortPage extends StatelessWidget {
   const ToSortPage({super.key});
 

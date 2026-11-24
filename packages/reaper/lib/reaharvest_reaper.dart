@@ -1,4 +1,5 @@
-/// REAPER integration: launching, resource path, plugin caches, preference checks.
+/// REAPER integration: launching, resource path, plugin caches, preference
+/// checks.
 library;
 
 export 'src/launcher.dart'
