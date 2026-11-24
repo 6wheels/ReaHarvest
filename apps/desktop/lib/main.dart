@@ -15,6 +15,7 @@ import 'app.dart';
 import 'app_paths.dart';
 import 'demo_titles.dart';
 import 'logs.dart';
+import 'perf_marks.dart';
 import 'state/migration_actions.dart';
 import 'state/navigation.dart';
 import 'state/desktop_window_shell.dart';
@@ -116,6 +117,7 @@ Future<void> main() async {
       child: const ReaHarvestApp(),
     ),
   );
+  if (perfMode) startPerfMarks(container, appData); // coverage:ignore-line
   // Indexed titles are shown at once; the scan then refreshes them, then
   // the fixes left to undo are offered.
   if (!_demo) unawaited(container.read(migrationActionsProvider).startup());
