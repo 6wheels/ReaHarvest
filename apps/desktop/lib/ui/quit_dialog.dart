@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../state/tasks.dart';
+import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
 import 'tasks_zone.dart' show appNavigatorKey;
 
@@ -29,7 +30,7 @@ class QuitDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(l10n.quitTasksBody),
-          const SizedBox(height: 12),
+          const SizedBox(height: Space.ml),
           for (final t in tasks) Text('• ${t.label(l10n)}'),
         ],
       ),

@@ -12,6 +12,9 @@ import '../library_form.dart';
 import '../members_editor.dart';
 import 'settings_section.dart';
 
+/// Width of the dialog.
+const _width = 560.0;
+
 /// Libraries page: configured libraries, with removal and addition.
 class LibrariesPage extends StatelessWidget {
   const LibrariesPage({super.key});
@@ -125,7 +128,7 @@ class _Libraries extends ConsumerWidget {
         return AlertDialog(
           title: Text(l10n.addLibrary),
           content: SizedBox(
-            width: 560,
+            width: _width,
             child: SingleChildScrollView(
               child: LibraryForm(
                 submitLabel: l10n.addLibrary,

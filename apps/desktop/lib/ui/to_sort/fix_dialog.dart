@@ -4,6 +4,12 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../widgets.dart';
 
+/// Width of the drop-down of a choice, bounds of its suggestions list.
+const _fieldWidth = 200.0;
+const _menuMin = 160.0;
+const _menuMaxWidth = 360.0;
+const _menuMax = 200.0;
+
 /// Labeled dropdown of [options] (value -> label).
 class Choice<T> extends StatelessWidget {
   const Choice({
@@ -26,7 +32,7 @@ class Choice<T> extends StatelessWidget {
       children: [
         Expanded(child: Text(label)),
         SizedBox(
-          width: 200,
+          width: _fieldWidth,
           child: Dropdown<T>(
             value: value,
             options: options,
@@ -165,19 +171,19 @@ class _LevelFieldState extends State<LevelField> {
     optionsViewBuilder: (context, onSelected, options) => Align(
       alignment: Alignment.topLeft,
       child: Padding(
-        padding: const EdgeInsets.only(top: 2),
+        padding: const EdgeInsets.only(top: Space.xxs),
         child: Material(
           color: context.colors.surface,
-          elevation: 6,
+          elevation: Elevation.menu,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Radii.s),
             side: BorderSide(color: context.colors.border),
           ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: 160,
-              maxWidth: 360,
-              maxHeight: 200,
+              minWidth: _menuMin,
+              maxWidth: _menuMaxWidth,
+              maxHeight: _menuMax,
             ),
             child: IntrinsicWidth(
               child: SingleChildScrollView(
@@ -239,7 +245,7 @@ class _OptionState extends State<_Option> {
       onPressed: widget.onPressed,
       style: widget.highlighted
           ? MenuItemButton.styleFrom(
-              backgroundColor: c.accent.withValues(alpha: 0.10),
+              backgroundColor: c.accent.withValues(alpha: Alpha.faint),
               foregroundColor: c.accent,
             )
           : null,

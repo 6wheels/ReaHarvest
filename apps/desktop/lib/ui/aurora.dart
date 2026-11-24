@@ -2,6 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+import '../theme/app_theme.dart';
+
+/// Opacity of the middle stop of a light of the aurora.
+const _midStop = 0.35;
+
 /// Colors of an aurora visual, derived from a stable seed (the title id),
 /// so that a title always looks the same and titles look different. A
 /// [light] palette is a pale dawn sky with deep lights standing out on it,
@@ -23,7 +28,7 @@ final class AuroraPalette {
               at(38, 0.80, 0.48).toColor(),
               at(78, 0.75, 0.55).toColor(),
             ],
-            const Color(0x99FFFFFF),
+            Tone.auroraShadeLight,
             hash,
           )
         : AuroraPalette._(
@@ -33,7 +38,7 @@ final class AuroraPalette {
               at(38, 0.68, 0.55).toColor(),
               at(78, 0.62, 0.62).toColor(),
             ],
-            const Color(0xB0000000),
+            Tone.auroraShadeDark,
             hash,
           );
   }
@@ -100,8 +105,8 @@ final class AuroraPainter extends CustomPainter {
       canvas.scale(0.55, 1.35);
       final shader = RadialGradient(
         colors: [
-          color.withValues(alpha: 0.85),
-          color.withValues(alpha: 0.35),
+          color.withValues(alpha: Alpha.dense),
+          color.withValues(alpha: _midStop),
           color.withValues(alpha: 0),
         ],
         stops: const [0, 0.45, 1],

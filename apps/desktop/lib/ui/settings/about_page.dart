@@ -7,6 +7,10 @@ import '../glass_dialog.dart';
 import '../path_row.dart';
 import 'settings_section.dart';
 
+/// Size of the licenses page.
+const _width = 700.0;
+const _height = 460.0;
+
 /// Application version, kept in step with `pubspec.yaml`.
 const appVersion = '0.1.0';
 
@@ -26,7 +30,7 @@ class AboutPage extends StatelessWidget {
           child: Text(
             'ReaHarvest',
             style: Theme.of(context).textTheme.displaySmall
-                ?.copyWith(fontWeight: FontWeight.w700),
+                ?.copyWith(fontWeight: Weights.bold),
           ),
         ),
         FormRow(label: l10n.applicationVersion, child: const Text(appVersion)),
@@ -59,8 +63,8 @@ Future<void> _showLicenses(BuildContext context) => showGlassDialog<void>(
       child: Focus(
         autofocus: true,
         child: SizedBox(
-          width: 700,
-          height: 460,
+          width: _width,
+          height: _height,
           child: Navigator(
             onGenerateRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const LicensePage(

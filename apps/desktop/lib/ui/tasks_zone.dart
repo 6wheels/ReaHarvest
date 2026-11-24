@@ -8,6 +8,14 @@ import '../theme/app_theme.dart';
 import 'report_dialog.dart';
 import 'widgets.dart';
 
+/// Layout of a task: height of the list and of a row, widths of the light,
+/// of the percentage and of the meter.
+const _listHeight = 220.0;
+const _rowHeight = 34.0;
+const _lightWidth = 20.0;
+const _percentWidth = 36.0;
+const _meterWidth = 120.0;
+
 /// Navigator of the application, for the tasks zone which sits outside of
 /// it.
 final appNavigatorKey = GlobalKey<NavigatorState>();
@@ -89,7 +97,7 @@ class TasksZone extends ConsumerWidget {
                       ],
                     ),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 220),
+                      constraints: const BoxConstraints(maxHeight: _listHeight),
                       child: ListView(
                         shrinkWrap: true,
                         children: [
@@ -175,7 +183,7 @@ class TaskProgress extends StatelessWidget {
         Expanded(child: Meter(progress)),
         const SizedBox(width: Space.s),
         SizedBox(
-          width: 36,
+          width: _percentWidth,
           child: Text(
             progress == null
                 ? '---'
@@ -216,16 +224,27 @@ class _TaskRow extends ConsumerWidget {
     final light = switch (task.state) {
       TaskState.queued || TaskState.cancelled => Led(c.muted, lit: false),
       TaskState.running => Led(c.ledAmber, mode: LedMode.pulse),
-      TaskState.done => Icon(Icons.check_circle, size: 18, color: c.ledGreen),
-      TaskState.warning => Icon(Icons.warning, size: 18, color: c.ledAmber),
-      TaskState.failed => Icon(Icons.error, size: 18, color: error),
+      TaskState.done => Icon(
+        Icons.check_circle,
+        size: IconSize.l,
+        color: c.ledGreen,
+      ),
+      TaskState.warning => Icon(
+        Icons.warning,
+        size: IconSize.l,
+        color: c.ledAmber,
+      ),
+      TaskState.failed => Icon(Icons.error, size: IconSize.l, color: error),
     };
     final trailing = taskAction(context, ref, task);
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 34),
+      constraints: const BoxConstraints(minHeight: _rowHeight),
       child: Row(
         children: [
-          SizedBox(width: 20, child: Center(child: light)),
+          SizedBox(
+            width: _lightWidth,
+            child: Center(child: light),
+          ),
           const SizedBox(width: Space.s),
           Expanded(
             child: Column(
@@ -260,7 +279,10 @@ class _TaskRow extends ConsumerWidget {
           ),
           if (task.isRunning) ...[
             const SizedBox(width: Space.m),
-            SizedBox(width: 120 + Space.s + 36, child: TaskProgress(task)),
+            SizedBox(
+              width: _meterWidth + Space.s + _percentWidth,
+              child: TaskProgress(task),
+            ),
           ],
           const SizedBox(width: Space.m),
           // State and report in columns of one width, the report slot kept

@@ -340,11 +340,13 @@ class _LayoutChoice extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.s),
       child: Material(
-        color: selected ? c.accent.withValues(alpha: 0.10) : c.raised,
+        color: selected ? c.accent.withValues(alpha: Alpha.faint) : c.raised,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.s),
           side: BorderSide(
-            color: selected ? c.accent.withValues(alpha: 0.6) : c.border,
+            color: selected
+                ? c.accent.withValues(alpha: Alpha.strong)
+                : c.border,
           ),
         ),
         child: InkWell(
@@ -353,7 +355,7 @@ class _LayoutChoice extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: Space.m,
-              vertical: Space.s + 2,
+              vertical: Space.md,
             ),
             child: Row(
               children: [

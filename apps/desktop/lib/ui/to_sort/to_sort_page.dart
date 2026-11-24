@@ -3,9 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../state/library_scans.dart';
+import '../../theme/app_theme.dart';
 import '../over_library.dart';
 import '../studio_title_bar.dart';
 import 'to_sort_list.dart';
+
+/// Widest the list grows.
+const _maxWidth = 720.0;
 
 /// Opens the "To sort" page over the library (SPEC §5.2).
 Future<void> openToSort(BuildContext context) =>
@@ -34,7 +38,7 @@ class ToSortPage extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: () =>
                         ref.read(libraryScansProvider).scanAll(full: true),
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    icon: const Icon(Icons.refresh_rounded, size: IconSize.m),
                     label: Text(l10n.fullScan),
                   ),
                 ),
@@ -44,7 +48,7 @@ class ToSortPage extends StatelessWidget {
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
+                  constraints: const BoxConstraints(maxWidth: _maxWidth),
                   child: const ToSortList(),
                 ),
               ),

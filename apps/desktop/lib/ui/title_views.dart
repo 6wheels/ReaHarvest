@@ -76,7 +76,7 @@ class _TitleListState extends ConsumerState<TitleList> {
             ],
           ),
         ),
-        Divider(height: 1, color: c.border),
+        Divider(height: Sizes.hairline, color: c.border),
         Expanded(
           child: ListView.builder(
             padding: EdgeInsets.fromLTRB(
@@ -104,7 +104,12 @@ class _TitleListState extends ConsumerState<TitleList> {
                     _Text('${t.versions.length}'),
                     _Text('${tempoOf(t) ?? ''}'),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 10, 6, 0),
+                      padding: const EdgeInsets.fromLTRB(
+                        Space.sm,
+                        Space.md,
+                        Space.sm,
+                        0,
+                      ),
                       child: StatusTrail(t.status),
                     ),
                     _Text(shortDate(l10n, lastModified(t))),
@@ -175,7 +180,10 @@ class _HeaderCell extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Space.s, horizontal: 6),
+        padding: const EdgeInsets.symmetric(
+          vertical: Space.s,
+          horizontal: Space.sm,
+        ),
         child: Row(
           children: [
             Flexible(
@@ -192,7 +200,7 @@ class _HeaderCell extends StatelessWidget {
                 ascending
                     ? Icons.arrow_upward_rounded
                     : Icons.arrow_downward_rounded,
-                size: 12,
+                size: IconSize.xs,
                 color: c.text,
               ),
           ],
@@ -210,7 +218,7 @@ class _NameCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const SizedBox(width: 6),
+      const SizedBox(width: Space.sm),
       _Swatch(title.id),
       const SizedBox(width: Space.s),
       Expanded(
@@ -219,7 +227,7 @@ class _NameCell extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(fontWeight: FontWeight.w500),
+              ?.copyWith(fontWeight: Weights.medium),
         ),
       ),
     ],
@@ -233,7 +241,7 @@ class _Text extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 6),
+    padding: const EdgeInsets.symmetric(horizontal: Space.sm),
     child: Text(
       text,
       maxLines: 1,
@@ -242,6 +250,9 @@ class _Text extends StatelessWidget {
     ),
   );
 }
+
+/// Side of the square of the colors of a title.
+const _swatch = 18.0;
 
 /// Small aurora swatch identifying a title in lists.
 class _Swatch extends StatelessWidget {
@@ -256,8 +267,8 @@ class _Swatch extends StatelessWidget {
       light: Theme.of(context).brightness == Brightness.light,
     ).lights;
     return Container(
-      width: 18,
-      height: 18,
+      width: _swatch,
+      height: _swatch,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(Radii.xs),
         gradient: LinearGradient(
@@ -309,7 +320,7 @@ class _TitleRowState extends ConsumerState<TitleRow> {
       onExit: (_) => setState(() => _hovered = false),
       child: Material(
         color: widget.selected
-            ? c.accent.withValues(alpha: 0.10)
+            ? c.accent.withValues(alpha: Alpha.faint)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(Radii.xs),
         child: InkWell(
@@ -321,8 +332,8 @@ class _TitleRowState extends ConsumerState<TitleRow> {
               // Lit edge of the selected strip.
               AnimatedContainer(
                 duration: Motion.fast,
-                width: 2,
-                margin: const EdgeInsets.symmetric(vertical: 6),
+                width: Sizes.bar,
+                margin: const EdgeInsets.symmetric(vertical: Space.sm),
                 color: widget.selected ? c.accent : Colors.transparent,
               ),
               Expanded(child: widget.child),

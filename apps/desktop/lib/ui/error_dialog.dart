@@ -8,6 +8,12 @@ import '../theme/app_theme.dart';
 import 'glass_dialog.dart';
 import 'tasks_zone.dart';
 
+/// Width of the dialog.
+const _width = 640.0;
+
+/// Height of the detail of an error, before it scrolls.
+const _detailHeight = 360.0;
+
 var _shown = false;
 
 /// Shows the unexpected [error] over the application (SPEC §5.2): its
@@ -36,9 +42,9 @@ class ErrorDialog extends ConsumerWidget {
     return AlertDialog(
       title: Text(l10n.unexpectedError),
       content: SizedBox(
-        width: 640,
+        width: _width,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 360),
+          constraints: const BoxConstraints(maxHeight: _detailHeight),
           child: SingleChildScrollView(
             child: SelectableText(detail, style: context.readout),
           ),

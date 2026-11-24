@@ -108,7 +108,7 @@ class Overview extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.all(Space.xs),
           child: Column(
-            spacing: Space.xs + 1,
+            spacing: Space.xs,
             children: [
               IconAction(
                 icon: const Icon(Icons.close_rounded),
@@ -130,9 +130,9 @@ class Overview extends ConsumerWidget {
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.30),
-            blurRadius: 24,
-            offset: const Offset(0, 6),
+            color: Tone.black.withValues(alpha: Alpha.soft),
+            blurRadius: Blur.l,
+            offset: Blur.dropOffset,
           ),
         ],
       ),
@@ -140,10 +140,10 @@ class Overview extends ConsumerWidget {
       child: ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          filter: ImageFilter.blur(sigmaX: Blur.l, sigmaY: Blur.l),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: c.surface.withValues(alpha: 0.6),
+              color: c.surface.withValues(alpha: Alpha.strong),
               borderRadius: radius,
               border: Border.all(color: c.border),
             ),
@@ -211,7 +211,7 @@ class _Identity extends ConsumerWidget {
                     levels,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: context.legend.copyWith(fontSize: 9.5),
+                    style: context.type.legendSmall,
                   ),
                 ),
               ],
@@ -219,7 +219,7 @@ class _Identity extends ConsumerWidget {
           ),
           if (library != null)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: Space.xxs),
               child: SectionLabel(library),
             ),
           const SizedBox(height: Space.xs),
@@ -245,14 +245,14 @@ class _Identity extends ConsumerWidget {
             _Alert(
               Icons.extension_off_outlined,
               l10n.missingPluginCount(missing),
-              color: warningColor,
+              color: context.colors.ledAmber,
               onTap: open,
             ),
           if (duplicated > 0)
             _Alert(
               Icons.content_copy_rounded,
               l10n.duplicateCount(duplicated),
-              color: warningColor,
+              color: context.colors.ledAmber,
               onTap: open,
             ),
           if (notAdopted > 0)
@@ -282,10 +282,10 @@ class _Alert extends StatelessWidget {
     borderRadius: BorderRadius.circular(Radii.xs),
     onTap: onTap,
     child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: Space.xxs),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: IconSize.m, color: color),
           const SizedBox(width: Space.s),
           Flexible(
             child: Text(
@@ -296,7 +296,7 @@ class _Alert extends StatelessWidget {
                   ?.copyWith(color: color),
             ),
           ),
-          Disclosure(Disclosure.right, size: 20, color: color),
+          Disclosure(Disclosure.right, size: IconSize.xl, color: color),
         ],
       ),
     ),
@@ -326,7 +326,7 @@ class _Recent extends StatelessWidget {
                   // Small, to fit the heading.
                   style: glowButtonStyle(context).merge(
                     TextButton.styleFrom(
-                      minimumSize: const Size(0, 22),
+                      minimumSize: const Size(0, Sizes.mini),
                       padding: const EdgeInsets.symmetric(horizontal: Space.s),
                     ),
                   ),
@@ -338,7 +338,7 @@ class _Recent extends StatelessWidget {
         ),
         const SizedBox(height: Space.xs),
         for (final (i, v) in versions.take(_recentCount).indexed) ...[
-          if (i > 0) const SizedBox(height: 3),
+          if (i > 0) const SizedBox(height: Space.xxs),
           _RecentVersion(title, v),
         ],
       ],
@@ -374,14 +374,14 @@ class _RecentVersion extends ConsumerWidget {
       padding: const EdgeInsets.only(left: Space.xs),
       child: Tooltip(
         message: tooltip,
-        child: Icon(icon, size: 14, color: color),
+        child: Icon(icon, size: IconSize.s, color: color),
       ),
     );
     return Container(
-      height: 30,
-      padding: const EdgeInsets.only(left: Space.s + 2, right: 1),
+      height: Sizes.row,
+      padding: const EdgeInsets.only(left: Space.md, right: Space.xxs),
       decoration: BoxDecoration(
-        color: c.raised.withValues(alpha: 0.7),
+        color: c.raised.withValues(alpha: Alpha.strong),
         borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(color: c.border),
       ),
@@ -395,37 +395,30 @@ class _RecentVersion extends ConsumerWidget {
                   label.isEmpty
                       ? TextSpan(
                           text: versionName(version),
-                          style: TextStyle(color: c.muted),
+                          style: AppText.color(c.muted),
                         )
-                      : TextSpan(
-                          text: label,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
+                      : TextSpan(text: label, style: AppText.semibold),
                   if (owner != null)
-                    TextSpan(
-                      text: '  $owner',
-                      style: TextStyle(color: c.muted),
-                    ),
+                    TextSpan(text: '  $owner', style: AppText.color(c.muted)),
                   TextSpan(text: '   $readout', style: context.readout),
                 ],
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(fontSize: 12.5),
+              style: context.type.caption,
             ),
           ),
           if (alerts.missing.isNotEmpty)
             alert(
               Icons.extension_off_outlined,
               l10n.missingPluginCount(alerts.missing.length),
-              warningColor,
+              context.colors.ledAmber,
             ),
           if (alerts.duplicates.isNotEmpty)
             alert(
               Icons.content_copy_rounded,
               l10n.duplicateCount(1),
-              warningColor,
+              context.colors.ledAmber,
             ),
           if (alerts.notAdopted)
             alert(Icons.help_outline_rounded, l10n.notAdopted, c.muted),

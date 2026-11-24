@@ -16,6 +16,9 @@ import '../labels.dart';
 import '../widgets.dart';
 import 'version_ui_actions.dart';
 
+/// Width of the dialog.
+const _width = 440.0;
+
 /// Source of a new version.
 enum _Source { blank, template, duplicate }
 
@@ -125,7 +128,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
         widget.duplicate ? l10n.duplicateVersionTitle : l10n.newVersion,
       ),
       content: SizedBox(
-        width: 440,
+        width: _width,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

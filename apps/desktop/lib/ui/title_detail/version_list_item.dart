@@ -38,7 +38,6 @@ class _VersionItemState extends ConsumerState<VersionItem> {
     final VersionItem(:title, :version, :selected) = widget;
     final l10n = AppLocalizations.of(context);
     final c = context.colors;
-    final text = Theme.of(context).textTheme;
     final alerts = versionAlerts(ref, title, version);
     final owners = ref.watch(ownerNamesProvider);
     final m = version.metadata;
@@ -57,7 +56,7 @@ class _VersionItemState extends ConsumerState<VersionItem> {
       if (m?.owner case final owner?) owners[owner] ?? l10n.unknownOwner,
     ].join(' · ');
     return Padding(
-      padding: const EdgeInsets.only(bottom: Space.xs + 2),
+      padding: const EdgeInsets.only(bottom: Space.sm),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -65,13 +64,15 @@ class _VersionItemState extends ConsumerState<VersionItem> {
           duration: Motion.fast,
           curve: Motion.curve,
           decoration: BoxDecoration(
-            color: selected ? c.accent.withValues(alpha: 0.07) : c.surface,
+            color: selected
+                ? c.accent.withValues(alpha: Alpha.faint)
+                : c.surface,
             borderRadius: BorderRadius.circular(Radii.s),
             border: Border.all(
               color: selected
-                  ? c.accent.withValues(alpha: 0.45)
+                  ? c.accent.withValues(alpha: Alpha.medium)
                   : _hovered
-                  ? c.muted.withValues(alpha: 0.6)
+                  ? c.muted.withValues(alpha: Alpha.strong)
                   : c.border,
             ),
           ),
@@ -87,11 +88,11 @@ class _VersionItemState extends ConsumerState<VersionItem> {
                     // Lit edge of the selected strip only.
                     AnimatedContainer(
                       duration: Motion.fast,
-                      width: 2,
-                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      width: Sizes.bar,
+                      margin: const EdgeInsets.symmetric(vertical: Space.sm),
                       color: selected ? c.accent : Colors.transparent,
                     ),
-                    const SizedBox(width: Space.s + 2),
+                    const SizedBox(width: Space.md),
                     if (m != null || alerts.notAdopted) ...[
                       Center(
                         child: m == null
@@ -101,11 +102,11 @@ class _VersionItemState extends ConsumerState<VersionItem> {
                               )
                             : Led(c.accent),
                       ),
-                      const SizedBox(width: Space.s + 2),
+                      const SizedBox(width: Space.md),
                     ],
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: Space.md),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -114,13 +115,11 @@ class _VersionItemState extends ConsumerState<VersionItem> {
                               label,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: text.bodyMedium?.copyWith(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
+                              style: context.type.item.copyWith(
                                 color: generic ? c.muted : null,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: Space.xxs),
                             Text.rich(
                               TextSpan(
                                 text: details,
@@ -128,15 +127,13 @@ class _VersionItemState extends ConsumerState<VersionItem> {
                                   if (generic)
                                     TextSpan(
                                       text: ' · ${version.fileName}',
-                                      style: const TextStyle(
-                                        fontStyle: FontStyle.italic,
-                                      ),
+                                      style: AppText.italic,
                                     ),
                                 ],
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: context.readout.copyWith(fontSize: 11),
+                              style: context.type.readoutSmall,
                             ),
                           ],
                         ),
@@ -151,11 +148,11 @@ class _VersionItemState extends ConsumerState<VersionItem> {
                     if (alerts.missing.isNotEmpty ||
                         alerts.duplicates.isNotEmpty) ...[
                       const SizedBox(width: Space.s),
-                      const Center(
+                      Center(
                         child: Icon(
                           Icons.warning_amber_rounded,
-                          size: 18,
-                          color: warningColor,
+                          size: IconSize.l,
+                          color: context.colors.ledAmber,
                         ),
                       ),
                     ],

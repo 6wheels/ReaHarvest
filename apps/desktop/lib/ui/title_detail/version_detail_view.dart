@@ -13,6 +13,9 @@ import '../widgets.dart';
 /// Tracks shown before "Show more" (SPEC §5.3).
 const trackLimit = 20;
 
+/// Side of the color square of a track.
+const _swatch = 10.0;
+
 /// Detailed view of the project at [path]: sample rate, tempo and signature
 /// changes, length, tracks with their FX, referenced media (SPEC §5.3).
 class VersionDetailView extends ConsumerWidget {
@@ -111,22 +114,22 @@ class _Content extends ConsumerWidget {
           const SizedBox(height: Space.xs),
           for (final m in detail.media)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(vertical: Space.xxs),
               child: Row(
                 children: [
                   Icon(
                     m.size == null
                         ? Icons.error_outline_rounded
                         : Icons.check_rounded,
-                    size: 16,
-                    color: m.size == null ? warningColor : muted,
+                    size: IconSize.m,
+                    color: m.size == null ? context.colors.ledAmber : muted,
                   ),
                   const SizedBox(width: Space.s),
                   Expanded(child: Text(m.reference, style: text.bodyMedium)),
                   Text(
                     m.size == null ? l10n.mediaAbsent : formatSize(m.size!),
                     style: text.bodySmall?.copyWith(
-                      color: m.size == null ? warningColor : muted,
+                      color: m.size == null ? context.colors.ledAmber : muted,
                     ),
                   ),
                 ],
@@ -175,9 +178,9 @@ class _TracksState extends State<_Tracks> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 10,
-                  height: 10,
-                  margin: const EdgeInsets.only(top: 4, right: Space.s),
+                  width: _swatch,
+                  height: _swatch,
+                  margin: const EdgeInsets.only(top: Space.xs, right: Space.s),
                   decoration: BoxDecoration(
                     color: t.color == null ? null : _color(t.color!),
                     border: Border.all(color: muted),
@@ -197,7 +200,9 @@ class _TracksState extends State<_Tracks> {
                                 '   ${_missing(plugin) ? '⚠ ' : ''}'
                                 '${plugin.name}',
                             style: text.bodySmall?.copyWith(
-                              color: _missing(plugin) ? warningColor : muted,
+                              color: _missing(plugin)
+                                  ? context.colors.ledAmber
+                                  : muted,
                             ),
                           ),
                       ],

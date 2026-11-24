@@ -42,7 +42,7 @@ class _ItemState extends State<Item> {
     final selected = widget.selected;
     final lit = selected ?? false;
     return Padding(
-      padding: const EdgeInsets.only(top: Space.xs + 2),
+      padding: const EdgeInsets.only(top: Space.sm),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -50,13 +50,13 @@ class _ItemState extends State<Item> {
           duration: Motion.fast,
           curve: Motion.curve,
           decoration: BoxDecoration(
-            color: lit ? c.accent.withValues(alpha: 0.07) : c.surface,
+            color: lit ? c.accent.withValues(alpha: Alpha.faint) : c.surface,
             borderRadius: BorderRadius.circular(Radii.s),
             border: Border.all(
               color: lit
-                  ? c.accent.withValues(alpha: 0.45)
+                  ? c.accent.withValues(alpha: Alpha.medium)
                   : _hovered
-                  ? c.muted.withValues(alpha: 0.6)
+                  ? c.muted.withValues(alpha: Alpha.strong)
                   : c.border,
             ),
           ),
@@ -74,13 +74,13 @@ class _ItemState extends State<Item> {
                     // Lit edge of the selected strip.
                     AnimatedContainer(
                       duration: Motion.fast,
-                      width: 2,
-                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      width: Sizes.bar,
+                      margin: const EdgeInsets.symmetric(vertical: Space.sm),
                       color: lit ? c.accent : Colors.transparent,
                     ),
                     if (selected != null)
                       Padding(
-                        padding: const EdgeInsets.only(left: Space.s + 2),
+                        padding: const EdgeInsets.only(left: Space.md),
                         child: Center(
                           child: Semantics(
                             checked: selected,
@@ -106,9 +106,8 @@ class _ItemState extends State<Item> {
   }
 
   Widget _content(BuildContext context) {
-    final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.m - 4, 10, Space.m, 10),
+      padding: const EdgeInsets.fromLTRB(Space.ml, Space.md, Space.m, Space.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -116,24 +115,23 @@ class _ItemState extends State<Item> {
             widget.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyMedium
-                ?.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600),
+            style: context.type.item,
           ),
           if (widget.subtitle.isNotEmpty) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: Space.xxs),
             Text(
               widget.subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: context.readout.copyWith(fontSize: 11),
+              style: context.type.readoutSmall,
             ),
           ],
           if (widget.details.isNotEmpty) ...[
-            const SizedBox(height: Space.xs + 2),
+            const SizedBox(height: Space.sm),
             for (final line in widget.details)
               Text(
                 line,
-                style: TextStyle(color: c.text, fontSize: 12, height: 1.4),
+                style: context.type.caption.copyWith(height: Leading.loose),
               ),
           ],
         ],

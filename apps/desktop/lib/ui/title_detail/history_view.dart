@@ -90,7 +90,7 @@ class History extends ConsumerWidget {
         for (final b in backups)
           Row(
             children: [
-              const Icon(Icons.history_rounded, size: 16),
+              const Icon(Icons.history_rounded, size: IconSize.m),
               const SizedBox(width: Space.s),
               Expanded(
                 child: Text(format.format(b.created), style: text.bodyMedium),

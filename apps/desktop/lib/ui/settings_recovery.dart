@@ -12,6 +12,9 @@ import '../logs.dart';
 import '../theme/app_theme.dart';
 import 'studio_title_bar.dart';
 
+/// Widest the recovery page grows.
+const _width = 520.0;
+
 final _log = Logger('settings');
 
 /// Loads the settings. When the file is unreadable or newer, runs a small
@@ -107,7 +110,7 @@ class SettingsRecoveryApp extends StatelessWidget {
               Expanded(
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 520),
+                    constraints: const BoxConstraints(maxWidth: _width),
                     child: Padding(
                       padding: const EdgeInsets.all(Space.l),
                       child: Column(
