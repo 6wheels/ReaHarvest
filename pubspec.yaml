@@ -12,6 +12,7 @@ workspace:
   - packages/repository
   - packages/index
   - packages/reaper
+  - packages/lints
 
 dev_dependencies:
   lints: ^6.0.0

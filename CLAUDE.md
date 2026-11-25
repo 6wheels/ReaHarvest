@@ -40,8 +40,8 @@ Test fixtures: real `.rpp` files in `test/fixtures/`.
 ## UI
 
 - Look: DAW / mixing console, polished, never flashy. Own design system over a minimal Material base (SPEC §7.1).
-- Every color, radius, spacing, text style and duration comes from the theme tokens (`apps/desktop/lib/theme/`): no hard-coded value.
-- Reuse the existing components (the kit: `apps/desktop/lib/ui/kit/`, one file per component, exported by `kit/kit.dart`) before writing a new one.
+- Every color, radius, spacing, text style and duration comes from the theme tokens (`apps/desktop/lib/theme/`): no hard-coded value. The native analyzer rule `no_hard_coded_style` (`packages/lints`) enforces it.
+- Reuse the existing components (the kit: `apps/desktop/lib/ui/kit/`, one file per component, exported by `kit/kit.dart`) before writing a new one. The rule `no_raw_material_widget` forbids the Material widgets outside the kit, except the closed list of `buildTheme` (`lib/theme/app_theme.dart`). Where a rule has a justified exception, write `// ignore: reaharvest_lints/<rule>` with its reason on the line above.
 - Never tell states apart by hue alone: also luminance, shape, icon or glow.
 - The showcase (`apps/desktop/lib/main_showcase.dart`, real components on mock data, no I/O) must keep compiling; a new or reworked component is added to it. Run: `flutter run -d windows -t lib/main_showcase.dart` in `apps/desktop`.
 

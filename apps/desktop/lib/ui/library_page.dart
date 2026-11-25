@@ -318,7 +318,7 @@ class _LibrarySearchFieldState extends ConsumerState<LibrarySearchField> {
             suffixIconConstraints: const BoxConstraints(),
             fillColor: c.background,
             contentPadding: const EdgeInsets.symmetric(
-              vertical: 6,
+              vertical: Space.sm,
               horizontal: Space.s,
             ),
           ),

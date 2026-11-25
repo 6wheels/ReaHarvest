@@ -176,8 +176,8 @@ class _TracksState extends State<_Tracks> {
           Padding(
             padding: EdgeInsets.only(
               left: t.depth * Space.l,
-              top: 2,
-              bottom: 2,
+              top: Space.xxs,
+              bottom: Space.xxs,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,6 +228,8 @@ class _TracksState extends State<_Tracks> {
 }
 
 /// Flutter color of a REAPER native color (`0x00BBGGRR`).
+// A user data color, not a style value.
+// ignore: reaharvest_lints/no_hard_coded_style
 Color _color(int native) => Color(
   0xFF000000 |
       (native & 0xFF) << 16 |
