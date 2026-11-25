@@ -1,9 +1,8 @@
-// The legacy window and tray API is removed by #223.
-// ignore_for_file: deprecated_member_use
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:window_manager/legacy.dart';
+import 'package:window_manager/window_manager.dart';
 
+import '../app_window.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'kit/kit.dart';
@@ -161,17 +160,19 @@ class _WindowButtons extends StatelessWidget {
     children: [
       WindowCaptionButton.minimize(
         brightness: brightness,
-        onPressed: windowManager.minimize,
+        onPressed: () => appWindow?.minimize(),
       ),
       WindowCaptionButton.maximize(
         brightness: brightness,
-        onPressed: () async => await windowManager.isMaximized()
-            ? windowManager.unmaximize()
-            : windowManager.maximize(),
+        onPressed: () {
+          final window = appWindow;
+          if (window == null) return;
+          window.isMaximized ? window.unmaximize() : window.maximize();
+        },
       ),
       WindowCaptionButton.close(
         brightness: brightness,
-        onPressed: windowManager.close,
+        onPressed: () => appWindow?.close(),
       ),
     ],
   );
@@ -186,30 +187,32 @@ class _ConsoleWindowButtons extends StatefulWidget {
   State<_ConsoleWindowButtons> createState() => _ConsoleWindowButtonsState();
 }
 
-class _ConsoleWindowButtonsState extends State<_ConsoleWindowButtons>
-    with WindowListener {
+class _ConsoleWindowButtonsState extends State<_ConsoleWindowButtons> {
+  final _window = appWindow;
+  ListenerId? _listener;
   var _maximized = false;
 
   @override
   void initState() {
     super.initState();
-    windowManager.addListener(this);
-    windowManager.isMaximized().then((m) {
-      if (mounted) setState(() => _maximized = m);
+    final window = _window;
+    if (window == null) return;
+    _maximized = window.isMaximized;
+    // Maximized, minimized or restored: the state is read again.
+    _listener = window.addListener((event) {
+      if (event is WindowMaximizedEvent ||
+          event is WindowMinimizedEvent ||
+          event is WindowRestoredEvent) {
+        if (mounted) setState(() => _maximized = window.isMaximized);
+      }
     });
   }
 
   @override
   void dispose() {
-    windowManager.removeListener(this);
+    if (_listener case final listener?) _window?.removeListener(listener);
     super.dispose();
   }
-
-  @override
-  void onWindowMaximize() => setState(() => _maximized = true);
-
-  @override
-  void onWindowUnmaximize() => setState(() => _maximized = false);
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +223,7 @@ class _ConsoleWindowButtonsState extends State<_ConsoleWindowButtons>
         _CaptionButton(
           icon: Icons.remove_rounded,
           tooltip: l10n.minimizeWindow,
-          onPressed: windowManager.minimize,
+          onPressed: () => _window?.minimize(),
         ),
         _CaptionButton(
           icon: _maximized
@@ -228,14 +231,13 @@ class _ConsoleWindowButtonsState extends State<_ConsoleWindowButtons>
               : Icons.crop_square_rounded,
           iconSize: _maximized ? 12 : 14,
           tooltip: _maximized ? l10n.restoreWindow : l10n.maximizeWindow,
-          onPressed: _maximized
-              ? windowManager.unmaximize
-              : windowManager.maximize,
+          onPressed: () =>
+              _maximized ? _window?.unmaximize() : _window?.maximize(),
         ),
         _CaptionButton(
           icon: Icons.close_rounded,
           tooltip: l10n.close,
-          onPressed: windowManager.close,
+          onPressed: () => _window?.close(),
           danger: true,
         ),
       ],

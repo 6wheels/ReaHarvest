@@ -1,9 +1,6 @@
-// The legacy window and tray API is removed by #223.
-// ignore_for_file: deprecated_member_use
 // UI showcase: every real component of the app on static data, with the
 // real theme. No I/O: run with
 // `flutter run -d windows -t lib/main_showcase.dart`.
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart' hide Title;
 import 'package:cupertino_ui/cupertino_ui.dart'
     show GlobalCupertinoLocalizations;
@@ -13,8 +10,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
-import 'package:window_manager/legacy.dart';
+import 'package:window_manager/window_manager.dart';
 
+import 'app_window.dart';
 import 'l10n/app_localizations.dart';
 import 'showcase_tokens.dart';
 import 'state/navigation.dart';
@@ -44,13 +42,10 @@ const _sliderWidth = 180.0;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // The window frame of the application: its own title bar and buttons.
-  if (defaultTargetPlatform == TargetPlatform.windows) {
-    await windowManager.ensureInitialized();
-    await windowManager.waitUntilReadyToShow(
-      const WindowOptions(titleBarStyle: TitleBarStyle.hidden),
-      windowManager.show,
-    );
-  }
+  // Shown by the runner with the first frame.
+  appWindow
+    ?..titleBarStyle = TitleBarStyle.hidden
+    ..isWindowControlButtonsVisible = true;
   // Providers read by the overview and the card actions, served from the
   // mock data below: nothing is read from or written to the disk, and REAPER
   // is never found.
