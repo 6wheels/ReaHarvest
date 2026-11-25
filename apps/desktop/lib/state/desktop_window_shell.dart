@@ -3,8 +3,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:logging/logging.dart';
-import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:tray_manager/legacy.dart';
+import 'package:window_manager/legacy.dart';
 
 import '../logs.dart';
 import 'window_behavior.dart';

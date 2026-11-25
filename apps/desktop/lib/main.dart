@@ -9,7 +9,7 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/legacy.dart';
 
 import 'app.dart';
 import 'app_paths.dart';

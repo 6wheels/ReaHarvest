@@ -3,12 +3,15 @@
 // `flutter run -d windows -t lib/main_showcase.dart`.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Title;
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart'
+    show GlobalCupertinoLocalizations;
+import 'package:flutter_localizations/flutter_localizations.dart'
+    show GlobalWidgetsLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/legacy.dart';
 
 import 'l10n/app_localizations.dart';
 import 'showcase_tokens.dart';
@@ -190,7 +193,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
     themeAnimationDuration: Motion.medium,
     locale: _locale,
     supportedLocales: AppLocalizations.supportedLocales,
-    localizationsDelegates: const [
+    localizationsDelegates: [
       AppLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
