@@ -48,7 +48,7 @@ Present the plan:
 - The integration test, when the issue asks for one, and its line ticked in the integration tests issue of the milestone.
 - New texts in both ARB files.
 - Run the `review-against-issue` skill on the diff. Fix the confirmed findings that are inside the scope; report the others to the user, with your verdict on each.
-- In a subagent, do not run `code-review`: `orchestrate` has it run by another model after your commit, and resumes you with the findings to fix. Alone, run the `code-review` skill at level `high` on the branch against `origin/main` (never a level above `high`), and handle its findings the same way.
+- In a subagent, do not run `code-review`: `orchestrate` has it run by another agent after your commit, when the user wants it, and resumes you with the findings to fix. Alone, run the `code-review` skill at level `high` on the branch against `origin/main` (never a level above `high`), and handle its findings the same way.
 
 ## 6. Commit
 
