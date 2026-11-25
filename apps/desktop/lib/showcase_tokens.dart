@@ -2,7 +2,7 @@
 // alpha levels, the icon sizes and the accents of both themes side by side.
 // Nothing here tells two things apart by hue alone: every swatch carries its
 // name, its hex code, its luminance and its contrast ratios.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:reaharvest_library/reaharvest_library.dart'
     show AccentPreference;
 

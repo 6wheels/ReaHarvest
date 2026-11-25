@@ -1,10 +1,12 @@
+// The legacy window and tray API is removed by #223.
+// ignore_for_file: deprecated_member_use
 // coverage:ignore-file
 import 'dart:async';
 import 'dart:io';
 
 import 'package:logging/logging.dart';
-import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:tray_manager/legacy.dart';
+import 'package:window_manager/legacy.dart';
 
 import '../logs.dart';
 import 'window_behavior.dart';

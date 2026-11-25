@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' hide Title;
+import 'package:material_ui/material_ui.dart' hide Title;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../l10n/app_localizations.dart';
