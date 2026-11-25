@@ -7,8 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../state/library_catalog.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
-import 'widgets.dart';
+import 'kit/kit.dart';
 
 /// Width of the dialog.
 const _width = 420.0;

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
-import '../glass_dialog.dart';
+import '../kit/kit.dart';
 import '../path_row.dart';
 import 'settings_section.dart';
 

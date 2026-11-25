@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
+import 'kit/kit.dart';
 import 'tasks_zone.dart';
 
 /// Width of the dialog.

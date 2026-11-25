@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
 import '../state/migration_actions.dart';
+import 'kit/kit.dart';
+import 'project_actions.dart';
 import 'tasks_zone.dart' show appNavigatorKey;
-import 'glass_dialog.dart';
-import 'widgets.dart';
 
 /// Shows, one after the other, the fixes offered to be undone
 /// ([interruptedFixesProvider], SPEC §5.8 step 5): "Undo" runs the undo as

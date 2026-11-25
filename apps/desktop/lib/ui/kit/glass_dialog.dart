@@ -2,8 +2,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-import '../l10n/app_localizations.dart';
-import '../theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
+import '../../theme/app_theme.dart';
 
 /// Geometry of the popup transition: blur of the pane behind, scale and
 /// slide the popup starts from, curve of its closing.

@@ -3,8 +3,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'kit/kit.dart';
 import 'labels.dart';
-import 'widgets.dart';
 
 /// Thickness of the bars of the trail, large and small.
 const _barLarge = 6.0;
@@ -123,9 +123,12 @@ class _StatusTrailState extends State<StatusTrail> {
             builder: (context, constraints) {
               final width = constraints.maxWidth;
               final segment = (width - gap * (steps.length - 1)) / steps.length;
-              // The current label starts where its segment starts, like the
-              // revealed one, and is pushed back at the end of the trail.
-              double currentLeft() {
+              // The extent of the current label: it starts where its segment
+              // starts, like the revealed one, and is pushed back at the end
+              // of the trail.
+              var left = 0.0;
+              var labelWidth = 0.0;
+              if (current >= 0) {
                 final text = TextPainter(
                   text: TextSpan(
                     text: labelOf(steps[current]),
@@ -135,10 +138,21 @@ class _StatusTrailState extends State<StatusTrail> {
                   textScaler: MediaQuery.textScalerOf(context),
                   maxLines: 1,
                 )..layout();
-                final left = current * (segment + gap);
-                final max = width - text.width;
+                labelWidth = text.width;
                 text.dispose();
-                return left.clamp(0.0, max < 0 ? 0.0 : max);
+                final max = width - labelWidth;
+                left = (current * (segment + gap)).clamp(
+                  0.0,
+                  max < 0 ? 0.0 : max,
+                );
+              }
+
+              // Whether the label of segment [i] stays clear of the current
+              // one.
+              bool clear(int i) {
+                final start = i * (segment + gap);
+                return i != current &&
+                    (start + segment <= left || start >= left + labelWidth);
               }
 
               return Stack(
@@ -150,8 +164,11 @@ class _StatusTrailState extends State<StatusTrail> {
                       for (final (i, step) in steps.indexed) ...[
                         if (i > 0) SizedBox(width: gap),
                         Expanded(
+                          // The current label is the one below: it stays
+                          // as it is, so that hovering never dims it, and
+                          // no label is revealed under it.
                           child: fade(
-                            _hovered,
+                            _hovered && clear(i),
                             Text(
                               labelOf(step),
                               maxLines: 1,
@@ -166,16 +183,13 @@ class _StatusTrailState extends State<StatusTrail> {
                   // The current label alone, not clipped to its segment.
                   if (current >= 0)
                     Positioned(
-                      left: currentLeft(),
+                      left: left,
                       top: 0,
-                      child: fade(
-                        !_hovered,
-                        Text(
-                          labelOf(steps[current]),
-                          maxLines: 1,
-                          softWrap: false,
-                          style: styleOf(current),
-                        ),
+                      child: Text(
+                        labelOf(steps[current]),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: styleOf(current),
                       ),
                     ),
                 ],

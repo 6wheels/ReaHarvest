@@ -7,7 +7,7 @@ import 'package:reaharvest_library/reaharvest_library.dart'
     show AccentPreference;
 
 import 'theme/app_theme.dart';
-import 'ui/widgets.dart';
+import 'ui/kit/kit.dart';
 
 /// Name of each text style of the type scale, with its style.
 List<(String, TextStyle)> _scale(AppText type) => [

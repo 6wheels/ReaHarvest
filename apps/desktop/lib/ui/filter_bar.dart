@@ -7,12 +7,10 @@ import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
+import 'kit/kit.dart';
 import 'labels.dart';
 import 'layout_labels.dart';
 import 'to_sort/to_sort_page.dart';
-import 'widgets.dart'
-    show ChoiceLight, Disclosure, MenuLegend, actionLabel, focusMenuEntry;
 
 /// Width of a segment of the display mode bar.
 const _segmentWidth = 28.0;
@@ -86,7 +84,7 @@ class FilterBar extends ConsumerWidget {
         ),
       if (options.missingPlugins || filter.missingPlugins)
         Pill(
-          label: l10n.filterMissingPlugins,
+          l10n.filterMissingPlugins,
           icon: Icons.extension_off_outlined,
           active: filter.missingPlugins,
           onPressed: () =>
@@ -95,7 +93,7 @@ class FilterBar extends ConsumerWidget {
       const _SavedViewsChip(),
       if (!filter.isEmpty)
         Pill(
-          label: l10n.clearFilters,
+          l10n.clearFilters,
           icon: Icons.close_rounded,
           onPressed: () => set(const TitleFilter()),
         ),
@@ -125,7 +123,7 @@ class FilterBar extends ConsumerWidget {
           const SizedBox(width: Space.m),
           if (toSort > 0) ...[
             Pill(
-              label: l10n.toSort,
+              l10n.toSort,
               count: toSort,
               icon: Icons.move_down_rounded,
               onPressed: () => openToSort(context),
@@ -134,7 +132,7 @@ class FilterBar extends ConsumerWidget {
           ],
           if (toAdopt > 0) ...[
             Pill(
-              label: l10n.toAdopt,
+              l10n.toAdopt,
               count: toAdopt,
               icon: Icons.add_task_rounded,
               active: filter.toAdopt,
@@ -147,86 +145,6 @@ class FilterBar extends ConsumerWidget {
             onChanged: notifier.setDisplayMode,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Console switch of the filter bar: a legend in a square frame, lit with
-/// the accent when [active]; an optional [count] readout at the end.
-class Pill extends StatelessWidget {
-  const Pill({
-    super.key,
-    required this.label,
-    this.icon,
-    this.menuOpen,
-    this.count,
-    this.active = false,
-    this.onPressed,
-  });
-
-  final String label;
-  final IconData? icon;
-
-  /// Whether the menu it opens is open; null when it opens none.
-  final bool? menuOpen;
-  final int? count;
-  final bool active;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final color = active ? c.accent : c.muted;
-    return Material(
-      color: active ? c.accent.withValues(alpha: Alpha.faint) : c.raised,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Radii.s),
-        side: BorderSide(
-          color: active ? c.accent.withValues(alpha: Alpha.medium) : c.border,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.s),
-        onTap: onPressed,
-        child: SizedBox(
-          height: Sizes.control,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Space.md),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: IconSize.s, color: color),
-                  const SizedBox(width: Space.sm),
-                ],
-                Text.rich(
-                  TextSpan(
-                    text: label.toUpperCase(),
-                    children: [
-                      if (count != null)
-                        TextSpan(
-                          text: '$labelSeparator$count',
-                          style: AppText.color(c.accent),
-                        ),
-                    ],
-                  ),
-                  style: context.legend.copyWith(
-                    color: active ? c.text : c.muted,
-                  ),
-                ),
-                if (menuOpen case final open?) ...[
-                  const SizedBox(width: Space.xxs),
-                  Disclosure(
-                    open ? Disclosure.up : Disclosure.down,
-                    size: IconSize.xl,
-                    color: color,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -264,22 +182,19 @@ class _DisplaySwitch extends StatelessWidget {
           for (final (mode, icon, tooltip) in modes)
             Tooltip(
               message: tooltip,
-              child: Material(
+              child: PressableSurface(
                 color: mode == selected
                     ? c.accent.withValues(alpha: Alpha.tint)
                     : Colors.transparent,
-                borderRadius: BorderRadius.circular(Radii.xs),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(Radii.xs),
-                  onTap: () => onChanged(mode),
-                  child: SizedBox(
-                    width: _segmentWidth,
-                    height: Sizes.segment,
-                    child: Icon(
-                      icon,
-                      size: IconSize.s,
-                      color: mode == selected ? c.accent : c.muted,
-                    ),
+                radius: Radii.xs,
+                onTap: () => onChanged(mode),
+                child: SizedBox(
+                  width: _segmentWidth,
+                  height: Sizes.segment,
+                  child: Icon(
+                    icon,
+                    size: IconSize.s,
+                    color: mode == selected ? c.accent : c.muted,
                   ),
                 ),
               ),
@@ -364,7 +279,7 @@ class _MultiChoiceChipState<T> extends State<_MultiChoiceChip<T>> {
           ),
       ],
       builder: (context, controller, _) => Pill(
-        label: text,
+        text,
         menuOpen: controller.isOpen,
         active: selected.isNotEmpty,
         onPressed: () =>
@@ -433,7 +348,7 @@ class _SavedViewsChipState extends ConsumerState<_SavedViewsChip> {
         ),
       ],
       builder: (context, controller, _) => Pill(
-        label: l10n.views,
+        l10n.views,
         icon: Icons.bookmark_outline_rounded,
         menuOpen: controller.isOpen,
         onPressed: () =>

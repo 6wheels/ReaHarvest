@@ -9,6 +9,7 @@ import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/state/window_behavior.dart';
 import 'package:reaharvest/theme/app_theme.dart';
+import 'package:reaharvest/ui/kit/kit.dart';
 import 'package:reaharvest/ui/quit_dialog.dart';
 import 'package:reaharvest/ui/settings/system_page.dart';
 import 'package:reaharvest/ui/tasks_zone.dart';
@@ -154,7 +155,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(CheckRow));
     await tester.pump();
     expect(container.read(settingsProvider).showInTray, isTrue);
     // With the tray, "Close" becomes "Minimize to tray".

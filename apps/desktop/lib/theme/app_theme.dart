@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:reaharvest_library/reaharvest_library.dart'
     show AccentPreference;
 
+import 'light_slider.dart';
+
 /// Spacing scale (logical pixels), by increasing value: [xxs] 2, [xs] 4,
 /// [sm] 6, [s] 8, [md] 10, [ml] 12, [m] 16, [l] 24, [xl] 32.
 abstract final class Space {
@@ -47,9 +49,8 @@ abstract final class Sizes {
   /// Hairline: dividers.
   static const hairline = 1.0;
 
-  /// Bar marking a selected row, and the wider one of a menu entry.
+  /// Bar marking a selected row.
   static const bar = 2.0;
-  static const menuBar = 3.0;
 
   /// Height of a filter pill and of its segmented bar, of a segment.
   static const control = 26.0;
@@ -437,9 +438,30 @@ abstract final class Accents {
 /// Width of the snack bars.
 const _snackbarWidth = 520.0;
 
+/// Tooltip: size of its text, vertical padding, delay before it shows.
+const _tooltipFontSize = 11.5;
+const _tooltipPaddingV = 3.0;
+const _tooltipDelay = Duration(milliseconds: 450);
+
+/// Thickness of the scrollbars and height of the track of a slider.
+const _scrollbarThickness = 6.0;
+const _sliderTrack = 2.0;
+
 /// Material theme built on the design tokens. Material is only the
 /// foundation: no splash, flat surfaces, hairlines, nearly square corners.
 /// The accent is [accent] (default: neutral).
+///
+/// The kit is everything under `lib/ui/kit/`. Outside the kit, only these
+/// Material widgets may be used, the ones styled here: `MaterialApp`,
+/// `Scaffold`, `Dialog`, `AlertDialog`, `Card`, `Divider`, `VerticalDivider`,
+/// `SnackBar`, `Tooltip`, `Scrollbar`, `Slider`, `SegmentedButton`, `Theme`,
+/// `TextField`, `SelectableText`, `MenuAnchor` with `MenuItemButton` and
+/// `SubmenuButton`,
+/// `FilledButton`, `OutlinedButton`, `TextButton`, `IconButton`,
+/// `LinearProgressIndicator`, `CircularProgressIndicator`, and `LicensePage`
+/// with the `MaterialPageRoute` opening it (Flutter's own page of the
+/// licenses). Anything else, `Material` and
+/// `InkWell` included, is a component of the kit.
 ThemeData buildTheme(
   Brightness brightness, {
   AccentPreference accent = AccentPreference.neutral,
@@ -489,8 +511,9 @@ ThemeData buildTheme(
     extensions: [c, AppText.of(c)],
   );
   final text = base.textTheme.apply(bodyColor: c.text, displayColor: c.text);
+  // The squarer corners of the keys: buttons, fields and segments share them.
   final square = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(Radii.s),
+    borderRadius: BorderRadius.circular(Radii.xs),
   );
   final hairline = BorderSide(color: c.border);
   final headlineSmall = text.headlineSmall?.copyWith(
@@ -721,15 +744,15 @@ ThemeData buildTheme(
         minHeight: 0,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Radii.s),
+        borderRadius: BorderRadius.circular(Radii.xs),
         borderSide: hairline,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Radii.s),
+        borderRadius: BorderRadius.circular(Radii.xs),
         borderSide: hairline,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(Radii.s),
+        borderRadius: BorderRadius.circular(Radii.xs),
         borderSide: BorderSide(color: c.accent.withValues(alpha: 0.75)),
       ),
     ),
@@ -739,26 +762,34 @@ ThemeData buildTheme(
       ),
     ),
     iconTheme: IconThemeData(color: c.muted, size: IconSize.l),
+    textSelectionTheme: TextSelectionThemeData(
+      cursorColor: c.accent,
+      selectionColor: c.accent.withValues(alpha: Alpha.soft),
+      selectionHandleColor: c.accent,
+    ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
         color: c.raised,
         borderRadius: BorderRadius.circular(Radii.s),
         border: Border.all(color: c.border),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: Space.s, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.s,
+        vertical: _tooltipPaddingV,
+      ),
       textStyle: TextStyle(
         fontFamily: Fonts.text,
-        fontSize: 11.5,
+        fontSize: _tooltipFontSize,
         fontWeight: Weights.medium,
         height: Leading.normal,
         color: c.text,
       ),
-      waitDuration: const Duration(milliseconds: 450),
+      waitDuration: _tooltipDelay,
     ),
     // Always shown: where the list stands is always visible.
     scrollbarTheme: ScrollbarThemeData(
       thumbVisibility: const WidgetStatePropertyAll(true),
-      thickness: const WidgetStatePropertyAll(6),
+      thickness: const WidgetStatePropertyAll(_scrollbarThickness),
       radius: const Radius.circular(Radii.xs),
       thumbColor: WidgetStateProperty.resolveWith(
         (states) =>
@@ -769,23 +800,62 @@ ThemeData buildTheme(
       ),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
+      // The selected segment differs by its fill, a brighter and bolder
+      // label: never by the hue alone. The frame is one hairline: Flutter
+      // resolves it once for the whole group.
       style: ButtonStyle(
         side: WidgetStatePropertyAll(hairline),
         shape: WidgetStatePropertyAll(square),
         visualDensity: VisualDensity.compact,
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? c.accent.withValues(alpha: Alpha.tint)
+              : Colors.transparent,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? c.muted.withValues(alpha: Alpha.medium)
+              : states.contains(WidgetState.selected) || lit(states)
+              ? c.text
+              : c.muted,
+        ),
+        textStyle: WidgetStateProperty.resolveWith(
+          (states) => buttonText.copyWith(
+            fontWeight: states.contains(WidgetState.selected)
+                ? Weights.bold
+                : Weights.medium,
+          ),
+        ),
       ),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: c.accent,
       linearTrackColor: c.border,
     ),
+    // A thin flat fader track and a thumb lit like a ChoiceLight.
     sliderTheme: SliderThemeData(
       activeTrackColor: c.accent,
       inactiveTrackColor: c.border,
-      thumbColor: c.accent,
-      overlayColor: c.accent.withValues(alpha: 0.12),
-      trackHeight: 3,
+      disabledActiveTrackColor: c.muted,
+      disabledInactiveTrackColor: c.border,
+      trackHeight: _sliderTrack,
+      // Room under and over the track, and half a thumb at each end: a
+      // slider never touches its neighbors, nor does its thumb overflow.
+      padding: const EdgeInsets.symmetric(
+        vertical: Space.s,
+        horizontal: Space.s,
+      ),
+      trackShape: const RectangularSliderTrackShape(),
+      thumbShape: LightThumbShape(
+        accent: c.accent,
+        active: c.text,
+        off: c.muted,
+        background: c.background,
+      ),
+      overlayShape: const LightHoverShape(),
       tickMarkShape: SliderTickMarkShape.noTickMark,
+      valueIndicatorColor: c.raised,
+      valueIndicatorTextStyle: AppText.of(c).readout.copyWith(color: c.text),
     ),
   );
 }

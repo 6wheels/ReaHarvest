@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:reaharvest/ui/filter_bar.dart';
+import 'package:reaharvest/ui/kit/kit.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/ui/title_card.dart';

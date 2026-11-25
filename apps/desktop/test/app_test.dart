@@ -1,32 +1,32 @@
 import 'dart:async';
 
-import 'package:path/path.dart' as p;
-import 'package:flutter/material.dart' hide Title;
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart' hide Title;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:reaharvest/app.dart';
 import 'package:reaharvest/demo_titles.dart';
+import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/library_catalog.dart';
 import 'package:reaharvest/state/migration_actions.dart';
-import 'package:reaharvest/state/reaper_actions.dart';
-import 'package:reaharvest/state/version_actions.dart';
-import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/pickers.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
+import 'package:reaharvest/state/reaper_actions.dart';
+import 'package:reaharvest/state/version_actions.dart';
 import 'package:reaharvest/ui/aurora.dart';
 import 'package:reaharvest/ui/first_run_wizard.dart';
-import 'package:reaharvest/ui/settings/about_page.dart';
-import 'package:reaharvest/l10n/app_localizations.dart';
+import 'package:reaharvest/ui/kit/kit.dart';
 import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
-import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
+import 'package:reaharvest/ui/overview.dart';
+import 'package:reaharvest/ui/settings/about_page.dart';
 import 'package:reaharvest/ui/title_card.dart';
+import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest/ui/title_detail/version_list_item.dart';
-import 'package:reaharvest/ui/widgets.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -1668,8 +1668,12 @@ void main() {
       ],
     );
     await openMidnightFerry(tester);
-    expect(find.widgetWithText(InputChip, 'live'), findsOne);
+    expect(find.widgetWithText(Pill, 'live'), findsOne);
 
+    // The field shows after a click on the "+".
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.byTooltip('Add a tag'));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextField, 'Add a tag'),
       'Mix 2',
@@ -1691,6 +1695,38 @@ void main() {
     await tester.tap(find.text('Remove'));
     await tester.pumpAndSettle();
     expect(versions.tagged, ['+Mix 2', '-live']);
+  });
+
+  testWidgets('the field adding a tag keeps the focus, hides on Escape', (
+    tester,
+  ) async {
+    await pumpApp(tester, titles: demoTitles());
+    await openMidnightFerry(tester);
+    await tester.tap(find.byTooltip('Add a tag'));
+    await tester.pumpAndSettle();
+    final field = find.widgetWithText(TextField, 'Add a tag');
+    await tester.enterText(field, 'Mix 2');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(versions.tagged, ['+Mix 2']);
+    // Enter keeps the focus in the field, ready for another tag.
+    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(find.byTooltip('Add a tag'), findsOne);
+  });
+
+  testWidgets('a click outside hides the field adding a tag', (tester) async {
+    await pumpApp(tester, titles: demoTitles());
+    await openMidnightFerry(tester);
+    await tester.tap(find.byTooltip('Add a tag'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Add a tag'), findsOne);
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
   });
 
   testWidgets('keeps only one version after one confirmation', (tester) async {

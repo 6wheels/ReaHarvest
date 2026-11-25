@@ -6,11 +6,11 @@ import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
-import 'glass_dialog.dart';
-import 'labels.dart';
 import 'formats.dart';
+import 'kit/kit.dart';
+import 'labels.dart';
+import 'project_actions.dart';
 import 'title_detail/title_detail_page.dart';
-import 'widgets.dart';
 
 /// Version opened by the quick "Open in REAPER" button: the latest one of
 /// member [me], else the latest one; null without versions.

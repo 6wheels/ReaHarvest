@@ -6,7 +6,8 @@ import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
-import '../widgets.dart';
+import '../kit/kit.dart';
+import '../project_actions.dart';
 
 /// Widest the row of the owner grows.
 const _rowWidth = 420.0;

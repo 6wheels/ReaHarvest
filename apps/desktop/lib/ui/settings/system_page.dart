@@ -5,6 +5,7 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
+import '../kit/kit.dart';
 import '../path_row.dart';
 import '../reaper_settings.dart';
 import 'settings_section.dart';
@@ -64,42 +65,35 @@ class _WindowSettings extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FormRow(
+        // Full-width rows: these labels are too long for the label column.
+        CheckRow(
+          value: settings.showInTray,
           label: l10n.showInTray,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Switch(
-              value: settings.showInTray,
-              onChanged: (v) =>
-                  notifier.change((s) => s.copyWith(showInTray: v)),
-            ),
-          ),
+          onChanged: (v) => notifier.change((s) => s.copyWith(showInTray: v)),
         ),
-        FormRow(
-          label: l10n.onProjectOpen,
-          child: SegmentedButton<ProjectOpenAction>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(
-                value: ProjectOpenAction.nothing,
-                label: Text(l10n.onOpenNothing),
+        const SizedBox(height: Space.m),
+        SectionLabel(l10n.onProjectOpen),
+        const SizedBox(height: Space.s),
+        Column(
+          spacing: Space.xs,
+          children: [
+            for (final (action, label) in [
+              (ProjectOpenAction.nothing, l10n.onOpenNothing),
+              (ProjectOpenAction.minimize, l10n.onOpenMinimize),
+              (
+                ProjectOpenAction.close,
+                settings.showInTray ? l10n.onOpenToTray : l10n.onOpenClose,
               ),
-              ButtonSegment(
-                value: ProjectOpenAction.minimize,
-                label: Text(l10n.onOpenMinimize),
+            ])
+              ChoiceRow(
+                selected: settings.onProjectOpen == action,
+                label: label,
+                onTap: () =>
+                    notifier.change((a) => a.copyWith(onProjectOpen: action)),
               ),
-              ButtonSegment(
-                value: ProjectOpenAction.close,
-                label: Text(
-                  settings.showInTray ? l10n.onOpenToTray : l10n.onOpenClose,
-                ),
-              ),
-            ],
-            selected: {settings.onProjectOpen},
-            onSelectionChanged: (s) =>
-                notifier.change((a) => a.copyWith(onProjectOpen: s.first)),
-          ),
+          ],
         ),
+        const SizedBox(height: Space.m),
       ],
     );
   }

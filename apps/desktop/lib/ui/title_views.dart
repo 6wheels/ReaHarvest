@@ -7,11 +7,11 @@ import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
+import 'kit/kit.dart';
 import 'labels.dart';
 import 'overview.dart';
 import 'status_trail.dart';
 import 'title_actions.dart';
-import 'widgets.dart';
 
 enum _Column { name, levels, versions, tempo, status, modified }
 
@@ -177,7 +177,8 @@ class _HeaderCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return InkWell(
+    return PressableSurface(
+      radius: 0,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -318,29 +319,24 @@ class _TitleRowState extends ConsumerState<TitleRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: Material(
-        color: widget.selected
-            ? c.accent.withValues(alpha: Alpha.faint)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(Radii.xs),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Radii.xs),
-          onTap: () =>
-              ref.read(overviewProvider.notifier).toggle(widget.title.id),
-          child: Row(
-            children: [
-              // Lit edge of the selected strip.
-              AnimatedContainer(
-                duration: Motion.fast,
-                width: Sizes.bar,
-                margin: const EdgeInsets.symmetric(vertical: Space.sm),
-                color: widget.selected ? c.accent : Colors.transparent,
-              ),
-              Expanded(child: widget.child),
-              TitleActions(widget.title, visible: _hovered || widget.selected),
-              const SizedBox(width: Space.s),
-            ],
-          ),
+      child: PressableSurface(
+        selected: widget.selected,
+        radius: Radii.xs,
+        onTap: () =>
+            ref.read(overviewProvider.notifier).toggle(widget.title.id),
+        child: Row(
+          children: [
+            // Lit edge of the selected strip.
+            AnimatedContainer(
+              duration: Motion.fast,
+              width: Sizes.bar,
+              margin: const EdgeInsets.symmetric(vertical: Space.sm),
+              color: widget.selected ? c.accent : Colors.transparent,
+            ),
+            Expanded(child: widget.child),
+            TitleActions(widget.title, visible: _hovered || widget.selected),
+            const SizedBox(width: Space.s),
+          ],
         ),
       ),
     );
@@ -450,9 +446,9 @@ class _TitleTreeState extends ConsumerState<TitleTree> {
           );
         }
         final collapsed = _collapsed.contains(row.key);
-        return InkWell(
+        return PressableSurface(
           key: ValueKey(row.key),
-          borderRadius: BorderRadius.circular(Radii.xs),
+          radius: Radii.xs,
           onTap: () => setState(
             () => collapsed
                 ? _collapsed.remove(row.key)

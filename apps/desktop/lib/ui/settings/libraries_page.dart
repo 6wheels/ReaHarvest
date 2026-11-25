@@ -6,7 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../state/library_catalog.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
-import '../glass_dialog.dart';
+import '../kit/kit.dart';
 import '../known_values_editor.dart';
 import '../library_form.dart';
 import '../members_editor.dart';

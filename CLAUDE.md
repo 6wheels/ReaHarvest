@@ -41,7 +41,7 @@ Test fixtures: real `.rpp` files in `test/fixtures/`.
 
 - Look: DAW / mixing console, polished, never flashy. Own design system over a minimal Material base (SPEC §7.1).
 - Every color, radius, spacing, text style and duration comes from the theme tokens (`apps/desktop/lib/theme/`): no hard-coded value.
-- Reuse the existing components (`apps/desktop/lib/ui/widgets.dart`, `glass_dialog.dart`…) before writing a new one.
+- Reuse the existing components (the kit: `apps/desktop/lib/ui/kit/`, one file per component, exported by `kit/kit.dart`) before writing a new one.
 - Never tell states apart by hue alone: also luminance, shape, icon or glow.
 - The showcase (`apps/desktop/lib/main_showcase.dart`, real components on mock data, no I/O) must keep compiling; a new or reworked component is added to it. Run: `flutter run -d windows -t lib/main_showcase.dart` in `apps/desktop`.
 

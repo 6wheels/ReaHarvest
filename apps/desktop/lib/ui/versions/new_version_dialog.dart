@@ -5,19 +5,21 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../state/tasks.dart';
 import '../../state/library_catalog.dart';
 import '../../state/providers.dart';
+import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
-import '../glass_dialog.dart';
+import '../kit/kit.dart';
 import '../labels.dart';
-import '../widgets.dart';
 import 'version_ui_actions.dart';
 
 /// Width of the dialog.
 const _width = 440.0;
+
+/// Width of the drop-down choosing a template, on the line of its choice.
+const _templateWidth = 160.0;
 
 /// Source of a new version.
 enum _Source { blank, template, duplicate }
@@ -114,15 +116,27 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
         error == null &&
         !labelMissing &&
         (_source != _Source.template || _template != null);
-    Widget source(_Source value, String label, {String? hint, bool? enabled}) =>
-        RadioListTile<_Source>(
-          value: value,
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          enabled: enabled ?? true,
-          title: Text(label),
-          subtitle: hint == null ? null : Text(hint),
-        );
+    Widget source(
+      _Source value,
+      String label, {
+      String? hint,
+      bool? enabled,
+      Widget? trailing,
+    }) => ChoiceRow(
+      selected: _source == value,
+      label: label,
+      hint: hint,
+      trailing: trailing,
+      onTap: (enabled ?? true)
+          ? () => setState(() {
+              _source = value;
+              // The first template is chosen with the source.
+              if (value == _Source.template) {
+                _template ??= templates.firstOrNull;
+              }
+            })
+          : null,
+    );
     return AlertDialog(
       title: Text(
         widget.duplicate ? l10n.duplicateVersionTitle : l10n.newVersion,
@@ -133,40 +147,47 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            RadioGroup<_Source>(
-              groupValue: _source,
-              onChanged: (v) => setState(() => _source = v ?? _source),
-              child: Column(
-                children: [
+            Column(
+              spacing: Space.s,
+              children: [
+                source(
+                  _Source.blank,
+                  l10n.versionSourceBlank,
+                  hint: l10n.versionSourceBlankHint,
+                ),
+                // The template is chosen on its own line: the dialog keeps
+                // its size.
+                source(
+                  _Source.template,
+                  l10n.versionSourceTemplate,
+                  hint: templates.isEmpty
+                      ? l10n.noTemplate
+                      : l10n.versionSourceTemplateHint,
+                  enabled: templates.isNotEmpty,
+                  trailing: templates.isEmpty
+                      ? null
+                      : SizedBox(
+                          width: _templateWidth,
+                          child: Dropdown<String>(
+                            enabled: _source == _Source.template,
+                            value: _template,
+                            options: {
+                              for (final t in templates)
+                                t: p.basenameWithoutExtension(t),
+                            },
+                            onChanged: (v) => setState(() => _template = v),
+                          ),
+                        ),
+                ),
+                if (selected != null)
                   source(
-                    _Source.blank,
-                    l10n.versionSourceBlank,
-                    hint: l10n.versionSourceBlankHint,
+                    _Source.duplicate,
+                    l10n.versionSourceDuplicate(versionName(selected)),
+                    hint: l10n.versionSourceDuplicateHint,
                   ),
-                  source(
-                    _Source.template,
-                    l10n.versionSourceTemplate,
-                    hint: templates.isEmpty ? l10n.noTemplate : null,
-                    enabled: templates.isNotEmpty,
-                  ),
-                  if (selected != null)
-                    source(
-                      _Source.duplicate,
-                      l10n.versionSourceDuplicate(versionName(selected)),
-                    ),
-                ],
-              ),
+              ],
             ),
-            if (_source == _Source.template)
-              Dropdown<String>(
-                value: _template,
-                label: l10n.versionSourceTemplate,
-                options: {
-                  for (final t in templates) t: p.basenameWithoutExtension(t),
-                },
-                onChanged: (v) => setState(() => _template = v),
-              ),
-            const SizedBox(height: Space.m),
+            const SizedBox(height: Space.s),
             TextField(
               controller: _label,
               autofocus: true,
@@ -184,7 +205,7 @@ class _NewVersionDialogState extends ConsumerState<_NewVersionDialog> {
                 isDense: true,
               ),
             ),
-            const SizedBox(height: Space.xs),
+            const SizedBox(height: Space.s),
             TextField(
               controller: _name,
               onChanged: (_) => setState(() => _nameEdited = true),

@@ -7,8 +7,8 @@ import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
-import '../glass_dialog.dart';
-import '../widgets.dart';
+import '../kit/kit.dart';
+import '../project_actions.dart';
 import 'version_ui_actions.dart';
 
 /// Width of the dialog.

@@ -10,11 +10,11 @@ Order: **kit, then showcase, then golden test, then screens**. A screen never ge
 
 ## Steps
 
-1. **Look for an existing component**: check `apps/desktop/lib/ui/widgets.dart`, `glass_dialog.dart` and the other files of `apps/desktop/lib/ui/`. When one fits, or fits with a parameter, propose to reuse or extend it, and stop there unless the user disagrees.
+1. **Look for an existing component**: check the kit, `apps/desktop/lib/ui/kit/` (one file per component, exported by `kit/kit.dart`), and the other files of `apps/desktop/lib/ui/`. When one fits, or fits with a parameter, propose to reuse or extend it, and stop there unless the user disagrees.
 2. **Map the tokens**: list every color, spacing, radius, text style, size and duration the component needs, each mapped to an existing token of `apps/desktop/lib/theme/app_theme.dart` (`Space`, `Radii`, `AppColors`, `Fonts`, `context.legend`, `context.readout`…). Write no literal value: no `Color(…)`, no hard-coded `EdgeInsets` numbers, radius, font size or `Duration`.
 3. **Write the component in the kit**:
    - a public widget with a doc comment;
-   - small components go in `ui/widgets.dart`, a larger one in its own file `ui/<name>.dart` (one file per component);
+   - one file per component, `ui/kit/<name>.dart`, exported by `ui/kit/kit.dart`;
    - states are never told apart by hue alone: add luminance, shape, icon or glow;
    - texts come from ARB, in both files.
 4. **Add it to the showcase**: a section in `apps/desktop/lib/main_showcase.dart`, on mock data, showing every state (default, hover or focus when relevant, disabled, error, busy) in both themes. The showcase must compile the first time; a change to `main()` needs a full restart. Tell the user how to see it (`flutter run -d windows -t lib/main_showcase.dart` in `apps/desktop`). **Wait for the user to validate the look.**

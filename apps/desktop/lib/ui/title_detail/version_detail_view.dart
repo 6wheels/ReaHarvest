@@ -8,7 +8,7 @@ import '../../state/navigation.dart';
 import '../../state/version_detail.dart';
 import '../../theme/app_theme.dart';
 import '../formats.dart';
-import '../widgets.dart';
+import '../kit/kit.dart';
 
 /// Tracks shown before "Show more" (SPEC §5.3).
 const trackLimit = 20;
@@ -117,12 +117,17 @@ class _Content extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: Space.xxs),
               child: Row(
                 children: [
-                  Icon(
-                    m.size == null
-                        ? Icons.error_outline_rounded
-                        : Icons.check_rounded,
-                    size: IconSize.m,
-                    color: m.size == null ? context.colors.ledAmber : muted,
+                  SizedBox(
+                    width: IconSize.m,
+                    child: Center(
+                      child: m.size == null
+                          ? Icon(
+                              Icons.error_outline_rounded,
+                              size: IconSize.m,
+                              color: context.colors.ledAmber,
+                            )
+                          : Led(context.colors.ledGreen),
+                    ),
                   ),
                   const SizedBox(width: Space.s),
                   Expanded(child: Text(m.reference, style: text.bodyMedium)),

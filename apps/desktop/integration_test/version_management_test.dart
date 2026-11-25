@@ -15,8 +15,8 @@ import 'package:reaharvest/state/library_scans.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/state/reaper.dart';
 import 'package:reaharvest/state/tasks.dart';
+import 'package:reaharvest/ui/kit/kit.dart' show Dropdown, Pill;
 import 'package:reaharvest/ui/overview.dart';
-import 'package:reaharvest/ui/widgets.dart' show Dropdown;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -366,6 +366,8 @@ void main() {
             as List?;
 
     // A tag is added, trimmed and written in the node file.
+    await tester.tap(find.byTooltip('Add a tag'));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextField, 'Add a tag'),
       ' standard C ',
@@ -373,7 +375,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await waitFor(
       tester,
-      () => find.widgetWithText(InputChip, 'standard C').evaluate().isNotEmpty,
+      () => find.widgetWithText(Pill, 'standard C').evaluate().isNotEmpty,
       reason: 'tag added',
     );
     expect(stored(), ['standard C']);
@@ -385,7 +387,7 @@ void main() {
     );
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
-    expect(find.byType(InputChip), findsOne);
+    expect(find.byTooltip('Remove the tag standard C'), findsOne);
     expect(stored(), ['standard C']);
 
     // Removed after confirmation, the key leaves the node file.
@@ -395,7 +397,7 @@ void main() {
     await tester.tap(find.text('Remove'));
     await waitFor(
       tester,
-      () => find.byType(InputChip).evaluate().isEmpty,
+      () => find.byTooltip('Remove the tag standard C').evaluate().isEmpty,
       reason: 'tag removed',
     );
     expect(stored(), isNull);

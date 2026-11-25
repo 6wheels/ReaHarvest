@@ -5,12 +5,12 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../state/tasks.dart';
 import '../../state/reaper_actions.dart';
+import '../../state/tasks.dart';
 import '../../state/version_actions.dart';
 import '../../theme/app_theme.dart';
-import '../glass_dialog.dart';
-import '../widgets.dart';
+import '../kit/kit.dart';
+import '../project_actions.dart';
 
 /// Backup points of a version: open and restore (SPEC §5.4).
 class History extends ConsumerWidget {
