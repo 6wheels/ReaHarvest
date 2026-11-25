@@ -1,3 +1,5 @@
+// The legacy window and tray API is removed by #223.
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:window_manager/legacy.dart';

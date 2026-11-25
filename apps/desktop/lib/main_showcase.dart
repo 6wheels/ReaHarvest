@@ -1,3 +1,5 @@
+// The legacy window and tray API is removed by #223.
+// ignore_for_file: deprecated_member_use
 // UI showcase: every real component of the app on static data, with the
 // real theme. No I/O: run with
 // `flutter run -d windows -t lib/main_showcase.dart`.

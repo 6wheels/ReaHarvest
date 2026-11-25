@@ -1,3 +1,5 @@
+// The legacy window and tray API is removed by #223.
+// ignore_for_file: deprecated_member_use
 // coverage:ignore-file
 import 'dart:async';
 import 'dart:io';
