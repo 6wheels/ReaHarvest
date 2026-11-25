@@ -8,7 +8,7 @@ on:
     - cron: '0 4 * * 1'
 
 env:
-  FLUTTER_VERSION: 3.47.9
+  FLUTTER_VERSION: 3.50.1
 
 jobs:
   bench:
