@@ -2,7 +2,7 @@
 // real theme. No I/O: run with
 // `flutter run -d windows -t lib/main_showcase.dart`.
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' hide Title;
+import 'package:material_ui/material_ui.dart' hide Title;
 import 'package:cupertino_ui/cupertino_ui.dart'
     show GlobalCupertinoLocalizations;
 import 'package:flutter_localizations/flutter_localizations.dart'
