@@ -429,4 +429,40 @@ void main() {
       Colors.red,
     );
   });
+
+  group('Led', () {
+    BoxDecoration dot(WidgetTester tester) =>
+        tester
+                .widget<Container>(
+                  find.descendant(
+                    of: find.byType(Led),
+                    matching: find.byType(Container),
+                  ),
+                )
+                .decoration!
+            as BoxDecoration;
+
+    testWidgets('blinks, and pauses with the tickers', (tester) async {
+      Widget blinking({required bool enabled}) => TickerMode(
+        enabled: enabled,
+        child: const Led(Colors.red, mode: LedMode.blink),
+      );
+      await pump(tester, blinking(enabled: true));
+      final lit = dot(tester).color;
+      // First switch of the blink: half a period, then its fade.
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(dot(tester).color, isNot(lit));
+
+      // A blink switch falls while the tickers are paused: it is skipped,
+      // not played when they resume.
+      await pump(tester, blinking(enabled: false));
+      final paused = dot(tester).color;
+      await tester.pump(const Duration(milliseconds: 700));
+      await pump(tester, blinking(enabled: true));
+      await tester.pump(const Duration(milliseconds: 20));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(dot(tester).color, paused);
+    });
+  });
 }

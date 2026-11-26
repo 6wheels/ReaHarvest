@@ -91,6 +91,8 @@ class _LedState extends State<Led> with SingleTickerProviderStateMixin {
           ..stop()
           ..value = 1;
         _blinkTimer = Timer.periodic(_blinkHalf, (_) {
+          // A timer is not stopped by `TickerMode`: pause with the tickers.
+          if (!TickerMode.getValuesNotifier(context).value.enabled) return;
           _controller.animateTo(
             _controller.value > 0.5 ? 0 : 1,
             duration: _blinkSwitch,

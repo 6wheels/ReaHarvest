@@ -27,9 +27,15 @@ Future<void> loadFonts() async {
     '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/'
     'material_fonts/materialicons-regular.otf',
   );
-  final loader = FontLoader('MaterialIcons')
-    ..addFont(icons.readAsBytes().then((bytes) => ByteData.sublistView(bytes)));
-  await loader.load();
+  // Missing on some SDK layouts (Linux CI): the icons do not change the width
+  // of the text, so the tests that only need the text fonts still run.
+  if (icons.existsSync()) {
+    final loader = FontLoader('MaterialIcons')
+      ..addFont(
+        icons.readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
+      );
+    await loader.load();
+  }
 
   await load(Fonts.text, ['Inter.ttf']);
   await load(Fonts.mono, [
