@@ -7,6 +7,7 @@ import 'package:cupertino_ui/cupertino_ui.dart'
 import 'package:flutter_localizations/flutter_localizations.dart'
     show GlobalWidgetsLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
@@ -50,21 +51,42 @@ Future<void> main() async {
   // mock data below: nothing is read from or written to the disk, and REAPER
   // is never found.
   runApp(
-    ProviderScope(
-      overrides: [
-        settingsProvider.overrideWith(_ShowcaseSettings.new),
-        titlesProvider.overrideWithValue(_titles),
-        indexedLibrariesProvider.overrideWithValue({_library: _libraryModel}),
-        pluginCacheProvider.overrideWith(
-          (ref) async => PluginCache.parse(vstIni: const [], jsIni: null),
-        ),
-        reaperExecutableProvider.overrideWith((ref) async => null),
-        tasksProvider.overrideWith(_ShowcaseTasks.new),
-      ],
-      child: const UiShowcaseApp(),
-    ),
+    ProviderScope(overrides: showcaseOverrides(), child: const UiShowcaseApp()),
   );
 }
+
+/// The providers served from the mock data, shared with the golden tests.
+@visibleForTesting
+List<Override> showcaseOverrides() => [
+  settingsProvider.overrideWith(_ShowcaseSettings.new),
+  titlesProvider.overrideWithValue(_titles),
+  indexedLibrariesProvider.overrideWithValue({_library: _libraryModel}),
+  pluginCacheProvider.overrideWith(
+    (ref) async => PluginCache.parse(vstIni: const [], jsIni: null),
+  ),
+  reaperExecutableProvider.overrideWith((ref) async => null),
+  tasksProvider.overrideWith(_ShowcaseTasks.new),
+];
+
+/// Ids of the sections, in display order: one golden image set per id.
+@visibleForTesting
+const showcaseSectionIds = [
+  'title_card',
+  'overview',
+  'status_trail',
+  'lights_progress',
+  'buttons',
+  'tokens',
+  'tags_menus',
+  'notifications',
+  'forms',
+  'to_sort',
+  'chrome',
+];
+
+/// Key of the section built alone (see [UiShowcaseApp.section]).
+@visibleForTesting
+const showcaseSectionKey = Key('showcase-section');
 
 /// Settings kept in memory only.
 class _ShowcaseSettings extends SettingsNotifier {
@@ -125,14 +147,25 @@ class _ShowcaseTasks extends TasksNotifier {
 const _cardSize = 264.0;
 
 class UiShowcaseApp extends StatefulWidget {
-  const UiShowcaseApp({super.key});
+  /// With a [section] id, only that section is built, without the controls,
+  /// in the given [themeMode] and [accent]: what the golden tests draw.
+  const UiShowcaseApp({
+    super.key,
+    this.section,
+    this.themeMode = ThemeMode.dark,
+    this.accent = AccentPreference.neutral,
+  });
+
+  final String? section;
+  final ThemeMode themeMode;
+  final AccentPreference accent;
 
   @override
   State<UiShowcaseApp> createState() => _UiShowcaseAppState();
 }
 
 class _UiShowcaseAppState extends State<UiShowcaseApp> {
-  ThemeMode _themeMode = ThemeMode.dark;
+  late ThemeMode _themeMode = widget.themeMode;
   Locale _locale = const Locale('en');
   double _progress = 0.65;
   bool _loading = true;
@@ -141,7 +174,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   int _segment = 1;
 
   /// Accent picked in the settings bar.
-  AccentPreference _accent = AccentPreference.neutral;
+  late AccentPreference _accent = widget.accent;
 
   /// Interface size (text scale of the settings, 75 to 150 %).
   double _scale = 1;
@@ -197,20 +230,47 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
       GlobalCupertinoLocalizations.delegate,
     ],
     home: Builder(
-      builder: (context) => Scaffold(
-        appBar: _windowBar(context),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(Space.l),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final section in _sections(context)) _SectionView(section),
-            ],
+      builder: (context) => widget.section != null
+          ? _alone(context, widget.section!)
+          : Scaffold(
+              appBar: _windowBar(context),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(Space.l),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final section in _sections(context))
+                      _SectionView(section),
+                  ],
+                ),
+              ),
+            ),
+    ),
+  );
+
+  /// One section alone, at its natural height, for the golden tests.
+  Widget _alone(BuildContext context, String id) {
+    final section = _sections(context).singleWhere((s) => s.id == id);
+    assert(
+      _sections(context).map((s) => s.id).join() == showcaseSectionIds.join(),
+    );
+    return Scaffold(
+      body: OverflowBox(
+        maxHeight: double.infinity,
+        alignment: Alignment.topLeft,
+        child: RepaintBoundary(
+          key: showcaseSectionKey,
+          child: ColoredBox(
+            color: context.colors.background,
+            child: Padding(
+              padding: const EdgeInsets.all(Space.l),
+              child: _SectionView(section),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   /// The title bar of the application above the showcase controls.
   PreferredSizeWidget _windowBar(BuildContext context) => PreferredSize(
@@ -334,6 +394,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
     final light = Theme.of(context).brightness == Brightness.light;
     return [
       _Section(
+        'title_card',
         'Title card — states',
         'Real TitleCard at its grid size (${_cardSize.round()} px). '
             'Hover is internal to the card: move the mouse over any card.',
@@ -419,6 +480,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         ],
       ),
       _Section(
+        'overview',
         'Overview',
         'Real Overview on mock providers, over cards to show the blur.',
         [
@@ -431,6 +493,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         ],
       ),
       _Section(
+        'status_trail',
         'Status trail',
         'StatusTrail: hover a trail to reveal every label.',
         [
@@ -463,6 +526,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         ],
       ),
       _Section(
+        'lights_progress',
         'Lights & progress',
         'Meters follow the PROGRESS slider; lights follow LOADING.',
         [
@@ -520,45 +584,51 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ],
       ),
-      _Section('Buttons', 'FilledButton is the lit console key of the theme.', [
-        _Specimen(
-          'Filled (lit key) — BusyLabel follows LOADING',
-          child: FilledButton(
-            onPressed: () {},
-            child: BusyLabel('Validate', busy: _loading),
-          ),
-        ),
-        _Specimen(
-          'Filled — with icon / disabled',
-          child: Row(
-            spacing: Space.s,
-            children: [
-              FilledButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Open'),
-              ),
-              const FilledButton(onPressed: null, child: Text('Disabled')),
-            ],
-          ),
-        ),
-        _Specimen(
-          'Outlined / Text / Icon',
-          child: Row(
-            spacing: Space.s,
-            children: [
-              OutlinedButton(onPressed: () {}, child: const Text('Choose…')),
-              TextButton(onPressed: () {}, child: const Text('Cancel')),
-              IconButton(
-                onPressed: () {},
-                tooltip: 'Reset',
-                icon: const Icon(Icons.restart_alt_rounded),
-              ),
-            ],
-          ),
-        ),
-      ]),
       _Section(
+        'buttons',
+        'Buttons',
+        'FilledButton is the lit console key of the theme.',
+        [
+          _Specimen(
+            'Filled (lit key) — BusyLabel follows LOADING',
+            child: FilledButton(
+              onPressed: () {},
+              child: BusyLabel('Validate', busy: _loading),
+            ),
+          ),
+          _Specimen(
+            'Filled — with icon / disabled',
+            child: Row(
+              spacing: Space.s,
+              children: [
+                FilledButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Open'),
+                ),
+                const FilledButton(onPressed: null, child: Text('Disabled')),
+              ],
+            ),
+          ),
+          _Specimen(
+            'Outlined / Text / Icon',
+            child: Row(
+              spacing: Space.s,
+              children: [
+                OutlinedButton(onPressed: () {}, child: const Text('Choose…')),
+                TextButton(onPressed: () {}, child: const Text('Cancel')),
+                IconButton(
+                  onPressed: () {},
+                  tooltip: 'Reset',
+                  icon: const Icon(Icons.restart_alt_rounded),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      _Section(
+        'tokens',
         'Tokens',
         'Style scales and the accents of both themes side by side. '
             'Pick an accent in the bar: the matrix always shows all six.',
@@ -573,7 +643,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ],
       ),
-      _Section('Tags, legends & menus', '', [
+      _Section('tags_menus', 'Tags, legends & menus', '', [
         _Specimen(
           'Pill — status / alert tag, removable tag',
           child: Wrap(
@@ -835,159 +905,165 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         ),
       ]),
       _Section(
+        'notifications',
         'Notifications',
         'Real TasksZone on mock tasks in every state: click TASKS to unfold, '
             'Escape folds it in the app.',
         [const _Specimen('TasksZone', width: 900, child: TasksZone())],
       ),
-      _Section('Forms', 'Fields, drop-downs and buttons share one height.', [
-        _Specimen(
-          'Heights side by side',
-          width: 660,
-          child: Row(
-            spacing: Space.s,
-            children: [
-              const Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search',
-                    prefixIcon: Icon(Icons.search_rounded, size: 16),
+      _Section(
+        'forms',
+        'Forms',
+        'Fields, drop-downs and buttons share one height.',
+        [
+          _Specimen(
+            'Heights side by side',
+            width: 660,
+            child: Row(
+              spacing: Space.s,
+              children: [
+                const Expanded(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search',
+                      prefixIcon: Icon(Icons.search_rounded, size: 16),
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(
-                width: 140,
-                child: Dropdown(
-                  value: _choice,
-                  options: const {'a': 'Artist', 'b': 'Album', 'c': 'Title'},
-                  onChanged: (v) => setState(() => _choice = v),
+                SizedBox(
+                  width: 140,
+                  child: Dropdown(
+                    value: _choice,
+                    options: const {'a': 'Artist', 'b': 'Album', 'c': 'Title'},
+                    onChanged: (v) => setState(() => _choice = v),
+                  ),
                 ),
-              ),
-              SizedBox(
-                width: 160,
-                child: LevelField(
+                SizedBox(
+                  width: 160,
+                  child: LevelField(
+                    label: 'Artist',
+                    controller: _levelController,
+                    options: () => const ['Sample Artist', 'Other Artist'],
+                    error: null,
+                    dense: true,
+                    onChanged: () {},
+                  ),
+                ),
+                FilledButton(onPressed: () {}, child: const Text('Adopt')),
+                OutlinedButton(onPressed: () {}, child: const Text('Choose…')),
+                TextButton(onPressed: () {}, child: const Text('Cancel')),
+              ],
+            ),
+          ),
+          _Specimen(
+            'Dropdown — with label / empty',
+            width: 480,
+            child: Row(
+              spacing: Space.s,
+              children: [
+                Expanded(
+                  child: Dropdown(
+                    label: 'Owner',
+                    value: _owner ?? 'sam',
+                    options: const {'sam': 'Sam', 'alex': 'Alex'},
+                    onChanged: (v) => setState(() => _owner = v),
+                  ),
+                ),
+                Expanded(
+                  child: Dropdown<String>(
+                    label: 'Template',
+                    value: null,
+                    options: const {'empty': 'Empty project'},
+                    onChanged: (_) {},
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _Specimen(
+            'FormRow + text field',
+            width: 480,
+            child: const FormRow(label: 'Name', child: TextField()),
+          ),
+          _Specimen(
+            'PathRow — value / placeholder',
+            width: 480,
+            child: Column(
+              children: [
+                PathRow(
+                  label: 'Library',
+                  value: r'C:\Music\Projects\A very long path\to the library',
+                  placeholder: 'Not set',
+                  onChoose: () {},
+                  onReset: () {},
+                ),
+                PathRow(
+                  label: 'REAPER',
+                  value: null,
+                  placeholder: 'Not set',
+                  onChoose: () {},
+                ),
+              ],
+            ),
+          ),
+          _Specimen(
+            'Choice (fix dialog)',
+            width: 480,
+            child: Choice(
+              label: 'Level',
+              value: _choice,
+              options: const {'a': 'Artist', 'b': 'Album', 'c': 'Title'},
+              onChanged: (v) => setState(() => _choice = v),
+            ),
+          ),
+          _Specimen(
+            'LevelField — autocomplete / compact (tag) / error',
+            width: 480,
+            child: Column(
+              spacing: Space.m,
+              children: [
+                LevelField(
                   label: 'Artist',
                   controller: _levelController,
                   options: () => const ['Sample Artist', 'Other Artist'],
                   error: null,
-                  dense: true,
                   onChanged: () {},
                 ),
-              ),
-              FilledButton(onPressed: () {}, child: const Text('Adopt')),
-              OutlinedButton(onPressed: () {}, child: const Text('Choose…')),
-              TextButton(onPressed: () {}, child: const Text('Cancel')),
-            ],
-          ),
-        ),
-        _Specimen(
-          'Dropdown — with label / empty',
-          width: 480,
-          child: Row(
-            spacing: Space.s,
-            children: [
-              Expanded(
-                child: Dropdown(
-                  label: 'Owner',
-                  value: _owner ?? 'sam',
-                  options: const {'sam': 'Sam', 'alex': 'Alex'},
-                  onChanged: (v) => setState(() => _owner = v),
+                SizedBox(
+                  width: 160,
+                  child: LevelField(
+                    label: 'Add a tag',
+                    controller: _compactController,
+                    options: () => const ['live', 'mix'],
+                    error: null,
+                    compact: true,
+                    onChanged: () {},
+                  ),
                 ),
-              ),
-              Expanded(
-                child: Dropdown<String>(
-                  label: 'Template',
-                  value: null,
-                  options: const {'empty': 'Empty project'},
-                  onChanged: (_) {},
-                ),
-              ),
-            ],
-          ),
-        ),
-        _Specimen(
-          'FormRow + text field',
-          width: 480,
-          child: const FormRow(label: 'Name', child: TextField()),
-        ),
-        _Specimen(
-          'PathRow — value / placeholder',
-          width: 480,
-          child: Column(
-            children: [
-              PathRow(
-                label: 'Library',
-                value: r'C:\Music\Projects\A very long path\to the library',
-                placeholder: 'Not set',
-                onChoose: () {},
-                onReset: () {},
-              ),
-              PathRow(
-                label: 'REAPER',
-                value: null,
-                placeholder: 'Not set',
-                onChoose: () {},
-              ),
-            ],
-          ),
-        ),
-        _Specimen(
-          'Choice (fix dialog)',
-          width: 480,
-          child: Choice(
-            label: 'Level',
-            value: _choice,
-            options: const {'a': 'Artist', 'b': 'Album', 'c': 'Title'},
-            onChanged: (v) => setState(() => _choice = v),
-          ),
-        ),
-        _Specimen(
-          'LevelField — autocomplete / compact (tag) / error',
-          width: 480,
-          child: Column(
-            spacing: Space.m,
-            children: [
-              LevelField(
-                label: 'Artist',
-                controller: _levelController,
-                options: () => const ['Sample Artist', 'Other Artist'],
-                error: null,
-                onChanged: () {},
-              ),
-              SizedBox(
-                width: 160,
-                child: LevelField(
-                  label: 'Add a tag',
-                  controller: _compactController,
-                  options: () => const ['live', 'mix'],
-                  error: null,
-                  compact: true,
+                LevelField(
+                  label: 'Album',
+                  hint: 'Album name',
+                  controller: _emptyLevelController,
+                  options: () => const [],
+                  error: 'Invalid folder name',
                   onChanged: () {},
                 ),
-              ),
-              LevelField(
-                label: 'Album',
-                hint: 'Album name',
-                controller: _emptyLevelController,
-                options: () => const [],
-                error: 'Invalid folder name',
-                onChanged: () {},
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        _Specimen(
-          'KnownValuesEditor',
-          width: 480,
-          child: KnownValuesEditor(
-            layout: Layout.classic(),
-            values: _knownValues,
-            used: const {'Sample Artist/Album 1'},
-            onChanged: (v) => setState(() => _knownValues = v),
+          _Specimen(
+            'KnownValuesEditor',
+            width: 480,
+            child: KnownValuesEditor(
+              layout: Layout.classic(),
+              values: _knownValues,
+              used: const {'Sample Artist/Album 1'},
+              onChanged: (v) => setState(() => _knownValues = v),
+            ),
           ),
-        ),
-      ]),
-      _Section('To sort & previews', '', [
+        ],
+      ),
+      _Section('to_sort', 'To sort & previews', '', [
         _Specimen(
           'To sort list — click a strip to select it',
           width: 640,
@@ -1023,7 +1099,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ),
       ]),
-      _Section('Chrome', 'StudioTitleBar at a bounded width.', [
+      _Section('chrome', 'Chrome', 'StudioTitleBar at a bounded width.', [
         _Specimen(
           'StudioTitleBar — location, back, search, actions',
           width: 900,
@@ -1234,8 +1310,9 @@ final _titles = [_nominal, _alerts];
 // --- Showcase layout -------------------------------------------------------
 
 class _Section {
-  const _Section(this.title, this.description, this.items);
+  const _Section(this.id, this.title, this.description, this.items);
 
+  final String id;
   final String title;
   final String description;
   final List<Widget> items;

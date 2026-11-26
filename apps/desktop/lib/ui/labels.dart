@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:intl/intl.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 
@@ -34,9 +35,13 @@ List<String> parentLevels(Title t) => [
     ...t.levels.values.take(t.levels.length - 1).where((v) => v.isNotEmpty),
 ];
 
+/// The current time: fixed by the tests so that "this year" does not move.
+@visibleForTesting
+DateTime Function() currentTime = DateTime.now;
+
 /// Short date: "Oct 28" this year, "Oct 2025" before.
 String shortDate(AppLocalizations l10n, DateTime? date) => switch (date) {
-  final d? when d.year == DateTime.now().year => DateFormat.MMMd(
+  final d? when d.year == currentTime().year => DateFormat.MMMd(
     l10n.localeName,
   ).format(d),
   final d? => DateFormat.yMMM(l10n.localeName).format(d),
