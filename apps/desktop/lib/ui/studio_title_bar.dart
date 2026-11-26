@@ -84,7 +84,7 @@ class StudioTitleBar extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(
-                left: _isMacOS ? 76 : Space.s + Space.xs,
+                left: _isMacOS ? Sizes.macosWindowButtons : Space.s + Space.xs,
               ),
               child: Row(
                 children: [

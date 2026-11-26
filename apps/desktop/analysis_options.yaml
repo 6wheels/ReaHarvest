@@ -35,3 +35,11 @@ linter:
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
+
+# Native rules of packages/lints (CLAUDE.md, UI).
+plugins:
+  reaharvest_lints:
+    path: ../../packages/lints
+    diagnostics:
+      no_hard_coded_style: error
+      no_raw_material_widget: error

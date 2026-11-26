@@ -66,6 +66,9 @@ abstract final class Sizes {
 
   /// Width of a window button.
   static const windowButton = 44.0;
+
+  /// Room left on the left of the title bar for the macOS window buttons.
+  static const macosWindowButtons = 76.0;
 }
 
 /// Blur of the glows and of the shadows, and the offset of a drop shadow.
