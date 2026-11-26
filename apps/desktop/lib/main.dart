@@ -1,5 +1,3 @@
-// The legacy window and tray API is removed by #223.
-// ignore_for_file: deprecated_member_use
 import 'dart:async';
 import 'dart:io';
 
@@ -11,10 +9,11 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
-import 'package:window_manager/legacy.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'app_paths.dart';
+import 'app_window.dart';
 import 'demo_titles.dart';
 import 'logs.dart';
 import 'perf_marks.dart';
@@ -40,22 +39,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   startup.mark('binding');
 
-  final desktop =
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.windows ||
-          defaultTargetPlatform == TargetPlatform.linux ||
-          defaultTargetPlatform == TargetPlatform.macOS);
-  if (desktop) {
-    await windowManager.ensureInitialized();
-    startup.mark('window init');
-    const options = WindowOptions(
-      minimumSize: Size(900, 600),
-      titleBarStyle: TitleBarStyle.hidden,
-    );
-    // Not shown here: the runner shows the window with its first frame.
-    await windowManager.waitUntilReadyToShow(options);
-    startup.mark('window options');
-  }
+  final window = appWindow;
+  startup.mark('window init');
+  // Not shown here: the runner shows the window with its first frame.
+  window
+    ?..minimumSize = const Size(900, 600).toNative()
+    ..titleBarStyle = TitleBarStyle.hidden
+    ..isWindowControlButtonsVisible = true;
+  startup.mark('window options');
 
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
@@ -77,13 +68,14 @@ Future<void> main() async {
   startLogging(logFolder);
   startup.mark('logging');
   Logger('app').info('Started; settings: $settingsPath, index: $indexPath');
+  if (window == null) Logger('app').warning('The window was not found');
   // Unexpected errors are logged and shown in a popup (SPEC §5.2).
   var running = false;
   void unexpected(Object error, StackTrace? stack) {
     Logger('app').severe('Unexpected error', error, stack);
     // Before runApp, no first frame comes to show the window: shown here,
     // so that it can be closed.
-    if (!running && desktop) unawaited(windowManager.show());
+    if (!running) window?.show();
     showErrorDialog(error, stack);
   }
 
@@ -101,6 +93,7 @@ Future<void> main() async {
 
   late final ProviderContainer container;
   final shell = DesktopWindowShell(
+    window,
     () => container.read(windowBehaviorProvider),
     startup,
   );
