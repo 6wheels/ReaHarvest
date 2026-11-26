@@ -10,7 +10,7 @@ const _width = 360.0;
 
 /// Loads the fonts of the application: the tests would draw boxes instead
 /// of the glyphs otherwise.
-Future<void> _loadFonts() async {
+Future<void> loadFonts() async {
   Future<void> load(String family, List<String> files) async {
     final loader = FontLoader(family);
     for (final file in files) {
@@ -44,7 +44,7 @@ Future<void> _loadFonts() async {
 /// to the test. Generated on Windows, the platform the CI compares on:
 /// `flutter test --tags golden --update-goldens test/goldens/<file>`.
 void goldenTest(String name, Widget Function(BuildContext) child) {
-  setUpAll(_loadFonts);
+  setUpAll(loadFonts);
   for (final brightness in Brightness.values) {
     testWidgets('$name on the ${brightness.name} theme', (tester) async {
       final key = GlobalKey();
