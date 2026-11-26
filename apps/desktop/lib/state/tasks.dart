@@ -98,7 +98,8 @@ final class BackgroundTask {
   /// Shown in a popup that blocks the interface until it ends (SPEC §5.2).
   final bool foreground;
 
-  /// Leaves the list when it ends: its caller tells the outcome itself.
+  /// Its caller tells the outcome itself: [TasksNotifier.run] rethrows the
+  /// failure and throws [TaskCancelled]. Listed like the others.
   final bool quiet;
 
   /// Stops at its steps when asked; otherwise, Cancel only takes it out of
@@ -175,12 +176,12 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
 
   /// Runs [body] as a task labelled [label]. Returns its result, or null if
   /// it failed or was cancelled (the outcome stays in the task); a [quiet]
-  /// one, whose caller tells the outcome, leaves the list when it ends and
-  /// rethrows the failure of [body], or throws [TaskCancelled]. A [Report]
-  /// result is kept in the task, which fails if it holds errors; with
-  /// [openReport], the tasks zone opens it at the end (actions launched by
-  /// the user, SPEC §5.2). A task writing in [library] is added at once,
-  /// queued, and runs in the turn of its library ([LibraryTurns]);
+  /// one, whose caller tells the outcome, rethrows the failure of [body], or
+  /// throws [TaskCancelled]; every task stays listed with its final
+  /// state. A [Report] result is kept in the task, which fails if it holds
+  /// errors; with [openReport], the tasks zone opens it at the end (actions
+  /// launched by the user, SPEC §5.2). A task writing in [library] is added
+  /// at once, queued, and runs in the turn of its library ([LibraryTurns]);
   /// cancelled while queued, it ends at once and [body] never runs. A
   /// [foreground] task blocks the interface in a popup while it waits and
   /// runs ([ForegroundTaskHost]). A task not [cancellable] can only be
@@ -255,7 +256,6 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     } finally {
       _cancels.remove(id);
       _logEnd(_task(id));
-      if (quiet) _remove(id);
     }
     return null;
   }
@@ -284,7 +284,6 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
       _cancels.remove(id);
       left.complete();
       _logEnd(_task(id));
-      if (_task(id).quiet) _remove(id);
       return;
     }
     final task = state.where((t) => t.id == id).firstOrNull;
@@ -314,8 +313,6 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   /// Removes the finished tasks.
   void clearFinished() => state = [...state.where((t) => !t.isFinished)];
 
-  void _remove(int id) => state = [...state.where((t) => t.id != id)];
-
   BackgroundTask _task(int id) => state.firstWhere((t) => t.id == id);
 
   void _update(int id, BackgroundTask Function(BackgroundTask) change) =>
@@ -326,6 +323,14 @@ final libraryTurnsProvider = Provider<LibraryTurns>((ref) => LibraryTurns());
 
 final tasksProvider = NotifierProvider<TasksNotifier, List<BackgroundTask>>(
   TasksNotifier.new,
+);
+
+/// Whether a foreground task waits or runs: the interface is blocked
+/// (SPEC §5.2).
+final foregroundLockedProvider = Provider<bool>(
+  (ref) => ref.watch(
+    tasksProvider.select((t) => t.any((t) => t.foreground && !t.isFinished)),
+  ),
 );
 
 /// Whether the tasks zone is unfolded.

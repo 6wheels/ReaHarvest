@@ -27,6 +27,7 @@ import 'ui/known_values_editor.dart';
 import 'ui/library_page.dart' show LibrarySearchField;
 import 'ui/overview.dart';
 import 'ui/path_row.dart';
+import 'ui/progress_popup.dart';
 import 'ui/status_trail.dart';
 import 'ui/studio_title_bar.dart';
 import 'ui/tasks_zone.dart';
@@ -79,6 +80,7 @@ const showcaseSectionIds = [
   'tokens',
   'tags_menus',
   'notifications',
+  'foreground_popup',
   'forms',
   'to_sort',
   'chrome',
@@ -912,6 +914,49 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         [const _Specimen('TasksZone', width: 900, child: TasksZone())],
       ),
       _Section(
+        'foreground_popup',
+        'Foreground task',
+        'The popup of a sensitive action, its cancel confirmation, and the '
+            'glass pane that covers the tasks zone while it runs.',
+        [
+          _Specimen(
+            'Running',
+            width: 420,
+            child: ProgressPopup(
+              BackgroundTask(
+                id: 1,
+                label: (l10n) => l10n.taskFix(2),
+                progress: 0.5,
+                step: (l10n) => l10n.taskStepCheck,
+              ),
+              onCancel: () {},
+            ),
+          ),
+          _Specimen(
+            'Waiting for the library',
+            width: 420,
+            child: ProgressPopup(
+              BackgroundTask(
+                id: 2,
+                label: (l10n) => l10n.taskFix(1),
+                state: TaskState.queued,
+              ),
+              onCancel: () {},
+            ),
+          ),
+          const _Specimen(
+            'Cancel confirmation',
+            width: 420,
+            child: CancelTaskDialog(),
+          ),
+          const _Specimen(
+            'Glass pane over the tasks zone',
+            width: 900,
+            child: _LockedZone(),
+          ),
+        ],
+      ),
+      _Section(
         'forms',
         'Forms',
         'Fields, drop-downs and buttons share one height.',
@@ -1446,4 +1491,19 @@ class _Gap extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The tasks zone under the glass pane of a running foreground task.
+class _LockedZone extends StatelessWidget {
+  const _LockedZone();
+
+  @override
+  Widget build(BuildContext context) => const ClipRect(
+    child: Stack(
+      children: [
+        TasksZone(),
+        Positioned.fill(child: GlassPane(AlwaysStoppedAnimation(1))),
+      ],
+    ),
+  );
 }

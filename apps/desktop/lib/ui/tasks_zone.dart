@@ -149,13 +149,22 @@ String? taskStep(BackgroundTask task, AppLocalizations l10n) => task.isQueued
 
 /// Cancel of [task] while it applies, or its stop state; null when done or
 /// failed.
-Widget? taskAction(BuildContext context, WidgetRef ref, BackgroundTask task) {
+///
+/// [onCancel] replaces the plain cancel of the task (the popup asks for a
+/// confirmation first).
+Widget? taskAction(
+  BuildContext context,
+  WidgetRef ref,
+  BackgroundTask task, {
+  VoidCallback? onCancel,
+}) {
   final l10n = AppLocalizations.of(context);
   final muted = Theme.of(context).textTheme.bodySmall
       ?.copyWith(color: context.colors.muted);
   if (task.canCancel) {
     return TextButton(
-      onPressed: () => ref.read(tasksProvider.notifier).cancel(task.id),
+      onPressed:
+          onCancel ?? () => ref.read(tasksProvider.notifier).cancel(task.id),
       child: Text(l10n.cancel),
     );
   }

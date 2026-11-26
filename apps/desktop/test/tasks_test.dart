@@ -9,7 +9,7 @@ import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/tasks.dart';
 import 'package:reaharvest/theme/app_theme.dart';
 import 'package:reaharvest/ui/error_dialog.dart';
-import 'package:reaharvest/ui/kit/kit.dart' show Led, LedMode, Meter;
+import 'package:reaharvest/ui/kit/kit.dart' show GlassPane, Led, LedMode;
 import 'package:reaharvest/ui/progress_popup.dart';
 import 'package:reaharvest/ui/report_dialog.dart';
 import 'package:reaharvest/ui/tasks_zone.dart';
@@ -363,8 +363,8 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  test('a quiet task leaves the list when it ends and throws its failure or '
-      'cancel', () async {
+  test('a quiet task stays listed with its final state and throws its failure '
+      'or cancel', () async {
     const band = LibraryId('band');
     expect(await tasks().run((l10n) => 'A', (_) async => 1, quiet: true), 1);
     await expectLater(
@@ -387,7 +387,12 @@ void main() {
     await expectLater(queued, throwsA(isA<TaskCancelled>()));
     hold.complete();
     await running;
-    expect(states(), [TaskState.done], reason: 'only the one not quiet');
+    expect(states(), [
+      TaskState.done,
+      TaskState.failed,
+      TaskState.done,
+      TaskState.cancelled,
+    ]);
   });
 
   test('a task not cancellable is only cancelled while queued', () async {
@@ -532,104 +537,343 @@ void main() {
     },
   );
 
-  testWidgets('a foreground task blocks the interface in a popup', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          navigatorKey: appNavigatorKey,
-          theme: buildTheme(Brightness.light),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          home: const Scaffold(body: ForegroundTaskHost()),
+  var pageTaps = 0;
+
+  /// The application shell: the tasks zone behind the lock, and the host.
+  Future<void> pumpShell(WidgetTester tester) => tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        navigatorKey: appNavigatorKey,
+        theme: buildTheme(Brightness.light),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        builder: (context, child) => Column(
+          children: [
+            Expanded(child: ForegroundWait(child: child!)),
+            const ForegroundLock(child: TasksZone()),
+            const ForegroundTaskHost(),
+          ],
+        ),
+        home: Scaffold(
+          body: TextButton(
+            onPressed: () => pageTaps++,
+            child: const Text('Page'),
+          ),
         ),
       ),
-    );
-    const band = LibraryId('band');
-    final step = Completer<void>();
-    final scan = tasks().run(
-      (l10n) => 'Scan',
-      (_) => step.future,
-      library: band,
-    );
-    expect(find.text('Fix'), findsNothing, reason: 'background: no popup');
+    ),
+  );
 
-    // Waits for the scan, shown in its popup; Escape leaves it.
-    final queued = tasks().run(
-      (l10n) => 'Fix',
-      (_) async {},
-      foreground: true,
-      library: band,
-    );
-    await settle(tester);
-    expect(find.text('Fix'), findsOneWidget);
-    expect(find.text('Waiting'), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await settle(tester);
-    expect(await queued, isNull);
-    expect(find.text('Fix'), findsNothing);
+  group('foreground tasks', () {
+    testWidgets('block the interface in a popup, Cancel asks first', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      const band = LibraryId('band');
+      final step = Completer<void>();
+      final scan = tasks().run(
+        (l10n) => 'Scan',
+        (_) => step.future,
+        library: band,
+      );
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing, reason: 'background');
 
-    // Running: step and progress; a click on the barrier does nothing,
-    // Cancel asks to stop, the popup stays until the task ends.
-    step.complete();
-    await scan;
-    final hold = Completer<void>();
-    final running = tasks().run((l10n) => 'Fix', (task) async {
-      task.step((l10n) => 'Fix 1 of 2');
-      task.progress(0.5);
-      await hold.future;
-      task.checkCancelled();
-    }, foreground: true);
-    await settle(tester);
-    expect(find.text('Fix 1 of 2'), findsOneWidget);
-    expect(tester.widget<Meter>(find.byType(Meter)).value, 0.5);
-    await tester.tapAt(const Offset(2, 2));
-    await settle(tester);
-    expect(find.text('Fix'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await tester.pump();
-    expect(find.text('Cancelling…'), findsOneWidget);
-    hold.complete();
-    await running;
-    await settle(tester);
-    expect(find.text('Fix'), findsNothing);
-    expect(states().last, TaskState.cancelled);
+      // Waits for the scan, shown in its popup; Escape asks, then leaves.
+      final queued = tasks().run(
+        (l10n) => 'Fix',
+        (_) async {},
+        foreground: true,
+        library: band,
+      );
+      await settle(tester);
+      expect(find.text('Waiting'), findsOneWidget, reason: 'popup');
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.text('Cancel this action?'), findsOneWidget);
+      await tester.tap(find.text('Stop it'));
+      await settle(tester);
+      expect(await queued, isNull);
+      expect(find.byType(AlertDialog), findsNothing);
 
-    // Not cancellable: no Cancel once running, Escape does nothing.
-    final slow = Completer<void>();
-    final change = tasks().run(
-      (l10n) => 'Trash',
-      (_) => slow.future,
-      foreground: true,
-      cancellable: false,
-    );
-    await settle(tester);
-    expect(find.text('Trash'), findsOneWidget);
-    expect(find.text('Cancel'), findsNothing);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await settle(tester);
-    expect(find.text('Cancelling…'), findsNothing);
-    slow.complete();
-    await change;
-    await settle(tester);
-    expect(states().last, TaskState.done);
+      // Running: step and progress; a click on the barrier does nothing, a
+      // refusal keeps it running, a confirmation asks it to stop.
+      step.complete();
+      await scan;
+      final hold = Completer<void>();
+      final running = tasks().run((l10n) => 'Fix', (task) async {
+        task.step((l10n) => 'Fix 1 of 2');
+        task.progress(0.5);
+        await hold.future;
+        task.checkCancelled();
+      }, foreground: true);
+      await settle(tester);
+      expect(find.text('Fix 1 of 2'), findsWidgets);
+      await tester.tapAt(const Offset(2, 2));
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Cancel'),
+        ),
+      );
+      await settle(tester);
+      await tester.tap(find.text('Keep running'));
+      await settle(tester);
+      expect(find.text('Cancelling…'), findsNothing);
+      expect(container.read(tasksProvider).last.cancelling, isFalse);
+      // A pop of the system asks too.
+      await appNavigatorKey.currentState!.maybePop();
+      await settle(tester);
+      expect(find.text('Cancel this action?'), findsOneWidget);
+      await tester.tap(find.text('Stop it'));
+      await settle(tester);
+      expect(find.text('Cancelling…'), findsWidgets);
+      hold.complete();
+      await running;
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(states().last, TaskState.cancelled);
 
-    // Ended before its popup was built: its route is removed at once, a
-    // dialog under it stays the top route.
-    final under = Completer<String?>();
-    final navigator = appNavigatorKey.currentState!;
-    unawaited(
-      navigator
-          .push<String>(MaterialPageRoute(builder: (_) => const Text('Under')))
-          .then(under.complete),
-    );
-    await settle(tester);
-    await tasks().run((l10n) => 'Quick', (_) async {}, foreground: true);
-    navigator.pop('created');
-    expect(await under.future, 'created');
-    await settle(tester);
-    expect(find.text('Quick'), findsNothing);
-    expect(find.byType(AlertDialog), findsNothing);
+      // Not cancellable: no Cancel once running, Escape asks nothing.
+      final slow = Completer<void>();
+      final change = tasks().run(
+        (l10n) => 'Trash',
+        (_) => slow.future,
+        foreground: true,
+        cancellable: false,
+      );
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Cancel'), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.text('Cancel this action?'), findsNothing);
+      slow.complete();
+      await change;
+      await settle(tester);
+      expect(states().last, TaskState.done);
+    });
+
+    testWidgets('lock the tasks zone under a glass pane', (tester) async {
+      await pumpShell(tester);
+      await tasks().run((l10n) => 'Old', (_) async => const Report());
+      await tester.pump();
+      final pane = find.descendant(
+        of: find.byType(ForegroundLock),
+        matching: find.byType(GlassPane),
+      );
+      expect(pane, findsNothing);
+
+      final hold = Completer<void>();
+      final running = tasks().run(
+        (l10n) => 'Fix',
+        (_) => hold.future,
+        foreground: true,
+      );
+      // Locked from the start, the pane comes with the popup.
+      await tester.pump(foregroundPopupDelay ~/ 2);
+      expect(container.read(foregroundLockedProvider), isTrue);
+      expect(pane, findsNothing);
+      // The page is blocked while the popup waits for its delay.
+      pageTaps = 0;
+      await tester.tap(find.text('Page'), warnIfMissed: false);
+      expect(pageTaps, 0);
+      await tester.tap(find.textContaining('TASKS'), warnIfMissed: false);
+      await tester.pump();
+      expect(container.read(tasksZoneUnfoldedProvider), isFalse);
+      await tester.pump(foregroundPopupDelay);
+      await settle(tester);
+      expect(pane, findsOneWidget);
+      await tester.tap(find.byIcon(Icons.clear_all), warnIfMissed: false);
+      await tester.tap(find.textContaining('TASKS'), warnIfMissed: false);
+      await settle(tester);
+      expect(container.read(tasksZoneUnfoldedProvider), isFalse);
+      expect(
+        container.read(tasksProvider),
+        hasLength(2),
+        reason: 'not cleared',
+      );
+
+      hold.complete();
+      await running;
+      await settle(tester);
+      expect(container.read(foregroundLockedProvider), isFalse);
+      expect(pane, findsNothing);
+      await tester.tap(find.textContaining('TASKS'));
+      await tester.pump();
+      expect(container.read(tasksZoneUnfoldedProvider), isTrue);
+      await tester.tap(find.text('Page'));
+      expect(pageTaps, 1, reason: 'unlocked');
+    });
+
+    testWidgets('never show the popup of a quick action', (tester) async {
+      await pumpShell(tester);
+      final hold = Completer<void>();
+      final quick = tasks().run(
+        (l10n) => 'Quick',
+        (_) => hold.future,
+        foreground: true,
+        quiet: true,
+      );
+      await tester.pump(foregroundPopupDelay ~/ 2);
+      expect(container.read(foregroundLockedProvider), isTrue);
+      expect(find.byType(AlertDialog), findsNothing);
+      hold.complete();
+      await quick;
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(container.read(foregroundPopupShownProvider), isFalse);
+
+      // Traced in the zone, which stays folded.
+      expect(states(), [TaskState.done]);
+      expect(find.text('Quick'), findsOneWidget);
+      expect(container.read(tasksZoneUnfoldedProvider), isFalse);
+    });
+
+    testWidgets('never leave a popup open when their task has ended', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      // Ended at once, long before the popup.
+      await tasks().run((l10n) => 'Quick', (_) async {}, foreground: true);
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+
+      // Ended after its popup, with a page under it.
+      final under = Completer<String?>();
+      final navigator = appNavigatorKey.currentState!;
+      unawaited(
+        navigator
+            .push<String>(
+              MaterialPageRoute(builder: (_) => const Text('Under')),
+            )
+            .then(under.complete),
+      );
+      await settle(tester);
+      final hold = Completer<void>();
+      final slow = tasks().run(
+        (l10n) => 'Slow',
+        (_) => hold.future,
+        foreground: true,
+      );
+      await tester.pump(foregroundPopupDelay);
+      await tester.pump();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      hold.complete();
+      await slow;
+      navigator.pop('created');
+      expect(await under.future, 'created');
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(container.read(foregroundPopupShownProvider), isFalse);
+    });
+
+    testWidgets('close the cancel confirmation when their task ends', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      final hold = Completer<void>();
+      final running = tasks().run(
+        (l10n) => 'Fix',
+        (_) => hold.future,
+        foreground: true,
+      );
+      await tester.pump(foregroundPopupDelay);
+      await settle(tester);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Cancel'),
+        ),
+      );
+      await settle(tester);
+      expect(find.text('Cancel this action?'), findsOneWidget);
+
+      hold.complete();
+      await running;
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('retry their popup while the navigator is not there', (
+      tester,
+    ) async {
+      Widget shell({required bool navigator}) => UncontrolledProviderScope(
+        container: container,
+        child: Column(
+          textDirection: TextDirection.ltr,
+          children: [
+            const ForegroundTaskHost(),
+            if (navigator)
+              Expanded(
+                child: MaterialApp(
+                  navigatorKey: appNavigatorKey,
+                  theme: buildTheme(Brightness.light),
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  home: const Scaffold(),
+                ),
+              ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(shell(navigator: false));
+      final hold = Completer<void>();
+      final running = tasks().run(
+        (l10n) => 'Fix',
+        (_) => hold.future,
+        foreground: true,
+      );
+      await tester.pump(foregroundPopupDelay * 2);
+      expect(container.read(foregroundPopupShownProvider), isFalse);
+
+      await tester.pumpWidget(shell(navigator: true));
+      await tester.pump(foregroundPopupDelay);
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      hold.complete();
+      await running;
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('show their report when they end or are cancelled', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      const report = Report({
+        ReportKind.corrupted: [ReportItem('Slow Tide/broken.rpp', 'bad')],
+      });
+      await tasks().run(
+        (l10n) => 'Fix A',
+        (_) async => report,
+        foreground: true,
+        openReport: true,
+      );
+      await settle(tester);
+      expect(find.textContaining('broken.rpp'), findsOneWidget);
+      await tester.tap(find.text('Close'));
+      await settle(tester);
+
+      final hold = Completer<void>();
+      final running = tasks().run<Report>(
+        (l10n) => 'Fix B',
+        (task) async {
+          await hold.future;
+          throw const TaskCancelled(report);
+        },
+        foreground: true,
+        openReport: true,
+      );
+      await settle(tester);
+      hold.complete();
+      await running;
+      await settle(tester);
+      expect(states().last, TaskState.cancelled);
+      expect(find.textContaining('broken.rpp'), findsOneWidget);
+    });
   });
 }

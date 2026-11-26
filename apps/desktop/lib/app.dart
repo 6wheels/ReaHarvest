@@ -55,9 +55,13 @@ class ReaHarvestApp extends ConsumerWidget {
         // The tasks zone stays at the bottom, below every page.
         child: Column(
           children: [
-            Expanded(child: child!),
-            const TasksZone(),
-            const InterruptedFixPrompt(),
+            Expanded(child: ForegroundWait(child: child!)),
+            const ForegroundLock(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [TasksZone(), InterruptedFixPrompt()],
+              ),
+            ),
             const ForegroundTaskHost(),
           ],
         ),
