@@ -74,9 +74,18 @@ void main() {
         find.descendant(of: popup, matching: find.text('Waiting')),
         findsOne,
       );
-      await tester.tap(
-        find.descendant(of: popup, matching: find.text('Cancel')),
-      );
+      // Cancel asks first; a refusal leaves the task waiting.
+      final cancel = find.descendant(of: popup, matching: find.text('Cancel'));
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(find.text('Cancel this action?'), findsOne);
+      await tester.tap(find.text('Keep running'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cancel this action?'), findsNothing);
+      expect(h.tasks.last.isQueued, isTrue);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Stop it'));
       await tester.pumpAndSettle();
       expect(popup, findsNothing);
       expect(h.tasks.last.state, TaskState.cancelled);

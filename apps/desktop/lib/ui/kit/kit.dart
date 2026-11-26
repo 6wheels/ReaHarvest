@@ -12,6 +12,7 @@ export 'disclosure.dart';
 export 'disclosure_tile.dart';
 export 'dropdown.dart';
 export 'glass_dialog.dart';
+export 'glass_pane.dart';
 export 'icon_action.dart';
 export 'led.dart';
 export 'level_field.dart';

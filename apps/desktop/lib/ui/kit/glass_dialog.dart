@@ -1,13 +1,11 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_theme.dart';
+import 'glass_pane.dart';
 
-/// Geometry of the popup transition: blur of the pane behind, scale and
-/// slide the popup starts from, curve of its closing.
-const _blur = 16.0;
+/// Geometry of the popup transition: scale and slide the popup starts from,
+/// curve of its closing.
 const _scaleFrom = 0.96;
 const _slideFrom = Offset(0, 0.02);
 const _closeCurve = Curves.easeInCubic;
@@ -42,24 +40,7 @@ RawDialogRoute<T> glassDialogRoute<T>(
     );
     return Stack(
       children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: AnimatedBuilder(
-              animation: t,
-              builder: (context, _) => BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: _blur * t.value,
-                  sigmaY: _blur * t.value,
-                ),
-                child: ColoredBox(
-                  color: context.colors.scrim.withValues(
-                    alpha: Alpha.medium * t.value,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+        Positioned.fill(child: IgnorePointer(child: GlassPane(t))),
         FadeTransition(
           opacity: t,
           child: ScaleTransition(
