@@ -15,7 +15,7 @@ Order: **kit, then showcase, then golden test, then screens**. A screen never ge
 3. **Write the component in the kit**:
    - a public widget with a doc comment;
    - one file per component, `ui/kit/<name>.dart`, exported by `ui/kit/kit.dart`;
-   - states are never told apart by hue alone: add luminance, shape, icon or glow;
+   - states as the issue specifies them; simple states on LEDs, with color and animation where possible, no extra icon or shape unless asked;
    - texts come from ARB, in both files.
 4. **Add it to the showcase**: a section in `apps/desktop/lib/main_showcase.dart`, on mock data, showing every state (default, hover or focus when relevant, disabled, error, busy) in both themes. The showcase must compile the first time; a change to `main()` needs a full restart. Tell the user how to see it (`flutter run -d windows -t lib/main_showcase.dart` in `apps/desktop`). **Wait for the user to validate the look.**
 5. **Golden test**: `apps/desktop/test/goldens/<name>_golden_test.dart`, tagged `@Tags(['golden'])`.

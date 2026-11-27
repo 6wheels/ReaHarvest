@@ -36,7 +36,7 @@ Read-only: change no file, write nothing to GitHub, commit nothing.
    - adapters wired at the entry point only;
    - RPP targeted patches and atomic writes;
    - no blocking work on the UI isolate;
-   - tokens only in UI code, and no state told apart by hue alone;
+   - tokens only in UI code, and states shown as the issue specifies them;
    - new texts in both ARB files;
    - showcase updated for the listed components, with a golden test;
    - tests present for each criterion.
