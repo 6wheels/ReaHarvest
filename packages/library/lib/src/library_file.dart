@@ -11,8 +11,6 @@ enum LayoutTemplate {
   projectOriented,
   film;
 
-  static const recommended = classic;
-
   Layout create() => switch (this) {
     classic => Layout.classic(),
     projectOriented => Layout.projectOriented(),

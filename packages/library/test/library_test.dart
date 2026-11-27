@@ -133,8 +133,7 @@ void main() {
       expect((await readLibrary(storage))!.isFreeTree, isTrue);
     });
 
-    test('provides the templates, classic recommended', () {
-      expect(LayoutTemplate.recommended, LayoutTemplate.classic);
+    test('provides the templates', () {
       expect(LayoutTemplate.projectOriented.create().levels.length, 2);
       expect(LayoutTemplate.film.create().leaf.key, 'scene');
     });

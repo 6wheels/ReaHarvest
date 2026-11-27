@@ -42,15 +42,25 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
 
   /// Selected choice: a template, the free tree, or the current custom
   /// layout of an existing library.
-  var _choice = LayoutTemplate.recommended.index;
+  var _choice = LayoutTemplate.classic.index;
   LibraryProblem? _problem;
   var _busy = false;
+
+  /// The folder, then its known values, are being discovered: no submit
+  /// meanwhile. Two flags, so that a layout choice does not end the folder one.
+  var _discoveringFolder = false;
+  var _discoveringValues = false;
+
+  bool get _discovering => _discoveringFolder || _discoveringValues;
 
   /// The folder holds projects: known values are asked (SPEC §3.1).
   var _hasProjects = false;
 
   /// Known values being checked, for [_layout]; null while not asked.
   List<KnownValue>? _values;
+
+  /// Number of the latest known values request (see [_refreshValues]).
+  var _valuesRequest = 0;
 
   @override
   void dispose() {
@@ -61,6 +71,16 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
   Future<void> _chooseFolder() async {
     final folder = await ref.read(pickersProvider).folder(initial: _folder);
     if (folder == null) return;
+    setState(() {
+      _folder = folder;
+      _discoveringFolder = true;
+      // What the previous folder told is no longer known.
+      _existing = null;
+      _locked = false;
+      _problem = null;
+      _hasProjects = false;
+      if (_name.text.trim().isEmpty) _name.text = p.basename(folder);
+    });
     final service = ref.read(libraryCatalogProvider);
     Library? existing;
     var locked = false;
@@ -76,16 +96,19 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
       }
     } on LibraryException catch (e) {
       problem = e.problem;
+    } finally {
+      if (mounted && folder == _folder) {
+        setState(() => _discoveringFolder = false);
+      }
     }
-    if (!mounted) return;
+    // Ignore a discovery outdated by another folder meanwhile.
+    if (!mounted || folder != _folder) return;
     setState(() {
-      _folder = folder;
       _existing = existing;
       _locked = locked;
       _problem = problem;
       _hasProjects = hasProjects;
       if (existing != null) _choice = _choiceOf(existing.layout);
-      if (_name.text.trim().isEmpty) _name.text = p.basename(folder);
     });
     await _refreshValues();
   }
@@ -115,6 +138,8 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
   /// projects, pre-filled from its folders, unless the existing library
   /// already declares them for this layout (SPEC §3.1, §5.1).
   Future<void> _refreshValues() async {
+    // Only the latest request may set the values or end the discovery.
+    final request = ++_valuesRequest;
     final layout = _layout;
     final declared = _existing?.knownValues ?? const [];
     final asked =
@@ -124,15 +149,25 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
         layout.levels.length > 1 &&
         !(declared.isNotEmpty && sameLayout(_existing?.layout, layout));
     if (!asked) {
-      setState(() => _values = null);
+      setState(() {
+        _values = null;
+        _discoveringValues = false;
+      });
       return;
     }
-    final choice = _choice;
-    final values = await ref
-        .read(libraryCatalogProvider)
-        .prefillKnownValues(_folder!, layout);
-    // Ignore a pre-fill outdated by another choice meanwhile.
-    if (mounted && choice == _choice) setState(() => _values = values);
+    final folder = _folder;
+    setState(() => _discoveringValues = true);
+    try {
+      final values = await ref
+          .read(libraryCatalogProvider)
+          .prefillKnownValues(folder!, layout);
+      if (!mounted || request != _valuesRequest || folder != _folder) return;
+      setState(() => _values = values);
+    } finally {
+      if (mounted && request == _valuesRequest) {
+        setState(() => _discoveringValues = false);
+      }
+    }
   }
 
   void _choose(int choice) {
@@ -168,6 +203,7 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
         _folder != null &&
         _problem == null &&
         !_busy &&
+        !_discovering &&
         (_layout == null ||
             _values?.problemFor(_layout!.levels.length) == null);
 
@@ -175,18 +211,18 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PathRow(
-          label: l10n.libraryFolder,
-          value: _folder,
-          placeholder: l10n.noFolder,
-          onChoose: _chooseFolder,
-        ),
         FormRow(
           label: l10n.libraryName,
           child: TextField(
             controller: _name,
             decoration: const InputDecoration(isDense: true),
           ),
+        ),
+        PathRow(
+          label: l10n.libraryFolder,
+          value: _folder,
+          placeholder: l10n.noFolder,
+          onChoose: _chooseFolder,
         ),
         FormRow(
           label: l10n.libraryMode,
@@ -246,7 +282,6 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
                       LayoutTemplate.film => l10n.layoutFilm,
                     },
                     detail: _levels(l10n, t.create()),
-                    recommended: t == LayoutTemplate.recommended,
                     selected: _choice == t.index,
                     onTap: () => _choose(t.index),
                   ),
@@ -267,7 +302,13 @@ class _LibraryFormState extends ConsumerState<LibraryForm> {
             ],
           ),
         ),
-        if ((_values, _layout) case (final values?, final layout?))
+        if (_discovering)
+          FormRow(
+            label: l10n.knownValues,
+            alignTop: true,
+            child: const LinearProgressIndicator(),
+          )
+        else if ((_values, _layout) case (final values?, final layout?))
           FormRow(
             label: l10n.knownValues,
             alignTop: true,
@@ -323,18 +364,15 @@ class _LayoutChoice extends StatelessWidget {
     required this.detail,
     required this.selected,
     required this.onTap,
-    this.recommended = false,
   });
 
   final String name;
   final String detail;
-  final bool recommended;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final c = context.colors;
     final text = Theme.of(context).textTheme;
 
@@ -356,18 +394,7 @@ class _LayoutChoice extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(name, style: text.bodyLarge),
-                        if (recommended) ...[
-                          const SizedBox(width: Space.s),
-                          Text(
-                            l10n.recommended,
-                            style: text.labelSmall?.copyWith(color: c.accent),
-                          ),
-                        ],
-                      ],
-                    ),
+                    Text(name, style: text.bodyLarge),
                     Text(
                       detail,
                       style: text.bodySmall?.copyWith(color: c.muted),
