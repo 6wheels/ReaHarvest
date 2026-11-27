@@ -62,6 +62,12 @@ final revealed = <String>[];
 /// When set, adopt and addVersion of the fake service wait for it (spinners).
 Completer<void>? pending;
 
+/// When set, the known values discovery of the library form waits for it.
+Completer<void>? discovery;
+
+/// Gates of the next known values requests, one per request, in order.
+final prefillGates = <Completer<void>>[];
+
 /// Library catalog recording calls, without file system access.
 class FakeLibraryCatalog extends LibraryCatalog {
   FakeLibraryCatalog(super.ref);
@@ -76,7 +82,10 @@ class FakeLibraryCatalog extends LibraryCatalog {
   List<Member> members = const [];
 
   @override
-  Future<Library?> existing(String folder) async => existingLibrary;
+  Future<Library?> existing(String folder) async {
+    await discovery?.future;
+    return existingLibrary;
+  }
 
   @override
   Future<bool> hasProjects(String folder) async => existingProjects;
@@ -85,9 +94,13 @@ class FakeLibraryCatalog extends LibraryCatalog {
   Future<List<KnownValue>> prefillKnownValues(
     String folder,
     Layout layout,
-  ) async => const [
-    KnownValue('Band', [KnownValue('First album')]),
-  ];
+  ) async {
+    await discovery?.future;
+    if (prefillGates.isNotEmpty) await prefillGates.removeAt(0).future;
+    return const [
+      KnownValue('Band', [KnownValue('First album')]),
+    ];
+  }
 
   @override
   Future<({List<KnownValue> values, Set<String> used})> knownValuesOf(
@@ -297,6 +310,8 @@ void main() {
     existingLibrary = null;
     revealed.clear();
     pending = null;
+    discovery = null;
+    prefillGates.clear();
     existingProjects = false;
     backupOpening = true;
     await tester.pumpWidget(
@@ -678,6 +693,188 @@ void main() {
     expect(catalog.knownValues, const [
       KnownValue('Band', [KnownValue(Layout.unassigned)]),
       KnownValue('Solo', [KnownValue('Live')]),
+    ]);
+  });
+
+  testWidgets('the library form orders its fields and drops the badge', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingProjects = true;
+    await tester.tap(find.text('Choose…'));
+    await tester.pumpAndSettle();
+
+    final tops = [
+      for (final label in [
+        'Name',
+        'Folder',
+        'Mode',
+        'Organization',
+        'Known values',
+      ])
+        tester.getTopLeft(find.text(label)).dy,
+    ];
+    expect(tops, orderedEquals([...tops]..sort()));
+    expect(find.text('Recommended'), findsNothing);
+
+    // Only the levels below an artist offer an unassigned album.
+    expect(find.widgetWithText(TextButton, 'Unassigned'), findsOneWidget);
+    await tester.ensureVisible(find.text('Project-oriented'));
+    await tester.tap(find.text('Project-oriented'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'Unassigned'), findsNothing);
+  });
+
+  testWidgets('the library form fills the folder while discovering', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingProjects = true;
+    discovery = Completer<void>();
+    await tester.tap(find.text('Choose…'));
+    await tester.pump();
+
+    FilledButton submit() =>
+        tester.widget(find.widgetWithText(FilledButton, 'Create library'));
+    expect(find.text('/music/Band'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(submit().onPressed, isNull);
+
+    discovery!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('First album'), findsOneWidget);
+    expect(submit().onPressed, isNotNull);
+  });
+
+  testWidgets('a layout choice keeps the folder discovery running', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingProjects = true;
+    discovery = Completer<void>();
+    await tester.tap(find.text('Choose…'));
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Free tree'));
+    await tester.tap(find.text('Free tree'));
+    await tester.pump();
+    FilledButton submit() =>
+        tester.widget(find.widgetWithText(FilledButton, 'Create library'));
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(submit().onPressed, isNull);
+
+    discovery!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(submit().onPressed, isNotNull);
+  });
+
+  testWidgets('a new folder forgets the layout lock of the previous one', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingLibrary = Library(
+      id: LibraryId.generate(),
+      mode: LibraryMode.local,
+      layout: Layout.projectOriented(),
+    );
+    existingProjects = true;
+    await tester.tap(find.text('Choose…'));
+    await tester.pumpAndSettle();
+    expect(find.text('Classic'), findsNothing);
+
+    // A second folder, whose discovery is still running.
+    existingLibrary = null;
+    existingProjects = false;
+    discovery = Completer<void>();
+    await tester.tap(find.text('Choose…'));
+    await tester.pump();
+    expect(find.text('Classic'), findsOneWidget);
+
+    discovery!.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the latest known values request ends the discovery', (
+    tester,
+  ) async {
+    await pumpApp(tester, configured: const []);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    existingProjects = true;
+    await tester.tap(find.text('Choose…'));
+    await tester.pumpAndSettle();
+
+    final first = Completer<void>();
+    final second = Completer<void>();
+    prefillGates.addAll([first, second]);
+    await tester.tap(find.text('Classic'));
+    await tester.pump();
+    await tester.tap(find.text('Classic'));
+    await tester.pump();
+
+    FilledButton submit() =>
+        tester.widget(find.widgetWithText(FilledButton, 'Create library'));
+    // The first request ends while the second one still runs.
+    first.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(submit().onPressed, isNull);
+
+    second.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('First album'), findsOneWidget);
+    expect(submit().onPressed, isNotNull);
+  });
+
+  testWidgets('settings remove all the unused children of a value', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      indexed: {
+        band.id: Library(
+          id: band.id,
+          mode: LibraryMode.local,
+          layout: Layout.classic(),
+        ),
+      },
+    );
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Libraries'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Known values'));
+    await tester.pumpAndSettle();
+
+    IconButton removeAll() => tester.widget(
+      find.ancestor(
+        of: find.byTooltip('Remove all children'),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(removeAll().onPressed, isNotNull);
+    await tester.tap(find.byTooltip('Remove all children'));
+    await tester.pumpAndSettle();
+    expect(find.text('Live'), findsNothing);
+    expect(find.text('First album'), findsOneWidget);
+    expect(removeAll().onPressed, isNull);
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(catalog.knownValues, const [
+      KnownValue('Band', [KnownValue('First album')]),
     ]);
   });
 

@@ -54,6 +54,13 @@ class KnownValuesEditor extends StatelessWidget {
     );
   }
 
+  /// Names of the children of [value] (under [parent]) that no folder uses.
+  List<String> _removable(List<String> parent, KnownValue value) => [
+    for (final child in value.children)
+      if (!used.contains([...parent, value.value, child.value].join('/')))
+        child.value,
+  ];
+
   /// Rows of [level] values under [parent], then the field adding one.
   List<Widget> _level(
     BuildContext context,
@@ -91,6 +98,22 @@ class KnownValuesEditor extends StatelessWidget {
                     ? null
                     : () => onChanged(values.withoutPath([...parent, v.value])),
               ),
+              if (v.children.isNotEmpty)
+                IconButton(
+                  tooltip: l10n.removeAllChildren,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: IconSize.m,
+                  icon: const Icon(Icons.playlist_remove_rounded),
+                  onPressed: _removable(parent, v).isEmpty
+                      ? null
+                      : () => onChanged(
+                          _removable(parent, v).fold(
+                            values,
+                            (vs, child) =>
+                                vs.withoutPath([...parent, v.value, child]),
+                          ),
+                        ),
+                ),
             ],
           ),
         ),
