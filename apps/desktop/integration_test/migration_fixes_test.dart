@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart' hide Title;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:reaharvest/state/providers.dart';
 import 'package:reaharvest/ui/title_card.dart';
+import 'package:reaharvest/ui/to_sort/version_fields.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_repository/reaharvest_repository.dart';
 
@@ -14,8 +16,8 @@ import 'harness.dart';
 /// batch, the inventory check passing (SPEC §5.8 step 4, #148): a title
 /// organized into version folders (a project below a version folder, a
 /// status subfolder), a title placed too high moved to its position, a
-/// loose project moved into a title; every project opens with no new
-/// missing media. `flutter test integration_test/migration_fixes_test.dart
+/// loose project moved into a title from its card (#149); every project
+/// opens with no new missing media. `flutter test integration_test/migration_fixes_test.dart
 /// -d windows`.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -102,18 +104,54 @@ void main() {
     expect(node!.versionStatuses.values, ['mixing']);
     expect(node.versionLabels.values, unorderedEquals(['v1', 'take', 'final']));
 
-    // A loose project moved into the title.
-    await runFixes(tester, h, id, [
-      MoveProject(
-        const FixVersion(
-          'Artist/Album/loose.rpp',
-          folder: 'loose',
-          label: 'Loose take',
-        ),
-        'Artist/Album/Song',
-        level: 'title',
+    // A loose project moved into the title from its card: "Move this
+    // project…" (#149), its label set first.
+    await tester.tap(find.textContaining('TO SORT //'));
+    await tester.pumpAndSettle();
+    final loose = find.ancestor(
+      of: find.text('loose.rpp'),
+      matching: find.byType(VersionFields),
+    );
+    await showToSort(tester, loose);
+    await tester.enterText(
+      find.descendant(of: loose, matching: find.byType(TextField)).first,
+      'Loose take',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: loose,
+        matching: find.byTooltip('Move this project…'),
       ),
-    ]);
+    );
+    await tester.pumpAndSettle();
+    for (final (level, value) in [
+      ('Artist', 'Artist'),
+      ('Album', 'Album'),
+      ('Title', 'Song'),
+    ]) {
+      await tester.enterText(dialogField(level), value);
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Fix…'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final before = h.tasks.length;
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Fix 1 item'),
+      ),
+    );
+    await waitFor(
+      tester,
+      () => h.tasks.length > before && !h.tasks[before].isRunning,
+      reason: 'move done',
+    );
     expect(find.text('Projects moved into their version folder · 1'), findsOne);
     expect(find.textContaining(lost), findsNothing);
     await tapText(tester, 'Close');

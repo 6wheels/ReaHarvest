@@ -5,6 +5,8 @@ import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart'
+    show ScanResult;
 import 'package:reaharvest_rpp/reaharvest_rpp.dart';
 
 import 'providers.dart';
@@ -243,6 +245,31 @@ final visibleTitlesProvider = Provider<List<Title>>((ref) {
 final issuesProvider = Provider<List<LibraryIssue>>((ref) {
   ref.watch(indexRevisionProvider);
   return ref.watch(localIndexProvider).issues();
+});
+
+/// A library as the "To sort" page shows it (SPEC §5.2, §5.8 steps 3 and
+/// 4): its entry, its configuration and its last scan (title candidates,
+/// files outside any title, unreadable files).
+typedef ToSortLibrary = ({
+  LibraryEntry entry,
+  Library library,
+  ScanResult scan,
+});
+
+/// The indexed libraries, in the order of the settings, with their last
+/// scan ("To sort").
+final toSortProvider = Provider<List<ToSortLibrary>>((ref) {
+  ref.watch(indexRevisionProvider);
+  final index = ref.watch(localIndexProvider);
+  final libraries = ref.watch(indexedLibrariesProvider);
+  return [
+    for (final entry in ref.watch(settingsProvider.select((s) => s.libraries)))
+      if ((libraries[entry.id], index.scanResult(entry.id)) case (
+        final library?,
+        final scan?,
+      ))
+        (entry: entry, library: library, scan: scan),
+  ];
 });
 
 /// Versions without metadata in layout libraries ("To adopt", SPEC §4.2).

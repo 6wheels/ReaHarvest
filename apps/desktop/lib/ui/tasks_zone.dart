@@ -20,10 +20,11 @@ const _meterWidth = 120.0;
 /// it.
 final appNavigatorKey = GlobalKey<NavigatorState>();
 
-/// Opens [report] over the pages of the application.
-void _openReport(String title, Report report) {
+/// Opens [report] over the pages of the application, [subject] under its
+/// title.
+void _openReport(String title, Report report, String? subject) {
   if (appNavigatorKey.currentContext case final context?) {
-    showReport(context, title, report);
+    showReport(context, title, report, subject: subject);
   }
 }
 
@@ -48,7 +49,7 @@ class TasksZone extends ConsumerWidget {
       for (final t in next) {
         if (t.openReport && !t.isRunning && running.contains(t.id)) {
           if (t.report case final report?) {
-            _openReport(t.label(l10n), report);
+            _openReport(t.label(l10n), report, t.subject);
           }
         }
       }
@@ -301,7 +302,8 @@ class _TaskRow extends ConsumerWidget {
             width: _actionWidth,
             child: switch (task.report) {
               final report? => TextButton(
-                onPressed: () => _openReport(task.label(l10n), report),
+                onPressed: () =>
+                    _openReport(task.label(l10n), report, task.subject),
                 child: Text(l10n.report),
               ),
               null => null,

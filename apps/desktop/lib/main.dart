@@ -114,6 +114,7 @@ Future<void> main() async {
           demoLibrary.id: demoLibrary,
         }),
         issuesProvider.overrideWithValue(const []),
+        toSortProvider.overrideWithValue(const []),
       ],
     ],
   );

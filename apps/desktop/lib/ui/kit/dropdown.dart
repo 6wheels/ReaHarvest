@@ -66,7 +66,8 @@ class _DropdownState<T> extends State<Dropdown<T>> {
           onTap: () =>
               controller.isOpen ? controller.close() : controller.open(),
           child: InputDecorator(
-            isEmpty: value == null,
+            // A null value can be an option of its own (e.g. "No status").
+            isEmpty: value == null && !options.containsKey(null),
             isFocused: controller.isOpen,
             decoration: InputDecoration(
               labelText: widget.label,

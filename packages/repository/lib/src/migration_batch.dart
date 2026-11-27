@@ -9,8 +9,8 @@ import 'mounted_folder_storage.dart';
 import 'undo.dart';
 
 /// Outcome of a batch of migration fixes: its [report] (library paths), the
-/// targets of the fixes applied, to add to the known values, and whether it
-/// was cancelled.
+/// targets of the fixes applied (files attached to a title aside), to add to
+/// the known values, and whether it was cancelled.
 typedef BatchResult = ({
   Report report,
   List<String> knownPaths,
@@ -50,7 +50,11 @@ Future<BatchResult> runMigrationBatch(
   var report = const Report();
   BatchResult result({required bool cancelled}) => (
     report: report,
-    knownPaths: [for (final f in applied) f.target],
+    // A file attached to a title moves no folder.
+    knownPaths: [
+      for (final f in applied)
+        if (f is! AttachFile) f.target,
+    ],
     cancelled: cancelled,
   );
   void checkCancelled() {

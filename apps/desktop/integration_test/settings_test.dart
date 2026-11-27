@@ -60,7 +60,12 @@ void main() {
     expect(find.text(band), findsOne);
     expect(find.text('Classic'), findsOne);
     await tapText(tester, 'Create library');
-    await waitForText(tester, 'Libraries scanned · 1');
+    // The library scanned, under the title of the report.
+    await waitFor(
+      tester,
+      () => find.textContaining(' — $band').evaluate().isNotEmpty,
+      reason: 'scan report',
+    );
     await tapText(tester, 'Close');
 
     // REAPER: detected application, default resource folder and templates.

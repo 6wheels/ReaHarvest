@@ -74,6 +74,7 @@ final class BackgroundTask {
     this.quiet = false,
     this.cancellable = true,
     this.step,
+    this.subject,
   });
 
   final int id;
@@ -109,6 +110,10 @@ final class BackgroundTask {
   /// Current sub-step of a running task, if it tells it.
   final String Function(AppLocalizations l10n)? step;
 
+  /// What the task works on, shown under the title of its report (SPEC
+  /// §5.2): the name and path of each library scanned, one per line.
+  final String? subject;
+
   bool get isRunning => state == TaskState.running;
 
   bool get isQueued => state == TaskState.queued;
@@ -139,6 +144,7 @@ final class BackgroundTask {
     quiet: quiet,
     cancellable: cancellable,
     step: step,
+    subject: subject,
   );
 
   /// This task at the sub-step [step], with an unknown progress.
@@ -153,6 +159,7 @@ final class BackgroundTask {
         quiet: quiet,
         cancellable: cancellable,
         step: step,
+        subject: subject,
       );
 }
 
@@ -185,7 +192,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
   /// cancelled while queued, it ends at once and [body] never runs. A
   /// [foreground] task blocks the interface in a popup while it waits and
   /// runs ([ForegroundTaskHost]). A task not [cancellable] can only be
-  /// cancelled while queued.
+  /// cancelled while queued. Its report shows [subject] under its title.
   Future<T?> run<T>(
     String Function(AppLocalizations l10n) label,
     Future<T> Function(TaskControl task) body, {
@@ -194,6 +201,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
     bool quiet = false,
     bool cancellable = true,
     LibraryId? library,
+    String? subject,
   }) async {
     final id = _next++;
     _cancels[id] = Completer<void>();
@@ -207,6 +215,7 @@ class TasksNotifier extends Notifier<List<BackgroundTask>> {
         foreground: foreground,
         quiet: quiet,
         cancellable: cancellable,
+        subject: subject,
       ),
     ];
     if (library == null) return _execute(id, body);

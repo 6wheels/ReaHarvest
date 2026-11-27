@@ -22,7 +22,9 @@ void main() {
   tearDown(() => h.dispose());
 
   const title = 'A fix was interrupted';
-  const tooDeep = 'PROJECTS BELOW A VERSION FOLDER · 1';
+
+  /// The issue line of the title card in "To sort" (#149).
+  const tooDeep = 'Projects below a version folder · 1';
   final ballad = OrganizeTitle('Live/Ballad', 'Artist/Live/Ballad', [
     const FixVersion('Live/Ballad/v1/v1.rpp', folder: 'v1', label: 'v1'),
   ], level: 'title');

@@ -35,12 +35,15 @@ String? proposeStatus(Map<String, String> statusLabels, String folder) {
 /// name; folder named after its label; owner from its member subfolder,
 /// else from the node files, when the library declares members; status
 /// from its status subfolder through [statusLabels] ([proposeStatus]), else
-/// from the node files.
+/// from the node files. Without [moveAncestors], the moves of the misplaced
+/// ancestors of the candidate are left out of its target: only its own
+/// move is made ([proposedMoves]).
 MigrationFix proposeFix(
   ScanCandidate candidate,
   Library library, {
   Map<String, NodeFile> nodes = const {},
   Map<String, String> statusLabels = const {},
+  bool moveAncestors = true,
 }) {
   final layout = library.layout!;
   final root = candidate.root;
@@ -76,21 +79,94 @@ MigrationFix proposeFix(
       titleFolder: false,
     );
   }
-  // The deepest move first: those of its ancestors keep its place in them.
-  final moves = [
+  var target = root;
+  for (final item in proposedMoves(candidate)) {
+    if (!moveAncestors && item.path != root) continue;
+    if (target == item.path || isWithin(target, item.path)) {
+      target = '${item.target}${target.substring(item.path.length)}';
+    }
+  }
+  return OrganizeTitle(root, target, versions, level: level);
+}
+
+/// Moves of the folder of [candidate] and of its misplaced ancestors that
+/// make its target (SPEC §5.8 step 4), the deepest first (those of its
+/// ancestors keep its place in them): each item a folder and its target. A
+/// move whose folder is above the candidate root is the move of an
+/// ancestor, which the user may leave out ([proposeFix]).
+List<ReportItem> proposedMoves(ScanCandidate candidate) {
+  final root = candidate.root;
+  final issues = candidate.issues.items;
+  if (issues.containsKey(ReportKind.projectTooShallow)) return const [];
+  return [
     for (final kind in [ReportKind.titleTooHigh, ReportKind.misplacedLevel])
       for (final item in issues[kind] ?? const <ReportItem>[])
         if (item.target != null &&
             (root == item.path || isWithin(root, item.path)))
           item,
   ]..sort((a, b) => b.path.length.compareTo(a.path.length));
-  var target = root;
-  for (final item in moves) {
-    if (target == item.path || isWithin(target, item.path)) {
-      target = '${item.target}${target.substring(item.path.length)}';
-    }
+}
+
+/// Values suggested for the layout level below the folders [parents] of
+/// [library] (SPEC §5.8 step 4): its known values there and the folders at
+/// that place of its indexed [titles] (titles of other libraries and titles
+/// out of the layout depth left out), each once ignoring case, in its first
+/// spelling, sorted.
+List<String> levelSuggestions(
+  Library library,
+  List<Title> titles,
+  List<String> parents,
+) {
+  final layout = library.layout;
+  if (layout == null || parents.length >= layout.levels.length) return [];
+  var known = library.knownValues;
+  for (final name in parents) {
+    known =
+        known
+            .where((v) => v.value.toLowerCase() == name.toLowerCase())
+            .firstOrNull
+            ?.children ??
+        const [];
   }
-  return OrganizeTitle(root, target, versions, level: level);
+  final values = <String, String>{};
+  void add(String value) =>
+      values.putIfAbsent(value.toLowerCase(), () => value);
+  for (final v in known) {
+    add(v.value);
+  }
+  final depth = parents.length;
+  for (final t in titles) {
+    if (t.libraryId != library.id) continue;
+    final segments = t.path.split('/');
+    if (segments.length != layout.levels.length) continue;
+    var under = true;
+    for (var i = 0; i < depth && under; i++) {
+      under = segments[i].toLowerCase() == parents[i].toLowerCase();
+    }
+    if (under) add(segments[depth]);
+  }
+  return values.values.toList()
+    ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+}
+
+/// Path of the title of [layout] named by the folder [values] (one per
+/// level, trimmed; an empty intermediate value is `_Unassigned`), the
+/// target of a project moved (SPEC §5.8 step 4); null if a value cannot
+/// name a folder ([isValidFolderName], reserved names aside) or the title
+/// name is empty.
+String? layoutTarget(Layout layout, List<String> values) {
+  if (values.length != layout.levels.length) return null;
+  final folders = [
+    for (final (i, v) in values.indexed)
+      switch (v.trim()) {
+        '' when i < values.length - 1 => Layout.unassigned,
+        final name => name,
+      },
+  ];
+  if (folders.any((f) => !isValidFolderName(f) || isReservedFolder(f))) {
+    return null;
+  }
+  return folders.join('/');
 }
 
 FixVersion _version(

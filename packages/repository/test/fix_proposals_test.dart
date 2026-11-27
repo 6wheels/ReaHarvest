@@ -226,33 +226,125 @@ organizeTitle Artist/Album/Song -> Artist/Album/Song
 
     test('the moves of a title and of its ancestors are composed', () {
       final layout = Layout.classic();
-      final fix = proposeFix(
-        ScanCandidate(
-          root: 'Jazz/Song',
-          versions: [
-            Version(fileName: 'v.rpp', modified: DateTime(2020), size: 0),
+      final candidate = ScanCandidate(
+        root: 'Jazz/Song',
+        versions: [
+          Version(fileName: 'v.rpp', modified: DateTime(2020), size: 0),
+        ],
+        issues: Report({
+          ReportKind.titleTooHigh: [
+            ReportItem.misplaced(
+              'Jazz/Song',
+              level: layout.leaf,
+              target: 'Jazz/_Unassigned/Song',
+            ),
           ],
-          issues: Report({
-            ReportKind.titleTooHigh: [
-              ReportItem.misplaced(
-                'Jazz/Song',
-                level: layout.leaf,
-                target: 'Jazz/_Unassigned/Song',
-              ),
-            ],
-            ReportKind.misplacedLevel: [
-              ReportItem.misplaced(
-                'Jazz',
-                level: layout.levels.first,
-                target: 'Rock',
-              ),
-            ],
-          }),
-        ),
-        _library(),
+          ReportKind.misplacedLevel: [
+            ReportItem.misplaced(
+              'Jazz',
+              level: layout.levels.first,
+              target: 'Rock',
+            ),
+          ],
+        }),
       );
+      final fix = proposeFix(candidate, _library());
 
       expect(fix.target, 'Rock/_Unassigned/Song');
+      expect(
+        [for (final m in proposedMoves(candidate)) '${m.path} -> ${m.target}'],
+        ['Jazz/Song -> Jazz/_Unassigned/Song', 'Jazz -> Rock'],
+      );
+      // The move of the ancestor left out.
+      expect(
+        proposeFix(candidate, _library(), moveAncestors: false).target,
+        'Jazz/_Unassigned/Song',
+      );
+    });
+
+    test('a candidate above the title level has no move to compose', () {
+      final candidate = ScanCandidate(
+        root: 'Artist',
+        versions: [
+          Version(fileName: 'song.rpp', modified: DateTime(2020), size: 0),
+        ],
+        issues: Report({
+          ReportKind.projectTooShallow: [
+            ReportItem.misplaced(
+              'Artist/song.rpp',
+              level: Layout.classic().leaf,
+            ),
+          ],
+        }),
+      );
+      expect(proposedMoves(candidate), isEmpty);
+    });
+  });
+
+  group('levelSuggestions', () {
+    Title title(String path, {LibraryId library = _lib}) => Title(
+      id: NodeId(path),
+      libraryId: library,
+      path: path,
+      levels: const {},
+    );
+
+    test('known values and the folders of the indexed titles', () {
+      final titles = [
+        title('Artist/Album/Song'),
+        title('artist/Live/Tune'),
+        title('Other/Album/Song'),
+        // Placed too high, or of another library: left out.
+        title('Artist/Lonely'),
+        title('Artist/Elsewhere/Song', library: const LibraryId('L2')),
+      ];
+      final library = _library();
+
+      expect(levelSuggestions(library, titles, const []), ['Artist', 'Other']);
+      expect(levelSuggestions(library, titles, const ['ARTIST']), [
+        'Album',
+        'Live',
+      ]);
+      expect(levelSuggestions(library, titles, const ['Artist', 'Album']), [
+        'Song',
+      ]);
+      expect(levelSuggestions(library, titles, const ['Nobody']), isEmpty);
+      // No level below the title.
+      expect(
+        levelSuggestions(library, titles, const ['Artist', 'Album', 'Song']),
+        isEmpty,
+      );
+    });
+
+    test('nothing for a free tree', () {
+      final free = Library(id: _lib, mode: LibraryMode.local, layout: null);
+      expect(levelSuggestions(free, [title('a/b')], const []), isEmpty);
+    });
+  });
+
+  group('layoutTarget', () {
+    final layout = Layout.classic();
+
+    test('joins the values, a missing level unassigned', () {
+      expect(
+        layoutTarget(layout, const [' Artist ', 'Album', 'Song']),
+        'Artist/Album/Song',
+      );
+      expect(
+        layoutTarget(layout, const ['Artist', '', 'Song']),
+        'Artist/_Unassigned/Song',
+      );
+    });
+
+    test('refuses a missing title or a value that cannot name a folder', () {
+      for (final values in const [
+        ['Artist', 'Album', ''],
+        ['Artist', 'A/B', 'Song'],
+        ['Artist', 'Assets', 'Song'],
+        ['Artist', 'Song'],
+      ]) {
+        expect(layoutTarget(layout, values), isNull, reason: '$values');
+      }
     });
   });
 }

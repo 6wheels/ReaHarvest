@@ -430,18 +430,14 @@ void main() {
   group('report', () {
     test('sorts non-empty sections by level, then kind', () {
       final report = Report({
-        ReportKind.libraryScanned: [const ReportItem('/a')],
+        ReportKind.folderMoved: [const ReportItem('/a')],
         ReportKind.projectTooShallow: const [],
         ReportKind.orphanNode: [const ReportItem('/a/.node.json')],
         ReportKind.scanFailed: [const ReportItem('/b', 'boom')],
       });
       expect(
         [for (final (kind, _) in report.sections) kind],
-        [
-          ReportKind.scanFailed,
-          ReportKind.orphanNode,
-          ReportKind.libraryScanned,
-        ],
+        [ReportKind.scanFailed, ReportKind.orphanNode, ReportKind.folderMoved],
       );
       expect(report.hasErrors, isTrue);
       expect(report.hasWarnings, isTrue);
@@ -450,7 +446,7 @@ void main() {
         report.toString(),
         'scanFailed (1)\n  /b: boom\n'
         'orphanNode (1)\n  /a/.node.json\n'
-        'libraryScanned (1)\n  /a',
+        'folderMoved (1)\n  /a',
       );
     });
 

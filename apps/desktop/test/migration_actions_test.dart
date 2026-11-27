@@ -30,75 +30,61 @@ void main() {
   setUpLibraryEnv();
   final en = lookupAppLocalizations(const Locale('en'));
 
-  test('deletes only node files of folders without project', () async {
-    final band = folder('Band');
-    final song = p.join(band, 'Artist', 'Album', 'Song');
-    Directory(song).createSync(recursive: true);
-    File('../../test/fixtures/tracks.rpp').copySync(p.join(song, 'v1.rpp'));
-    final orphan = File(p.join(band, 'Artist', 'render', '.node.json'))
-      ..createSync(recursive: true)
-      ..writeAsStringSync('{"nodeId": "01X", "level": "album"}');
-    await catalog.addLocal(
-      folder: band,
-      displayName: '',
-      layout: Layout.classic(),
-    );
-    final id = container.read(settingsProvider).libraries.single.id;
-    expect(index.issues(kind: ReportKind.orphanNode), [
-      (
-        library: id,
-        kind: ReportKind.orphanNode,
-        item: const ReportItem('Artist/render/.node.json'),
-      ),
-    ]);
+  test(
+    'attaches an orphan node file to the Unsorted folder of a title',
+    () async {
+      final band = folder('Band');
+      final song = p.join(band, 'Artist', 'Album', 'Song');
+      Directory(song).createSync(recursive: true);
+      File('../../test/fixtures/tracks.rpp').copySync(p.join(song, 'v1.rpp'));
+      final orphan = File(p.join(band, 'Artist', 'render', '.node.json'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{"nodeId": "01X", "level": "album"}');
+      await catalog.addLocal(
+        folder: band,
+        displayName: '',
+        layout: Layout.classic(),
+      );
+      final id = container.read(settingsProvider).libraries.single.id;
+      expect(index.issues(kind: ReportKind.orphanNode), [
+        (
+          library: id,
+          kind: ReportKind.orphanNode,
+          item: const ReportItem('Artist/render/.node.json'),
+        ),
+      ]);
+      const fix = AttachFile('Artist/render/.node.json', 'Artist/Album/Song');
 
-    await expectLater(
-      migration.deleteOrphanNode(id, 'Artist/Album/Song/.node.json'),
-      throwsArgumentError,
-    );
-    await expectLater(
-      migration.deleteOrphanNode(id, 'Artist/Album/Song/v1.rpp'),
-      throwsArgumentError,
-    );
-    await migration.deleteOrphanNode(id, 'Artist/render/.node.json');
+      // The preview writes nothing.
+      final plans = await migration.preview(id, [fix]).plans;
+      expect(
+        [for (final op in plans[fix.path]!.operations) '$op'],
+        [
+          'create Artist/Album/Song/Unsorted/',
+          'move Artist/render/.node.json -> Artist/Album/Song/Unsorted/.node.json',
+        ],
+      );
+      expect(orphan.existsSync(), isTrue);
 
-    expect(orphan.existsSync(), isFalse);
-    expect(index.issues(kind: ReportKind.orphanNode), isEmpty);
-    expect(File(p.join(song, '.node.json')).existsSync(), isTrue);
-  });
+      final report = await migration.fix(id, [fix]);
 
-  test('checks an orphan node file again in the turn of its library', () async {
-    final band = folder('Band');
-    File(p.join(band, 'Artist', 'Album', 'Song', '.node.json'))
-      ..createSync(recursive: true)
-      ..writeAsStringSync('{"nodeId": "01X", "level": "title"}');
-    await catalog.addLocal(
-      folder: band,
-      displayName: '',
-      layout: Layout.classic(),
-    );
-    final entry = container.read(settingsProvider).libraries.single;
-    const path = 'Artist/Album/Song/.node.json';
-    expect(index.issues(kind: ReportKind.orphanNode).map((i) => i.item.path), [
-      path,
-    ]);
-
-    // A change asked before gives its folder a project: not deleted.
-    final hold = Completer<void>();
-    final turns = container.read(libraryTurnsProvider);
-    final holding = turns.run(entry.id, () async {
-      await hold.future;
-      File('../../test/fixtures/tracks.rpp')
-          .copySync(p.join(band, 'Artist', 'Album', 'Song', 'v1.rpp'));
-      await scans.scan(entry);
-    });
-    final deleting = migration.deleteOrphanNode(entry.id, path);
-    hold.complete();
-    await holding;
-
-    await expectLater(deleting, throwsArgumentError);
-    expect(File(p.join(band, path)).existsSync(), isTrue);
-  });
+      expect(report!.items[ReportKind.fileUnsorted], [
+        ReportItem(
+          p.join(song, 'Unsorted', '.node.json'),
+          'Artist/render/.node.json',
+        ),
+      ]);
+      expect(orphan.existsSync(), isFalse);
+      expect(File(p.join(song, 'Unsorted', '.node.json')).existsSync(), isTrue);
+      expect(index.issues(kind: ReportKind.orphanNode), isEmpty);
+      expect(index.titles().single.path, 'Artist/Album/Song');
+      // No known value from a file attached.
+      expect(
+        (await readLibrary(MountedFolderStorage(band)))!.knownValues,
+        isEmpty,
+      );
+    },
+  );
 
   test('organizes a title, keeping the date of its projects', () async {
     final song = await bandWithSong();

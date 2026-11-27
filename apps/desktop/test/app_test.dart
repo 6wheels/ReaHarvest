@@ -248,12 +248,21 @@ class FakeVersionActions extends VersionActions {
 class FakeMigrationActions extends MigrationActions {
   FakeMigrationActions(super.ref);
 
-  final orphansDeleted = <String>[];
+  final fixed = <(LibraryId, List<MigrationFix>)>[];
 
   @override
-  Future<void> deleteOrphanNode(LibraryId library, String path) async {
-    if (path.startsWith('locked/')) throw StateError('locked');
-    orphansDeleted.add(path);
+  PlanPreview preview(LibraryId library, List<MigrationFix> fixes) => (
+    plans: Future.value({
+      for (final f in fixes)
+        f.path: (operations: const <MediaOperation>[], blocked: const Report()),
+    }),
+    cancel: () async {},
+  );
+
+  @override
+  Future<Report?> fix(LibraryId library, List<MigrationFix> fixes) async {
+    fixed.add((library, fixes));
+    return const Report();
   }
 }
 
@@ -299,6 +308,7 @@ void main() {
     NavigationSettings navigation = const NavigationSettings(),
     String language = 'en',
     List<LibraryIssue> issues = const [],
+    List<ToSortLibrary> toSort = const [],
     List<LibraryEntry> configured = const [band],
     Map<LibraryId, Library>? indexed,
     Map<String, List<Backup>> history = const {},
@@ -335,6 +345,7 @@ void main() {
             indexed ?? {demoLibrary.id: demoLibrary},
           ),
           issuesProvider.overrideWithValue(issues),
+          toSortProvider.overrideWithValue(toSort),
           titleFiguresProvider.overrideWith(
             (ref, title) => figuresOf(title, const []),
           ),
@@ -2018,110 +2029,75 @@ void main() {
     expect(find.text('Deleted permanently'), findsOne);
   });
 
-  testWidgets('groups the issues by kind, without fix until #149', (
+  testWidgets('opens the title cards of To sort from its counter', (
     tester,
   ) async {
-    const other = LibraryId('L2');
     const title = LayoutLevel('title');
-    LibraryIssue issue(LibraryId library, ReportKind kind, ReportItem item) =>
-        (library: library, kind: kind, item: item);
+    final library = Library(
+      id: band.id,
+      mode: LibraryMode.local,
+      layout: Layout.classic(),
+    );
     await pumpApp(
       tester,
       titles: demoTitles(),
-      indexed: {
-        band.id: demoLibrary,
-        other: demoLibrary,
-        demoLibrary.id: demoLibrary,
-      },
       issues: [
-        issue(
-          band.id,
-          ReportKind.projectTooDeep,
-          const ReportItem.misplaced(
-            'Artist/Album/Song/Alice/mix/a.rpp',
+        (
+          library: band.id,
+          kind: ReportKind.titleTooHigh,
+          item: const ReportItem.misplaced(
+            'Artist/Old',
             level: title,
-            target: 'Artist/Album/Song',
+            target: 'Artist/_Unassigned/Old',
           ),
         ),
-        // In the library of the demo titles, for the autocompletion.
-        issue(
-          demoLibrary.id,
-          ReportKind.projectTooShallow,
-          const ReportItem.misplaced('loose.rpp', level: title),
-        ),
-        issue(
-          band.id,
-          ReportKind.titleTooHigh,
-          const ReportItem.misplaced(
-            'Old',
-            level: title,
-            target: '_Unassigned/_Unassigned/Old',
+      ],
+      toSort: [
+        (
+          entry: band,
+          library: library,
+          scan: ScanResult(
+            candidates: [
+              ScanCandidate(
+                root: 'Artist/Old',
+                versions: [
+                  Version(
+                    fileName: 'v1/v1.rpp',
+                    modified: DateTime(2026),
+                    size: 0,
+                  ),
+                ],
+                issues: const Report({
+                  ReportKind.titleTooHigh: [
+                    ReportItem.misplaced(
+                      'Artist/Old',
+                      level: title,
+                      target: 'Artist/_Unassigned/Old',
+                    ),
+                  ],
+                }),
+              ),
+            ],
           ),
         ),
-        issue(
-          other,
-          ReportKind.duplicateVersionId,
-          const ReportItem('A/B/C/x.rpp', 'id'),
-        ),
-        issue(band.id, ReportKind.corrupted, const ReportItem('A/bad.rpp')),
       ],
     );
-    await tester.tap(find.text('TO SORT // 5'));
+    await tester.tap(find.text('TO SORT // 1'));
     await tester.pumpAndSettle();
 
-    expect(find.text('PROJECTS BELOW A VERSION FOLDER · 1'), findsOne);
-    expect(find.text('UNREADABLE FILES · 1'), findsOne);
-    expect(find.text('Band · Artist/Album/Song/Alice/mix'), findsOne);
-    expect(find.text('Expected: Title'), findsWidgets);
-    expect(find.text('Proposed place: Artist/Album/Song'), findsOne);
     expect(find.text('Old'), findsOne);
-    expect(find.text('Fix…'), findsNothing);
-    expect(find.text('Move…'), findsNothing);
-
-    final hint = find.text('Open the title to make each copy a new version.');
-    await tester.scrollUntilVisible(hint, 200);
-    // The second library has no configured name.
-    expect(find.text('A/B/C'), findsOne);
+    expect(find.text('Titles placed too high · 1'), findsOne);
+    await tester.tap(find.text('Fix…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fix 1 item').last);
+    await tester.pumpAndSettle();
+    expect('${migration.fixed.single.$2.single}', '''
+organizeTitle Artist/Old -> Artist/_Unassigned/Old
+  Artist/Old/v1/v1.rpp -> v1, v1''');
 
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Old'), findsNothing);
-  });
-
-  testWidgets('lists and deletes node files without project', (tester) async {
-    LibraryIssue orphan(String path) =>
-        (library: band.id, kind: ReportKind.orphanNode, item: ReportItem(path));
-    await pumpApp(
-      tester,
-      titles: demoTitles(),
-      issues: [
-        orphan('Artist/render/.node.json'),
-        orphan('locked/sub/.node.json'),
-      ],
-    );
-    await tester.tap(find.text('TO SORT // 2'));
-    await tester.pumpAndSettle();
-    expect(find.text('REAHARVEST FILES WITHOUT PROJECT · 2'), findsOne);
-    expect(find.text('render'), findsOne);
-    expect(find.text('Artist'), findsWidgets);
-
-    await tester.tap(find.text('Delete this file').first);
-    await tester.pumpAndSettle();
-    expect(find.text('Delete this ReaHarvest file?'), findsOne);
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Delete this file').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete this file').last);
-    await tester.pumpAndSettle();
-    expect(migration.orphansDeleted, ['Artist/render/.node.json']);
-
-    await tester.tap(find.text('Delete this file').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete this file').last);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('The operation failed'), findsOne);
   });
 
   testWidgets('uses French when chosen', (tester) async {

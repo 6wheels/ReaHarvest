@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_library/reaharvest_library.dart';
 import 'package:reaharvest_reaper/reaharvest_reaper.dart';
+import 'package:reaharvest_repository/reaharvest_repository.dart'
+    show FixVersion;
 import 'package:window_manager/window_manager.dart';
 
 import 'app_window.dart';
@@ -34,7 +36,10 @@ import 'ui/tasks_zone.dart';
 import 'ui/title_card.dart';
 import 'ui/title_views.dart' show TitleList, TitleTree;
 import 'ui/to_sort/fix_dialog.dart' show Choice;
+import 'ui/to_sort/candidate_card.dart';
+import 'ui/to_sort/outside_file.dart';
 import 'ui/to_sort/to_sort_item.dart';
+import 'ui/to_sort/version_fields.dart';
 
 /// Heights of the controls bar and of the accent presets bar, width of the
 /// sliders of the controls.
@@ -72,6 +77,21 @@ List<Override> showcaseOverrides() => [
   ),
   reaperExecutableProvider.overrideWith((ref) async => null),
   tasksProvider.overrideWith(_ShowcaseTasks.new),
+];
+
+/// Statuses of the "To sort" specimens.
+const _showcaseStatuses = {
+  'idea': 'Idea',
+  'writing': 'Writing',
+  'recording': 'Recording',
+  'mixing': 'Mixing',
+  'done': 'Done',
+};
+
+/// Members of the "To sort" specimens.
+const _showcaseMembers = [
+  Member(MemberId('alice'), 'Alice'),
+  Member(MemberId('bob'), 'Bob'),
 ];
 
 /// Ids of the sections, in display order: one golden image set per id.
@@ -195,7 +215,6 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   // Local state of the interactive specimens.
   bool _checked = true;
   bool _filterActive = true;
-  final _selectedItems = {0};
   String _choice = 'b';
   String _row = 'a';
   String? _owner;
@@ -1176,7 +1195,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             ),
           ),
           _Specimen(
-            'LevelField — autocomplete / compact (tag) / error',
+            'LevelField — new value / compact (tag) / error',
             width: 480,
             child: Column(
               spacing: Space.m,
@@ -1186,6 +1205,7 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                   controller: _levelController,
                   options: () => const ['Sample Artist', 'Other Artist'],
                   error: null,
+                  newValueHint: 'This level will be created',
                   onChanged: () {},
                 ),
                 SizedBox(
@@ -1224,36 +1244,63 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
       ),
       _Section('to_sort', 'To sort & previews', '', [
         _Specimen(
-          'To sort list — click a strip to select it',
-          width: 640,
+          'CandidateCard — composed moves, versions, same status, Force',
+          width: 680,
+          child: const _CandidateCardSpecimen(),
+        ),
+        _Specimen(
+          'CandidateCard — attach, one status per version, errors',
+          width: 680,
+          child: CandidateCard(
+            title: 'Copper Sky',
+            subtitle: 'Sample Artist/Album 1',
+            issues: const ['Versions of another title, moved by hand · 1'],
+            fix: 'Attach the versions to the title Sample Artist/Album 2/Copper Sky',
+            statuses: _showcaseStatuses,
+            onSameStatus: (_) {},
+            force: true,
+            onForce: (_) {},
+            selected: false,
+            onSelected: (_) {},
+            versions: [
+              VersionFields(
+                project: 'take/take.rpp',
+                version: const FixVersion(
+                  'Sample Artist/Album 1/Copper Sky/take/take.rpp',
+                  folder: 'Assets',
+                  label: '',
+                  status: 'recording',
+                ),
+                statuses: _showcaseStatuses,
+                onChanged: (_) {},
+              ),
+            ],
+          ),
+        ),
+        _Specimen(
+          'OutsideFile — attach to a title / Item without action',
+          width: 680,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SectionLabel('Title too high · 3'),
-              for (final (i, name) in [
-                'Paper Boats',
-                'Copper Sky',
-                'A project folder with a really long name that must be cut',
-              ].indexed)
-                Item(
-                  title: name,
-                  subtitle: 'Sample Artist/$name',
-                  details: const [
-                    'Expected level: album',
-                    'Proposed: _Unassigned/Album 1',
-                  ],
-                  selected: _selectedItems.contains(i),
-                  onSelected: (on) => setState(
-                    () => on ? _selectedItems.add(i) : _selectedItems.remove(i),
-                  ),
-                  action: OutlinedButton(
-                    onPressed: () {},
-                    child: const Text('Move…'),
-                  ),
-                ),
+              SectionLabel('Files outside any title · 2'),
+              OutsideFile(
+                path: 'Sample Artist/cover.jpg',
+                titles: const [
+                  'Sample Artist/Album 1/Copper Sky',
+                  'Sample Artist/Album 1/Paper Boats',
+                ],
+                onAttach: (_) {},
+              ),
+              OutsideFile(
+                path: 'Old/.node.json',
+                library: 'Archive',
+                titles: const ['Sample Artist/Album 1/Copper Sky'],
+                onAttach: (_) {},
+              ),
               const SizedBox(height: Space.m),
-              const SectionLabel('Scan failed · 1'),
-              const Item(title: 'Loose project.RPP', subtitle: 'Inbox'),
+              const SectionLabel('Unreadable files · 1'),
+              const Item(title: 'broken.rpp', subtitle: 'Slow Tide'),
             ],
           ),
         ),
@@ -1668,5 +1715,72 @@ class _LockedZone extends StatelessWidget {
         Positioned.fill(child: GlassPane(AlwaysStoppedAnimation(1))),
       ],
     ),
+  );
+}
+
+/// The interactive card of the "To sort" section, with its own state: a
+/// change rebuilds the card only, not the whole showcase.
+class _CandidateCardSpecimen extends StatefulWidget {
+  const _CandidateCardSpecimen();
+
+  @override
+  State<_CandidateCardSpecimen> createState() => _CandidateCardSpecimenState();
+}
+
+class _CandidateCardSpecimenState extends State<_CandidateCardSpecimen> {
+  bool _cardSelected = true;
+  bool _cardAncestors = true;
+  bool _cardSameStatus = true;
+  String? _cardStatus = 'mixing';
+  bool _cardForce = false;
+  final _cardVersions = [
+    const FixVersion(
+      'Jazz/Paper Boats/Alice/take 1.rpp',
+      folder: 'take 1',
+      label: 'take 1',
+      owner: MemberId('alice'),
+    ),
+    const FixVersion(
+      'Jazz/Paper Boats/mix.rpp',
+      folder: 'mix',
+      label: 'Final mix',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) => CandidateCard(
+    title: 'Paper Boats',
+    subtitle: 'Jazz',
+    issues: const [
+      'Titles placed too high · 1',
+      'Folders at the wrong level · 1',
+      'Member subfolders · 1',
+    ],
+    fix: 'Organize into version folders at Rock/_Unassigned/Paper Boats',
+    moves: const ['Move Jazz/Paper Boats → Jazz/_Unassigned/Paper Boats'],
+    ancestorMove: 'Move Jazz → Rock',
+    moveAncestors: _cardAncestors,
+    onMoveAncestors: (on) => setState(() => _cardAncestors = on),
+    selected: _cardSelected,
+    onSelected: (on) => setState(() => _cardSelected = on),
+    statuses: _showcaseStatuses,
+    sameStatus: _cardSameStatus,
+    onSameStatus: (on) => setState(() => _cardSameStatus = on),
+    status: _cardStatus,
+    onStatus: (s) => setState(() => _cardStatus = s),
+    force: _cardForce,
+    onForce: (on) => setState(() => _cardForce = on),
+    versions: [
+      for (final (i, v) in _cardVersions.indexed)
+        VersionFields(
+          key: ValueKey(v.source),
+          project: v.source.substring('Jazz/Paper Boats/'.length),
+          version: v,
+          members: _showcaseMembers,
+          statuses: _cardSameStatus ? null : _showcaseStatuses,
+          onChanged: (changed) => setState(() => _cardVersions[i] = changed),
+          onMove: () {},
+        ),
+    ],
   );
 }

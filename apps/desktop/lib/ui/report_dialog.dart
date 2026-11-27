@@ -9,10 +9,18 @@ import 'layout_labels.dart';
 /// Width of the dialog.
 const _width = 600.0;
 
-/// Shows [report] of the action [title] (SPEC §5.2): one section per kind of
-/// outcome, problems first and expanded, each item with its path.
-Future<void> showReport(BuildContext context, String title, Report report) =>
-    showGlassDialog(context, (context) => _ReportDialog(title, report));
+/// Shows [report] of the action [title] (SPEC §5.2), what it worked on
+/// ([subject], e.g. the library scanned) under its title: one section per
+/// kind of outcome, problems first, all collapsed, each item with its path.
+Future<void> showReport(
+  BuildContext context,
+  String title,
+  Report report, {
+  String? subject,
+}) => showGlassDialog(
+  context,
+  (context) => _ReportDialog(title, report, subject),
+);
 
 String _expectedLevelText(AppLocalizations l10n, LayoutLevel level) =>
     '\n${l10n.reportExpectedLevel(layoutLevelLabel(l10n, level))}';
@@ -28,6 +36,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.targetExists => l10n.reportTargetExists,
       ReportKind.folderMoved => l10n.reportFolderMoved,
       ReportKind.fileRenamed => l10n.reportFileRenamed,
+      ReportKind.fileUnsorted => l10n.reportFileUnsorted,
       ReportKind.titleTooHigh => l10n.reportTitleTooHigh,
       ReportKind.misplacedLevel => l10n.reportMisplacedLevel,
       ReportKind.unknownValue => l10n.reportUnknownValue,
@@ -42,6 +51,7 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.statusFolder => l10n.reportStatusFolder,
       ReportKind.duplicateVersionId => l10n.reportDuplicateVersionId,
       ReportKind.orphanNode => l10n.orphanNodesTitle,
+      ReportKind.fileOutsideTitle => l10n.reportFileOutsideTitle,
       ReportKind.mediaOutsideVersion => l10n.reportMediaOutsideVersion,
       ReportKind.missingMedia => l10n.reportMissingMedia,
       ReportKind.externalMedia => l10n.reportExternalMedia,
@@ -49,7 +59,6 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
       ReportKind.renderFileForm => l10n.reportRenderFileForm,
       ReportKind.referencedByPlugin => l10n.reportReferencedByPlugin,
       ReportKind.libraryUnavailable => l10n.reportLibraryUnavailable,
-      ReportKind.libraryScanned => l10n.reportLibraryScanned,
       ReportKind.projectMoved => l10n.reportProjectMoved,
       ReportKind.mediaMoved => l10n.reportMediaMoved,
       ReportKind.mediaCopied => l10n.reportMediaCopied,
@@ -58,10 +67,11 @@ String reportKindLabel(AppLocalizations l10n, ReportKind kind) =>
     };
 
 class _ReportDialog extends StatelessWidget {
-  const _ReportDialog(this.title, this.report);
+  const _ReportDialog(this.title, this.report, this.subject);
 
   final String title;
   final Report report;
+  final String? subject;
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +79,17 @@ class _ReportDialog extends StatelessWidget {
     final c = context.colors;
     final muted = context.type.caption.copyWith(color: c.muted);
     return AlertDialog(
-      title: Text(title),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title),
+          if (subject case final subject?)
+            Padding(
+              padding: const EdgeInsets.only(top: Space.xs),
+              child: SelectableText(subject, style: muted),
+            ),
+        ],
+      ),
       content: SizedBox(
         width: _width,
         child: report.isEmpty
@@ -80,9 +100,6 @@ class _ReportDialog extends StatelessWidget {
                   children: [
                     for (final (kind, items) in report.sections)
                       DisclosureTile(
-                        initiallyExpanded:
-                            kind.level == ReportLevel.error ||
-                            kind.level == ReportLevel.warning,
                         // The level as a light: blinking for an error, dark
                         // when skipped, steady otherwise; the sections are in
                         // the order of the levels.

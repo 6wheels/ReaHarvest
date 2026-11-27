@@ -51,6 +51,7 @@ final fixes = <String, MigrationFix>{
     'Band/New',
     level: 'title',
   ),
+  'file attachment': const AttachFile('Band/notes.txt', song),
 };
 
 void main() {
@@ -77,7 +78,8 @@ void main() {
     ..put('Band/Song/a.rpp', rpp([r'audio\x.wav']))
     ..put('Band/Song/audio/x.wav', 'x2')
     ..put('Band/loose.rpp', rpp([r'loose\l.wav']))
-    ..put('Band/loose/l.wav', 'l');
+    ..put('Band/loose/l.wav', 'l')
+    ..put('Band/notes.txt', 'notes');
 
   /// Every file outside `.migration/`, with its content and date.
   Map<String, (String, DateTime)> tree() => {
@@ -118,6 +120,8 @@ void main() {
       library();
       final result = await batch([fix], Reporter());
       expect(result.report.hasErrors, isFalse, reason: '${result.report}');
+      // A file attached to a title moves no folder: no known value.
+      expect(result.knownPaths, fix is AttachFile ? isEmpty : [fix.target]);
       done.addAll(storage.files.keys);
     }
 
@@ -129,6 +133,7 @@ void main() {
         'Band/Moved/Song/a/a.rpp',
         '$song/a/a.rpp',
         'Band/New/loose/loose.rpp',
+        '$song/Unsorted/notes.txt',
       ]),
     );
   });

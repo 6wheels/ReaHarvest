@@ -442,7 +442,13 @@ void main() {
       reason: 'report opened',
     );
     await adding;
-    expect(find.text('Titles placed too high · 1'), findsOne);
+    // Sections collapsed (#149): opened to read their items.
+    for (final section in [
+      'Titles placed too high · 1',
+      'Folders at the wrong level · 1',
+    ]) {
+      await tapText(tester, section);
+    }
     expect(find.textContaining('Proposed target: Artist/Album'), findsOne);
     expect(
       find.textContaining('Proposed target: _Unassigned/_Unassigned/Loose'),
@@ -505,7 +511,7 @@ void main() {
     );
     await adding;
     // Its report opens at the end of the launched action (#63).
-    expect(find.text('Libraries scanned · 1'), findsOne);
+    expect(find.textContaining(' — '), findsOne);
     await tapText(tester, 'Close');
 
     final cancelled = scans.scanAll();
@@ -526,10 +532,11 @@ void main() {
     expect(tasks().last.progress, 1);
 
     // The report of the startup-like scan waits in the tasks zone (#63).
-    expect(find.text('Libraries scanned · 2'), findsNothing);
+    expect(find.textContaining(' — '), findsNothing);
     await tester.tap(find.widgetWithText(TextButton, 'Report').last);
     await tester.pumpAndSettle();
-    expect(find.text('Libraries scanned · 2'), findsOne);
+    // Each library scanned under the title of the report.
+    expect(find.textContaining(' — '), findsOne);
     await tapText(tester, 'Close');
     await tapText(tester, 'TASKS // 4');
     expect(find.text('Scan of “Other”'), findsOne);
@@ -541,6 +548,5 @@ void main() {
     expect(log, contains('INFO tasks: Scan of “Other”: done'));
     expect(log, contains('WARNING tasks: Scan of the libraries: cancelled'));
     expect(log, contains('INFO tasks: Scan of the libraries: done'));
-    expect(log, contains('libraryScanned (2)'));
   });
 }

@@ -51,6 +51,8 @@ final class FixFacts {
     this.target,
     this.targetNames = const {},
     this.targetIds = const {},
+    this.unsortedFolder,
+    this.unsortedNames = const {},
   });
 
   /// Every entry of the folder of the fix (its candidate root, or the
@@ -78,10 +80,19 @@ final class FixFacts {
   /// Version ids of the projects of the target title, when it is another
   /// folder than the one of the fix.
   final Set<VersionId> targetIds;
+
+  /// For an [AttachFile]: path of the `Unsorted/` folder of the target
+  /// title (in any case), null if it has none.
+  final String? unsortedFolder;
+
+  /// For an [AttachFile]: lowercase names of the entries of
+  /// [unsortedFolder].
+  final Set<String> unsortedNames;
 }
 
-/// What a moved or copied file is, for the report.
-enum FileRole { media, proxy, project, folder }
+/// What a moved or copied file is, for the report: [unsorted] for a file
+/// found outside any title, moved into the `Unsorted/` folder of a title.
+enum FileRole { media, proxy, project, folder, unsorted }
 
 /// One operation of a [MediaPlan], applied in order.
 sealed class MediaOperation {
@@ -270,11 +281,62 @@ MediaPlanCounts countPlan(MediaPlan plan) {
 ///
 /// Nothing is planned if a project of the fix cannot be read: its media
 /// are unknown ([ReportKind.fixFailed]).
+///
+/// An [AttachFile] moves its file into the `Unsorted/` folder of its
+/// target title, created if missing, under a free `name (n)` variant of its
+/// name; nothing is planned ([ReportKind.fixFailed]) when the file is
+/// missing or a folder, when the target is not a title (no node file), when
+/// the file already lies in its `Unsorted/` folder, or when the title holds
+/// a file named `Unsorted`.
 MediaPlan planFix(
   MigrationFix fix,
   FixFacts facts, {
   Map<String, List<String>> usage = const {},
-}) => _Planner(fix, facts, usage).plan();
+}) => switch (fix) {
+  AttachFile() => _planAttach(fix, facts),
+  _ => _Planner(fix, facts, usage).plan(),
+};
+
+/// The plan of [fix] ([planFix]).
+MediaPlan _planAttach(AttachFile fix, FixFacts facts) {
+  MediaPlan failed(String detail) => (
+    operations: const [],
+    blocked: Report({
+      ReportKind.fixFailed: [ReportItem(fix.path, detail)],
+    }),
+  );
+  final source = facts.entries
+      .where((e) => e.path.toLowerCase() == fix.path.toLowerCase())
+      .firstOrNull;
+  if (source == null || source.isDirectory) {
+    return failed('No file at ${fix.path}');
+  }
+  final target = fix.target;
+  if (facts.target == null || !facts.targetNames.contains(nodeFileName)) {
+    return failed('No title at $target');
+  }
+  final existing = facts.unsortedFolder;
+  if (existing == null &&
+      facts.targetNames.contains(unsortedFolderName.toLowerCase())) {
+    return failed('A file named $unsortedFolderName is in $target');
+  }
+  final folder = existing ?? joinPath(target, unsortedFolderName);
+  if (isWithin(fix.path, folder)) return failed('Already in $folder');
+  final name = p.posix.basename(fix.path);
+  final stem = p.posix.basenameWithoutExtension(name);
+  final ext = p.posix.extension(name);
+  var free = name;
+  for (var i = 2; facts.unsortedNames.contains(free.toLowerCase()); i++) {
+    free = '$stem ($i)$ext';
+  }
+  return (
+    operations: [
+      if (existing == null) CreateFolder(folder),
+      MoveFile(fix.path, joinPath(folder, free), role: FileRole.unsorted),
+    ],
+    blocked: const Report(),
+  );
+}
 
 /// State of one [planFix].
 final class _Planner {

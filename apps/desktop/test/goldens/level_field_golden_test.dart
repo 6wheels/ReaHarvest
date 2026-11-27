@@ -12,7 +12,9 @@ void main() {
   final filled = TextEditingController(text: 'Sample Artist');
   final empty = TextEditingController();
   final compact = TextEditingController();
+  final created = TextEditingController(text: 'New Artist');
   tearDownAll(() {
+    created.dispose();
     filled.dispose();
     empty.dispose();
     compact.dispose();
@@ -27,6 +29,14 @@ void main() {
           controller: filled,
           options: () => const ['Sample Artist'],
           error: null,
+          onChanged: () {},
+        ),
+        LevelField(
+          label: 'Artist',
+          controller: created,
+          options: () => const ['Sample Artist'],
+          error: null,
+          newValueHint: 'This level will be created',
           onChanged: () {},
         ),
         LevelField(

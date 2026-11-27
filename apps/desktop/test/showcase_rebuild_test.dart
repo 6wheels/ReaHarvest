@@ -129,6 +129,34 @@ void main() {
     expect(tokens(), same(before));
   });
 
+  testWidgets('typing in a To sort card restarts no theme animation', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(1920, 1080)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: showcaseOverrides(),
+        child: const UiShowcaseApp(section: 'to_sort'),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    // A button rebuilt gives its AnimatedTheme a new ThemeData: it restarts
+    // an animation, which nests a lerp in the buttons' styles.
+    var animatedThemes = 0;
+    debugOnRebuildDirtyWidget = (element, builtOnce) {
+      if (element.widget is AnimatedTheme) animatedThemes++;
+    };
+    addTearDown(() => debugOnRebuildDirtyWidget = null);
+    await tester.enterText(find.byType(TextField).first, 'abc');
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byType(LightSwitch).first);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(animatedThemes, 0);
+  });
+
   testWidgets('what grows with use stays bounded', (tester) async {
     await _pumpShowcase(tester);
     final progress = _progressSlider();

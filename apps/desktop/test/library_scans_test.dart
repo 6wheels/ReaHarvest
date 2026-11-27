@@ -200,9 +200,10 @@ void main() {
     expect([for (final t in tasks) t.state], [TaskState.done, TaskState.done]);
     expect([for (final t in tasks) t.openReport], [true, false]);
     expect(tasks.last.progress, 1);
-    expect(tasks.first.report!.items[ReportKind.libraryScanned], [
-      ReportItem(folder('Band')),
-    ]);
+    // The library scanned under the title of the report, in no section.
+    expect(tasks.first.subject, 'Band — ${folder('Band')}');
+    expect(tasks.first.report!.isEmpty, isTrue);
+    expect(tasks.last.subject, 'Band — ${folder('Band')}\nGone — $gone');
     expect(tasks.last.report!.items[ReportKind.libraryUnavailable], [
       ReportItem(gone),
     ]);

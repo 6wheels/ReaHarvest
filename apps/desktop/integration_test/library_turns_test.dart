@@ -23,7 +23,8 @@ void main() {
 
   tearDown(() => h.dispose());
 
-  const wrongLevel = 'FOLDERS AT THE WRONG LEVEL · 1';
+  /// The issue line of the title card in "To sort" (#149).
+  const wrongLevel = 'Folders at the wrong level · 1';
 
   testWidgets(
     'a batch waits for the turn of its library, in its popup, cancellable',

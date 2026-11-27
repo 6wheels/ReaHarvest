@@ -82,7 +82,7 @@ void main() {
     // The misplaced project is to sort.
     await tester.tap(find.textContaining('TO SORT //'));
     await tester.pumpAndSettle();
-    expect(find.text('PROJECTS ABOVE THE TITLE LEVEL · 1'), findsOne);
+    expect(find.text('Projects above the title level · 1'), findsOne);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
 

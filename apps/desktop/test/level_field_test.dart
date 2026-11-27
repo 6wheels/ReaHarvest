@@ -97,6 +97,43 @@ void main() {
     expect(changes, greaterThanOrEqualTo(3));
   });
 
+  testWidgets('a new value says that the level will be created', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    const hint = 'This level will be created';
+    Widget field({String? error}) => LevelField(
+      label: 'Artist',
+      controller: controller,
+      options: () => ['Sample Artist'],
+      error: error,
+      newValueHint: hint,
+      onChanged: () {},
+    );
+    await pump(tester, field());
+    expect(find.text(hint), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'Someone');
+    await tester.pumpAndSettle();
+    expect(find.text(hint), findsOne);
+
+    // A known value, in any case: no hint.
+    await tester.enterText(find.byType(TextField), 'sample artist');
+    await tester.pumpAndSettle();
+    expect(find.text(hint), findsNothing);
+    await tester.tap(find.text('Sample Artist'));
+    await tester.pumpAndSettle();
+    expect(controller.text, 'Sample Artist');
+    expect(find.text(hint), findsNothing);
+
+    // An error wins over the hint.
+    controller.text = 'Someone';
+    await pump(tester, field(error: 'Invalid level name'));
+    expect(find.text(hint), findsNothing);
+    expect(find.text('Invalid level name'), findsOne);
+  });
+
   testWidgets('a choice shows its options and tells the one picked', (
     tester,
   ) async {

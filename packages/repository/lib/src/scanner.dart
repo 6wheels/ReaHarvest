@@ -241,6 +241,10 @@ Future<TitleScan> scanTitle(
   ).runTitle(previous);
 }
 
+/// The library file, at the root (`.library.json`, written by the library
+/// package).
+const _libraryFileName = '.library.json';
+
 final class _Scanner {
   _Scanner(
     this.storage,
@@ -326,6 +330,7 @@ final class _Scanner {
       await _readCandidates();
       _findDuplicates();
       _findKnownElsewhere(layout);
+      _findOutsideFiles();
     }
     final orphanNodes = _orphanNodes();
     titles.sort((a, b) => a.path.compareTo(b.path));
@@ -526,10 +531,54 @@ final class _Scanner {
     }
   }
 
-  /// Node files of folders that are not nodes, sorted.
+  /// Reports the files outside any title (SPEC §5.8 step 3): those below
+  /// no title folder nor candidate title folder (beside the titles, in a
+  /// level folder, at the root), projects, node files (orphan ones are
+  /// reported as such), the library file and the files a candidate project
+  /// references aside.
+  void _findOutsideFiles() {
+    final roots = {
+      for (final t in titles) t.path,
+      for (final root in groups.keys)
+        if (!shallow.contains(root)) root,
+    };
+    bool inTitle(String dir) {
+      for (var d = dir; ; d = parentOf(d)) {
+        if (roots.contains(d)) return true;
+        if (d.isEmpty) return false;
+      }
+    }
+
+    final referenced = {
+      for (final MapEntry(key: root, value: versions)
+          in candidateVersions.entries)
+        for (final v in versions)
+          for (final ref in v.media)
+            ?resolveReference(
+              parentOf(joinPath(root, v.fileName)),
+              ref,
+            )?.toLowerCase(),
+    };
+    for (final MapEntry(key: dir, value: entries) in files.entries) {
+      if (inTitle(dir)) continue;
+      for (final e in entries) {
+        final name = p.posix.basename(e.path);
+        if (isProjectFile(name) ||
+            name == nodeFileName ||
+            (dir.isEmpty && name == _libraryFileName) ||
+            referenced.contains(e.path.toLowerCase())) {
+          continue;
+        }
+        _issue(ReportKind.fileOutsideTitle, ReportItem(e.path));
+      }
+    }
+  }
+
+  /// Node files of folders that are not nodes, sorted; those of an
+  /// `Unsorted/` folder, attached to a title (SPEC §5.8 step 4), aside.
   List<String> _orphanNodes() => [
     for (final MapEntry(key: dir, value: entries) in files.entries)
-      if (!nodes.containsKey(dir))
+      if (!nodes.containsKey(dir) && !_inUnsorted(dir))
         for (final e in entries)
           if (p.posix.basename(e.path) == nodeFileName &&
               !corrupted.contains(e.path))
@@ -795,6 +844,19 @@ final class _Scanner {
   /// Whether the folder [dir] is or lies in a reserved folder.
   static bool _inReserved(String dir) =>
       dir.isNotEmpty && dir.split('/').any(isReservedFolder);
+
+  /// Whether the folder [dir] is or lies in the `Unsorted/` folder of a
+  /// title (a folder with a node file).
+  bool _inUnsorted(String dir) {
+    final segments = dir.split('/');
+    for (var i = 0; i < segments.length; i++) {
+      if (segments[i].toLowerCase() == unsortedFolderName.toLowerCase() &&
+          nodes.containsKey(segments.take(i).join('/'))) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /// Reads the projects of every candidate (the versions of its title
   /// reused, their file names relative to the same folder), then checks their

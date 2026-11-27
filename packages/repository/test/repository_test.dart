@@ -465,7 +465,13 @@ void main() {
         'band/album/song',
         'proj',
       });
-      expect(issuePaths(result), ['proj/proj.rpp']);
+      expect(issuePaths(result), [
+        'proj/proj.rpp',
+        // Outside any title.
+        'band/album/empty/notes.txt',
+        'band/audio-files/kick.wav',
+        'band/render/sub/mix.wav',
+      ]);
       for (final dir in [
         'band/audio-files',
         'band/render',
@@ -533,6 +539,69 @@ void main() {
       expect(result.corrupted, isEmpty);
       expect(result.nodes.containsKey('band/audio-files'), isFalse);
       expect(exists('band/audio-files/.node.json'), isTrue);
+    });
+
+    test(
+      'an Unsorted folder of a title is neither a version nor a node',
+      () async {
+        final lib = library(Layout.classic());
+        put('band/album/song/v1/v1.rpp', unknown);
+        put('band/album/song/Unsorted/old.rpp', unknown);
+        put('band/album/song/unsorted/.node.json', '{"nodeId": "01X"}');
+        put('band/album/song/Unsorted/notes.txt', 'x');
+        // Not the Unsorted folder of a title: an orphan node file.
+        put('Unsorted/.node.json', '{"nodeId": "01Y"}');
+
+        final result = await scan(storage, lib);
+
+        expect(result.titles.single.versions.map((v) => v.folder), ['v1']);
+        expect(result.orphanNodes, ['Unsorted/.node.json']);
+        expect(issuePaths(result), isEmpty);
+      },
+    );
+
+    test('reports the files outside any title', () async {
+      final lib = library(Layout.classic());
+      const loose = '''
+<REAPER_PROJECT 0.1 "7.0" 0
+  <TRACK
+    <ITEM
+      <SOURCE WAVE
+        FILE "media/kick.wav"
+      >
+    >
+  >
+>
+''';
+      put('.library.json', '{}');
+      put('band/album/song/v1/v1.rpp', unknown);
+      put('band/album/song/notes.txt', 'in the title');
+      put('readme.txt', 'x');
+      put('band/cover.jpg', 'x');
+      put('band/old/.node.json', '{"nodeId": "01X", "level": "album"}');
+      put('band/Thumbs.db', 'excluded');
+      // A project above the title level, its media and a file beside it.
+      put('band/loose.rpp', loose);
+      put('band/media/kick.wav', 'x');
+      put('band/todo.txt', 'x');
+
+      final result = await scan(storage, lib);
+
+      expect(result.issues.items[ReportKind.fileOutsideTitle], [
+        const ReportItem('band/cover.jpg'),
+        const ReportItem('band/todo.txt'),
+        const ReportItem('readme.txt'),
+      ]);
+      expect(result.orphanNodes, ['band/old/.node.json']);
+    });
+
+    test('a free tree reports no file outside any title', () async {
+      put('a/a.rpp', unknown);
+      put('readme.txt', 'x');
+
+      final result = await scan(storage, library(null));
+
+      expect(result.issues.items[ReportKind.fileOutsideTitle], isNull);
     });
 
     test('is incremental by size and mtime', () async {

@@ -9,13 +9,18 @@ const collabFolderName = '.collab';
 /// (SPEC §5.8).
 const migrationFolderName = '.migration';
 
+/// Folder of a title holding the files found outside any title by the
+/// migration (SPEC §3.2, §5.8 step 4).
+const unsortedFolderName = 'Unsorted';
+
 /// Title subfolders that are not versions (SPEC §3.2), lowercase.
-const reservedTitleFolders = {'assets', '.trash'};
+const reservedTitleFolders = {'assets', 'unsorted', '.trash'};
 
 /// Version subfolders (SPEC §3.2), lowercase.
 const reservedVersionFolders = {'media', 'renders', 'backups', '.history'};
 
-/// Whether [name] is a reserved folder of a title (`Assets`, `.trash`).
+/// Whether [name] is a reserved folder of a title (`Assets`, `Unsorted`,
+/// `.trash`).
 bool isReservedTitleFolder(String name) =>
     reservedTitleFolders.contains(name.toLowerCase());
 

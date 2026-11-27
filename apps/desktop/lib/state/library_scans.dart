@@ -55,6 +55,7 @@ class LibraryScans {
     if (entries.isEmpty) return;
     await ref.read(tasksProvider.notifier).run(
       (l10n) => full ? l10n.taskFullScan : l10n.taskScanAll,
+      subject: entries.map(scanSubject).join('\n'),
       (task) async {
         var report = const Report();
         for (final (i, entry) in entries.indexed) {
@@ -146,6 +147,7 @@ class LibraryScans {
         (_) => _scanReport(entry),
         openReport: true,
         library: entry.id,
+        subject: scanSubject(entry),
       );
 
   /// Scans [entry] in an isolate that writes the index ([scanIntoIndex]),
@@ -181,12 +183,14 @@ class LibraryScans {
       '${total - corrupted - count(ReportKind.orphanNode)} to sort, '
       '$corrupted corrupted',
     );
-    return Report({
-          ReportKind.libraryScanned: [ReportItem(root)],
-        }) +
-        rootedReport(root, issues);
+    return rootedReport(root, issues);
   }
 }
+
+/// The library [entry] as the subject of a scan report: its name and its
+/// path (SPEC §5.2).
+String scanSubject(LibraryEntry entry) =>
+    '${entry.displayName} — ${entry.libraryRoot}';
 
 final libraryScansProvider = Provider<LibraryScans>(LibraryScans.new);
 

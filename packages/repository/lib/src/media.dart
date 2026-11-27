@@ -51,8 +51,11 @@ Map<String, List<String>> mediaUsage(ScanResult result) {
 /// reference, each read once, one at a time, its text not kept (gathering
 /// stops at the first unreadable or missing one, recorded); the entries of
 /// the files they reference and of the proxy files of the subprojects; the
-/// target folder and the names it holds.
+/// target folder and the names it holds. For an [AttachFile]: the entry
+/// of its file, the target folder, the names it holds and those of its
+/// `Unsorted/` folder.
 Future<FixFacts> gatherFix(RepositoryStorage storage, MigrationFix fix) async {
+  if (fix is AttachFile) return _gatherAttach(storage, fix);
   final root = fix is MoveProject ? parentOf(fix.path) : fix.path;
   final shallow = fix is OrganizeTitle && !fix.titleFolder;
   final entries = await storage.list(
@@ -140,6 +143,39 @@ Future<FixFacts> gatherFix(RepositoryStorage storage, MigrationFix fix) async {
   return facts();
 }
 
+/// The facts of [fix] ([gatherFix]).
+Future<FixFacts> _gatherAttach(
+  RepositoryStorage storage,
+  AttachFile fix,
+) async {
+  final source = await storage.stat(fix.path);
+  final target = await storage.stat(fix.target);
+  final targetEntries = target != null && target.isDirectory
+      ? await storage.list(fix.target)
+      : const <StorageEntry>[];
+  final unsorted = targetEntries
+      .where(
+        (e) =>
+            e.isDirectory &&
+            p.posix.basename(e.path).toLowerCase() ==
+                unsortedFolderName.toLowerCase(),
+      )
+      .firstOrNull;
+  return FixFacts(
+    entries: [?source],
+    target: target,
+    targetNames: {
+      for (final e in targetEntries) p.posix.basename(e.path).toLowerCase(),
+    },
+    unsortedFolder: unsorted?.path,
+    unsortedNames: {
+      if (unsorted != null)
+        for (final e in await storage.list(unsorted.path))
+          p.posix.basename(e.path).toLowerCase(),
+    },
+  );
+}
+
 /// Facts of the project [path], with which of [names] it names outside its
 /// `FILE` lines. Throws [FormatException] if it is missing or cannot be
 /// read.
@@ -184,6 +220,8 @@ Future<Report> applyPlan(RepositoryStorage storage, MediaPlan plan) async {
             add(ReportKind.projectMoved, ReportItem(to, from));
           case FileRole.folder:
             add(ReportKind.folderMoved, ReportItem(to, from));
+          case FileRole.unsorted:
+            add(ReportKind.fileUnsorted, ReportItem(to, from));
           case FileRole.proxy:
             break;
         }

@@ -47,7 +47,12 @@ void main() {
   /// Submits the open library form, then closes the report of its scan.
   Future<void> add(WidgetTester tester) async {
     await tapSubmit(tester);
-    await waitForText(tester, 'Libraries scanned · 1');
+    // The library scanned, under the title of the report.
+    await waitFor(
+      tester,
+      () => find.textContaining(' — ').evaluate().isNotEmpty,
+      reason: 'scan report',
+    );
     // The form is closed, the report stays (#59).
     expect(submit(), findsNothing);
     await tapText(tester, 'Close');

@@ -5,8 +5,8 @@ import '../kit/kit.dart';
 
 /// Entry of the "To sort" list, like a rack strip: a square light to select
 /// it (when it can be), its name and place, detail readouts and its action
-/// at the end. The whole strip toggles the selection; a selected strip has
-/// a lit edge.
+/// at the end, then its [body] (the fields of a title card). The head of
+/// the strip toggles the selection; a selected strip has a lit edge.
 class Item extends StatefulWidget {
   const Item({
     required this.title,
@@ -15,6 +15,7 @@ class Item extends StatefulWidget {
     this.action,
     this.selected,
     this.onSelected,
+    this.body,
     super.key,
   });
 
@@ -25,9 +26,12 @@ class Item extends StatefulWidget {
   final String title;
   final String subtitle;
 
-  /// Lines under the subtitle (expected level, proposed place).
+  /// Lines under the subtitle (what is wrong, the fix proposed).
   final List<String> details;
   final Widget? action;
+
+  /// Shown under the head of the strip, outside its selection toggle.
+  final Widget? body;
 
   @override
   State<Item> createState() => _ItemState();
@@ -60,47 +64,74 @@ class _ItemState extends State<Item> {
                   : c.border,
             ),
           ),
-          child: PressableSurface(
-            dimDisabled: false,
-            onTap: selected == null
-                ? null
-                : () => widget.onSelected?.call(!selected),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Lit edge of the selected strip.
-                  AnimatedContainer(
-                    duration: Motion.fast,
-                    width: Sizes.bar,
-                    margin: const EdgeInsets.symmetric(vertical: Space.sm),
-                    color: lit ? c.accent : Colors.transparent,
-                  ),
-                  if (selected != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: Space.md),
-                      child: Center(
-                        child: Semantics(
-                          checked: selected,
-                          label: widget.title,
-                          child: ChoiceLight(checked: selected),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: Sizes.bar),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _head(context, selected),
+                    if (widget.body case final body?)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          Space.ml,
+                          0,
+                          Space.m,
+                          Space.md,
                         ),
+                        child: body,
                       ),
-                    ),
-                  Expanded(child: _content(context)),
-                  if (widget.action case final action?)
-                    Padding(
-                      padding: const EdgeInsets.only(right: Space.s),
-                      child: Center(child: action),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              // Lit edge of the selected strip.
+              Positioned(
+                left: 0,
+                top: Space.sm,
+                bottom: Space.sm,
+                child: AnimatedContainer(
+                  duration: Motion.fast,
+                  width: Sizes.bar,
+                  color: lit ? c.accent : Colors.transparent,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  /// The light, the texts and the action, toggling the selection.
+  Widget _head(BuildContext context, bool? selected) => PressableSurface(
+    dimDisabled: false,
+    onTap: selected == null ? null : () => widget.onSelected?.call(!selected),
+    child: IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (selected != null)
+            Padding(
+              padding: const EdgeInsets.only(left: Space.md),
+              child: Center(
+                child: Semantics(
+                  checked: selected,
+                  label: widget.title,
+                  child: ChoiceLight(checked: selected),
+                ),
+              ),
+            ),
+          Expanded(child: _content(context)),
+          if (widget.action case final action?)
+            Padding(
+              padding: const EdgeInsets.only(right: Space.s),
+              child: Center(child: action),
+            ),
+        ],
+      ),
+    ),
+  );
 
   Widget _content(BuildContext context) {
     return Padding(

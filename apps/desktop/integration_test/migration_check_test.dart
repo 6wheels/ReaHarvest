@@ -26,7 +26,9 @@ void main() {
   tearDown(() => h.dispose());
 
   const lost = 'Files missing or changed since the inventory';
-  const wrongLevel = 'FOLDERS AT THE WRONG LEVEL · 1';
+
+  /// The issue line of the title card in "To sort" (#149).
+  const wrongLevel = 'Folders at the wrong level · 1';
 
   String band() => h.path('Band');
 

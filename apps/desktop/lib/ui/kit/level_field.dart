@@ -27,6 +27,7 @@ class LevelField extends StatefulWidget {
     this.compact = false,
     this.autofocus = false,
     this.onCancel,
+    this.newValueHint,
   });
 
   final String label;
@@ -56,6 +57,11 @@ class LevelField extends StatefulWidget {
 
   /// Called when the user presses Escape in the field.
   final VoidCallback? onCancel;
+
+  /// Shown under the field, in place of the error, while its text is not
+  /// empty and equals none of the [options] ignoring case (e.g. "This level
+  /// will be created").
+  final String? newValueHint;
 
   @override
   State<LevelField> createState() => _LevelFieldState();
@@ -121,6 +127,14 @@ class _LevelFieldState extends State<LevelField> {
     widget.onSubmit?.call(controller.text);
   }
 
+  /// [LevelField.newValueHint], while the text is a new value.
+  String? get _newValueHint {
+    final hint = widget.newValueHint;
+    final typed = widget.controller.text.trim().toLowerCase();
+    if (hint == null || widget.error != null || typed.isEmpty) return null;
+    return widget.options().any((o) => o.toLowerCase() == typed) ? null : hint;
+  }
+
   @override
   void dispose() {
     _focus.dispose();
@@ -136,6 +150,7 @@ class _LevelFieldState extends State<LevelField> {
       onSelected: (value) {
         _picked = true;
         _browsed = false;
+        setState(() {});
         widget.onChanged();
         widget.onSubmit?.call(value);
       },
@@ -151,6 +166,7 @@ class _LevelFieldState extends State<LevelField> {
             onChanged: (_) {
               _browsed = false;
               _closed = false;
+              setState(() {});
               widget.onChanged();
             },
             // Enter keeps the focus: several values can be entered in a row.
@@ -169,6 +185,7 @@ class _LevelFieldState extends State<LevelField> {
                   : null,
               isDense: true,
               errorText: widget.error,
+              helperText: _newValueHint,
               contentPadding: widget.compact
                   ? const EdgeInsets.symmetric(
                       horizontal: Space.sm,
@@ -220,7 +237,11 @@ class _LevelFieldState extends State<LevelField> {
       children: [
         field,
         SizedBox(
-          height: widget.dense || widget.compact || widget.error != null
+          height:
+              widget.dense ||
+                  widget.compact ||
+                  widget.error != null ||
+                  _newValueHint != null
               ? 0
               : MediaQuery.textScalerOf(context).scale(_errorRoom),
         ),

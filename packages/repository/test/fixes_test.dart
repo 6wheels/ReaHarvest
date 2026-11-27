@@ -391,6 +391,79 @@ void main() {
     expect(await noLoss(m), isTrue);
   });
 
+  test('attaches a file outside any title to its Unsorted folder', () async {
+    title(song);
+    put('Band/notes.txt', 'notes');
+    put('Band/Old/.node.json', '{"nodeId":"${newUlid()}","level":"album"}');
+    put('Band/other.txt', 'other');
+    final m = await migration();
+
+    final report = await applyFixes(m, [
+      const AttachFile('Band/notes.txt', song),
+      const AttachFile('Band/Old/.node.json', song),
+    ]);
+
+    expect(file('$song/Unsorted/notes.txt').readAsStringSync(), 'notes');
+    expect(file('$song/Unsorted/.node.json').existsSync(), isTrue);
+    expect(file('Band/notes.txt').existsSync(), isFalse);
+    expect(report.items[ReportKind.fileUnsorted], [
+      const ReportItem('$song/Unsorted/notes.txt', 'Band/notes.txt'),
+      const ReportItem('$song/Unsorted/.node.json', 'Band/Old/.node.json'),
+    ]);
+    expect(await noLoss(m), isTrue);
+
+    // A name taken in Unsorted gets a free variant, in the folder as named.
+    Directory(file('$song/Unsorted').path)
+        .renameSync(file('$song/unsorted').path);
+    put('Band/Other/notes.txt', 'other notes');
+    // An orphan node file inside the title, attached to it.
+    put('$song/sub/.node.json', '{"nodeId":"${newUlid()}","level":"title"}');
+    final again = await migration();
+    await applyFixes(again, [
+      const AttachFile('Band/Other/notes.txt', song),
+      const AttachFile('$song/sub/.node.json', song),
+    ]);
+    expect(file('$song/unsorted/.node (2).json').existsSync(), isTrue);
+    expect(
+      file('$song/unsorted/notes (2).txt').readAsStringSync(),
+      'other notes',
+    );
+    expect(await noLoss(again), isTrue);
+  });
+
+  test('a file is attached to an existing title only', () async {
+    title(song);
+    put('Band/notes.txt', 'notes');
+    put('$song/Unsorted/inside.txt', 'inside');
+    put('Plain/readme.txt', 'not a title');
+    put('Blocked/.node.json', '{"nodeId":"${newUlid()}","level":"title"}');
+    put('Blocked/Unsorted', 'a file');
+    final m = await migration();
+
+    final report = await applyFixes(m, [
+      const AttachFile('Band/notes.txt', 'Plain'),
+      const AttachFile('Band/notes.txt', 'Missing'),
+      const AttachFile('Band/gone.txt', song),
+      const AttachFile('Band', song),
+      const AttachFile('$song/Unsorted/inside.txt', song),
+      const AttachFile('Band/notes.txt', 'Blocked'),
+    ]);
+
+    expect(
+      [for (final i in report.items[ReportKind.fixFailed]!) i.detail],
+      [
+        contains('No title at Plain'),
+        contains('No title at Missing'),
+        contains('No file at Band/gone.txt'),
+        contains('No file at Band'),
+        contains('Already in $song/Unsorted'),
+        contains('A file named Unsorted is in Blocked'),
+      ],
+    );
+    expect(file('Band/notes.txt').existsSync(), isTrue);
+    expect(await noLoss(m), isTrue);
+  });
+
   test(
     'a project alone in its folder moves with it to another title',
     () async {
@@ -888,5 +961,49 @@ void main() {
     expect('${const CopyFile('a', 'b')}', 'copy a -> b');
     expect('${const CreateFolder('a')}', 'create a/');
     expect('${const CreateTitle('a', 'title')}', 'create title a');
+    expect('${const AttachFile('a.txt', 'T')}', 'attachFile a.txt -> T');
+  });
+
+  test('takes the choices of the user, its source kept', () {
+    final v = version('a/b.rpp', statusFolder: 'mix');
+    final chosen = v.withChoices(
+      folder: 'F',
+      label: 'L',
+      owner: const MemberId('m'),
+      status: 'mixing',
+    );
+    expect('$chosen', 'a/b.rpp -> F, L, m, mixing');
+    expect(chosen.statusFolder, 'mix');
+    for (final (fix, text) in [
+      (
+        OrganizeTitle('a', 'T', [v], level: 'title', titleFolder: false),
+        'organizeTitle a -> T, forced\n  a/b.rpp -> F, L, m, mixing',
+      ),
+      (
+        AttachVersions('a', 'T', [v], level: 'title'),
+        'attachVersions a -> T, forced\n  a/b.rpp -> F, L, m, mixing',
+      ),
+      (
+        MoveProject(v, 'T', level: 'title'),
+        'moveProject a/b.rpp -> T, forced\n  a/b.rpp -> F, L, m, mixing',
+      ),
+    ]) {
+      final changed = fix.withChoices(versions: [chosen], force: true);
+      expect('$changed', text);
+      expect(changed.runtimeType, fix.runtimeType);
+      expect(changed.level, 'title');
+    }
+    expect(
+      (OrganizeTitle(
+        'a',
+        'T',
+        [v],
+        level: 'title',
+        titleFolder: false,
+      ).withChoices(versions: [v], force: false)).titleFolder,
+      isFalse,
+    );
+    const attach = AttachFile('a.txt', 'T');
+    expect(attach.withChoices(versions: const [], force: true), same(attach));
   });
 }

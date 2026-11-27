@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
-import 'package:path/path.dart' as p;
 import 'package:reaharvest_domain/reaharvest_domain.dart';
 import 'package:reaharvest_index/reaharvest_index.dart' show xxh3Hasher;
 import 'package:reaharvest_library/reaharvest_library.dart';
@@ -16,8 +15,8 @@ import 'tasks.dart';
 
 final _log = Logger('library.migration');
 
-/// Migration of a library: fixes, orphan node deletion and undo of an
-/// interrupted fix (SPEC §5.8).
+/// Migration of a library: preview and fixes, and undo of an interrupted fix
+/// (SPEC §5.8).
 class MigrationActions {
   MigrationActions(this.ref);
 
@@ -27,6 +26,20 @@ class MigrationActions {
   /// for a fix left to undo never run together on a library (a fix being
   /// applied looks interrupted), nor with another writer.
   LibraryTurns get _turns => ref.read(libraryTurnsProvider);
+
+  /// Plans of the migration [fixes] of [library], by path of fix (dry run,
+  /// SPEC §5.8 step 4, [planFixesOn]): computed in an isolate, from the
+  /// media usage of the indexed library; nothing is written.
+  PlanPreview preview(LibraryId library, List<MigrationFix> fixes) {
+    final entry = ref.libraryEntry(library);
+    return planFixesOn(
+      entry.libraryRoot,
+      fixes,
+      usage: mediaUsage(
+        ref.read(localIndexProvider).scanResult(library) ?? const ScanResult(),
+      ),
+    );
+  }
 
   /// Applies the migration [fixes] to [library] (SPEC §5.8 step 4), as a
   /// task whose report is shown at the end. Then rescans.
@@ -180,27 +193,6 @@ class MigrationActions {
           foreground: true,
           library: library,
         );
-  }
-
-  /// Deletes the `.node.json` file [path] of [library], found in a folder
-  /// without project (#54). Then rescans, in the turn of the library.
-  /// Throws [ArgumentError] for any other file, checked in the turn: a
-  /// change of the library asked before may have given it a project.
-  Future<void> deleteOrphanNode(LibraryId library, String path) async {
-    if (p.posix.basename(path) != nodeFileName) {
-      throw ArgumentError.value(path, 'path', 'Not a node file');
-    }
-    final entry = ref.libraryEntry(library);
-    final root = entry.libraryRoot;
-    await _turns.run(library, () async {
-      final known = ref.read(localIndexProvider).scanResult(library);
-      if (!(known?.orphanNodes.contains(path) ?? false)) {
-        throw ArgumentError.value(path, 'path', 'Not an orphan node file');
-      }
-      await MountedFolderStorage(root).delete(path);
-      _log.info('Orphan node file $path of ${entry.displayName} deleted');
-      await ref.scanLibrary(entry);
-    });
   }
 }
 

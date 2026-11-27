@@ -36,6 +36,22 @@ final class FixVersion {
   /// null.
   final String? statusFolder;
 
+  /// This version with the folder, label, owner and status chosen by the
+  /// user (SPEC §5.8 step 4); its source and status subfolder kept.
+  FixVersion withChoices({
+    required String folder,
+    required String label,
+    MemberId? owner,
+    String? status,
+  }) => FixVersion(
+    source,
+    folder: folder,
+    label: label,
+    owner: owner,
+    status: status,
+    statusFolder: statusFolder,
+  );
+
   @override
   String toString() =>
       ['$source -> $folder', label, ?owner, ?status].join(', ');
@@ -73,6 +89,12 @@ sealed class MigrationFix {
   /// Name of the fix in the migration journal.
   String get kind;
 
+  /// This fix with the [versions] and [force] chosen by the user.
+  MigrationFix withChoices({
+    required List<FixVersion> versions,
+    required bool force,
+  });
+
   @override
   String toString() => [
     '$kind $path -> $target${force ? ', forced' : ''}',
@@ -99,6 +121,19 @@ final class OrganizeTitle extends MigrationFix {
 
   @override
   String get kind => 'organizeTitle';
+
+  @override
+  OrganizeTitle withChoices({
+    required List<FixVersion> versions,
+    required bool force,
+  }) => OrganizeTitle(
+    path,
+    target,
+    versions,
+    level: level,
+    force: force,
+    titleFolder: titleFolder,
+  );
 }
 
 /// Attaches the versions of the candidate [path] to the existing title
@@ -114,6 +149,12 @@ final class AttachVersions extends MigrationFix {
 
   @override
   String get kind => 'attachVersions';
+
+  @override
+  AttachVersions withChoices({
+    required List<FixVersion> versions,
+    required bool force,
+  }) => AttachVersions(path, target, versions, level: level, force: force);
 }
 
 /// Moves one project to another title [target] (created if missing), where
@@ -128,6 +169,33 @@ final class MoveProject extends MigrationFix {
 
   @override
   String get kind => 'moveProject';
+
+  /// The single version of [versions] replaces its own.
+  @override
+  MoveProject withChoices({
+    required List<FixVersion> versions,
+    required bool force,
+  }) => MoveProject(versions.single, target, level: level, force: force);
+}
+
+/// Moves the file [path], found outside any title (an orphan node file, a
+/// document beside the titles), into the `Unsorted/` folder of the
+/// existing title [target], under a free `name (n)` variant of its name
+/// (SPEC §5.8 step 4). Nothing else is changed: no version, no title
+/// created.
+final class AttachFile extends MigrationFix {
+  const AttachFile(String path, String target)
+    : super(path, target, const [], level: '');
+
+  @override
+  String get kind => 'attachFile';
+
+  /// Nothing to choose but its title: the same fix.
+  @override
+  AttachFile withChoices({
+    required List<FixVersion> versions,
+    required bool force,
+  }) => this;
 }
 
 /// Applies [fixes] through the storage of [migration] (so that no file is

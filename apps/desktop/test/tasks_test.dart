@@ -455,14 +455,32 @@ void main() {
         ],
       }),
       openReport: true,
+      subject: 'Band — /lib',
     );
     await settle(tester);
 
-    // Problems expanded, the rest collapsed.
+    // Every section collapsed, the library under the title.
     expect(find.text('Move'), findsNWidgets(2));
+    expect(find.text('Band — /lib'), findsOneWidget);
     expect(find.text('Scan failed · 1'), findsOneWidget);
     expect(find.text('Media not found · 1'), findsOneWidget);
     expect(find.text('Named by a plugin · 1'), findsOneWidget);
+    expect(find.text('Libraries not available · 1'), findsOneWidget);
+    expect(find.text('Media moved · 1'), findsOneWidget);
+    expect(find.textContaining('gone.wav'), findsNothing);
+    expect(find.textContaining('kick.wav'), findsNothing);
+    for (final section in [
+      'Scan failed · 1',
+      'Media not found · 1',
+      'Named by a plugin · 1',
+      'Titles placed too high · 1',
+      'Media moved · 1',
+    ]) {
+      await tester.ensureVisible(find.text(section));
+      await settle(tester);
+      await tester.tap(find.text(section));
+      await settle(tester);
+    }
     expect(
       find.text(
         'A plugin of these projects names this file: move it by hand if '
@@ -470,8 +488,6 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Libraries not available · 1'), findsOneWidget);
-    expect(find.text('Media moved · 1'), findsOneWidget);
     expect(find.textContaining('gone.wav'), findsOneWidget);
     expect(find.textContaining('boom'), findsOneWidget);
     expect(find.textContaining('Expected level: Title'), findsOneWidget);
@@ -479,11 +495,6 @@ void main() {
       find.textContaining('Proposed target: _Unassigned/_Unassigned/Loose'),
       findsOneWidget,
     );
-    expect(find.textContaining('kick.wav'), findsNothing);
-    await tester.ensureVisible(find.text('Media moved · 1'));
-    await settle(tester);
-    await tester.tap(find.text('Media moved · 1'));
-    await settle(tester);
     expect(find.textContaining('kick.wav'), findsOneWidget);
     await tester.tap(find.text('Close'));
     await settle(tester);
@@ -854,7 +865,8 @@ void main() {
         openReport: true,
       );
       await settle(tester);
-      expect(find.textContaining('broken.rpp'), findsOneWidget);
+      // Its sections collapsed (#149).
+      expect(find.text('Unreadable files · 1'), findsOneWidget);
       await tester.tap(find.text('Close'));
       await settle(tester);
 
@@ -873,7 +885,7 @@ void main() {
       await running;
       await settle(tester);
       expect(states().last, TaskState.cancelled);
-      expect(find.textContaining('broken.rpp'), findsOneWidget);
+      expect(find.text('Unreadable files · 1'), findsOneWidget);
     });
   });
 }
