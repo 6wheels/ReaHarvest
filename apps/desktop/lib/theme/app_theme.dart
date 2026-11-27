@@ -465,10 +465,26 @@ const _sliderTrack = 2.0;
 /// with the `MaterialPageRoute` opening it (Flutter's own page of the
 /// licenses). Anything else, `Material` and
 /// `InkWell` included, is a component of the kit.
+///
+/// The theme of a brightness and an accent is built once: the same object is
+/// returned each time, so that a rebuild with an unchanged theme starts no
+/// theme animation (`ThemeData` has no value equality: the new object of a
+/// rebuild would never equal the previous one).
 ThemeData buildTheme(
   Brightness brightness, {
   AccentPreference accent = AccentPreference.neutral,
-}) {
+}) => _themes.putIfAbsent((
+  brightness,
+  accent,
+), () => _buildTheme(brightness, accent));
+
+final _themes = <(Brightness, AccentPreference), ThemeData>{};
+
+/// Forgets the themes built so far, so that the next [buildTheme] builds them
+/// again. For hot reload: a changed token shows only in a new theme.
+void clearThemeCache() => _themes.clear();
+
+ThemeData _buildTheme(Brightness brightness, AccentPreference accent) {
   final dark = brightness == Brightness.dark;
   final tokens = dark ? AppColors.dark : AppColors.light;
   final c = tokens.copyWith(accent: Accents.of(accent, brightness));

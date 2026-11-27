@@ -56,6 +56,10 @@ Future<void> main() async {
   );
 }
 
+/// The LOADING switch of the controls bar, for the tests.
+@visibleForTesting
+const showcaseLoadingKey = ValueKey('showcase-loading');
+
 /// The providers served from the mock data, shared with the golden tests.
 @visibleForTesting
 List<Override> showcaseOverrides() => [
@@ -169,10 +173,12 @@ class UiShowcaseApp extends StatefulWidget {
 class _UiShowcaseAppState extends State<UiShowcaseApp> {
   late ThemeMode _themeMode = widget.themeMode;
   Locale _locale = const Locale('en');
-  double _progress = 0.65;
-  bool _loading = true;
+  // Values that change often (slider drags): each one is read by a few
+  // widgets, which listen to it, so that a tick rebuilds only these.
+  final _progress = ValueNotifier(0.65);
+  final _loading = ValueNotifier(true);
+  final _slider = ValueNotifier(0.5);
   bool _switch = true;
-  double _slider = 0.5;
   int _segment = 1;
 
   /// Accent picked in the settings bar.
@@ -201,7 +207,17 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
   ];
 
   @override
+  void reassemble() {
+    super.reassemble();
+    // Hot reload: the themes are cached, rebuild them with the new tokens.
+    clearThemeCache();
+  }
+
+  @override
   void dispose() {
+    _progress.dispose();
+    _loading.dispose();
+    _slider.dispose();
     _levelController.dispose();
     _emptyLevelController.dispose();
     _compactController.dispose();
@@ -236,15 +252,26 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ? _alone(context, widget.section!)
           : Scaffold(
               appBar: _windowBar(context),
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.all(Space.l),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final section in _sections(context))
-                      _SectionView(section),
-                  ],
-                ),
+              // Lazy: only the sections near the viewport are built and laid
+              // out, so a text scale change costs what is shown.
+              body: Builder(
+                builder: (context) {
+                  final sections = _sections(context);
+                  // LOADING off stills the lights of the real components too
+                  // (the tasks zone): a `Led` honours "fewer animations".
+                  return _Live(
+                    _loading,
+                    (loading) => MediaQuery(
+                      data: MediaQuery.of(context)
+                          .copyWith(disableAnimations: !loading),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(Space.l),
+                        itemCount: sections.length,
+                        itemBuilder: (context, i) => _SectionView(sections[i]),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
     ),
@@ -312,17 +339,32 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           ),
         ),
         Text('LOADING', style: context.legend),
-        LightSwitch(
-          value: _loading,
-          onChanged: (v) => setState(() => _loading = v),
+        _Live(
+          _loading,
+          (loading) => LightSwitch(
+            key: showcaseLoadingKey,
+            value: loading,
+            onChanged: (v) => _loading.value = v,
+          ),
         ),
         const SizedBox(width: Space.s),
-        Text('PROGRESS ${(_progress * 100).round()}%', style: context.readout),
-        SizedBox(
-          width: _sliderWidth,
-          child: Slider(
-            value: _progress,
-            onChanged: (v) => setState(() => _progress = v),
+        _Live(
+          _progress,
+          (progress) => Row(
+            spacing: Space.s,
+            children: [
+              Text(
+                'PROGRESS ${(progress * 100).round()}%',
+                style: context.readout,
+              ),
+              SizedBox(
+                width: _sliderWidth,
+                child: Slider(
+                  value: progress,
+                  onChanged: (v) => _progress.value = v,
+                ),
+              ),
+            ],
           ),
         ),
         Text('SIZE ${(_scale * 100).round()}%', style: context.readout),
@@ -532,12 +574,25 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         'Lights & progress',
         'Meters follow the PROGRESS slider; lights follow LOADING.',
         [
-          _Specimen(
-            'Meter — ${(_progress * 100).round()}%',
-            child: Meter(_progress),
+          _Live(
+            _progress,
+            (progress) => _Specimen(
+              'Meter — ${(progress * 100).round()}%',
+              child: Meter(progress),
+            ),
           ),
-          _Specimen('Meter — tall', child: Meter(_progress, height: 18)),
-          const _Specimen('Meter — unknown progress', child: Meter(null)),
+          _Live(
+            _progress,
+            (progress) =>
+                _Specimen('Meter — tall', child: Meter(progress, height: 18)),
+          ),
+          _Live(
+            _loading,
+            (loading) => _Specimen(
+              'Meter — unknown progress',
+              child: Meter(loading ? null : 0.3),
+            ),
+          ),
           _Specimen(
             'Led — steady / pulse / blink',
             child: Column(
@@ -560,28 +615,38 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
                         c.ledAmber,
                         c.ledRed,
                       ])
-                        Led(color, mode: mode),
+                        _Live(
+                          _loading,
+                          (loading) =>
+                              Led(color, mode: loading ? mode : LedMode.steady),
+                        ),
                       Led(c.accent, lit: false),
                     ],
                   ),
               ],
             ),
           ),
-          _Specimen(
-            'Led — follows LOADING (pulse / steady)',
-            child: Led(
-              c.ledAmber,
-              size: 10,
-              mode: _loading ? LedMode.pulse : LedMode.steady,
+          _Live(
+            _loading,
+            (loading) => _Specimen(
+              'Led — follows LOADING (pulse / steady)',
+              child: Led(
+                c.ledAmber,
+                size: 10,
+                mode: loading ? LedMode.pulse : LedMode.steady,
+              ),
             ),
           ),
-          _Specimen(
-            'BusyLight (shown while loading)',
-            child: SizedBox(
-              height: 40,
-              child: _loading
-                  ? const BusyLight()
-                  : const Center(child: Text('Loaded')),
+          _Live(
+            _loading,
+            (loading) => _Specimen(
+              'BusyLight (shown while loading)',
+              child: SizedBox(
+                height: 40,
+                child: loading
+                    ? const BusyLight()
+                    : const Center(child: Text('Loaded')),
+              ),
             ),
           ),
         ],
@@ -591,11 +656,14 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
         'Buttons',
         'FilledButton is the lit console key of the theme.',
         [
-          _Specimen(
-            'Filled (lit key) — BusyLabel follows LOADING',
-            child: FilledButton(
-              onPressed: () {},
-              child: BusyLabel('Validate', busy: _loading),
+          _Live(
+            _loading,
+            (loading) => _Specimen(
+              'Filled (lit key) — BusyLabel follows LOADING',
+              child: FilledButton(
+                onPressed: () {},
+                child: BusyLabel('Validate', busy: loading),
+              ),
             ),
           ),
           _Specimen(
@@ -711,9 +779,10 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Slider(
-                value: _slider,
-                onChanged: (v) => setState(() => _slider = v),
+              _Live(
+                _slider,
+                (value) =>
+                    Slider(value: value, onChanged: (v) => _slider.value = v),
               ),
               const Slider(value: 0.3, onChanged: null),
               SegmentedButton<int>(
@@ -735,26 +804,36 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             ],
           ),
         ),
-        _Specimen(
-          'DisclosureTile — report sections (error blinks)',
-          child: Column(
-            children: [
-              for (final (level, led, open) in [
-                ('Error', Led(c.ledRed, mode: LedMode.blink), true),
-                ('Warning', Led(c.ledAmber), true),
-                ('Skipped', Led(c.muted, lit: false), false),
-                ('Done', Led(c.ledGreen), false),
-              ])
-                DisclosureTile(
-                  initiallyExpanded: open,
-                  leading: SizedBox(
-                    width: IconSize.l,
-                    child: Center(child: led),
+        _Live(
+          _loading,
+          (loading) => _Specimen(
+            'DisclosureTile — report sections (error blinks)',
+            child: Column(
+              children: [
+                for (final (level, led, open) in [
+                  (
+                    'Error',
+                    Led(
+                      c.ledRed,
+                      mode: loading ? LedMode.blink : LedMode.steady,
+                    ),
+                    true,
                   ),
-                  title: Text('$level section · 2'),
-                  children: const [Text('First item'), Text('Second item')],
-                ),
-            ],
+                  ('Warning', Led(c.ledAmber), true),
+                  ('Skipped', Led(c.muted, lit: false), false),
+                  ('Done', Led(c.ledGreen), false),
+                ])
+                  DisclosureTile(
+                    initiallyExpanded: open,
+                    leading: SizedBox(
+                      width: IconSize.l,
+                      child: Center(child: led),
+                    ),
+                    title: Text('$level section · 2'),
+                    children: const [Text('First item'), Text('Second item')],
+                  ),
+              ],
+            ),
           ),
         ),
         const _Specimen(
@@ -1354,6 +1433,20 @@ final _titles = [_nominal, _alerts];
 
 // --- Showcase layout -------------------------------------------------------
 
+/// Rebuilds only [builder] when [notifier] changes.
+class _Live<T> extends StatelessWidget {
+  const _Live(this.notifier, this.builder);
+
+  final ValueNotifier<T> notifier;
+  final Widget Function(T value) builder;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<T>(
+    valueListenable: notifier,
+    builder: (context, value, _) => builder(value),
+  );
+}
+
 class _Section {
   const _Section(this.id, this.title, this.description, this.items);
 
@@ -1363,30 +1456,45 @@ class _Section {
   final List<Widget> items;
 }
 
-class _SectionView extends StatelessWidget {
+/// A section of the showcase. Kept alive once built, so that scrolling it
+/// out of the viewport does not lose the state of its specimens.
+class _SectionView extends StatefulWidget {
   const _SectionView(this.section);
 
   final _Section section;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: Space.xl + Space.m),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(section.title, style: Theme.of(context).textTheme.titleLarge),
-        if (section.description.isNotEmpty) ...[
-          const SizedBox(height: Space.xs),
-          Text(
-            section.description,
-            style: TextStyle(color: context.colors.muted, fontSize: 13),
-          ),
+  State<_SectionView> createState() => _SectionViewState();
+}
+
+class _SectionViewState extends State<_SectionView>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final section = widget.section;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.xl + Space.m),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(section.title, style: Theme.of(context).textTheme.titleLarge),
+          if (section.description.isNotEmpty) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              section.description,
+              style: TextStyle(color: context.colors.muted, fontSize: 13),
+            ),
+          ],
+          const Divider(height: Space.l),
+          Wrap(spacing: Space.l, runSpacing: Space.l, children: section.items),
         ],
-        const Divider(height: Space.l),
-        Wrap(spacing: Space.l, runSpacing: Space.l, children: section.items),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 /// One component under its label, at a bounded width (and height when
