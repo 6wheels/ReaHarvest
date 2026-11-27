@@ -32,6 +32,7 @@ import 'ui/status_trail.dart';
 import 'ui/studio_title_bar.dart';
 import 'ui/tasks_zone.dart';
 import 'ui/title_card.dart';
+import 'ui/title_views.dart' show TitleList, TitleTree;
 import 'ui/to_sort/fix_dialog.dart' show Choice;
 import 'ui/to_sort/to_sort_item.dart';
 
@@ -77,6 +78,7 @@ List<Override> showcaseOverrides() => [
 @visibleForTesting
 const showcaseSectionIds = [
   'title_card',
+  'library_views',
   'overview',
   'status_trail',
   'lights_progress',
@@ -520,6 +522,39 @@ class _UiShowcaseAppState extends State<UiShowcaseApp> {
             width: 200,
             height: 200,
             child: TitleCard(_overflow, toAdopt: 128),
+          ),
+        ],
+      ),
+      _Section(
+        'library_views',
+        'Library — list and tree',
+        'Real TitleList and TitleTree on mock titles: level columns, '
+            'figures aligned on the right, status trail, tags.',
+        [
+          _Specimen(
+            'List',
+            width: 1100,
+            height: 280,
+            child: TitleList(_viewTitles),
+          ),
+          _Specimen(
+            'Tree',
+            width: 1100,
+            height: 340,
+            child: TitleTree(_viewTitles),
+          ),
+          _Specimen(
+            'Tags line — 1 to 6 tags, three widths',
+            width: 480,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: Space.s,
+              children: [
+                for (final width in [120.0, 220.0, 420.0])
+                  SizedBox(width: width, child: TagLine(_overflow.tags)),
+                const TagLine(['live']),
+              ],
+            ),
           ),
         ],
       ),
@@ -1292,12 +1327,15 @@ Title _title(
   String? status,
   int versions = 0,
   double? tempo,
+  int? sampleRate,
+  List<String> tags = const [],
   Map<String, String> versionStatuses = const {},
 }) => Title(
   id: NodeId(id),
   libraryId: _library,
   path: levels.values.join('/'),
   levels: levels,
+  tags: tags,
   // The title status is derived: [status] goes to the first version.
   versionStatuses: {
     if (status != null && versions > 0) '$id-0': status,
@@ -1310,6 +1348,7 @@ Title _title(
         modified: DateTime(2026, 11, 12).subtract(Duration(days: v * 3)),
         size: 1,
         tempo: tempo,
+        sampleRate: sampleRate,
         metadata: VersionMetadata(
           id: VersionId('$id-$v'),
           owner: const MemberId('me'),
@@ -1325,6 +1364,8 @@ final _nominal = _title(
   status: 'mixing',
   versions: 6,
   tempo: 92,
+  sampleRate: 48000,
+  tags: const ['live', 'standard tuning', 'rehearsal'],
   versionStatuses: const {
     'nominal-0': 'mixing',
     'nominal-1': 'recording',
@@ -1342,6 +1383,8 @@ final _done = _title(
   status: 'done',
   versions: 3,
   tempo: 120,
+  sampleRate: 44100,
+  tags: const ['acoustic'],
 );
 
 final _customStatus = _title(
@@ -1373,6 +1416,15 @@ final _overflow = _title(
   status: 'recording',
   versions: 999,
   tempo: 174.6,
+  sampleRate: 96000,
+  tags: const [
+    'live',
+    'standard tuning',
+    'rehearsal',
+    'a very long tag that cannot fit on the line',
+    'demo',
+    'bonus',
+  ],
 );
 
 /// A title with every overview alert: a version using a plugin missing on
@@ -1430,6 +1482,9 @@ final _alerts = Title(
 );
 
 final _titles = [_nominal, _alerts];
+
+/// Titles of the list and tree specimens.
+final _viewTitles = [_nominal, _done, _customStatus, _alerts, _minimal];
 
 // --- Showcase layout -------------------------------------------------------
 

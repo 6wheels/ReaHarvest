@@ -124,7 +124,7 @@
   "duplicateOf": "Même identité que « {name} », sans doute une copie (Enregistrer sous).",
   "separateDuplicate": "En faire une nouvelle version",
   "missingPluginCount": "{count, plural, =1{1 plugin manquant} other{{count} plugins manquants}}",
-  "columnName": "Nom",
+  "columnName": "Titre",
   "columnModified": "Modifié",
   "actionFailed": "L'opération a échoué : {error}",
   "projectEncodingFailed": "Ce projet utilise un ancien encodage de texte qui ne peut pas contenir ce nom. Renommez le dossier ou le fichier sans caractères spéciaux, puis réessayez.",
@@ -383,5 +383,15 @@
   "quitTasksBody": "Ces tâches sont en cours ou en attente :",
   "keepRunning": "Continuer",
   "cancelTasksAndQuit": "Annuler les tâches et quitter",
-  "onOpenToTray": "Réduire dans la zone de notification"
+  "onOpenToTray": "Réduire dans la zone de notification",
+  "columnBpm": "BPM",
+  "columnTags": "Tags",
+  "showTags": "Afficher les tags",
+  "scanningLibraries": "Analyse des bibliothèques…",
+  "levelCountArtist": "{count, plural, =0{0 artiste} =1{1 artiste} other{{count} artistes}}",
+  "levelCountAlbum": "{count, plural, =0{0 album} =1{1 album} other{{count} albums}}",
+  "levelCountTitle": "{count, plural, =0{0 titre} =1{1 titre} other{{count} titres}}",
+  "levelCountProject": "{count, plural, =0{0 projet} =1{1 projet} other{{count} projets}}",
+  "levelCountChapter": "{count, plural, =0{0 chapitre} =1{1 chapitre} other{{count} chapitres}}",
+  "levelCountScene": "{count, plural, =0{0 scène} =1{1 scène} other{{count} scènes}}"
 }

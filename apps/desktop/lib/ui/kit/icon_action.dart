@@ -46,11 +46,6 @@ class IconAction extends StatelessWidget {
             ? Tone.black.withValues(alpha: Alpha.medium)
             : Tone.white.withValues(alpha: Alpha.strong),
         borderRadius: BorderRadius.circular(Radii.s),
-        border: Border.all(
-          color: dark
-              ? Tone.white.withValues(alpha: Alpha.soft)
-              : Tone.black.withValues(alpha: Alpha.tint),
-        ),
       ),
       child: button,
     );

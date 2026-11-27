@@ -47,3 +47,16 @@ String shortDate(AppLocalizations l10n, DateTime? date) => switch (date) {
   final d? => DateFormat.yMMM(l10n.localeName).format(d),
   null => '',
 };
+
+/// Sample rate of the latest dated version that has one; null when none.
+int? latestSampleRate(Title t) {
+  final dated = [...t.versions.where((v) => v.sampleRate != null)]
+    ..sort((a, b) => b.modified.compareTo(a.modified));
+  return dated.firstOrNull?.sampleRate;
+}
+
+/// Sample rate in kHz: `48 kHz`, `44.1 kHz`.
+String sampleRateLabel(int hertz) {
+  final khz = hertz / 1000;
+  return '${khz.toStringAsFixed(khz == khz.roundToDouble() ? 0 : 1)} kHz';
+}

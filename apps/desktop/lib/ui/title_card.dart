@@ -1,8 +1,10 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart' as domain show Title;
 
 import '../l10n/app_localizations.dart';
 import '../state/navigation.dart';
+import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'aurora.dart';
 import 'kit/kit.dart';
@@ -15,7 +17,7 @@ import 'title_actions.dart';
 const _barHeight = 28.0;
 
 /// Square title card, like a rack module (SPEC §5.2).
-class TitleCard extends StatefulWidget {
+class TitleCard extends ConsumerStatefulWidget {
   const TitleCard(
     this.title, {
     super.key,
@@ -35,10 +37,10 @@ class TitleCard extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<TitleCard> createState() => _TitleCardState();
+  ConsumerState<TitleCard> createState() => _TitleCardState();
 }
 
-class _TitleCardState extends State<TitleCard> {
+class _TitleCardState extends ConsumerState<TitleCard> {
   var _hovered = false;
 
   /// Aurora drift: moves forward on each hover, never back.
@@ -61,10 +63,16 @@ class _TitleCardState extends State<TitleCard> {
     final l10n = AppLocalizations.of(context);
     final light = Theme.of(context).brightness == Brightness.light;
     final palette = AuroraPalette.of(t.id, light: light);
-    final levels = [
-      for (final v in parentLevels(t)) levelValueLabel(l10n, v).toUpperCase(),
-    ].join(labelSeparator);
+    final levels = [for (final v in parentLevels(t)) levelValueLabel(l10n, v)]
+        .join(labelSeparator);
     final bpm = tempoOf(t);
+    final sampleRate = latestSampleRate(t);
+    final figures = [
+      if (bpm != null) l10n.bpm(bpm),
+      if (sampleRate != null) sampleRateLabel(sampleRate),
+    ].join(labelSeparator);
+    final ink = light ? c.text : Tone.white;
+    final showTags = ref.watch(settingsProvider.select((s) => s.showTags));
     final date = shortDate(l10n, lastModified(t));
     final frame = widget.selected
         ? c.accent
@@ -107,16 +115,7 @@ class _TitleCardState extends State<TitleCard> {
                   child: Row(
                     children: [
                       Led(c.accent, lit: widget.selected, size: IconSize.ledS),
-                      const SizedBox(width: Space.s),
-                      Expanded(
-                        child: Text(
-                          levels,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.type.legendSmall,
-                        ),
-                      ),
-                      const SizedBox(width: Space.s),
+                      const Spacer(),
                       Text(date, style: context.type.readoutSmall),
                     ],
                   ),
@@ -142,29 +141,16 @@ class _TitleCardState extends State<TitleCard> {
                         ),
                         Padding(
                           padding: const EdgeInsets.all(Space.md),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Align(
-                                alignment: Alignment.topRight,
-                                child: TitleActions(
-                                  t,
-                                  visible: _hovered || widget.selected,
-                                  onAurora: true,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                titleName(t),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      color: light ? c.text : Tone.white,
-                                      height: Leading.tight,
-                                    ),
-                              ),
-                            ],
+                          child: _AuroraText(
+                            name: titleName(t),
+                            levels: levels,
+                            figures: figures,
+                            ink: ink,
+                            actions: TitleActions(
+                              t,
+                              visible: _hovered || widget.selected,
+                              onAurora: true,
+                            ),
                           ),
                         ),
                       ],
@@ -185,7 +171,6 @@ class _TitleCardState extends State<TitleCard> {
                     Row(
                       children: [
                         _Readout(l10n.versionsUnit, '${t.versions.length}'),
-                        if (bpm != null) _Readout('BPM', '$bpm'),
                         Expanded(
                           child: Text(
                             widget.toAdopt > 0
@@ -203,6 +188,10 @@ class _TitleCardState extends State<TitleCard> {
                         ),
                       ],
                     ),
+                    if (showTags && t.tags.isNotEmpty) ...[
+                      const SizedBox(height: Space.s),
+                      TagLine(t.tags),
+                    ],
                     const SizedBox(height: Space.s),
                     StatusTrail(t.status),
                   ],
@@ -242,4 +231,111 @@ class _Readout extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Text over the aurora of a card: the title on one line, centered vertically
+/// on its own, the levels (artist, album…) below it, the actions at the top
+/// right and the figures at the bottom right. The levels are dropped when the
+/// card is too small for them; every line is cut by an ellipsis.
+class _AuroraText extends StatelessWidget {
+  const _AuroraText({
+    required this.name,
+    required this.levels,
+    required this.figures,
+    required this.ink,
+    required this.actions,
+  });
+
+  final String name;
+  final String levels;
+  final String figures;
+  final Color ink;
+  final Widget actions;
+
+  static double _lineHeight(
+    BuildContext context,
+    TextStyle style,
+    TextScaler scaler,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: 'Ag', style: style),
+      textDirection: Directionality.of(context),
+      textScaler: scaler,
+    )..layout();
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final nameStyle = text.titleLarge!.copyWith(
+      color: ink,
+      height: Leading.tight,
+    );
+    final levelsStyle = text.bodyMedium!.copyWith(color: ink);
+    final figuresStyle = context.type.readoutSmall.copyWith(color: ink);
+    final scaler = MediaQuery.textScalerOf(context);
+    final nameHeight = _lineHeight(context, nameStyle, scaler);
+    final levelsHeight = _lineHeight(context, levelsStyle, scaler);
+    final rowHeight = _lineHeight(context, figuresStyle, scaler);
+    return Stack(
+      children: [
+        // The title alone is centered in the aurora; the levels go below it,
+        // and are dropped when they would reach the figures.
+        Positioned.fill(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final height = constraints.maxHeight;
+              final levelsTop = (height + nameHeight) / 2;
+              final withLevels =
+                  levels.isNotEmpty &&
+                  levelsTop + levelsHeight <= height - rowHeight;
+              return ClipRect(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: (height - nameHeight) / 2,
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: nameStyle,
+                      ),
+                    ),
+                    if (withLevels)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: levelsTop,
+                        child: Text(
+                          levels,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: levelsStyle,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        Align(alignment: Alignment.topRight, child: actions),
+        if (figures.isNotEmpty)
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Text(
+              figures,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: figuresStyle,
+            ),
+          ),
+      ],
+    );
+  }
 }

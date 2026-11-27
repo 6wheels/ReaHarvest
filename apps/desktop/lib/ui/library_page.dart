@@ -9,6 +9,7 @@ import 'package:reaharvest_domain/reaharvest_domain.dart' show NodeId;
 import 'package:reaharvest_library/reaharvest_library.dart';
 
 import '../l10n/app_localizations.dart';
+import '../state/library_scans.dart';
 import '../state/navigation.dart';
 import '../state/providers.dart';
 import '../state/tasks.dart';
@@ -91,12 +92,19 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final titles = ref.watch(visibleTitlesProvider);
     final navigation = ref.watch(navigationProvider);
     final hasTitles = ref.watch(titlesProvider).isNotEmpty;
+    final scanning = ref.watch(scanActiveProvider) > 0;
     final hasIssues = ref.watch(issuesProvider).isNotEmpty;
     final overview = ref.watch(overviewProvider);
     final l10n = AppLocalizations.of(context);
 
     final Widget content;
-    if (!hasTitles) {
+    if (!hasTitles && scanning) {
+      content = _Message(
+        key: const ValueKey('scanning'),
+        icon: Icons.sync_rounded,
+        title: l10n.scanningLibraries,
+      );
+    } else if (!hasTitles) {
       content = _Message(
         key: const ValueKey('empty'),
         icon: Icons.album_outlined,

@@ -10,6 +10,7 @@ import 'package:reaharvest/app.dart';
 import 'package:reaharvest/demo_titles.dart';
 import 'package:reaharvest/l10n/app_localizations.dart';
 import 'package:reaharvest/state/library_catalog.dart';
+import 'package:reaharvest/state/library_scans.dart';
 import 'package:reaharvest/state/migration_actions.dart';
 import 'package:reaharvest/state/navigation.dart';
 import 'package:reaharvest/state/pickers.dart';
@@ -24,7 +25,10 @@ import 'package:reaharvest/ui/known_values_editor.dart';
 import 'package:reaharvest/ui/labels.dart';
 import 'package:reaharvest/ui/overview.dart';
 import 'package:reaharvest/ui/settings/about_page.dart';
+import 'package:reaharvest/ui/status_trail.dart';
+import 'package:reaharvest/ui/title_actions.dart';
 import 'package:reaharvest/ui/title_card.dart';
+import 'package:reaharvest/ui/title_views.dart' show TitleRow;
 import 'package:reaharvest/ui/title_detail/title_detail_page.dart';
 import 'package:reaharvest/ui/title_detail/version_list_item.dart';
 import 'package:reaharvest_domain/reaharvest_domain.dart';
@@ -1112,7 +1116,7 @@ void main() {
     final headers = find.byWidgetPredicate(
       (w) => w.runtimeType.toString() == '_HeaderCell',
     );
-    expect(headers, findsNWidgets(6));
+    expect(headers, findsNWidgets(8));
 
     // Name: ascending, then descending, then unsorted.
     final names = [for (final t in titles) titleName(t)]..sort();
@@ -1128,7 +1132,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.arrow_downward_rounded), findsNothing);
 
-    for (var i = 1; i < 6; i++) {
+    for (var i = 1; i < 8; i++) {
       for (var tap = 0; tap < 2; tap++) {
         await tester.tap(headers.at(i));
         await tester.pumpAndSettle();
@@ -1374,7 +1378,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(Overview), findsNothing);
 
-    await tester.tap(find.text('Midnight Ferry'));
+    // Beside the actions the hovered card shows over its title.
+    await tester.tapAt(
+      tester.getCenter(find.widgetWithText(TitleCard, 'Midnight Ferry')) +
+          const Offset(-60, 40),
+      kind: PointerDeviceKind.mouse,
+    );
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Midnight');
     await tester.pumpAndSettle();
@@ -2138,5 +2147,248 @@ void main() {
       hasLength(KnownValuesProblem.values.length - 1),
       reason: 'tooDeep and duplicate share a label',
     );
+  });
+
+  group('library views', () {
+    List<Title> tagged() => [
+      for (final (i, t) in demoTitles().take(4).indexed)
+        Title(
+          id: t.id,
+          libraryId: t.libraryId,
+          path: t.path,
+          levels: t.levels,
+          tags: i == 0 ? const ['live', 'standard tuning'] : const [],
+          versions: t.versions,
+          versionStatuses: t.versionStatuses,
+        ),
+    ];
+
+    ProviderContainer containerOf(WidgetTester tester) =>
+        ProviderScope.containerOf(tester.element(find.byType(ReaHarvestApp)));
+
+    testWidgets('a scan without titles yet shows no empty message', (
+      tester,
+    ) async {
+      await pumpApp(tester);
+      final scans = containerOf(tester).read(scanActiveProvider.notifier);
+      final done = Completer<void>();
+      final running = scans.counted(() => done.future);
+      await tester.pumpAndSettle();
+      expect(find.text('Scanning the libraries…'), findsOneWidget);
+      expect(find.text('Your library is empty'), findsNothing);
+
+      done.complete();
+      await running;
+      await tester.pumpAndSettle();
+      expect(find.text('Scanning the libraries…'), findsNothing);
+      expect(find.text('Your library is empty'), findsOneWidget);
+    });
+
+    testWidgets('the titles stay shown during a scan', (tester) async {
+      await pumpApp(tester, titles: demoTitles());
+      final done = Completer<void>();
+      final running = containerOf(tester)
+          .read(scanActiveProvider.notifier)
+          .counted(() => done.future);
+      await tester.pumpAndSettle();
+      expect(find.byType(TitleCard), findsWidgets);
+      expect(find.text('Scanning the libraries…'), findsNothing);
+      done.complete();
+      await running;
+    });
+
+    testWidgets('the card shows the figures and the tags', (tester) async {
+      await pumpApp(tester, titles: tagged());
+      expect(find.text('LIVE'), findsNothing);
+      expect(find.text('live'), findsOneWidget);
+      expect(find.text('standard tuning'), findsOneWidget);
+      expect(find.textContaining('72 BPM'), findsOneWidget);
+    });
+
+    testWidgets('the setting hides the tags', (tester) async {
+      await pumpApp(tester, titles: tagged());
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(LightSwitch).first);
+      await tester.pumpAndSettle();
+      expect(settings.saved.last.showTags, isFalse);
+      expect(find.text('live'), findsNothing);
+    });
+
+    testWidgets('the list has the columns in order, with the tags', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        titles: tagged(),
+        navigation: const NavigationSettings(displayMode: DisplayMode.list),
+      );
+      final headers = [
+        for (final w in tester.widgetList<Text>(
+          find.descendant(
+            of: find.byWidgetPredicate(
+              (w) => w.runtimeType.toString() == '_HeaderCell',
+            ),
+            matching: find.byType(Text),
+          ),
+        ))
+          w.data,
+      ];
+      expect(headers, [
+        'TITLE',
+        'ARTIST',
+        'ALBUM',
+        'VERSIONS',
+        'BPM',
+        'STATUS',
+        'TAGS',
+        'MODIFIED',
+      ]);
+      expect(find.text('live'), findsOneWidget);
+    });
+
+    /// Titles with versions and one without.
+    List<Title> withEmpty() => [
+      ...tagged(),
+      Title(
+        id: const NodeId('empty'),
+        libraryId: demoLibrary.id,
+        path: 'Sample Artist/Album 1/Empty',
+        levels: const {
+          'artist': 'Sample Artist',
+          'album': 'Album 1',
+          'title': 'Empty',
+        },
+      ),
+    ];
+
+    /// The right edges of the cells of every row, by cell: the same on every
+    /// row, empty cell or not.
+    void expectAligned(WidgetTester tester) {
+      final trails = tester
+          .widgetList<StatusTrail>(find.byType(StatusTrail))
+          .length;
+      expect(trails, 5);
+      final lefts = {
+        for (final e in find.byType(StatusTrail).evaluate())
+          tester.getTopLeft(find.byWidget(e.widget)).dx,
+      };
+      expect(lefts, hasLength(1));
+      final actions = {
+        for (final e in find.byType(TitleActions).evaluate())
+          tester.getTopRight(find.byWidget(e.widget)).dx,
+      };
+      expect(actions, hasLength(1));
+    }
+
+    testWidgets(
+      'the list keeps its columns aligned for a title without versions',
+      (tester) async {
+        await pumpApp(
+          tester,
+          titles: withEmpty(),
+          navigation: const NavigationSettings(displayMode: DisplayMode.list),
+        );
+        expectAligned(tester);
+        // The versions column too: the figures end at the same x.
+        final ends = {
+          for (final t in withEmpty())
+            tester
+                .getTopRight(
+                  find
+                      .descendant(
+                        of: find.widgetWithText(TitleRow, titleName(t)),
+                        matching: find.text('${t.versions.length}'),
+                      )
+                      .first,
+                )
+                .dx,
+        };
+        expect(ends, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'the tree keeps its columns aligned for a title without versions',
+      (tester) async {
+        await pumpApp(
+          tester,
+          titles: withEmpty(),
+          navigation: const NavigationSettings(displayMode: DisplayMode.tree),
+        );
+        expectAligned(tester);
+        final l10n = lookupAppLocalizations(const Locale('en'));
+        final ends = {
+          for (final t in withEmpty())
+            tester
+                .getTopRight(
+                  find.descendant(
+                    of: find.widgetWithText(TitleRow, titleName(t)),
+                    matching: find.text(l10n.versionCount(t.versions.length)),
+                  ),
+                )
+                .dx,
+        };
+        expect(ends, hasLength(1));
+      },
+    );
+
+    testWidgets('the list of a free tree has no level column', (tester) async {
+      final library = Library(
+        id: demoLibrary.id,
+        mode: LibraryMode.local,
+        layout: null,
+      );
+      await pumpApp(
+        tester,
+        titles: [
+          Title(
+            id: const NodeId('riff'),
+            libraryId: library.id,
+            path: '',
+            levels: const {'title': 'Riff'},
+          ),
+        ],
+        indexed: {library.id: library},
+        navigation: const NavigationSettings(displayMode: DisplayMode.list),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Riff'), findsOneWidget);
+      expect(find.text('ARTIST'), findsNothing);
+    });
+
+    testWidgets('the empty values come last in both directions', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        titles: withEmpty(),
+        navigation: const NavigationSettings(displayMode: DisplayMode.list),
+      );
+      double top(String name) => tester.getTopLeft(find.text(name)).dy;
+      final others = [for (final t in tagged()) titleName(t)];
+      for (final header in ['BPM', 'MODIFIED', 'STATUS']) {
+        // Ascending, then descending.
+        for (var i = 0; i < 2; i++) {
+          await tester.tap(find.text(header).last);
+          await tester.pumpAndSettle();
+          for (final name in others) {
+            expect(top('Empty'), greaterThan(top(name)), reason: '$header $i');
+          }
+        }
+      }
+    });
+
+    testWidgets('the tree counts the children of every level', (tester) async {
+      await pumpApp(
+        tester,
+        titles: tagged(),
+        navigation: const NavigationSettings(displayMode: DisplayMode.tree),
+      );
+      // Two artists with one album each, which holds two titles each.
+      expect(find.text('1 album'), findsNWidgets(2));
+      expect(find.text('2 titles'), findsNWidgets(2));
+      expect(find.text('live'), findsOneWidget);
+    });
   });
 }

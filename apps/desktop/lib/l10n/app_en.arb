@@ -148,7 +148,7 @@
   "@missingPluginCount": {
     "placeholders": { "count": { "type": "int" } }
   },
-  "columnName": "Name",
+  "columnName": "Title",
   "columnModified": "Modified",
   "actionFailed": "The operation failed: {error}",
   "@actionFailed": {
@@ -484,5 +484,33 @@
   "quitTasksBody": "These tasks are running or waiting:",
   "keepRunning": "Keep running",
   "cancelTasksAndQuit": "Cancel the tasks and quit",
-  "onOpenToTray": "Minimize to tray"
+  "onOpenToTray": "Minimize to tray",
+  "columnBpm": "BPM",
+  "columnTags": "Tags",
+  "showTags": "Show tags",
+  "scanningLibraries": "Scanning the libraries…",
+  "levelCountArtist": "{count, plural, =1{1 artist} other{{count} artists}}",
+  "@levelCountArtist": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "levelCountAlbum": "{count, plural, =1{1 album} other{{count} albums}}",
+  "@levelCountAlbum": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "levelCountTitle": "{count, plural, =1{1 title} other{{count} titles}}",
+  "@levelCountTitle": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "levelCountProject": "{count, plural, =1{1 project} other{{count} projects}}",
+  "@levelCountProject": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "levelCountChapter": "{count, plural, =1{1 chapter} other{{count} chapters}}",
+  "@levelCountChapter": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "levelCountScene": "{count, plural, =1{1 scene} other{{count} scenes}}",
+  "@levelCountScene": {
+    "placeholders": { "count": { "type": "int" } }
+  }
 }
