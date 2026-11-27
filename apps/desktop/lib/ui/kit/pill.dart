@@ -4,6 +4,11 @@ import '../../theme/app_theme.dart';
 import 'disclosure.dart';
 import 'pressable_surface.dart';
 
+/// Padding on each side of the label of a tag, and thickness of its frame:
+/// what [TagLine] needs to know the width of a tag.
+const pillPadding = Space.sm;
+const pillBorder = 1.0;
+
 /// Console tag or key.
 ///
 /// Without [onPressed] it is an inert tag (status, alerts, tags of a
@@ -64,13 +69,16 @@ class Pill extends StatelessWidget {
     return Container(
       // The remove button, when there is one, ends the tag on its own.
       padding: EdgeInsets.only(
-        left: Space.sm,
-        right: onDeleted == null ? Space.sm : 0,
+        left: pillPadding,
+        right: onDeleted == null ? pillPadding : 0,
       ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: Alpha.tint),
         borderRadius: BorderRadius.circular(Radii.xs),
-        border: Border.all(color: color.withValues(alpha: Alpha.medium)),
+        border: Border.all(
+          color: color.withValues(alpha: Alpha.medium),
+          width: pillBorder,
+        ),
       ),
       child: IntrinsicHeight(
         child: Row(

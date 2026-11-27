@@ -74,7 +74,7 @@ void main() {
     expect(
       find.descendant(
         of: card('Demo'),
-        matching: find.textContaining('UNASSIGNED'),
+        matching: find.textContaining('Unassigned'),
       ),
       findsOne,
     );

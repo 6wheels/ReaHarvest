@@ -266,6 +266,7 @@ final class AppSettings {
     this.language = systemLanguage,
     this.navigation = const NavigationSettings(),
     this.showInTray = false,
+    this.showTags = true,
     this.onProjectOpen = ProjectOpenAction.nothing,
   }) : libraries = List.unmodifiable(libraries);
 
@@ -302,6 +303,10 @@ final class AppSettings {
   /// then hides it.
   final bool showInTray;
 
+  /// Whether the free tags of a title are shown on its card, in the list
+  /// and in the tree (SPEC §5.9).
+  final bool showTags;
+
   /// Window behavior when a project opens in REAPER.
   final ProjectOpenAction onProjectOpen;
 
@@ -319,6 +324,7 @@ final class AppSettings {
     String? language,
     NavigationSettings? navigation,
     bool? showInTray,
+    bool? showTags,
     ProjectOpenAction? onProjectOpen,
   }) => AppSettings(
     identity: identity ?? this.identity,
@@ -332,6 +338,7 @@ final class AppSettings {
     language: language ?? this.language,
     navigation: navigation ?? this.navigation,
     showInTray: showInTray ?? this.showInTray,
+    showTags: showTags ?? this.showTags,
     onProjectOpen: onProjectOpen ?? this.onProjectOpen,
   );
 
@@ -394,6 +401,7 @@ final class AppSettings {
     'language': language,
     'navigation': navigation.toJson(),
     'showInTray': showInTray,
+    'showTags': showTags,
     'onProjectOpen': onProjectOpen.name,
   };
 
@@ -426,6 +434,7 @@ final class AppSettings {
         (json['navigation'] as Map? ?? const {}).cast(),
       ),
       showInTray: json['showInTray'] as bool? ?? false,
+      showTags: json['showTags'] as bool? ?? true,
       onProjectOpen:
           ProjectOpenAction.values.asNameMap()[json['onProjectOpen']] ??
           ProjectOpenAction.nothing,

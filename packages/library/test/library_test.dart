@@ -285,6 +285,7 @@ void main() {
             textScale: 1.2,
             language: 'fr',
             showInTray: true,
+            showTags: false,
             onProjectOpen: ProjectOpenAction.close,
             navigation: const NavigationSettings(
               displayMode: DisplayMode.tree,
@@ -339,15 +340,18 @@ void main() {
         (read.showInTray, read.onProjectOpen),
         (true, ProjectOpenAction.close),
       );
+      expect(read.showTags, isFalse);
       final fresh = AppSettings.fromJson({
         ...settings.toJson(),
         'showInTray': null,
+        'showTags': null,
         'onProjectOpen': 'unknown',
       });
       expect(
         (fresh.showInTray, fresh.onProjectOpen),
         (false, ProjectOpenAction.nothing),
       );
+      expect(fresh.showTags, isTrue);
       final nav = read.navigation;
       expect((nav.displayMode, nav.query), (DisplayMode.tree, 'tide'));
       expect(nav.filter.toJson(), settings.navigation.filter.toJson());

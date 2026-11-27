@@ -92,9 +92,41 @@ void main() {
     // List: a click on a row opens the overview.
     await tapTooltip(tester, 'List');
     expect(find.byType(TitleList), findsOne);
+    // One column per level above the title.
+    expect(
+      [
+        for (final w in tester.widgetList<Text>(
+          find.descendant(
+            of: find.byWidgetPredicate(
+              (w) => w.runtimeType.toString() == '_HeaderCell',
+            ),
+            matching: find.byType(Text),
+          ),
+        ))
+          w.data,
+      ],
+      [
+        'TITLE',
+        'ARTIST',
+        'ALBUM',
+        'VERSIONS',
+        'BPM',
+        'STATUS',
+        'TAGS',
+        'MODIFIED',
+      ],
+    );
     await tapText(tester, 'Song');
     expect(find.byType(Overview), findsOne);
     expect(find.text('RECENT VERSIONS'), findsOne);
+
+    // Tree: every level shows the count of what it holds.
+    await tapTooltip(tester, 'Tree');
+    expect(find.byType(TitleTree), findsOne);
+    expect(find.text('1 album'), findsNWidgets(2));
+    expect(find.text('2 titles'), findsOne);
+    await tapTooltip(tester, 'List');
+    expect(find.byType(TitleList), findsOne);
 
     // Title detail, and back with Escape, the back button or the mouse.
     Future<void> openDetail() async {

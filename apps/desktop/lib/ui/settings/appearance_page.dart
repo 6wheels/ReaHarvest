@@ -5,6 +5,7 @@ import 'package:reaharvest_library/reaharvest_library.dart';
 import '../../l10n/app_localizations.dart';
 import '../../state/providers.dart';
 import '../../theme/app_theme.dart';
+import '../kit/kit.dart';
 import '../path_row.dart';
 import 'settings_section.dart';
 
@@ -110,6 +111,13 @@ class AppearancePage extends ConsumerWidget {
             selected: {settings.language},
             onSelectionChanged: (s) =>
                 notifier.change((a) => a.copyWith(language: s.first)),
+          ),
+        ),
+        FormRow(
+          label: l10n.showTags,
+          child: LightSwitch(
+            value: settings.showTags,
+            onChanged: (v) => notifier.change((a) => a.copyWith(showTags: v)),
           ),
         ),
       ],

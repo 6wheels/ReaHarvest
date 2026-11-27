@@ -33,6 +33,29 @@ Finder _progressSlider() {
   return find.byElementPredicate((e) => e == element);
 }
 
+/// Scrolls the page itself by [delta], never by a drag: a drag would land on
+/// the lists of the specimens (library views) that scroll on their own.
+void _scrollPage(WidgetTester tester, double delta) {
+  final position = tester
+      .state<ScrollableState>(find.byType(Scrollable).first)
+      .position;
+  position.jumpTo((position.pixels + delta).clamp(0, position.maxScrollExtent));
+}
+
+/// Scrolls the page by [step] until [finder] is built, then brings it in.
+Future<void> _scrollPageUntilVisible(
+  WidgetTester tester,
+  Finder finder,
+  double step,
+) async {
+  for (var i = 0; i < 100 && finder.evaluate().isEmpty; i++) {
+    _scrollPage(tester, step);
+    await tester.pump();
+  }
+  await tester.ensureVisible(finder);
+  await tester.pump();
+}
+
 void main() {
   setUpAll(loadFonts);
   setUp(() => currentTime = () => DateTime(2026, 11, 20));
@@ -69,11 +92,7 @@ void main() {
     await _pumpShowcase(tester);
     final progress = _progressSlider();
     // The sections are built as they come near the viewport.
-    await tester.scrollUntilVisible(
-      find.text('METER — TALL'),
-      500,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await _scrollPageUntilVisible(tester, find.text('METER — TALL'), 500);
     final rebuilt = <String, int>{};
     debugOnRebuildDirtyWidget = (element, builtOnce) {
       final name = element.widget.runtimeType.toString();
@@ -163,7 +182,7 @@ void main() {
     final scrollable = find.byType(Scrollable).first;
     // Build every section: the list keeps them once built.
     for (var i = 0; i < 60; i++) {
-      await tester.drag(scrollable, const Offset(0, -900), warnIfMissed: false);
+      _scrollPage(tester, 900);
       await tester.pump(const Duration(milliseconds: 50));
     }
     await tester.tap(find.byKey(showcaseLoadingKey));
@@ -173,7 +192,7 @@ void main() {
 
     // The one-off animations still play: a checkbox lights up on its tap.
     final label = find.text('LIGHTCHECKBOX — SELECT ALL: NONE, SOME, ALL');
-    await tester.scrollUntilVisible(label, -500, scrollable: scrollable);
+    await _scrollPageUntilVisible(tester, label, -500);
     final checkbox = find
         .descendant(
           of: find.ancestor(of: label, matching: find.byType(SizedBox)).first,

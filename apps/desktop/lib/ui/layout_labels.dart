@@ -14,3 +14,16 @@ String layoutLevelLabel(AppLocalizations l10n, LayoutLevel level) =>
       'scene' => l10n.levelScene,
       _ => level.label(l10n.localeName),
     };
+
+/// Count of the values of [level], for the group rows of the tree: "3
+/// albums". A custom level has no plural to translate: "label: 3".
+String levelCountLabel(AppLocalizations l10n, LayoutLevel level, int count) =>
+    switch (level.key) {
+      'artist' => l10n.levelCountArtist(count),
+      'album' => l10n.levelCountAlbum(count),
+      'title' => l10n.levelCountTitle(count),
+      'project' => l10n.levelCountProject(count),
+      'chapter' => l10n.levelCountChapter(count),
+      'scene' => l10n.levelCountScene(count),
+      _ => '${layoutLevelLabel(l10n, level)}: $count',
+    };

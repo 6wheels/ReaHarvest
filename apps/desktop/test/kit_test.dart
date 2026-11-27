@@ -51,6 +51,46 @@ void main() {
     });
   });
 
+  group('TagLine', () {
+    const tags = ['live', 'standard tuning', 'rehearsal', 'demo', 'bonus'];
+
+    testWidgets('shows every tag that fits, then the count of the others', (
+      tester,
+    ) async {
+      await pump(tester, const SizedBox(width: 260, child: TagLine(tags)));
+      expect(find.text('live'), findsOne);
+      expect(find.text('bonus'), findsNothing);
+      final shown = find.byType(Pill).evaluate().length;
+      expect(find.text('+${tags.length - (shown - 1)}'), findsOne);
+      expect(
+        tester.getSize(find.byType(TagLine)).width,
+        lessThanOrEqualTo(260),
+      );
+    });
+
+    testWidgets('shows all the tags without a count when there is room', (
+      tester,
+    ) async {
+      await pump(tester, const SizedBox(width: 800, child: TagLine(tags)));
+      expect(find.byType(Pill), findsNWidgets(tags.length));
+      expect(find.textContaining('+'), findsNothing);
+    });
+
+    testWidgets('clips a first tag wider than the line', (tester) async {
+      await pump(
+        tester,
+        const SizedBox(width: 40, child: TagLine(['a very long tag', 'b'])),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(Pill), findsNWidgets(2));
+    });
+
+    testWidgets('is empty without tags', (tester) async {
+      await pump(tester, const TagLine([]));
+      expect(find.byType(Pill), findsNothing);
+    });
+  });
+
   group('LightSwitch', () {
     testWidgets('toggles on tap and tells its state', (tester) async {
       final semantics = tester.ensureSemantics();

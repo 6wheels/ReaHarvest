@@ -12,18 +12,45 @@ import 'tasks.dart';
 
 final _log = Logger('library.scans');
 
+/// Number of scans running (a scan task, or a scan or rescan of a library):
+/// the library page tells a scan from an empty library with it.
+class ScanActivity extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  /// Runs [action], counted as a scan.
+  Future<T> counted<T>(Future<T> Function() action) async {
+    state++;
+    try {
+      return await action();
+    } finally {
+      if (ref.mounted) state--;
+    }
+  }
+}
+
+final scanActiveProvider = NotifierProvider<ScanActivity, int>(
+  ScanActivity.new,
+);
+
 /// Scans of the libraries into the local index (SPEC §5.1, §5.2, §8).
 class LibraryScans {
   LibraryScans(this.ref);
 
   final Ref ref;
 
+  Future<T> _counted<T>(Future<T> Function() action) =>
+      ref.read(scanActiveProvider.notifier).counted(action);
+
   /// Scans every configured library, one after the other, as a background
   /// task cancellable between two libraries (SPEC §5.2), each in the turn
   /// of its library ([LibraryTurns]). A failed library does not stop the
   /// others; it is reported. A [full] scan reads every file again, changed
   /// or not.
-  Future<void> scanAll({bool full = false}) async {
+  Future<void> scanAll({bool full = false}) =>
+      _counted(() => _scanAll(full: full));
+
+  Future<void> _scanAll({bool full = false}) async {
     final entries = ref.read(settingsProvider).libraries;
     if (entries.isEmpty) return;
     await ref.read(tasksProvider.notifier).run(
@@ -95,12 +122,14 @@ class LibraryScans {
     final root = entry.libraryRoot;
     final library = await readLibrary(MountedFolderStorage(root));
     if (library == null) return false;
-    final stored = await scanTitleIntoIndex(
-      ref.read(indexPathProvider),
-      root,
-      library,
-      title.path,
-      reread: reread,
+    final stored = await _counted(
+      () => scanTitleIntoIndex(
+        ref.read(indexPathProvider),
+        root,
+        library,
+        title.path,
+        reread: reread,
+      ),
     );
     if (!stored) return false;
     ref.read(indexRevisionProvider.notifier).bump();
@@ -124,7 +153,10 @@ class LibraryScans {
   /// by a migration since read again).
   /// Unavailable libraries are skipped. Reports the problems found (SPEC
   /// §5.2).
-  Future<Report> _scanReport(LibraryEntry entry, {bool full = false}) async {
+  Future<Report> _scanReport(LibraryEntry entry, {bool full = false}) =>
+      _counted(() => _scanLibrary(entry, full: full));
+
+  Future<Report> _scanLibrary(LibraryEntry entry, {bool full = false}) async {
     final root = entry.libraryRoot;
     final storage = MountedFolderStorage(root);
     final library = await readLibrary(storage);

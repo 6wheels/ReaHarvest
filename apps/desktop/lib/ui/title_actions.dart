@@ -107,77 +107,87 @@ class _TitleActionsState extends ConsumerState<TitleActions> {
     final l10n = AppLocalizations.of(context);
     final visible = widget.visible || _menuOpen;
     final t = widget.title;
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
-        duration: Motion.fast,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (t.versions.isNotEmpty) ...[
-              _gap,
-              IconAction(
-                icon: const ReaperIcon(),
-                tooltip: l10n.openInReaper,
-                onAurora: widget.onAurora,
-                onPressed: () => openLatestInReaper(context, ref, t),
-              ),
-              _gap,
-              // Not wired yet: renders are played from phase 3 (SPEC §5).
-              IconAction(
-                icon: const Icon(Icons.play_arrow_rounded),
-                tooltip: l10n.playRender,
-                onAurora: widget.onAurora,
-                onPressed: null,
-              ),
-            ],
-            _gap,
-            OpenDetailAction(
-              tooltip: l10n.openDetail,
-              onAurora: widget.onAurora,
-              onPressed: () => openTitleDetail(context, t.id),
-            ),
-            _gap,
-            MenuAnchor(
-              onOpen: () {
-                setState(() => _menuOpen = true);
-                focusMenuEntry(_first);
-              },
-              onClose: () => setState(() => _menuOpen = false),
-              // Not wired yet (#51 and following).
-              menuChildren: [
-                MenuItemButton(
-                  leadingIcon: const Icon(Icons.add_rounded),
-                  child: Text(l10n.newVersion),
+    // Always the width of every action, so that what follows it in a row
+    // does not move with a title that has fewer.
+    return SizedBox(
+      width: titleActionsWidth,
+      child: Align(
+        alignment: Alignment.centerRight,
+        heightFactor: 1,
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: Motion.fast,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (t.versions.isNotEmpty) ...[
+                  _gap,
+                  IconAction(
+                    icon: const ReaperIcon(),
+                    tooltip: l10n.openInReaper,
+                    onAurora: widget.onAurora,
+                    onPressed: () => openLatestInReaper(context, ref, t),
+                  ),
+                  _gap,
+                  // Not wired yet: renders are played from phase 3 (SPEC §5).
+                  IconAction(
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    tooltip: l10n.playRender,
+                    onAurora: widget.onAurora,
+                    onPressed: null,
+                  ),
+                ],
+                _gap,
+                OpenDetailAction(
+                  tooltip: l10n.openDetail,
+                  onAurora: widget.onAurora,
+                  onPressed: () => openTitleDetail(context, t.id),
                 ),
-                MenuItemButton(
-                  leadingIcon: const Icon(Icons.bookmark_add_outlined),
-                  child: Text(l10n.createBackup),
-                ),
-                SubmenuButton(
-                  focusNode: _first,
-                  leadingIcon: const Icon(Icons.flag_outlined),
+                _gap,
+                MenuAnchor(
+                  onOpen: () {
+                    setState(() => _menuOpen = true);
+                    focusMenuEntry(_first);
+                  },
+                  onClose: () => setState(() => _menuOpen = false),
+                  // Not wired yet (#51 and following).
                   menuChildren: [
-                    for (final s in Title.defaultStatuses)
-                      MenuItemButton(child: Text(statusLabel(l10n, s))),
+                    MenuItemButton(
+                      leadingIcon: const Icon(Icons.add_rounded),
+                      child: Text(l10n.newVersion),
+                    ),
+                    MenuItemButton(
+                      leadingIcon: const Icon(Icons.bookmark_add_outlined),
+                      child: Text(l10n.createBackup),
+                    ),
+                    SubmenuButton(
+                      focusNode: _first,
+                      leadingIcon: const Icon(Icons.flag_outlined),
+                      menuChildren: [
+                        for (final s in Title.defaultStatuses)
+                          MenuItemButton(child: Text(statusLabel(l10n, s))),
+                      ],
+                      child: Text(l10n.changeStatus),
+                    ),
+                    MenuItemButton(
+                      leadingIcon: const Icon(Icons.folder_open_outlined),
+                      child: Text(l10n.showInExplorer),
+                    ),
                   ],
-                  child: Text(l10n.changeStatus),
-                ),
-                MenuItemButton(
-                  leadingIcon: const Icon(Icons.folder_open_outlined),
-                  child: Text(l10n.showInExplorer),
+                  builder: (context, controller, _) => IconAction(
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    tooltip: l10n.moreActions,
+                    onAurora: widget.onAurora,
+                    onPressed: () => controller.isOpen
+                        ? controller.close()
+                        : controller.open(),
+                  ),
                 ),
               ],
-              builder: (context, controller, _) => IconAction(
-                icon: const Icon(Icons.more_horiz_rounded),
-                tooltip: l10n.moreActions,
-                onAurora: widget.onAurora,
-                onPressed: () =>
-                    controller.isOpen ? controller.close() : controller.open(),
-              ),
             ),
-          ],
+          ),
         ),
       ),
     );
